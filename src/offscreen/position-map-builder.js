@@ -455,6 +455,124 @@ export function detectWrapHyphens(entries) {
 }
 
 // ---------------------------------------------------------------------------
+// Gutter line-marker grid extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract a physical line grid from gutter line-number markers.
+ *
+ * US patent specifications print line markers (5, 10, 15, ..., 60, 65) in
+ * the gutter between the two columns. These markers have known line numbers
+ * and known y-positions, so they define a physical grid. By interpolating
+ * from this grid, we can assign line numbers to any y-position — ensuring
+ * both columns get the same line number for the same y-coordinate.
+ *
+ * This function uses the same identification criteria as filterGutterLineNumbers
+ * (standalone 1-2 digit numbers, multiple of 5, range 5-65, near boundary or
+ * page center).
+ *
+ * @param {Array} items - Text items (after header/footer filtering).
+ * @param {number} boundary - The x-coordinate of the column boundary.
+ * @param {number} pageWidth - Width of the page in points.
+ * @returns {{ firstLineY: number, lineSpacing: number } | null}
+ *   Grid parameters, or null if fewer than 2 markers found.
+ */
+export function extractGutterLineGrid(items, boundary, pageWidth) {
+  const pageMid = pageWidth / 2;
+  const markers = [];
+
+  for (const item of items) {
+    const text = item.text.trim();
+    // Must be a standalone 1-2 digit number
+    if (!/^\d{1,2}$/.test(text)) continue;
+    const num = parseInt(text, 10);
+    // Must be a multiple of 5 in the range 5-65
+    if (num < 5 || num > 65 || num % 5 !== 0) continue;
+    // Must be near the gutter: close to column boundary OR close to page center
+    const nearBoundary = Math.abs(item.x - boundary) <= 40;
+    const nearCenter = Math.abs(item.x - pageMid) <= 40;
+    if (!nearBoundary && !nearCenter) continue;
+
+    markers.push({ lineNumber: num, y: item.y });
+  }
+
+  if (markers.length < 2) return null;
+
+  // Deduplicate by lineNumber — keep first encountered (highest y if from
+  // top-to-bottom scanning, but we just keep the first since duplicates
+  // from the same marker are rare).
+  const seen = new Map();
+  for (const m of markers) {
+    if (!seen.has(m.lineNumber)) {
+      seen.set(m.lineNumber, m);
+    }
+  }
+  const unique = [...seen.values()];
+
+  if (unique.length < 2) return null;
+
+  // Sort by lineNumber ascending
+  unique.sort((a, b) => a.lineNumber - b.lineNumber);
+
+  // Compute per-marker spacing: for each consecutive pair of markers,
+  // calculate the y-distance per line
+  const perLineSpacings = [];
+  for (let i = 1; i < unique.length; i++) {
+    const lineDiff = unique[i].lineNumber - unique[i - 1].lineNumber;
+    // y decreases going down the page (PDF coords: y=0 at bottom)
+    const yDiff = unique[i - 1].y - unique[i].y;
+    if (lineDiff > 0 && yDiff > 0) {
+      perLineSpacings.push(yDiff / lineDiff);
+    }
+  }
+
+  if (perLineSpacings.length === 0) return null;
+
+  // Use median spacing for robustness
+  perLineSpacings.sort((a, b) => a - b);
+  const lineSpacing = perLineSpacings[Math.floor(perLineSpacings.length / 2)];
+
+  // Extrapolate y-position of line 1 from the first marker
+  // firstLineY = marker.y + (marker.lineNumber - 1) * lineSpacing
+  // (line 1 is above the marker, i.e. higher y value)
+  const firstMarker = unique[0];
+  const firstLineY = firstMarker.y + (firstMarker.lineNumber - 1) * lineSpacing;
+
+  return { firstLineY, lineSpacing };
+}
+
+// ---------------------------------------------------------------------------
+// Grid-based line numbering
+// ---------------------------------------------------------------------------
+
+/**
+ * Assign line numbers using the gutter-marker grid.
+ *
+ * Instead of counting blank lines by detecting y-gaps, this approach uses
+ * the physical grid derived from gutter markers to compute line numbers
+ * by absolute y-position. Both columns on a page share the same grid,
+ * ensuring consistent line numbers for the same y-coordinate.
+ *
+ * @param {Array<Array>} lines - Clustered lines (arrays of text items), top-to-bottom.
+ * @param {Array} entries - PositionMap entries array to push into.
+ * @param {number} pageNum - PDF page number.
+ * @param {number} column - Document-wide column number.
+ * @param {{ firstLineY: number, lineSpacing: number }} grid - Grid from extractGutterLineGrid.
+ */
+export function assignLineNumbersByGrid(lines, entries, pageNum, column, grid) {
+  for (const lineItems of lines) {
+    // Compute average y of items in this line
+    const avgY = lineItems.reduce((sum, item) => sum + item.y, 0) / lineItems.length;
+
+    // Compute line number from grid position
+    const lineNumber = 1 + Math.round((grid.firstLineY - avgY) / grid.lineSpacing);
+
+    // Clamp to >= 1 (safety for items above the expected first line)
+    entries.push(buildLineEntry(lineItems, pageNum, column, Math.max(1, lineNumber)));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Blank-line-aware line numbering
 // ---------------------------------------------------------------------------
 
@@ -556,6 +674,11 @@ export function buildPositionMap(pageResults) {
     const filtered = filterHeadersFooters(items, pageHeight);
     if (filtered.length === 0) continue;
 
+    // Extract gutter line-marker grid BEFORE filtering gutter markers out.
+    // The grid provides absolute y-to-line-number mapping, ensuring both
+    // columns get consistent line numbers for the same y-coordinate.
+    const grid = extractGutterLineGrid(filtered, boundary, pageWidth);
+
     // Split into left and right column items.
     // For left-column items, first strip any cross-boundary contamination
     // (PDF text items that physically span from left column into the right
@@ -573,11 +696,19 @@ export function buildPositionMap(pageResults) {
 
     // Process left column (use printed column number)
     const leftLines = clusterIntoLines(leftItems);
-    assignLineNumbers(leftLines, entries, pageNum, colNums.left);
+    if (grid) {
+      assignLineNumbersByGrid(leftLines, entries, pageNum, colNums.left, grid);
+    } else {
+      assignLineNumbers(leftLines, entries, pageNum, colNums.left);
+    }
 
     // Process right column (use printed column number)
     const rightLines = clusterIntoLines(rightItems);
-    assignLineNumbers(rightLines, entries, pageNum, colNums.right);
+    if (grid) {
+      assignLineNumbersByGrid(rightLines, entries, pageNum, colNums.right, grid);
+    } else {
+      assignLineNumbers(rightLines, entries, pageNum, colNums.right);
+    }
   }
 
   // Detect claims boundary and tag sections

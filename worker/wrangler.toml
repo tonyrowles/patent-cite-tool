@@ -1,0 +1,7 @@
+name = "patent-cite-worker"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "PATENT_CACHE"
+id = "6e7af6faa9c340fdb8120036913b00b5"

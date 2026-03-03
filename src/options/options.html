@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patent Citation Tool — Settings</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #1e293b;
+      background: #f9fafb;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      margin-bottom: 28px;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e3a8a;
+      letter-spacing: -0.01em;
+    }
+
+    .header p {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    /* Settings card */
+    .settings-card {
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 8px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+    }
+
+    /* Setting group */
+    .setting-group {
+      padding: 20px 24px;
+    }
+
+    .setting-group + .setting-group {
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .setting-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .setting-label label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .saved-feedback {
+      font-size: 12px;
+      font-weight: 500;
+      color: #059669;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .setting-description {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+
+    select {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #1e293b;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    /* Checkbox setting */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #2563eb;
+      flex-shrink: 0;
+    }
+
+    .checkbox-row label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+      cursor: pointer;
+    }
+
+    /* Silent mode helper text */
+    .silent-help {
+      display: none;
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #eff6ff;
+      border-left: 3px solid #2563eb;
+      border-radius: 0 6px 6px 0;
+      font-size: 13px;
+      color: #1e40af;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .footer a {
+      color: #64748b;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+
+    .footer-sep {
+      margin: 0 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="header">
+      <h1>Patent Citation Tool</h1>
+      <p>Extension settings — changes save automatically</p>
+    </header>
+
+    <div class="settings-card">
+
+      <!-- Trigger Mode -->
+      <div class="setting-group">
+        <div class="setting-label">
+          <label for="triggerMode">Trigger mode</label>
+          <span class="saved-feedback" id="triggerSaved">Saved</span>
+        </div>
+        <p class="setting-description">How to trigger citation generation when you select text on a patent page.</p>
+        <select id="triggerMode">
+          <option value="floating-button">Floating button</option>
+          <option value="auto">Auto on selection</option>
+          <option value="context-menu">Right-click menu</option>
+          <option value="silent">Silent (Ctrl+C)</option>
+        </select>
+        <div class="silent-help" id="silentHelp">
+          Select text on a patent page, then press Ctrl+C to copy with the citation automatically appended.
+        </div>
+      </div>
+
+      <!-- Display Mode -->
+      <div class="setting-group">
+        <div class="setting-label">
+          <label for="displayMode">Display mode</label>
+          <span class="saved-feedback" id="displaySaved">Saved</span>
+        </div>
+        <p class="setting-description">Controls how much information appears in the citation output.</p>
+        <select id="displayMode">
+          <option value="default">Default (citation only)</option>
+          <option value="advanced">Advanced (with confidence)</option>
+        </select>
+      </div>
+
+      <!-- Include Patent Number -->
+      <div class="setting-group">
+        <div class="setting-label">
+          <span class="saved-feedback" id="patentNumSaved">Saved</span>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="includePatentNumber">
+          <label for="includePatentNumber">Include patent number</label>
+        </div>
+        <p class="setting-description" style="margin-top: 8px;">Prefix the citation with the patent number (e.g., "US10123456: Col. 5, ll. 12–14").</p>
+      </div>
+
+    </div>
+
+    <footer class="footer">
+      <span id="version"></span>
+      <span class="footer-sep">·</span>
+      <a id="privacyLink" href="https://tonyrowles.github.io/patent-cite-tool/privacy" target="_blank">Privacy Policy</a>
+    </footer>
+
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

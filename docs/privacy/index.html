@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Patent Citation Tool</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #1e293b;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 48px 24px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1e3a8a;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 32px 0 8px;
+    }
+
+    p {
+      color: #334155;
+      margin-bottom: 8px;
+    }
+
+    ul {
+      color: #334155;
+      padding-left: 20px;
+      margin-bottom: 8px;
+    }
+
+    li {
+      color: #334155;
+      margin-bottom: 8px;
+    }
+
+    strong {
+      color: #0f172a;
+    }
+
+    a {
+      color: #2563eb;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 14px;
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .last-updated {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 32px;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #e2e8f0;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    footer a {
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Privacy Policy</h1>
+  <p class="subtitle"><strong>Patent Citation Tool</strong></p>
+  <p class="last-updated">Last updated: March 2026</p>
+
+  <p>Patent Citation Tool does not collect, store, or transmit any personal data. The extension runs entirely in your browser and only communicates with two services for its core citation generation functionality.</p>
+
+  <h2>Information We Collect</h2>
+  <p>We collect <strong>no personal information</strong> of any kind. Specifically:</p>
+  <ul>
+    <li>No personal information is collected or stored</li>
+    <li>No browsing history is accessed or recorded</li>
+    <li>No analytics or usage tracking is performed</li>
+    <li>No user account is required or created</li>
+    <li>No cookies are set</li>
+  </ul>
+
+  <h2>Services Used</h2>
+  <p>The extension communicates with the following services to provide citation functionality:</p>
+
+  <p><strong>Google Patents CDN (patentimages.storage.googleapis.com)</strong><br>
+  The extension fetches patent PDF files from Google's public CDN to extract text position data. Only the patent document identifier is included in the request URL. No user data is transmitted.</p>
+
+  <p><strong>Cloudflare KV Cache (pct.tonyrowles.com)</strong><br>
+  The extension fetches pre-computed patent text position maps from this first-party infrastructure operated by the developer. Only patent document identifiers are sent as part of URL requests. No user data is transmitted. No data is logged or retained beyond the cached position maps. The pct.tonyrowles.com domain is wholly owned and operated by the extension developer — it is not a third-party service.</p>
+
+  <p><strong>chrome.storage.sync</strong><br>
+  Three user preferences are synced across Chrome sessions using Chrome's built-in sync storage:</p>
+  <ul>
+    <li>Trigger mode (floating button or text selection)</li>
+    <li>Display mode (tooltip or side panel)</li>
+    <li>Patent number prefix toggle (whether to prepend the patent number to citations)</li>
+  </ul>
+  <p>This data is managed entirely by Chrome's infrastructure and is not accessible to the developer. It never leaves Chrome's own sync system.</p>
+
+  <h2>Data Sharing</h2>
+  <p>We do not sell, trade, or transfer any data to third parties. No data is collected that could be shared.</p>
+
+  <h2>Permissions Used</h2>
+  <p>The extension requests the following Chrome permissions, used solely for citation generation:</p>
+  <ul>
+    <li><strong>declarativeContent</strong> — Activates the extension icon only on Google Patents pages, not on all sites</li>
+    <li><strong>offscreen</strong> — Creates a hidden document to perform PDF text extraction without blocking the browser UI</li>
+    <li><strong>activeTab</strong> — Reads the current patent page URL to identify which patent is open</li>
+    <li><strong>storage</strong> — Saves your trigger mode, display mode, and prefix preferences via chrome.storage.sync</li>
+    <li><strong>contextMenus</strong> — Adds a right-click menu option for generating citations from selected text</li>
+    <li><strong>clipboardWrite</strong> — Copies the generated citation text to your clipboard</li>
+  </ul>
+
+  <h2>Changes to This Policy</h2>
+  <p>This privacy policy may be updated from time to time. The date at the top of this page reflects the date of the most recent revision. Continued use of the extension after any changes constitutes acceptance of the updated policy.</p>
+
+  <h2>Contact</h2>
+  <p>For questions about this privacy policy, please open an issue at <a href="https://github.com/tonyrowles/patent-cite-tool">https://github.com/tonyrowles/patent-cite-tool</a>.</p>
+
+  <footer>
+    Patent Citation Tool &mdash; <a href="https://github.com/tonyrowles/patent-cite-tool">GitHub</a>
+  </footer>
+
+</body>
+</html>

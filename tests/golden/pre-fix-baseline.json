@@ -1,0 +1,178 @@
+{
+  "US11427642-spec-short-1": {
+    "citation": "1:25-27",
+    "confidence": 1
+  },
+  "US11427642-spec-short-2": {
+    "citation": "2:1-2",
+    "confidence": 1
+  },
+  "US11427642-spec-long": {
+    "citation": "1:25-30",
+    "confidence": 1
+  },
+  "US11427642-claims-1": {
+    "citation": "63:1-4",
+    "confidence": 1
+  },
+  "US11427642-cross-col": {
+    "citation": "1:67-2:2",
+    "confidence": 1
+  },
+  "US11427642-repetitive": {
+    "citation": "63:3-4",
+    "confidence": 1
+  },
+  "US11086978-spec-short": {
+    "citation": null,
+    "confidence": 0
+  },
+  "US11086978-spec-long": {
+    "citation": "1:27-28",
+    "confidence": 0.96
+  },
+  "US11086978-claims": {
+    "citation": "12:18-19",
+    "confidence": 1
+  },
+  "US10592688-spec-short": {
+    "citation": "1:66-2:2",
+    "confidence": 1
+  },
+  "US10592688-spec-long": {
+    "citation": "1:66-2:2",
+    "confidence": 1
+  },
+  "US10592688-claims": {
+    "citation": "23:60-62",
+    "confidence": 1
+  },
+  "US10592688-cross-col": {
+    "citation": "1:66-2:2",
+    "confidence": 1
+  },
+  "US10592688-repetitive": {
+    "citation": "23:60-62",
+    "confidence": 1
+  },
+  "US6738932-spec-short": {
+    "citation": "1:36",
+    "confidence": 1
+  },
+  "US6738932-spec-long": {
+    "citation": "1:32-36",
+    "confidence": 1
+  },
+  "US6738932-claims": {
+    "citation": "10:25-29",
+    "confidence": 1
+  },
+  "US6738932-cross-col": {
+    "citation": "1:66-2:1",
+    "confidence": 1
+  },
+  "US5440748-spec-short": {
+    "citation": "1:24-25",
+    "confidence": 1
+  },
+  "US5440748-spec-long": {
+    "citation": "1:23-32",
+    "confidence": 1
+  },
+  "US5440748-claims": {
+    "citation": "8:6-11",
+    "confidence": 1
+  },
+  "US5440748-cross-col": {
+    "citation": "1:65-2:2",
+    "confidence": 1
+  },
+  "US5440748-repetitive": {
+    "citation": "8:6-9",
+    "confidence": 1
+  },
+  "US4723129-spec-short": {
+    "citation": "1:14-16",
+    "confidence": 1
+  },
+  "US4723129-spec-long": {
+    "citation": "1:65-2:2",
+    "confidence": 1
+  },
+  "US4723129-claims": {
+    "citation": "34:24-26",
+    "confidence": 1
+  },
+  "US4723129-cross-col": {
+    "citation": "1:65-2:2",
+    "confidence": 1
+  },
+  "US5959167-spec-short": {
+    "citation": "10:1-3",
+    "confidence": 1
+  },
+  "US5959167-spec-long": {
+    "citation": "1:5-8",
+    "confidence": 1
+  },
+  "US9688736-chemical-short": {
+    "citation": "1:9-10",
+    "confidence": 1
+  },
+  "US9688736-chemical-long": {
+    "citation": "1:42-47",
+    "confidence": 1
+  },
+  "US9688736-chemical-seq": {
+    "citation": "1:59-61",
+    "confidence": 1
+  },
+  "US10472384-chemical-claims": {
+    "citation": "134:1-2",
+    "confidence": 1
+  },
+  "US7346586-cross-col": {
+    "citation": "1:64-2:2",
+    "confidence": 1
+  },
+  "US9876543-cross-col": {
+    "citation": "9:66-10:2",
+    "confidence": 1
+  },
+  "US7346586-claims-repetitive": {
+    "citation": "77:49-53",
+    "confidence": 1
+  },
+  "US4723129-claims-repetitive": {
+    "citation": "34:25-29",
+    "confidence": 1
+  },
+  "US8024718-claims-repetitive": {
+    "citation": "13:53-56",
+    "confidence": 1
+  },
+  "US8024718-spec-short": {
+    "citation": "1:35-36",
+    "confidence": 1
+  },
+  "US8024718-spec-long": {
+    "citation": "1:35-42",
+    "confidence": 1
+  },
+  "US9876543-spec-short": {
+    "citation": "9:31-32",
+    "confidence": 1
+  },
+  "US9876543-spec-long": {
+    "citation": "9:31-38",
+    "confidence": 1
+  },
+  "US9001285-spec-short": {
+    "citation": "1:41-43",
+    "confidence": 1
+  },
+  "US9001285-claims": {
+    "citation": "7:1-4",
+    "confidence": 1
+  }
+}

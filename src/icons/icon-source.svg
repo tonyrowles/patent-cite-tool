@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <style>
+    .icon-primary { fill: #2563eb; }
+    .icon-accent { fill: #f59e0b; }
+    .icon-detail { fill: #1e3a8a; }
+  </style>
+
+  <!-- Document page body -->
+  <rect class="icon-primary" x="36" y="16" width="184" height="224" rx="10" ry="10"/>
+
+  <!-- Page fold corner (top-right) -->
+  <polygon class="icon-detail" points="180,16 220,56 180,56"/>
+
+  <!-- Column divider line -->
+  <rect class="icon-detail" x="122" y="72" width="4" height="144"/>
+
+  <!-- Text lines - left column -->
+  <rect class="icon-detail" x="52" y="80" width="58" height="8" rx="2"/>
+  <rect class="icon-detail" x="52" y="100" width="58" height="8" rx="2"/>
+  <rect class="icon-detail" x="52" y="120" width="58" height="8" rx="2"/>
+  <rect class="icon-detail" x="52" y="140" width="58" height="8" rx="2"/>
+  <rect class="icon-detail" x="52" y="160" width="58" height="8" rx="2"/>
+  <rect class="icon-detail" x="52" y="180" width="44" height="8" rx="2"/>
+
+  <!-- Text lines - right column -->
+  <rect class="icon-detail" x="136" y="80" width="68" height="8" rx="2"/>
+  <rect class="icon-detail" x="136" y="100" width="68" height="8" rx="2"/>
+  <rect class="icon-detail" x="136" y="120" width="68" height="8" rx="2"/>
+  <rect class="icon-detail" x="136" y="140" width="68" height="8" rx="2"/>
+  <rect class="icon-detail" x="136" y="160" width="68" height="8" rx="2"/>
+  <rect class="icon-detail" x="136" y="180" width="52" height="8" rx="2"/>
+
+  <!-- Citation highlight bar (right column, one highlighted line) -->
+  <rect class="icon-accent" x="130" y="118" width="80" height="12" rx="2"/>
+
+  <!-- Citation bracket (left side of highlight) -->
+  <rect class="icon-accent" x="130" y="114" width="8" height="20" rx="1"/>
+</svg>

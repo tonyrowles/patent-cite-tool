@@ -1,0 +1,94 @@
+# Requirements: Patent Citation Tool
+
+**Defined:** 2026-03-03
+**Core Value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
+
+## v2.0 Requirements
+
+Requirements for Firefox port milestone. Each maps to roadmap phases.
+
+### Build Pipeline
+
+- [ ] **BUILD-01**: esbuild script produces `dist/chrome/` from `src/` with correct bundle formats (IIFE for content scripts, ESM for background/offscreen)
+- [ ] **BUILD-02**: Static assets (HTML, icons, pdf.mjs, pdf.worker.mjs) are copied to dist output
+- [ ] **BUILD-03**: Chrome manifest is copied/generated into `dist/chrome/`
+- [ ] **BUILD-04**: Built Chrome extension is functionally identical to current raw source
+- [ ] **BUILD-05**: Vitest 71-case test corpus passes against built Chrome output
+
+### Shared Code
+
+- [ ] **SHARED-01**: Matching functions consolidated into single `src/shared/matching.js` — no duplication
+- [ ] **SHARED-02**: Constants exported as ES module from `src/shared/constants.js`
+- [ ] **SHARED-03**: Content scripts, background script, and offscreen document all import from shared modules
+
+### Firefox Extension
+
+- [ ] **FOX-01**: Firefox MV3 manifest with `browser_specific_settings.gecko.id` and correct permissions
+- [ ] **FOX-02**: Firefox background script absorbs offscreen document logic (PDF fetch, parse, IndexedDB, matching)
+- [ ] **FOX-03**: Icon activation via `tabs.onUpdated` URL matching replaces Chrome's `declarativeContent`
+- [ ] **FOX-04**: esbuild produces `dist/firefox/` alongside `dist/chrome/`
+- [ ] **FOX-05**: IndexedDB graceful degradation for Firefox private browsing / "Never remember history"
+
+### Validation
+
+- [ ] **VALID-01**: 71-case test corpus passes against both Chrome and Firefox builds
+- [ ] **VALID-02**: `web-ext lint` passes on Firefox build
+- [ ] **VALID-03**: Both extensions load and produce citations on Google Patents
+
+## Future Requirements
+
+### Store Submission
+
+- **STOR-01**: Chrome Web Store screenshot (1280x800)
+- **STOR-02**: Chrome Web Store promotional tile (440x280)
+- **STOR-03**: Chrome Web Store submission and review
+- **STOR-04**: Firefox Add-ons (AMO) submission and review
+
+### Power User Features
+
+- **FMT-01**: Configurable citation format (4:5-20 vs col. 4, ll. 5-20 vs column 4, lines 5-20)
+- **KEY-01**: Keyboard shortcut for citation (e.g., Ctrl+Shift+C)
+- **BATCH-01**: Batch citation mode — queue multiple citations and copy all at once
+- **CACHE-01**: Patent family cache reuse — continuation patents share specification text
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Safari extension | Different extension model (Xcode required), defer to future |
+| webextension-polyfill | Firefox supports `chrome.*` natively; polyfill adds unnecessary dependency |
+| Unified manifest | Chrome and Firefox manifest differences too numerous; two separate manifests is cleaner |
+| Firefox AMO submission | Store submission is a separate concern from the port itself |
+| Build-time minification | Not needed for extension review; keep source readable |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SHARED-01 | — | Pending |
+| SHARED-02 | — | Pending |
+| SHARED-03 | — | Pending |
+| BUILD-01 | — | Pending |
+| BUILD-02 | — | Pending |
+| BUILD-03 | — | Pending |
+| BUILD-04 | — | Pending |
+| BUILD-05 | — | Pending |
+| FOX-01 | — | Pending |
+| FOX-02 | — | Pending |
+| FOX-03 | — | Pending |
+| FOX-04 | — | Pending |
+| FOX-05 | — | Pending |
+| VALID-01 | — | Pending |
+| VALID-02 | — | Pending |
+| VALID-03 | — | Pending |
+
+**Coverage:**
+- v2.0 requirements: 16 total
+- Mapped to phases: 0
+- Unmapped: 16 (pending roadmap creation)
+
+---
+*Requirements defined: 2026-03-03*
+*Last updated: 2026-03-03 after initial definition*

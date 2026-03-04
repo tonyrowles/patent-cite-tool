@@ -68,8 +68,8 @@ Full details: `.planning/milestones/v1.2-ROADMAP.md`
   4. The 71-case Vitest corpus passes without modification after the refactor (Chrome loads from src/ as before)
 **Plans**: 2 plans
 Plans:
-- [ ] 14-01-PLAN.md — Create shared ESM modules (constants + matching), wire constants consumers, add smoke tests
-- [ ] 14-02-PLAN.md — Wire matching consumers (offscreen + content wrapper), migrate test imports, verify deduplication
+- [x] 14-01-PLAN.md — Create shared ESM modules (constants + matching), wire constants consumers, add smoke tests
+- [x] 14-02-PLAN.md — Wire matching consumers (offscreen + content wrapper), migrate test imports, verify deduplication
 
 ### Phase 15: esbuild Build Pipeline
 **Goal**: A single build script produces dist/chrome/ and dist/firefox/ scaffolding from src/; the Chrome build is functionally identical to loading from src/ directly
@@ -81,7 +81,11 @@ Plans:
   3. Loading dist/chrome/ via "Load unpacked" in Chrome produces correct column:line citations on Google Patents
   4. The 71-case Vitest corpus passes when run against the built dist/chrome/ output
   5. dist/firefox/ directory scaffold is created by the build script (populated in Phase 16)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 15-01-PLAN.md — Refactor content scripts to ES modules, create Firefox manifest, update config
+- [ ] 15-02-PLAN.md — Create esbuild build script, npm scripts, verify build output
+- [ ] 15-03-PLAN.md — Human verification of built Chrome extension in browser
 
 ### Phase 16: Firefox Extension
 **Goal**: A complete Firefox MV3 extension exists in dist/firefox/ that loads in Firefox and produces citations using a background script instead of an offscreen document
@@ -122,7 +126,7 @@ Plans:
 | 11. Options Page Polish | v1.2 | 2/2 | Complete | 2026-03-03 |
 | 12. Store Listing and Submission | v1.2 | 2/2 | Complete | 2026-03-03 |
 | 13. Offscreen Wrap-Hyphen Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
-| 14. Shared Code Extraction | 2/2 | Complete    | 2026-03-04 | - |
-| 15. esbuild Build Pipeline | v2.0 | 0/? | Not started | - |
+| 14. Shared Code Extraction | v2.0 | 2/2 | Complete | 2026-03-04 |
+| 15. esbuild Build Pipeline | v2.0 | 0/3 | Not started | - |
 | 16. Firefox Extension | v2.0 | 0/? | Not started | - |
 | 17. Cross-Browser Validation | v2.0 | 0/? | Not started | - |

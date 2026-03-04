@@ -1,202 +1,189 @@
 # Project Research Summary
 
-**Project:** Patent Citation Tool — v1.2 Store Polish + Accuracy Hardening
-**Domain:** Chrome MV3 Extension for legal citation generation on Google Patents
-**Researched:** 2026-03-02
-**Confidence:** HIGH (store requirements, architecture, pitfalls all verified against official Chrome docs and existing source)
+**Project:** Patent Citation Tool v2.0 — esbuild Build Pipeline + Firefox Port
+**Domain:** Cross-browser browser extension build pipeline (Chrome MV3 + Firefox MV3)
+**Researched:** 2026-03-03
+**Confidence:** HIGH
 
 ## Executive Summary
 
-This is a v1.2 polish-and-hardening milestone for a working Chrome MV3 extension. The core product — highlight text on a Google Patents page and get a formatted col:line citation for patent prosecution — already works (v1.1, 4,333 LOC, deployed Cloudflare Worker at pct.tonyrowles.com). The v1.2 work has two independent tracks: (1) store submission readiness (icon set, store assets, privacy policy, options page polish) and (2) accuracy hardening (test harness, accuracy audit, algorithm fixes). These tracks can run in parallel after the test harness is established, but the test harness must be built before any algorithm changes are made.
+The v2.0 milestone has a single clear goal: take an existing, working Chrome MV3 extension (4,500 LOC) and ship it on Firefox MV3, while simultaneously introducing a proper build pipeline to eliminate code duplication across the codebase. The recommended approach is a custom `scripts/build.mjs` Node script using esbuild that produces two independent output trees (`dist/chrome/` and `dist/firefox/`) from a shared `src/` directory. No framework (WXT, Vite, Parcel) is needed — esbuild's native API is sufficient and fully transparent at this scale.
 
-The recommended approach is to build test infrastructure first, then use it to drive accuracy improvements, while executing the store polish track in parallel. The extension's architecture is clean for testing: the matching and parsing logic lives in pure functions in ES modules with no Chrome API dependencies. Adding `export` keywords to existing functions in `offscreen/offscreen.js` and `content/paragraph-finder.js` unlocks Vitest-based unit testing with zero restructuring. The only complication is that `text-matcher.js` is a classic script without exports — the recommended fix is to add `export` keywords there too, which does not break classic script loading in Chrome.
+The key architectural challenge is that Chrome and Firefox diverge at the background context level. Chrome MV3 service workers lack DOM access, which is why the extension uses a Chrome-specific offscreen document to run PDF.js. Firefox MV3 background scripts are event pages with full DOM access — making the offscreen workaround unnecessary. The Firefox port requires a new `src/firefox/background.js` entry point that absorbs all offscreen document logic directly, collapsing a two-process Chrome pattern into a single Firefox background process. Content scripts, popup, options, icons, and PDF.js library files are identical between targets and shared via bundling.
 
-The highest-risk items for this milestone are in the store submission track, not the algorithm track. Chrome Web Store rejections from an incomplete privacy policy, missing data disclosure form fields, or incorrect screenshot dimensions are common and each cost a full review cycle (2-7 days). All these pitfalls are well-documented and entirely preventable with a pre-submission checklist. The accuracy track risks center on algorithm regression — mitigated by establishing frozen golden outputs before any algorithm change is made.
+The primary risk is the number of silent failure modes in cross-browser extension development: content scripts bundled as ESM fail to inject without any console error; missing `declarativeContent` replacement causes the icon to behave incorrectly without throwing; omitting `browser_specific_settings.gecko.id` silently breaks storage sync across devices. The mitigation strategy is strict phase ordering (shared code extraction first, build pipeline Chrome-only second, Firefox port third) combined with `web-ext lint` as an automated gate and the existing 71-case Vitest corpus as the primary regression signal throughout every step of the refactor.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing stack requires no changes. The only new additions for v1.2 are two devDependencies: `sharp` (0.34.5) for icon generation from SVG source, and `vitest` (4.0.18) for the test harness. A root-level `package.json` for dev tooling does not exist yet and needs to be created — the extension source in `src/` continues to ship with zero dependencies.
+The new build pipeline requires exactly three new dependencies: `esbuild` (bundler), `web-ext` (Firefox developer tooling), and optionally `webextension-polyfill` (cross-browser API normalization). The existing stack — Chrome MV3, PDF.js v5, Shadow DOM, IndexedDB, Cloudflare Workers + KV, Vitest — remains unchanged and validated.
 
-**Core technologies (existing — no change):**
-- Chrome MV3, Shadow DOM, content scripts — deployed and working
-- Offscreen Document API + PDF.js v5 — PDF parsing pipeline operational
-- Cloudflare Workers + KV — proxy and shared cache at pct.tonyrowles.com
-- IndexedDB — local patent position map cache
+**Core technologies (new for v2.0):**
+- **esbuild 0.27.3:** Produces `dist/chrome/` and `dist/firefox/` from a single `build.mjs` script. Sub-second incremental builds. No plugins required. IIFE format for content scripts; ESM for background/offscreen. Set `outbase: 'src'` to prevent path flattening surprises.
+- **web-ext 9.3.0:** Mozilla's official CLI. `web-ext run` loads extension into Firefox with auto-reload. `web-ext lint` catches Chrome-specific keys in the Firefox manifest before manual testing. ES module only (Node 14+, already satisfied by `"type": "module"` in package.json).
+- **webextension-polyfill 0.12.0 (optional):** Wraps `chrome.*` callbacks as Promises under `browser.*` namespace; Firefox-native no-op. FEATURES.md research notes this may not be needed since Firefox natively supports `chrome.*` — decision can be deferred to Phase 2 implementation.
 
-**New devDependencies only:**
-- `sharp 0.34.5` — SVG-to-PNG batch icon generation; fastest Node.js image library, zero runtime footprint in extension bundle; script pattern: `sharp(src).resize(size).png().toFile(dest)`
-- `vitest 4.0.18` — ESM-native test runner; no build step required; `environment: 'node'` for pure functions, `environment: 'happy-dom'` for DOM-walking tests (paragraph-finder.js)
-- `vitest-chrome 0.1.0` — Chrome API mock; published 2023 against older Vitest, but the `globalThis.chrome` assignment pattern is version-agnostic. Treat as optional: a manual chrome stub in `test/setup.js` is more resilient for the small API surface this extension uses
-
-See `.planning/research/STACK.md` for version details and the root `package.json` template.
+The "what not to add" list is as important: no WXT, no Vite, no Parcel, no Babel, no esbuild plugins for file copying (`fs.cpSync` suffices), no code splitting (`splitting: true` is incompatible with content script IIFE requirement), no single merged manifest.
 
 ### Expected Features
 
-The core citation features are complete (v1.0/v1.1 delivered). v1.2 adds no new user-facing citation capabilities — it polishes the surrounding product and hardens the existing accuracy.
+**Must have (P1 — v2.0 table stakes):**
+- esbuild build script (`scripts/build.mjs`) producing working `dist/chrome/` and `dist/firefox/` — the entire milestone foundation
+- Shared code extraction: `src/shared/constants.js` (add ES module exports) and `src/shared/matching.js` (new — extract duplicated matching functions from both `text-matcher.js` and `offscreen.js`)
+- Firefox manifest (`src/manifests/manifest.firefox.json`) with correct permissions, gecko ID, `background.scripts`, and no Chrome-only APIs (`declarativeContent`, `offscreen`)
+- Firefox background script (`src/firefox/background.js`) absorbing offscreen document responsibilities (fetch, PDF.js, IndexedDB, text matching, KV cache)
+- `tabs.onActivated` + `tabs.onUpdated` replacing `declarativeContent` for per-tab icon activation in Firefox
+- Both targets pass the 71-case test corpus and manual spot-check on 5+ real patents
 
-**Must have for v1.2 (table stakes for store submission):**
-- Professional icon set (16/32/48/128px active + inactive) — placeholder PNGs are 306 bytes each; unacceptable for a store listing
-- Small promotional tile (440x280px) — absence causes lower search ranking in store results
-- At least one screenshot at exactly 1280x800 showing citation in context on a real patent page — missing screenshot causes rejection
-- Privacy policy at a public stable URL — required by Chrome Web Store due to `host_permissions` and Cloudflare Worker data transmission
-- Options page accessible via right-click "Options" (`options_ui` in manifest) — settings currently buried in popup
+**Should have (P2 — before AMO submission):**
+- `web-ext lint` passing cleanly on Firefox build
+- `web-ext run` developer loop configured (`.web-ext-config.cjs`)
+- Cross-browser corpus validation documented
 
-**Must have for v1.2 (accuracy hardening):**
-- Automated citation test harness with fixture-driven frozen golden outputs — prerequisite for safe algorithm changes
-- Diverse patent corpus (pre-2000, chemical, cross-column, repetitive claims) — 30-50 test cases minimum
-- Frozen expected outputs recorded before any algorithm change begins
-
-**Should have (quality differentiators):**
-- Off-by-one line detection in test harness — distinguish systematic bugs from total misses
-- Save feedback in options page ("Saved" confirmation after settings change)
-- Link to privacy policy and extension version display in options page
-- Options discoverable via right-click (requires `options_ui` manifest entry)
-
-**Defer to v2+:**
-- International patent support (EP, JP, PCT) — multiplies complexity 3-5x
-- Batch citation mode — not essential for core prosecution workflow
-- AI-powered summarization — different product category
-- Build step / ESM module unification — resolves tech debt but the simpler `export` keyword approach is sufficient for v1.2
-
-See `.planning/research/FEATURES.md` for the full feature landscape and dependency graph.
+**Defer (v3+):**
+- Firefox AMO listing/submission (requires screenshots, review queue time)
+- Safari port (Xcode wrapping, App Store review — entirely different mechanism)
+- Playwright automated cross-browser testing harness (large scope)
+- Chained esbuild watch + web-ext watch dev loop (developer comfort, not correctness)
+- webextension-polyfill adoption (not needed; `chrome.*` works in Firefox natively)
 
 ### Architecture Approach
 
-v1.2 adds two new directory trees alongside the existing extension source: `tests/` for the Vitest harness (never bundled into the extension) and `store-assets/` for Chrome Web Store submission assets (also never bundled). The extension source in `src/` receives three targeted changes: (1) `export` keywords added to pure functions in `offscreen/offscreen.js` and `content/paragraph-finder.js`, (2) new `src/options/` directory with `options.html` and `options.js`, (3) icon files replaced with production artwork and 32px variants added.
+The v2.0 architecture maintains the existing Chrome structure (service worker orchestrates offscreen document) while adding a parallel Firefox structure where the background event page handles everything inline. The source tree diverges only at the entry point level: `src/background/service-worker.js` for Chrome, `src/firefox/background.js` for Firefox. Everything else — content scripts, popup, options, shared logic, PDF.js library files — is shared source that esbuild bundles into each target independently.
 
-**Major components and their responsibilities:**
-
-1. **`tests/` (new)** — Vitest harness, fixture JSON, test cases. Imports directly from `src/offscreen/` and `src/content/` using native ESM. No build step. Fixture format: PositionMap JSON (pre-captured) + `cases.json` (selectedText + expectedCitation).
-2. **`store-assets/` (new)** — Static assets for Chrome Web Store dashboard upload: 128px icon, 440x280 promotional tile, 1280x800 screenshots, `privacy-policy.md` (hosted separately at a stable public URL).
-3. **`src/options/` (new)** — Settings form (trigger mode, display mode, patent number prefix). Uses the same `chrome.storage.sync` keys as popup — no migration needed. Manifest gains `options_ui` entry with `open_in_tab: true`.
-4. **`src/icons/` (modified)** — Replace placeholder PNGs with production artwork; add 32px active + inactive variants; update manifest to include `"32"` key in both `icons` and `action.default_icon`.
-5. **`src/offscreen/offscreen.js` (minor modification)** — Add `export` keyword to `matchAndCiteOffscreen()`, `normalizeTextOffscreen()`. One-word change per function; zero behavioral impact; enables Vitest imports.
-6. **`src/popup/popup.html` and `popup.js` (modified)** — Strip settings controls; add link via `chrome.runtime.openOptionsPage()`.
-
-The test harness data flow is: fixture JSON (pre-captured position maps) → Vitest imports pure function from `src/offscreen/` → assert citation string. No Chrome APIs, no network, sub-second execution.
-
-**Critical integration constraint:** `pdf-parser.js` uses `chrome.runtime.getURL()` to set the PDF.js worker URL. This breaks in Node.js. The fixture generation script must patch `GlobalWorkerOptions.workerSrc` before calling `extractTextFromPdf()`. This is a one-time concern for fixture generation only — the tests themselves run against pre-generated JSON fixtures.
-
-See `.planning/research/ARCHITECTURE.md` for the full component file table, integration constraints, and the four-phase build order.
+**Major components:**
+1. **`scripts/build.mjs`** — esbuild orchestrator; separate build calls per format (IIFE for content scripts, ESM for background/offscreen); static asset copy via `fs.cpSync`; compile-time `BROWSER_TARGET` define for dead-code elimination
+2. **`src/shared/` (new)** — `constants.js` with ES module exports (MSG, STATUS, PATENT_TYPE); `matching.js` with all deduplicated text-matching functions; imported by Chrome offscreen and Firefox background via bundling
+3. **`src/firefox/background.js` (new)** — Firefox-only entry point; union of Chrome's `service-worker.js` + `offscreen.js`; handles message routing, PDF fetch/parse, IndexedDB, KV cache, and icon activation via `tabs.onUpdated` / `tabs.onActivated`
+4. **`src/manifests/` (new)** — `manifest.chrome.json` and `manifest.firefox.json` maintained independently; differences are too large (permissions, background key, WAR format, gecko ID) for a patch-based approach
+5. **`dist/chrome/` and `dist/firefox/`** — independent, self-contained extension packages; Chrome keeps offscreen.html, Firefox does not
 
 ### Critical Pitfalls
 
-1. **Missing privacy policy blocks submission (Purple Lithium violation)** — Write a single-page privacy policy, host at a stable public URL (GitHub Pages is sufficient), enter URL in the Developer Dashboard privacy section before the submission attempt. The policy must explicitly state: patent position maps are uploaded to Cloudflare KV (shared cache, no PII); `chrome.storage.sync` stores user preferences cross-device. The presence of `host_permissions` pointing to pct.tonyrowles.com guarantees reviewer scrutiny regardless of whether any PII is involved.
+1. **`declarativeContent` has no Firefox equivalent** — The Chrome service worker's icon activation logic (`chrome.declarativeContent.onPageChanged`) silently does nothing or throws in Firefox. Replace entirely with `browser.action.disable()` (global) + `tabs.onUpdated`/`tabs.onActivated` listeners in the Firefox background script. Requires adding `"tabs"` permission to Firefox manifest.
 
-2. **Data disclosure form incomplete causes suspension after 30 days** — The privacy policy URL field is NOT the only privacy requirement. Complete all four Developer Dashboard privacy subsections: single purpose description, permission justification for every manifest permission (`declarativeContent`, `offscreen`, `activeTab`, `storage`, `contextMenus`, `clipboardWrite`, both host permissions), remote code certification (MV3 prohibits it), and all data use checkboxes. Developers who fill only the URL field get suspended 30 days post-approval by automated enforcement.
+2. **Content scripts must be IIFE, not ESM** — esbuild configured with `format: 'esm'` or `splitting: true` for content scripts produces output that Chrome and Firefox silently refuse to inject. No console error — citation UI never appears. Use `format: 'iife'` with `bundle: true` for every content script entry point, in a separate esbuild build call.
 
-3. **Algorithm fix causes citation regression** — Before any algorithm change, run the full test harness and record all outputs as the frozen baseline. After the fix, diff every output. Any citation that changed must be manually verified against the actual PDF before accepting. Never update expected outputs and algorithm logic in the same commit without that PDF verification.
+3. **`offscreen` API does not exist in Firefox** — The entire PDF fetch/parse/cache pipeline is inoperative on Firefox until it is moved into the Firefox background script. Firefox event pages have full DOM access and can run PDF.js directly without a separate document context.
 
-4. **Test fixtures biased toward known-working patents** — A homogeneous corpus (e.g., all modern software patents from the same decade) produces a false 100% accuracy signal. Include: at least two pre-2000 patents, at least two chemical/biotech patents with subscript/Greek characters, at least one cross-column selection, at least one selection from highly repetitive claims language. Write the diversity checklist before selecting any patents.
+4. **esbuild `outbase` must be set explicitly** — Without `outbase: 'src'`, esbuild's path flattening uses the lowest common ancestor of all entry points, which can silently shift output paths and break manifest references. Always set `outbase: 'src'`.
 
-5. **32px icon missing on Windows** — The current manifest has no 32px entries. Windows users see blurry scaled-up 16px icons in the toolbar. Add 16/32/48/128 for both active and inactive variants in a single pass — do not plan to patch 32px in after store submission.
-
-6. **Screenshot dimension mismatch causes upload rejection** — The Chrome Web Store requires exactly 1280x800 or 640x400. Screenshots taken at arbitrary browser zoom levels will fail dimension validation on upload. Use browser devtools device mode set to exactly 1280x800 and capture full-bleed with no border/padding.
-
-See `.planning/research/PITFALLS.md` for the complete pitfall catalog, warning signs, and a "Looks Done But Isn't" pre-submission checklist.
+5. **Classic script → IIFE bundle breaks implicit globals** — The current content scripts share state via implicit globals assigned at classic-script top level. Bundling as IIFE makes those globals local to the IIFE closure. Fix: convert all shared code to explicit ES module exports before bundling. Run the 71-case corpus after every individual module move.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+The architecture research documents a mandatory phase ordering based on hard technical dependencies. All four research files agree on the same sequence.
 
-### Phase 1: Test Harness Foundation
-**Rationale:** The test harness is a hard prerequisite for the accuracy work. Without frozen golden outputs, algorithm changes are fly-blind. Building this first gives every subsequent phase regression protection. It also de-risks Phase 2 by establishing what "passing" looks like before any changes are made.
-**Delivers:** Root-level `package.json` with vitest devDependency, `tests/` directory structure, `export` additions to `offscreen.js` and `paragraph-finder.js`, fixture generation script (`scripts/generate-fixture.mjs`), 30-50 diverse test cases covering the required variation axes, frozen golden output baseline.
-**Addresses:** Automated Citation Test Harness (Group 4 from FEATURES.md)
-**Avoids:** "Algorithm fix causes regression" (Pitfall 6), "Test fixtures not representing real diversity" (Pitfall 5)
-**Stack used:** vitest 4.0.18, manual chrome stubs in `test/setup.js`, happy-dom for DOM tests in paragraph-finder tests
-**Research flag:** Standard patterns — no additional research needed. The one uncertainty (vitest-chrome 0.1.0 compatibility with Vitest 4) has a documented safer fallback (manual `vi.fn()` stubs) that is preferable anyway.
+### Phase 1: Shared Code Extraction
 
-### Phase 2: Accuracy Audit + Algorithm Fixes
-**Rationale:** Can only run safely after Phase 1 establishes the regression harness. The audit generates new failing test cases; fixes are validated by re-running the harness. This is iterative — plan 3-4 fix cycles, not a single pass.
-**Delivers:** Expanded test corpus with adversarial cases, algorithm fixes for the highest-impact failure modes (bookend false positives on repetitive claims, long selection failures, old patent OCR normalization), documented accuracy metrics (citation match rate, exact accuracy, confidence calibration).
-**Addresses:** Accuracy Audit and Algorithm Fixes (Group 5 from FEATURES.md)
-**Avoids:** "Overfitting algorithm fix to specific patent" (Pitfall 7), "Bookend false positive on repetitive claims" (Pitfall 8)
-**Research flag:** May need shallow research on specific algorithm approaches (sliding bookend window from 50 to 100 chars, Levenshtein pre-filter region) during execution. The algorithm itself is documented in FEATURES.md; no blocking external research needed before starting.
+**Rationale:** Every subsequent phase depends on `src/shared/constants.js` having ES module exports and `src/shared/matching.js` existing. The Firefox background script cannot import shared matching logic until the shared module exists. The Chrome offscreen.js refactor cannot eliminate duplication until then either. This phase has no prerequisites and must go first.
 
-### Phase 3: Icon Set + Manifest Updates
-**Rationale:** Independent of accuracy work. Can run in parallel with Phase 2 if bandwidth allows. Required before store submission. Icon design work sets the visual language for the options page and should precede it.
-**Delivers:** Production-quality 16/32/48/128px icon set (active + inactive variants), `scripts/generate-icons.mjs` using sharp 0.34.5, updated manifest with 32px entries and `options_ui` declaration, `store-assets/icon-128.png`.
-**Addresses:** Extension Icon Set (Group 1 from FEATURES.md)
-**Avoids:** "32px icon missing on Windows" (Pitfall 3), unblocks store submission
-**Stack used:** sharp 0.34.5 for batch PNG generation from source SVG
-**Research flag:** No additional research needed. Icon size requirements are HIGH confidence from official Chrome docs.
+**Delivers:** `src/shared/constants.js` with ES module exports; `src/shared/matching.js` extracted from `text-matcher.js` and `offscreen.js`; updated `offscreen.js` and `service-worker.js` importing from shared. No `dist/` changes — Chrome extension continues to load from `src/` via "Load unpacked" and must remain regression-free throughout.
 
-### Phase 4: Options Page Polish
-**Rationale:** Depends on finalized icon artwork (for visual consistency). Independent of accuracy work. Small scope — CSS/HTML work plus `chrome.runtime.openOptionsPage()` wiring. Build and verify `options.html` before stripping settings from popup (per Anti-Pattern 3 in ARCHITECTURE.md).
-**Delivers:** `src/options/options.html`, `src/options/options.js`, updated popup (settings stripped, options link added), right-click "Options" working via `options_ui` manifest entry, "Saved" confirmation feedback, privacy policy link, version display.
-**Addresses:** Options Page UX Polish (Group 2 from FEATURES.md)
-**Avoids:** "Options not right-click discoverable" (UX Pitfall in PITFALLS.md), "Modifying popup.js before options page exists" (Anti-Pattern 3 in ARCHITECTURE.md)
-**Research flag:** No additional research needed. Options page patterns are HIGH confidence from official Chrome docs.
+**Addresses:** Tech debt (duplicated MSG/STATUS/PATENT_TYPE constants, duplicated normalizeText/matchAndCite/formatCitation and related matching functions). Enables the Firefox port and build pipeline phases.
 
-### Phase 5: Store Listing Assets + Submission
-**Rationale:** Last phase. Requires completed icon set (Phase 3), polished options page (Phase 4), and satisfactory accuracy (Phase 2). Privacy policy and screenshots must be created before the Developer Dashboard can be fully completed.
-**Delivers:** Privacy policy hosted at a public stable URL, 440x280 promotional tile, 1280x800 screenshots showing real citations on Google Patents, completed Developer Dashboard privacy section (all four subsections), store listing text (title ≤45 chars, summary ≤132 chars, description), submitted extension.
-**Addresses:** Chrome Web Store Listing Package (Group 3 from FEATURES.md)
-**Avoids:** "Missing privacy policy" (Pitfall 1), "Data disclosure form incomplete" (Pitfall 2), "Screenshot sizing mismatches" (Pitfall 4)
-**Research flag:** No additional research needed, but use the "Looks Done But Isn't" checklist from PITFALLS.md as a mandatory pre-submission gate.
+**Avoids:** Pitfall 8 (classic→IIFE global scope regression — conversion to explicit ES module exports is the prerequisite for safe bundling). Pitfall 12 (Vitest test breakage — run the 71-case corpus after every individual module move, not just at the end).
+
+**Research flag:** Standard patterns — ES module extraction is well-documented JavaScript refactoring; no additional research needed.
+
+### Phase 2: esbuild Build Pipeline (Chrome Target Only)
+
+**Rationale:** Validate the build pipeline against the known-working Chrome target before introducing Firefox complexity. A working `dist/chrome/` that passes the 71-case corpus confirms that shared code extraction is correct and that esbuild configuration is sound. Firefox-specific failures cannot pollute this signal.
+
+**Delivers:** `scripts/build.mjs`, `src/manifests/manifest.chrome.json`, `dist/chrome/` output tree matching all existing manifest path references. Chrome extension loaded from `dist/chrome/` must be functionally identical to loading from `src/`. npm scripts: `build`, `build:chrome`, `build:firefox`.
+
+**Addresses:** esbuild build pipeline feature (P1), manifest split (P1).
+
+**Avoids:** Pitfall 4 (IIFE vs ESM — content script entry uses separate IIFE build call); Pitfall 5 (path flattening — `outbase: 'src'` set explicitly); Pitfall 7 (shared code duplication accepted and correct for content scripts); Pitfall 8 (global scope regression — caught here against Chrome before Firefox adds noise).
+
+**Research flag:** Standard patterns — esbuild API is well-documented; IIFE/ESM split configuration is explicitly described in STACK.md and ARCHITECTURE.md with code examples ready to use.
+
+### Phase 3: Firefox Background Script + Manifest
+
+**Rationale:** With shared code (Phase 1) and a validated build scaffold (Phase 2) in place, Firefox-specific work can proceed without two unknowns at once. Both prerequisites are in place; only the Firefox-specific logic remains.
+
+**Delivers:** `src/firefox/background.js` (union of service-worker + offscreen logic); `src/manifests/manifest.firefox.json` (gecko ID, `background.scripts`, no Chrome-only permissions); `dist/firefox/` output tree; Firefox extension loads and produces citations.
+
+**Addresses:** Firefox background script feature (P1); Firefox manifest (P1); `declarativeContent` replacement (P1); `tabs.onActivated`/`tabs.onUpdated` icon logic (P1).
+
+**Avoids:** Pitfall 1 (`declarativeContent` gap); Pitfall 2 (offscreen API missing in Firefox); Pitfall 3 (Chrome manifest on Firefox); Pitfall 6 (module type mismatch for Firefox background — use IIFE for safety); Pitfall 9 (IndexedDB in "Never remember history" mode — add graceful degradation); Pitfall 10 (PDF.js worker URL — always use `chrome.runtime.getURL`, never hardcode); Pitfall 11 (gecko ID missing, storage.sync broken across devices).
+
+**Research flag:** Needs empirical validation on three specific points: (a) Firefox event page lifecycle during active async PDF parsing (does the page stay alive through a long parse?), (b) IndexedDB behavior under Firefox "Never remember history" privacy mode and graceful degradation path, (c) PDF.js v5 WASM CSP requirements in Firefox background page context (`wasm-unsafe-eval` may be required in Firefox manifest `content_security_policy`). These are MEDIUM-confidence gaps identified in PITFALLS.md that require empirical testing during implementation.
+
+### Phase 4: Cross-Browser Validation
+
+**Rationale:** Both targets must be functional before validation is meaningful. This phase is primarily a gate and documentation step, not a construction phase.
+
+**Delivers:** Confirmed pass of 71-case corpus against `dist/chrome/` (loaded in Chrome, manual spot-check on 5+ real patents). Confirmed pass against `dist/firefox/` (loaded via `web-ext run`, same spot-check). `web-ext lint` passes with zero warnings. Release packaging workflow documented.
+
+**Addresses:** Cross-browser corpus validation (P2); web-ext lint gate (P2); web-ext run developer loop (P2).
+
+**Avoids:** Shipping the Firefox build before verifying it behaves identically to Chrome on real patents from the existing corpus.
+
+**Research flag:** Standard patterns — manual spot-check process and `web-ext` commands are well-documented. If regressions appear, git bisect over Phase 1–3 commits using the 71-case corpus as the oracle.
 
 ### Phase Ordering Rationale
 
-- **Test harness before algorithm fixes** is a hard dependency identified in both FEATURES.md and ARCHITECTURE.md. Violating this order risks regressions on working cases while fixing failing ones.
-- **Icon set before options page** ensures visual consistency during options page development. Saves rework if the icon color palette drives options page styling decisions.
-- **Phases 3 and 4 can parallelize with Phase 2** if developer bandwidth allows. The UI/asset track is independent of the accuracy track after Phase 1 is complete.
-- **All phases before store submission** is required, but the privacy policy and data disclosure form are the most commonly missed submission blockers. PITFALLS.md and STACK.md both flag this independently — it warrants extra attention.
+- **Hard dependency chain:** Shared code extraction (1) → Build pipeline Chrome-only (2) → Firefox port (3) → Validation (4). Each phase creates prerequisites for the next.
+- **Chrome-first in Phase 2 is explicitly required:** Debugging Firefox background script behavior while the build pipeline itself is unvalidated introduces two simultaneous unknowns. ARCHITECTURE.md's build order section states this constraint explicitly.
+- **71-case Vitest corpus is the single regression gate throughout:** All research files emphasize this. It is the only automated signal that shared code extraction and bundling preserved correctness. Never batch multiple module moves into a single untested commit.
+- **Separate entry points preferred over runtime conditionals:** ARCHITECTURE.md documents the anti-pattern of `if (chrome.offscreen) { /* Chrome */ } else { /* Firefox */ }` branching. Separate `src/background/service-worker.js` and `src/firefox/background.js` entry points, sharing `src/shared/` modules, is cleaner and easier to test in isolation.
 
 ### Research Flags
 
-Phases with standard patterns (no additional research needed before starting):
-- **Phase 1:** Vitest setup is well-documented; the vitest-chrome uncertainty has a safer manual fallback
-- **Phase 3:** Chrome extension icon requirements are HIGH confidence from official docs
-- **Phase 4:** Options page patterns are HIGH confidence from official docs
-- **Phase 5:** Store submission requirements are HIGH confidence; the PITFALLS.md checklist covers all failure modes
+Phases needing empirical validation or deeper research during implementation:
+- **Phase 3 (Firefox Background Script):** Three specific unknowns need empirical testing: (a) event page suspension behavior during active PDF.js parse, (b) IndexedDB availability under Firefox privacy settings, (c) PDF.js WASM + Firefox CSP. These are implementation-time discoveries, not blocking research.
 
-Phases that may benefit from shallow research during execution:
-- **Phase 2:** Specific algorithm improvements (sliding bookend, Levenshtein pre-filter) may benefit from consulting fuzzy matching literature. Not blocking to start — the accuracy audit drives the specific research needs.
+Phases with standard, well-documented patterns (no additional research needed before starting):
+- **Phase 1 (Shared Code Extraction):** ES module extraction is standard; no domain-specific unknowns.
+- **Phase 2 (esbuild Chrome Build):** esbuild API is comprehensive; all configuration decisions documented in STACK.md and ARCHITECTURE.md with ready-to-use code examples.
+- **Phase 4 (Validation):** Process-level; `web-ext` commands documented; no technical unknowns.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | sharp 0.34.5 and vitest 4.0.18 verified on npm 2026-03-02. The one uncertainty — vitest-chrome 0.1.0 compatibility with Vitest 4 — has a documented safer fallback. |
-| Features | MEDIUM-HIGH | Table stakes for store submission are HIGH (official Chrome docs). Feature prioritization for v1.2 is HIGH (defined by existing PROJECT.md milestone scope). General feature landscape for patent citation tools is MEDIUM (niche domain, no direct competitors). |
-| Architecture | HIGH | Verified against actual v1.1 source code. Module system constraints, integration boundaries, and build order are ground truth, not inference. |
-| Pitfalls | HIGH | Chrome Web Store policy pitfalls verified against official policy docs and named violation codes. Algorithm regression pitfalls verified against existing codebase (text-matcher.js, position-map-builder.js). First-person submission account corroborates privacy policy rejection pattern. |
+| Stack | HIGH | esbuild, web-ext, webextension-polyfill versions verified against npm and official docs. Build script pattern verified against 1Password real-world case study (90% build time reduction). |
+| Features | HIGH | Firefox API gaps verified against MDN official docs and Firefox Extension Workshop. Feature priorities are unambiguous given the codebase's existing state and existing tech debt identified in source. |
+| Architecture | HIGH | Phase ordering follows hard technical dependencies, not preferences. Component boundaries verified against existing v1.2 source code. Firefox event page DOM access confirmed via MDN. Build script pattern cross-validated across STACK.md and ARCHITECTURE.md. |
+| Pitfalls | HIGH | 12 pitfalls identified. 10 of 12 backed by official MDN/Mozilla docs or official Firefox Bugzilla. 2 of 12 (IndexedDB under Firefox privacy settings) are MEDIUM confidence based on Bugzilla bug reports and community observation. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **vitest-chrome 0.1.0 API surface coverage:** At Phase 1 implementation time, verify that the specific Chrome APIs this extension uses (`storage.sync`, `runtime.sendMessage`, `runtime.onMessage`) are present in vitest-chrome's mock. If gaps exist, use manual `vi.fn()` stubs in `test/setup.js`. Decision deferred until setup — not blocking.
-- **Fixture generation script for `pdf-parser.js`:** `scripts/generate-fixture.mjs` must patch `GlobalWorkerOptions.workerSrc` before calling `extractTextFromPdf()` because `pdf-parser.js` uses `chrome.runtime.getURL()` which breaks in Node.js. One-time concern during Phase 1 setup.
-- **Privacy policy hosting URL:** No decision on hosting location (GitHub Pages vs. Cloudflare Pages vs. project domain path). Must be decided before Phase 5, but the URL does not need to exist before Phases 1-4.
-- **Icon artwork source:** The research recommends designing a source SVG for `sharp` to process, but no design tool or designer is specified. If no SVG artwork exists by Phase 3, icons can be placed manually at required sizes. Unblock by deciding on design approach before Phase 3 begins.
+- **webextension-polyfill decision:** FEATURES.md recommends against it (Firefox natively supports `chrome.*`); STACK.md includes it as a new dependency. Decision should be made at Phase 2 implementation time — if `chrome.*` calls in Firefox background work without polyfill (quick empirical check), skip the dependency. Risk of adding it is low (10 KB minified); risk of omitting it is also low.
+
+- **PDF.js WASM + Firefox CSP:** The existing `offscreen.html` may have an implicit CSP permitting WASM evaluation. The Firefox background page's default CSP may not. If citations fail on Firefox with a CSP error, add `"wasm-unsafe-eval"` to `content_security_policy` in `manifest.firefox.json`. Test empirically in Phase 3.
+
+- **Cloudflare Worker CORS for `moz-extension://` origin:** If `pct.tonyrowles.com` Cloudflare Worker validates the `Origin` header, `moz-extension://` origins need to be explicitly allowed. The Chrome `chrome-extension://` origin presumably already works. Verify during Phase 3 by checking network requests in Firefox DevTools.
+
+- **`strict_min_version` discrepancy across research files:** STACK.md recommends `128.0` (full MV3 support, July 2024); ARCHITECTURE.md shows `109.0` in sample manifest; PITFALLS.md uses `121.0`. Use `128.0` — it has the strongest rationale (all MV3 APIs available, still current in 2026) and aligns with the STACK.md recommendation.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Chrome Web Store Images](https://developer.chrome.com/docs/webstore/images) — icon (128px), promotional tile (440x280), screenshot (1280x800) requirements
-- [Chrome Web Store Listing Requirements](https://developer.chrome.com/docs/webstore/program-policies/listing-requirements/) — metadata, keyword rules, accuracy requirements
-- [Chrome Web Store Dashboard Privacy Fields](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy) — four required subsections for the privacy section
-- [Chrome Web Store User Data FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq) — privacy policy trigger conditions; `host_permissions` as flag
-- [Chrome Web Store Troubleshooting / Violation Codes](https://developer.chrome.com/docs/webstore/troubleshooting) — Purple Lithium, Yellow Magnesium, Red Nickel violations
-- [Chrome Extensions Configure Icons](https://developer.chrome.com/docs/extensions/develop/ui/configure-icons) — 16/32/48/128px sizes; Windows 32px requirement; SVG not supported
-- [Chrome Extensions Unit Testing docs](https://developer.chrome.com/docs/extensions/how-to/test/unit-testing) — Vitest recommendation; chrome API mocking pattern
-- [Chrome Extensions Give Users Options](https://developer.chrome.com/docs/extensions/develop/ui/options-page) — `options_ui` with `open_in_tab: true`
-- [Vitest 4.0 official docs](https://vitest.dev/guide/) — ESM-native execution; `node` and `happy-dom` environments; version 4.0.18 confirmed
-- [sharp official docs](https://sharp.pixelplumbing.com/) — SVG to PNG; resize API; version 0.34.5 confirmed
-- v1.1 extension source code — ground truth for architecture, existing module system, storage keys, and icon file structure
+- [MDN: Chrome incompatibilities](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities) — `declarativeContent` unsupported (bug 1435864), WAR UUID behavior, content script global scope differences
+- [MDN: Background scripts](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Background_scripts) — Firefox event page DOM access, lifecycle, suspension behavior, state persistence
+- [MDN: browser_specific_settings](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings) — gecko.id format, strict_min_version, data_collection_permissions (post-Nov 2025 AMO requirement)
+- [MDN: action.disable()](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/action/disable) — per-tab enable/disable confirmed for Firefox MV3
+- [Firefox Extension Workshop: MV3 Migration Guide](https://extensionworkshop.com/documentation/develop/manifest-v3-migration-guide/) — background scripts vs service workers, Firefox-specific manifest fields
+- [Firefox Extension Workshop: web-ext command reference](https://extensionworkshop.com/documentation/develop/web-ext-command-reference/) — run, build, lint commands (updated December 2025)
+- [esbuild API documentation](https://esbuild.github.io/api/) — format, outbase, bundle, define, entryPoints, splitting behavior
+- [webextension-polyfill GitHub](https://github.com/mozilla/webextension-polyfill) — MV3 compatibility, no-op behavior on Firefox, usage patterns
+- [web-ext npm](https://www.npmjs.com/package/web-ext) — version 9.3.0 confirmed as latest
+- [Firefox Bugzilla 1435864](https://bugzil.la/1435864) — `declarativeContent` not implemented in Firefox, no planned timeline
+- Project source code (v1.2) — ground truth for existing architecture, duplication locations, Chrome API usage patterns, dual-context constants pattern
 
 ### Secondary (MEDIUM confidence)
-- [vitest-chrome GitHub](https://github.com/probil/vitest-chrome) — `globalThis.chrome` assignment pattern; API surface; last published 2023; Vitest 4 compatibility untested
-- [Vitest browser mode InfoQ analysis](https://www.infoq.com/news/2025/12/vitest-4-browser-mode/) — Vitest 4 stable browser mode release context
-- Chrome Web Store first-person submission account (TraceMind Blog) — privacy policy rejection pattern confirmed in practice even for local-only extensions
-
-### Tertiary (LOW confidence)
-- General fuzzy matching literature — algorithm improvement approaches (sliding bookend, Levenshtein pre-filter region); applicable but not domain-verified against patent PDF parsing specifically
+- [1Password blog: esbuild extension build](https://1password.com/blog/new-extension-build-system) — real-world extension build patterns, 90% build time reduction vs Webpack (May 2024)
+- [How to port Chrome MV3 to Firefox](https://decembergarnetsmith.com/blog/2024/05/10/how-to-port-an-mv3-chrome-extension-to-firefox/) — corroborates manifest change requirements
+- [Mozilla Discourse: webextension-polyfill MV3](https://discourse.mozilla.org/t/how-to-use-browser-polyfill-for-mv3-cross-browser-web-extension/137839) — MV3 usage patterns and compatibility confirmation
+- [Firefox Bugzilla 1406675](https://bugzilla.mozilla.org/show_bug.cgi?id=1406675) — IndexedDB broken when cookies disabled
+- [Firefox Bugzilla 1841806](https://bugzilla.mozilla.org/show_bug.cgi?id=1841806) — IndexedDB not working in Firefox private browsing mode for extensions
+- [esbuild GitHub issue #1025](https://github.com/evanw/esbuild/issues/1025) — shared dependencies between builds
 
 ---
-*Research completed: 2026-03-02*
+*Research completed: 2026-03-03*
 *Ready for roadmap: yes*

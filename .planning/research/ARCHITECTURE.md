@@ -1,28 +1,32 @@
 # Architecture Research
 
-**Domain:** Chrome Extension (Manifest V3) — Patent Citation Tool v1.2 Store Polish + Accuracy Hardening
-**Researched:** 2026-03-02
-**Confidence:** HIGH (verified against v1.1 source; Chrome extension testing patterns and icon requirements verified against official Chrome docs)
+**Domain:** Multi-browser extension build pipeline — Chrome MV3 + Firefox MV3 port with esbuild
+**Researched:** 2026-03-03
+**Confidence:** HIGH (Firefox API differences verified against MDN/Extension Workshop; esbuild API verified against official docs; existing code verified from source)
 
 ---
 
-## Existing Architecture (v1.1 — Verified from Source)
+## Existing Architecture (v1.2 — Ground Truth from Source)
 
-This milestone adds testing infrastructure and UI polish to a working v1.1 extension. No structural changes to the core citation pipeline are planned. The architecture below is ground truth from the codebase.
+Before describing changes, this is the verified current state:
 
 ```
-Google Patents Tab                    Extension Context
+Google Patents Tab                    Chrome Extension Context
 +---------------------+     msg      +----------------------+
 | Content Script       |------------>| Service Worker        |
-| (classic scripts)    |<------------| - Message router      |
-|                      |     msg     | - Offscreen lifecycle |
+| (classic scripts)    |<------------| (ES module)           |
+|                      |     msg     | - Message router      |
+| constants.js (glob)  |             | - Offscreen lifecycle |
 | text-matcher.js      |             | - chrome.storage.local|
 | paragraph-finder.js  |             +----------+-----------+
 | citation-ui.js       |                        |
-| content-script.js    |              msg (both directions)
+| content-script.js    |             msg (both directions)
 +---------------------+              +----------v-----------+
                                      | Offscreen Document    |
-                                     | (ES modules)          |
+                                     | (ES modules only)     |
+                                     | offscreen.js          |
+                                     | pdf-parser.js         |
+                                     | position-map-builder.js
                                      | - Fetch PDF blob      |
                                      | - Store in IndexedDB  |
                                      | - Parse with PDF.js   |
@@ -38,601 +42,712 @@ Google Patents Tab                    Extension Context
                    | patent-cite-tool v1   |         | pct.tonyrowles.com    |
                    | pdfs store            |         | GET/POST /cache/{id}  |
                    +----------------------+         | GET /pdf?patent={id}  |
-                                                    | KV: positionMap JSON  |
                                                     +----------------------+
 ```
 
-### Component Files (v1.1)
+### Current Tech Debt (What v2.0 Fixes)
 
-| Component | Files | Module System |
-|-----------|-------|---------------|
-| Content Script | `src/content/content-script.js`, `text-matcher.js`, `paragraph-finder.js`, `citation-ui.js` | Classic scripts (globals) |
-| Service Worker | `src/background/service-worker.js` | ES module |
-| Offscreen Document | `src/offscreen/offscreen.js`, `pdf-parser.js`, `position-map-builder.js` | ES modules |
-| Shared Constants | `src/shared/constants.js` | Classic script (no export) — service worker and offscreen duplicate inline |
-| Popup | `src/popup/popup.html`, `popup.js` | Classic script |
-| Icons | `src/icons/` | PNG assets: 16/48/128px, active + inactive variants |
-| Manifest | `src/manifest.json` | Static JSON |
-| Cloudflare Worker | `worker/` | Separate Wrangler project |
-
-**Critical constraint on module system:** Content scripts are loaded as classic scripts via `manifest.json` `content_scripts` array. They cannot use `import`/`export`. The offscreen document uses ES modules (`<script type="module">`). This is why matching functions are duplicated: `text-matcher.js` (global functions for content script) and identical copies inside `offscreen/offscreen.js`. This tech debt is pre-existing and out of scope for v1.2.
+| Problem | Root Cause | v2.0 Resolution |
+|---------|-----------|-----------------|
+| `matchAndCite` duplicated in `text-matcher.js` AND `offscreen.js` | Content scripts are classic scripts; offscreen is ES module — they cannot share code without a build step | Extract to `src/shared/matching.js`; bundle into each target |
+| `MSG`/`STATUS`/`PATENT_TYPE` constants duplicated in `service-worker.js` AND `shared/constants.js` | Service worker couldn't ES-import `constants.js` originally (classic script design) | Import from `src/shared/constants.js` in all contexts after bundling |
+| `offscreen.js` has Chrome-only APIs (`chrome.offscreen.createDocument`) | Chrome MV3 architecture requirement | Firefox port absorbs this logic into background script directly |
 
 ---
 
-## v1.2 New Components
+## v2.0 Target Architecture
 
-### 1. Test Harness (New — Separate from Extension Bundle)
+### Chrome: Service Worker + Offscreen (Unchanged Structure)
 
-The test harness lives outside the extension source tree. It tests pure JavaScript parsing and matching logic without a browser. The Chrome extension's module system constraint (classic scripts vs ES modules) means the test runner cannot directly import `content/text-matcher.js`. The test fixtures exercise `offscreen/offscreen.js` matching logic instead, which is already ES-module compatible.
-
-**What is testable without a browser:**
-- `matchAndCiteOffscreen()` — pure function, no Chrome API dependencies
-- `normalizeTextOffscreen()` — pure string transformation
-- `buildPositionMap()` — pure function over plain JS arrays
-- `formatCitationOffscreen()` — pure formatting logic
-- `whitespaceStrippedMatch()`, `bookendMatch()`, `fuzzySubstringMatch()` — all pure functions
-- `findParagraphCitation()` (paragraph-finder.js) — requires a DOM; use `happy-dom` or `jsdom`
-
-**What requires a browser/Chrome APIs (not unit testable):**
-- Actual PDF fetch (network, CORS)
-- `chrome.storage.local` read/write
-- `chrome.runtime.sendMessage` round-trips
-- `chrome.offscreen.createDocument`
-- Shadow DOM rendering in content script
-
-**Test runner recommendation: Vitest (HIGH confidence)**
-- Node-native, zero config, ES module support out of the box
-- `environment: 'node'` for pure function tests (no DOM overhead)
-- `environment: 'happy-dom'` for paragraph-finder.js DOM walking tests
-- No Chrome API mocking needed for the target functions — they have no chrome dependencies
-- Fast (sub-second for pure logic tests)
-
-**Integration point:** Tests live in `tests/` at the project root, separate from `src/`. The test runner imports directly from `src/offscreen/` and `src/content/` files — this works because Vitest handles ES modules natively and the files are plain `.js` without any build step requirement.
-
-**Module import strategy for tests:**
-
-The matching functions in `offscreen/offscreen.js` are not exported (they are standalone functions in an IIFE-less module without `export` statements). To make them importable by tests:
-
-Option A (minimal change): Add named exports to `offscreen.js` for testable functions. Since offscreen.js is already an ES module, this requires only adding `export` keywords — zero behavior change.
-
-Option B (extraction): Extract shared pure functions into a new `src/shared/matching.js` ES module, import from both `offscreen.js` and tests. This also resolves the duplication tech debt between `text-matcher.js` and `offscreen.js`. Out of scope for v1.2 but an option to keep in mind.
-
-**Recommendation: Option A.** Add `export` to the functions in `offscreen.js` that need to be tested. One-word change per function, no refactoring, immediately testable.
-
-### 2. Test Fixtures (New Data Files)
-
-Test fixtures provide known inputs and expected outputs for the matching pipeline. They are JSON files, not binary PDFs. The fixture format decouples the test harness from PDF parsing infrastructure.
-
-**Fixture structure:**
+Chrome keeps its existing separation because MV3 service workers lack DOM access. The offscreen document provides the DOM context needed by PDF.js. Build pipeline consolidates the code but the runtime separation remains.
 
 ```
-tests/
-  fixtures/
-    position-maps/
-      US7393678.json        # Pre-computed PositionMap for a known patent
-      US11427642.json       # Another patent across different era
-      US20230123456.json    # Published application (paragraph citations)
-    cases/
-      basic-spec-matches.json    # selectedText + expected citation cases
-      cross-column-matches.json  # Selection spanning column boundary
-      hyphenated-words.json      # Wrap hyphen handling
-      fuzzy-matches.json         # Cases requiring fuzzy fallback
-      paragraph-citations.json   # Published application cases
-  unit/
-    matching.test.js        # Tests for matchAndCiteOffscreen()
-    normalization.test.js   # Tests for normalizeTextOffscreen()
-    position-map.test.js    # Tests for buildPositionMap() logic
-    citation-format.test.js # Tests for formatCitationOffscreen()
-    paragraph-finder.test.js # Tests for findParagraphCitation()
-  package.json              # Vitest + test dependencies
-  vitest.config.js          # Vitest configuration
+Chrome Runtime
++---------------------------+     +---------------------------+
+| Service Worker (SW)       |     | Offscreen Document        |
+| dist/chrome/background/   |<--->| dist/chrome/offscreen/    |
+| service-worker.js         |     | offscreen.js              |
+| (bundled ES module)       |     | (bundled ES module)       |
+|                           |     | pdf.mjs + pdf.worker.mjs  |
+| Imports:                  |     | IndexedDB operations      |
+|   shared/constants        |     | Fetch + parse pipeline    |
+|   (bundled in)            |     | Text matching             |
++---------------------------+     +---------------------------+
 ```
 
-**PositionMap fixture format (already defined by position-map-builder.js):**
+### Firefox: Background Script Absorbs Offscreen
+
+Firefox MV3 background scripts run as event pages (non-persistent pages with DOM access). They have full access to: `fetch`, `IndexedDB`, DOM APIs. There is no offscreen document API in Firefox. The background script directly executes what Chrome required an offscreen document for.
+
+```
+Firefox Runtime
++------------------------------------------+
+| Background Script (Event Page)           |
+| dist/firefox/background/background.js    |
+| (bundled ES module)                      |
+|                                          |
+| Everything Chrome splits between SW and  |
+| Offscreen lives here in Firefox:         |
+| - Message routing (was service-worker.js)|
+| - Fetch PDF blob (was offscreen.js)      |
+| - IndexedDB operations (was offscreen.js)|
+| - PDF.js parsing (was offscreen.js)      |
+| - Text matching (was offscreen.js)       |
+| - KV cache operations (was offscreen.js) |
+| pdf.mjs + pdf.worker.mjs (copied)        |
++------------------------------------------+
+```
+
+### Content Scripts: Identical in Both Targets
+
+Content scripts are classic scripts in both Chrome and Firefox (injected via manifest `content_scripts`). They use the same DOM-based paragraph finding and citation UI. esbuild bundles the shared matching code into `content.js` for each target.
+
+---
+
+## Directory Structure
+
+### Source Tree (src/)
+
+```
+src/
+├── background/
+│   └── service-worker.js           # Chrome-specific: SW + offscreen lifecycle
+├── content/
+│   ├── content-script.js           # Both targets
+│   ├── citation-ui.js              # Both targets
+│   └── paragraph-finder.js         # Both targets
+├── firefox/
+│   └── background.js               # Firefox-specific: merged SW + offscreen logic
+├── offscreen/
+│   ├── offscreen.js                # Chrome-specific: Chrome offscreen document
+│   ├── pdf-parser.js               # Shared logic (imported by offscreen + firefox/background)
+│   └── position-map-builder.js     # Shared logic
+├── shared/
+│   ├── constants.js                # Single source for MSG, STATUS, PATENT_TYPE
+│   └── matching.js                 # Extracted: normalizeText, matchAndCite, formatCitation
+│                                   #   (replaces duplication between text-matcher and offscreen)
+├── lib/
+│   ├── pdf.mjs                     # PDF.js (copied to both dist targets)
+│   └── pdf.worker.mjs              # PDF.js worker (web_accessible_resources)
+├── icons/                          # PNG assets (copied to both dist targets)
+├── popup/
+│   ├── popup.html
+│   └── popup.js
+├── options/
+│   ├── options.html
+│   └── options.js
+├── manifests/
+│   ├── manifest.chrome.json        # Chrome MV3 manifest
+│   └── manifest.firefox.json       # Firefox MV3 manifest
+└── offscreen/
+    └── offscreen.html              # Chrome-only HTML host for offscreen document
+```
+
+**Rationale for `src/manifests/` subdirectory:** The two manifests differ enough that a merge/patch approach adds complexity with no benefit. Separate source manifests are readable, diffable, and independently maintainable. The build script copies the correct one to each dist target.
+
+**Rationale for `src/firefox/background.js`:** Firefox needs a single background entry point that combines service-worker.js behavior with offscreen.js behavior. Keeping it in `src/firefox/` makes the platform-specific nature explicit rather than burying it in a shared directory.
+
+### Build Output (dist/)
+
+```
+dist/
+├── chrome/
+│   ├── manifest.json               # From src/manifests/manifest.chrome.json
+│   ├── background/
+│   │   └── service-worker.js       # Bundled: service-worker.js + shared imports
+│   ├── content/
+│   │   └── content.js              # Bundled: content-script + text-matcher + paragraph-finder
+│   │                               #   + citation-ui + shared/matching + shared/constants
+│   ├── offscreen/
+│   │   ├── offscreen.html          # Copied
+│   │   └── offscreen.js            # Bundled: offscreen.js + pdf-parser + position-map-builder
+│   │                               #   + shared/matching + shared/constants
+│   ├── popup/
+│   │   ├── popup.html              # Copied
+│   │   └── popup.js                # Bundled
+│   ├── options/
+│   │   ├── options.html            # Copied
+│   │   └── options.js              # Bundled
+│   ├── icons/                      # Copied
+│   └── lib/
+│       ├── pdf.mjs                 # Copied
+│       └── pdf.worker.mjs          # Copied
+└── firefox/
+    ├── manifest.json               # From src/manifests/manifest.firefox.json
+    ├── background/
+    │   └── background.js           # Bundled: firefox/background.js + pdf-parser
+    │                               #   + position-map-builder + shared/matching
+    │                               #   + shared/constants
+    ├── content/
+    │   └── content.js              # Same bundle recipe as Chrome content.js
+    ├── popup/
+    │   ├── popup.html              # Copied (identical)
+    │   └── popup.js                # Bundled (identical recipe)
+    ├── options/
+    │   ├── options.html            # Copied (identical)
+    │   └── options.js              # Bundled (identical recipe)
+    ├── icons/                      # Copied (identical)
+    └── lib/
+        ├── pdf.mjs                 # Copied
+        └── pdf.worker.mjs          # Copied
+```
+
+**Content script bundling note:** In current v1.2, content scripts are classic scripts loaded via manifest array order (`constants.js`, `text-matcher.js`, `paragraph-finder.js`, `citation-ui.js`, `content-script.js`). After bundling, the manifest lists a single `content.js` that includes all of these in correct order. The bundle format must be `iife` (not `esm`) because content scripts cannot use `import` at runtime.
+
+---
+
+## Manifest Differences: Chrome vs Firefox
+
+### Chrome manifest (src/manifests/manifest.chrome.json)
 
 ```json
 {
-  "patentId": "US7393678B2",
-  "generatedAt": "2026-03-02",
-  "source": "Google Patents PDF",
-  "entries": [
-    {
-      "page": 3,
-      "column": 1,
-      "lineNumber": 1,
-      "text": "The present invention relates to",
-      "hasWrapHyphen": false,
-      "section": "description"
-    }
+  "manifest_version": 3,
+  "permissions": [
+    "declarativeContent",
+    "offscreen",
+    "activeTab",
+    "storage",
+    "contextMenus",
+    "clipboardWrite"
   ],
-  "meta": {
-    "totalLines": 847,
-    "totalColumns": 22,
-    "hasClaimsSection": true
-  }
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [{
+    "matches": ["https://patents.google.com/patent/US*"],
+    "js": ["content/content.js"],
+    "run_at": "document_idle"
+  }],
+  "web_accessible_resources": [{
+    "resources": ["lib/pdf.worker.mjs", "offscreen/offscreen.html"],
+    "matches": ["<all_urls>"]
+  }]
 }
 ```
 
-**Test case fixture format:**
+### Firefox manifest (src/manifests/manifest.firefox.json)
 
 ```json
 {
-  "positionMapFile": "US7393678.json",
-  "cases": [
-    {
-      "id": "basic-1",
-      "description": "Short phrase exact match in spec",
-      "selectedText": "present invention relates",
-      "contextBefore": "The ",
-      "contextAfter": " to a novel",
-      "expectedCitation": "1:1",
-      "expectedConfidence": 1.0,
-      "expectMatch": true
-    },
-    {
-      "id": "fuzzy-1",
-      "description": "Smart-quote normalization",
-      "selectedText": "inventor\u2019s preferred embodiment",
-      "expectedCitation": "3:12",
-      "expectMatch": true,
-      "minConfidence": 0.95
+  "manifest_version": 3,
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "patent-cite-tool@yourname.com",
+      "strict_min_version": "109.0"
     }
-  ]
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "contextMenus",
+    "clipboardWrite"
+  ],
+  "background": {
+    "scripts": ["background/background.js"],
+    "type": "module"
+  },
+  "content_scripts": [{
+    "matches": ["https://patents.google.com/patent/US*"],
+    "js": ["content/content.js"],
+    "run_at": "document_idle"
+  }],
+  "web_accessible_resources": [{
+    "resources": ["lib/pdf.worker.mjs"],
+    "matches": ["https://patents.google.com/*"]
+  }]
 }
 ```
 
-**How fixtures are generated:**
+**Key manifest differences explained:**
 
-Fixtures cannot be auto-generated by running the extension against live patents (extension APIs required). Instead:
+| Field | Chrome | Firefox | Reason |
+|-------|--------|---------|--------|
+| `declarativeContent` permission | Required | **Omit** | Firefox does not implement `declarativeContent` API |
+| `offscreen` permission | Required | **Omit** | No offscreen document API in Firefox |
+| `background.service_worker` | Used | **Not used** | Firefox ignores `service_worker`; use `background.scripts` |
+| `background.scripts` | Not needed | `["background/background.js"]` | Firefox uses event page (non-persistent background script) |
+| `browser_specific_settings.gecko` | Not needed | **Required** | Firefox AMO requires gecko ID for signing |
+| `web_accessible_resources[].extension_ids` | Optional | **Use `matches` instead** | Firefox requires `matches` not `extension_ids` for WAR |
+| `offscreen/offscreen.html` in WAR | Required | **Omit** | No offscreen document in Firefox |
 
-1. **Manual fixture creation:** Run the extension against a known patent, open DevTools in the offscreen document, log `positionMap` to console, copy and save as JSON. Then select specific text passages and note expected citations.
+---
 
-2. **Semi-automated audit script:** Write a Node.js script that reads a pre-saved PDF ArrayBuffer, calls `extractTextFromPdf()` and `buildPositionMap()` locally (these are ES modules with no Chrome API deps), and outputs the PositionMap JSON. This is the faster path.
+## Mapping Chrome Offscreen Logic to Firefox Background
 
-The audit script pattern is:
+Chrome's offscreen document was created because MV3 service workers lack DOM access. Firefox event pages have DOM access natively. Every operation in `offscreen.js` can run directly in `firefox/background.js`.
+
+### Message Flow: Chrome vs Firefox
+
+**Chrome flow:**
+
+```
+Content Script
+  → chrome.runtime.sendMessage(LOOKUP_POSITION)
+  → Service Worker handles, forwards to Offscreen
+  → Offscreen does IndexedDB read + matching
+  → Offscreen sends CITATION_RESULT
+  → Service Worker forwards to content script tab
+```
+
+**Firefox flow (collapsed):**
+
+```
+Content Script
+  → browser.runtime.sendMessage(LOOKUP_POSITION)
+  → Background script handles directly
+  → Background script does IndexedDB read + matching
+  → Background script sends CITATION_RESULT to tab
+```
+
+The Firefox background.js is the union of service-worker.js + offscreen.js:
+
+- **From service-worker.js:** All `chrome.runtime.onMessage` handlers, declarative content rules replacement (see below), context menu setup, icon management via `browser.action.setIcon`
+- **From offscreen.js:** All PDF fetch/parse/match/cache functions, IndexedDB operations, Cloudflare Worker interactions
+
+The `ensureOffscreenDocument()` function and all `chrome.offscreen.*` calls are **Chrome-only** — they are not present in firefox/background.js at all.
+
+### `declarativeContent` Replacement in Firefox
+
+Chrome uses `declarativeContent.onPageChanged` to enable the toolbar icon only on `patents.google.com/patent/US*` pages. Firefox does not implement this API.
+
+**Firefox alternative:** Use `tabs.onUpdated` to listen for URL changes and call `action.enable()`/`action.disable()` per tab. Start with action disabled globally (set `"enabled": false` on the `action` key in manifest, or call `browser.action.disable()` on startup with no tabId to disable for all tabs by default), then enable per tab as URLs match.
 
 ```javascript
-// scripts/generate-fixture.mjs
-import { readFile } from 'fs/promises';
-import { extractTextFromPdf } from '../src/offscreen/pdf-parser.js';
-import { buildPositionMap } from '../src/offscreen/position-map-builder.js';
+// firefox/background.js — replaces declarativeContent rules
+browser.action.disable(); // disable globally on startup
 
-// pdf-parser.js requires PDF.js which needs GlobalWorkerOptions.workerSrc
-// In Node context, use pdfjs-dist directly with workerSrc = ''
-```
-
-**Important:** `pdf-parser.js` uses `chrome.runtime.getURL()` to set the PDF.js worker URL. This Chrome API call breaks in Node. The audit/fixture generation script must either:
-- Patch `GlobalWorkerOptions.workerSrc` before calling `extractTextFromPdf()`, or
-- Use the standalone `pdfjs-dist` npm package directly (not the bundled `src/lib/pdf.mjs`)
-
-This is a one-time setup concern for fixture generation, not for running tests (tests consume pre-generated fixtures as JSON, not PDFs).
-
-### 3. Options Page (New HTML/JS File)
-
-The popup currently contains both status display and settings. The options page extracts settings into a dedicated page reachable via right-click on the extension icon.
-
-**MV3 manifest configuration (HIGH confidence — verified against official Chrome docs):**
-
-```json
-{
-  "options_ui": {
-    "page": "options/options.html",
-    "open_in_tab": true
+browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url) {
+    if (/^https:\/\/patents\.google\.com\/patent\/US/.test(changeInfo.url)) {
+      browser.action.enable(tabId);
+    } else {
+      browser.action.disable(tabId);
+    }
   }
-}
-```
+});
 
-Using `open_in_tab: true` opens options in a full Chrome tab rather than embedded in `chrome://extensions`. This is the recommended pattern for settings that benefit from more screen space. The popup can link to options via `chrome.runtime.openOptionsPage()`.
-
-**New files:**
-- `src/options/options.html`
-- `src/options/options.js`
-
-**What moves from popup to options page:**
-- Trigger mode selector (floating button / auto / context menu / silent)
-- Display mode selector (default / advanced)
-- Include patent number prefix checkbox
-
-**What stays in popup:**
-- Current patent status display
-- Quick visual indicator (ready/fetching/error)
-- Link to open options
-
-**Options page storage:** Uses the same `chrome.storage.sync` keys as the popup (trigger-mode, display-mode, include-patent-number). No migration needed.
-
-### 4. Icon Set (Asset Replacement)
-
-The extension already has icons at `src/icons/`. The v1.2 goal is to replace placeholder icons with a proper icon set.
-
-**Required sizes per Chrome extension specs (HIGH confidence — official Chrome docs):**
-
-| Size | Purpose | Key |
-|------|---------|-----|
-| 16px | Toolbar (normal DPI), favicon in browser | `action.default_icon` + `icons` |
-| 32px | Windows taskbar, high-DPI toolbar | `icons` (optional but recommended) |
-| 48px | Extensions management page (chrome://extensions) | `icons` |
-| 128px | Chrome Web Store listing, installation dialog | `icons` |
-
-**Current manifest uses both `action.default_icon` and `icons`:**
-- `icons` key: the extension's identity icon (store + chrome://extensions)
-- `action.default_icon`: the toolbar button icon
-
-**The existing manifest already declares active/inactive variants:**
-```json
-"action": {
-  "default_icon": {
-    "16": "icons/icon-inactive-16.png",
-    "48": "icons/icon-inactive-48.png",
-    "128": "icons/icon-inactive-128.png"
+browser.tabs.onActivated.addListener(async ({ tabId }) => {
+  const tab = await browser.tabs.get(tabId);
+  if (/^https:\/\/patents\.google\.com\/patent\/US/.test(tab.url || '')) {
+    browser.action.enable(tabId);
+  } else {
+    browser.action.disable(tabId);
   }
-},
-"icons": {
-  "16": "icons/icon-active-16.png",
-  "48": "icons/icon-active-48.png",
-  "128": "icons/icon-active-128.png"
-}
-```
-
-**Add 32px variants:** The current manifest does not include 32px icons. Add `icon-active-32.png` and `icon-inactive-32.png` to the `icons` and `action.default_icon` sections. This improves appearance on Windows high-DPI displays.
-
-**Chrome Web Store 128px requirement:** The store icon must be exactly 128x128 PNG with 16px transparent padding on each side (effective artwork area 96x96px for square icons, ~112px diameter for circular icons). This is different from what many developers expect — the artwork should not fill the full 128x128.
-
-**Format constraint (HIGH confidence):** Icons must be raster PNG (or other Blink-supported rasters: BMP, GIF, ICO, JPEG). SVG and WebP are not supported. No build step required — raw PNG files are placed directly in `src/icons/`.
-
-**No manifest.json structure change required.** Replace the PNG files in `src/icons/`, add 32px variants, update the `icons` and `action.default_icon` sections to include the `"32"` key.
-
-### 5. Chrome Web Store Assets (New — Non-Extension Files)
-
-Store assets live outside the extension source tree. They are uploaded directly to the Chrome Web Store developer dashboard, not bundled into the extension .zip.
-
-**Required store assets (HIGH confidence — verified against official Chrome Web Store docs):**
-
-| Asset | Dimensions | Format | Notes |
-|-------|-----------|--------|-------|
-| Extension icon | 128x128 | PNG | Same as `src/icons/icon-active-128.png` — already exists |
-| Small promotional tile | 440x280 | PNG | Required for prominent store display |
-| Screenshot(s) | 1280x800 or 640x400 | PNG or JPG | At least 1 required, up to 5 allowed |
-
-**Optional store assets:**
-| Asset | Dimensions | Notes |
-|-------|-----------|-------|
-| Marquee promotional image | 1400x560 | Extensions without small tile shown after those with it |
-
-**Where to store these locally:**
-```
-store-assets/
-  icon-128.png              # Copy of src/icons/icon-active-128.png
-  promotional-440x280.png   # Small tile
-  screenshot-1.png          # 1280x800, shows citation being generated
-  screenshot-2.png          # 1280x800, shows silent mode or options
-  privacy-policy.md         # Text version; must be hosted at a URL
-```
-
-**Privacy policy requirement:** Because the extension stores data locally (IndexedDB) and uploads position maps to Cloudflare KV (shared cache), a privacy policy is required. The store submission form requires a URL to a hosted privacy policy. The privacy policy must disclose what data is collected and how it is used.
-
-**Privacy policy key disclosures for this extension:**
-- Patent position maps are uploaded to a shared server-side cache (Cloudflare KV) to improve performance for all users
-- No personally identifiable information is collected
-- Patent numbers searched/cited are not logged
-- The cached data (patent text extracted from public PDFs) is not private
-
----
-
-## System Overview (v1.2 — Full)
-
-```
-Chrome Extension Source (src/)
-+-----------------------------------------------------+
-| manifest.json            — Updated: +32px icons,    |
-|                              options_ui              |
-| icons/                   — New: 32px, quality icons  |
-| background/              — Unchanged                 |
-| content/                 — Unchanged                 |
-| offscreen/               — Minor: add test exports   |
-| shared/                  — Unchanged                 |
-| popup/                   — Modified: link to options |
-| options/                 — New: options.html/.js     |
-+-----------------------------------------------------+
-
-Test Infrastructure (tests/) — NOT bundled into extension
-+-----------------------------------------------------+
-| vitest.config.js                                     |
-| package.json (vitest, happy-dom)                     |
-| fixtures/position-maps/*.json   — Pre-built maps     |
-| fixtures/cases/*.json           — Input/expected     |
-| unit/matching.test.js           — matchAndCite tests |
-| unit/normalization.test.js      — text norm tests    |
-| unit/position-map.test.js       — parser logic tests |
-| unit/paragraph-finder.test.js   — DOM walk tests     |
-+-----------------------------------------------------+
-
-Store Assets (store-assets/) — NOT bundled into extension
-+-----------------------------------------------------+
-| icon-128.png                                         |
-| promotional-440x280.png                              |
-| screenshot-1.png, screenshot-2.png                   |
-| privacy-policy.md                                    |
-+-----------------------------------------------------+
-```
-
----
-
-## Integration Points: New vs. Modified Components
-
-| Component | Status | Change Description |
-|-----------|--------|--------------------|
-| `src/manifest.json` | Modified | Add `options_ui`, add `"32"` icon sizes |
-| `src/icons/*.png` | Modified | Replace placeholder PNGs with proper icon set; add 32px variants |
-| `src/popup/popup.html` | Modified | Remove settings UI; add link to options page |
-| `src/popup/popup.js` | Modified | Remove settings save/load; add `chrome.runtime.openOptionsPage()` call |
-| `src/options/options.html` | **New** | Settings form (trigger mode, display mode, patent number prefix) |
-| `src/options/options.js` | **New** | Settings read/write via `chrome.storage.sync` |
-| `src/offscreen/offscreen.js` | Minor modification | Add `export` keyword to testable pure functions |
-| `tests/` directory | **New** | Vitest test harness, fixtures, test cases |
-| `tests/package.json` | **New** | `vitest`, `happy-dom` dependencies |
-| `store-assets/` directory | **New** | Chrome Web Store submission assets |
-
-### What Explicitly Does NOT Change
-
-- `src/background/service-worker.js` — no changes for UI/icon work; algorithm fixes may modify it during accuracy audit
-- `src/content/content-script.js` — no structural changes; algorithm fixes may touch matching logic
-- `src/content/text-matcher.js` — may receive algorithm fixes found during audit
-- `src/offscreen/pdf-parser.js` — no changes expected
-- `src/offscreen/position-map-builder.js` — may receive algorithm fixes found during audit
-- `src/shared/constants.js` — no changes
-- IndexedDB schema — no changes
-- Cloudflare Worker — no changes (already deployed from v1.1)
-- `worker/` directory — no changes
-
----
-
-## Data Flow: Test Harness Pipeline
-
-The test harness does not run through Chrome APIs. It exercises the parsing and matching pipeline directly in Node.
-
-```
-Test Fixture (JSON)
-  → tests/unit/matching.test.js
-    → import { matchAndCiteOffscreen } from '../../src/offscreen/offscreen.js'
-      → import { buildPositionMap } from '../../src/offscreen/position-map-builder.js'
-    → Load positionMap from fixture file (JSON.parse, no PDF needed)
-    → Call matchAndCiteOffscreen(selectedText, positionMap, contextBefore, contextAfter)
-    → Assert: citation === expectedCitation, confidence >= minConfidence
-```
-
-For position-map builder tests:
-
-```
-Raw text items (inline test data, no PDF)
-  → tests/unit/position-map.test.js
-    → import { buildPositionMap } from '../../src/offscreen/position-map-builder.js'
-    → Call buildPositionMap([{ pageNum, items: [...], pageWidth, pageHeight }])
-    → Assert: correct column numbers, line numbers, section tags
-```
-
-For paragraph-finder DOM tests:
-
-```
-HTML string (inline or from fixture)
-  → tests/unit/paragraph-finder.test.js (environment: 'happy-dom')
-    → import { findParagraphCitation } from '../../src/content/paragraph-finder.js'
-    → Set document.body.innerHTML = htmlFixture
-    → Simulate text selection (set window.getSelection mock)
-    → Assert: citation matches expected paragraph number
-```
-
-**Paragraph-finder import constraint:** `paragraph-finder.js` is a classic script (no export). To import it in tests, either:
-- Add `export` to the functions needed
-- Or use Vitest's `vi.importActual` with a wrapper
-
-Recommendation: Add `export` to `findParagraphCitation` in `paragraph-finder.js`. Same pattern as offscreen.js.
-
----
-
-## Build Order for v1.2
-
-Build order is sequenced to deliver value early and avoid blocking on unknown quantities.
-
-```
-Phase 1: Test Harness Foundation
-  Why first: Fixtures and test infrastructure are prerequisites for the
-  accuracy audit. Building the harness before auditing ensures findings
-  are captured as reproducible test cases, not one-off observations.
-
-  Steps:
-  1a. Set up tests/package.json, vitest.config.js
-  1b. Add exports to offscreen.js (matchAndCiteOffscreen, normalizeTextOffscreen, etc.)
-  1c. Add exports to paragraph-finder.js (findParagraphCitation)
-  1d. Write fixture generation script (scripts/generate-fixture.mjs)
-  1e. Generate 3-5 PositionMap fixtures from known patents
-  1f. Write test cases for known correct citations
-  1g. Verify tests pass against current code (establish baseline)
-
-Phase 2: Accuracy Audit + Algorithm Fixes
-  Why second: Cannot fix accuracy without a test harness to capture failures
-  and verify fixes. The audit findings may generate new test cases that drive
-  algorithm changes. Algorithm fixes feed back into the test suite.
-
-  Steps:
-  2a. Manually audit 15-20 patents across era/type/length spectrum
-      - Short spec (< 20 cols), long spec (> 60 cols)
-      - Early-era patents (pre-2000), modern patents (2020+)
-      - Claims-only selections, cross-column selections
-      - Published applications (paragraph citations)
-  2b. For each failure: add test case to fixtures, diagnose root cause
-  2c. Fix algorithm issues found (position-map-builder.js, text-matcher logic)
-  2d. Verify all existing test cases still pass after each fix
-  2e. Iterate until audit sample passes at acceptable rate
-
-Phase 3: Store Polish
-  Why third: Does not depend on accuracy work. Could run in parallel with
-  Phase 2 if bandwidth allows. Delivers the visual/UX milestone independently.
-
-  Steps:
-  3a. Design and create icon set (16/32/48/128px, active + inactive)
-  3b. Update manifest.json: add 32px icon keys
-  3c. Replace src/icons/*.png with new icons
-  3d. Create src/options/options.html and options.js
-  3e. Update manifest.json: add options_ui section
-  3f. Strip settings from popup, add link to options
-  3g. Create store-assets/ with promotional tile and screenshots
-  3h. Write privacy policy (markdown + hosted at a URL)
-  3i. Load unpacked and verify: icon appearance, options page, popup link
-
-Phase 4: Store Submission
-  Why last: Requires completed extension (all phases), privacy policy URL,
-  and store assets. Chrome Web Store review typically takes 1-7 days.
-
-  Steps:
-  4a. Increment version in manifest.json
-  4b. Zip src/ directory for submission
-  4c. Fill out store listing (name, description, category, screenshots)
-  4d. Submit for review
-```
-
----
-
-## Architecture Patterns
-
-### Pattern 1: Pure-Function Extraction for Testability
-
-**What:** The matching and citation logic in `offscreen.js` is already expressed as pure functions (no side effects, no Chrome API calls). Tests can import and call these functions directly.
-
-**When to use:** Any function that transforms input data to output data without I/O or browser API calls qualifies. The test harness targets exactly these functions.
-
-**Trade-off:** The offscreen.js matching functions are currently not exported (no `export` keyword). Adding `export` is a one-word change with zero behavioral impact. The only risk is accidentally exporting internal helpers that change in future refactors, breaking tests unnecessarily. Export only the top-level entry points (`matchAndCiteOffscreen`, `normalizeTextOffscreen`, `buildPositionMap`) and avoid exporting internal helpers.
-
-**Example:**
-
-```javascript
-// src/offscreen/offscreen.js — add export to existing function
-export function matchAndCiteOffscreen(selectedText, positionMap, contextBefore, contextAfter) {
-  // existing implementation unchanged
-}
-
-// tests/unit/matching.test.js
-import { matchAndCiteOffscreen } from '../../src/offscreen/offscreen.js';
-import positionMap from '../fixtures/position-maps/US7393678.json' assert { type: 'json' };
-
-test('exact match in specification', () => {
-  const result = matchAndCiteOffscreen('present invention relates', positionMap.entries, '', '');
-  expect(result.citation).toBe('1:1');
-  expect(result.confidence).toBe(1.0);
 });
 ```
 
-### Pattern 2: Fixture-Driven Regression Testing
+**Confidence: HIGH** — `browser.action.disable(tabId)` and `browser.action.enable(tabId)` are confirmed supported in Firefox MV3.
 
-**What:** Test cases expressed as JSON fixtures (input + expected output) rather than hardcoded in test files. Fixtures can be generated from observed extension behavior and serve as regression anchors for future algorithm changes.
+---
 
-**When to use:** When test inputs are data-heavy (long patent text strings, position map arrays). When the test suite needs to grow without requiring test file edits (new cases are just new JSON entries).
+## Shared Code Extraction via Bundling
 
-**Trade-off:** Fixtures can go stale if the expected citation format changes. Include `expectedCitation` as a string that must be updated when format changes occur — this is intentional (it forces explicit acknowledgment of format changes).
+### What Gets Extracted to src/shared/
 
-### Pattern 3: Options Page as Separate Page vs. Embedded
+**`src/shared/constants.js` (already exists, modify):**
+Currently written as a classic script with no export. After v2.0: add ES module exports. The file still works as a classic script (exports are silently ignored when loaded as classic script), but the service worker and Firefox background can now `import` from it.
 
-**What:** `options_ui` with `open_in_tab: true` opens the options page in a full Chrome tab rather than embedding it in the chrome://extensions iframe.
+```javascript
+// src/shared/constants.js — add exports
+export const MSG = { ... };
+export const STATUS = { ... };
+export const PATENT_TYPE = { ... };
+```
 
-**When to use:** When settings benefit from full-width layout. When options page needs to use Chrome APIs that are unavailable in embedded mode (e.g., Tabs API). When users should have a full back-button-navigable URL for options.
+**`src/shared/matching.js` (new file):**
+Extract the duplicated matching logic that currently exists in both `content/text-matcher.js` (classic-script globals) and `offscreen/offscreen.js` (ES module functions with `Offscreen` suffix). After extraction:
 
-**Trade-off:** Full-page options feel slightly less integrated than embedded panels. For this extension the settings are simple enough that either works, but `open_in_tab: true` avoids the subtle embedded-mode API restrictions (Tabs API unavailable).
+- `src/shared/matching.js` — single authoritative copy, ES module exports
+- `src/content/text-matcher.js` — deleted or reduced to a thin wrapper (or the file is removed entirely and content.js imports from shared)
+- `src/offscreen/offscreen.js` — imports from shared/matching instead of defining its own copies
 
-### Pattern 4: Test Infrastructure Outside Extension Bundle
+**Functions that move to shared/matching.js:**
 
-**What:** The `tests/` directory and its `package.json` live at the project root, not inside `src/`. The extension bundle (zipped `src/`) never includes test files or Vitest dependencies.
+| Function | Currently in | After |
+|----------|-------------|-------|
+| `normalizeText` / `normalizeTextOffscreen` | Both files (duplicated) | `shared/matching.js` as `normalizeText` |
+| `matchAndCite` / `matchAndCiteOffscreen` | Both files (duplicated) | `shared/matching.js` as `matchAndCite` |
+| `formatCitation` / `formatCitationOffscreen` | Both files (duplicated) | `shared/matching.js` as `formatCitation` |
+| `resolveMatch` / `resolveMatchOffscreen` | Both files (duplicated) | `shared/matching.js` as `resolveMatch` |
+| `whitespaceStrippedMatch` | Both files (duplicated) | `shared/matching.js` |
+| `bookendMatch` | Both files (duplicated) | `shared/matching.js` |
+| `fuzzySubstringMatch` / `fuzzySubstringMatchOffscreen` | Both files (duplicated) | `shared/matching.js` |
+| `findAllOccurrences` | Both files (duplicated) | `shared/matching.js` |
+| `pickBestByContext` | Offscreen only | `shared/matching.js` |
+| `levenshtein` / `levenshteinOffscreen` | Both files (duplicated) | `shared/matching.js` |
 
-**When to use:** Always. Test infrastructure should never ship to end users.
+**After extraction, esbuild bundles shared/matching.js into every bundle that needs it.** There is no runtime module sharing — each bundle is self-contained. This is correct for extensions: content scripts, background scripts, and offscreen documents cannot share a module instance at runtime anyway.
 
-**Trade-off:** Requires a second `package.json` (the `worker/` directory already has one, establishing the precedent). The extension source `src/` remains dependency-free — just HTML, JS, and PNG files.
+---
+
+## esbuild Build Script
+
+The build script lives at `scripts/build.mjs` (sibling to existing `scripts/generate-icons.mjs`).
+
+### Entry Points Per Target
+
+```javascript
+// scripts/build.mjs
+import * as esbuild from 'esbuild';
+import { cp, mkdir, copyFile } from 'fs/promises';
+
+const targets = ['chrome', 'firefox'];
+
+for (const target of targets) {
+  const outdir = `dist/${target}`;
+  await mkdir(outdir, { recursive: true });
+
+  // JavaScript bundles
+  await esbuild.build({
+    entryPoints: target === 'chrome'
+      ? {
+          'background/service-worker': 'src/background/service-worker.js',
+          'offscreen/offscreen': 'src/offscreen/offscreen.js',
+          'content/content': 'src/content/content-script.js',
+          'popup/popup': 'src/popup/popup.js',
+          'options/options': 'src/options/options.js',
+        }
+      : {
+          'background/background': 'src/firefox/background.js',
+          'content/content': 'src/content/content-script.js',
+          'popup/popup': 'src/popup/popup.js',
+          'options/options': 'src/options/options.js',
+        },
+    bundle: true,
+    outdir,
+    format: 'esm',   // service-worker and background use ESM; see content note
+    platform: 'browser',
+    define: {
+      'BROWSER_TARGET': JSON.stringify(target),
+    },
+  });
+
+  // Content script needs IIFE format (not ESM) — separate build call
+  await esbuild.build({
+    entryPoints: { 'content/content': 'src/content/content-script.js' },
+    bundle: true,
+    outdir,
+    format: 'iife',  // classic script injection — cannot use ESM at runtime
+    platform: 'browser',
+    define: { 'BROWSER_TARGET': JSON.stringify(target) },
+  });
+
+  // Copy static assets
+  await cp('src/icons', `${outdir}/icons`, { recursive: true });
+  await cp('src/lib', `${outdir}/lib`, { recursive: true });
+  await copyFile(`src/popup/popup.html`, `${outdir}/popup/popup.html`);
+  await copyFile(`src/options/options.html`, `${outdir}/options/options.html`);
+  await copyFile(
+    `src/manifests/manifest.${target}.json`,
+    `${outdir}/manifest.json`
+  );
+
+  // Chrome-only: copy offscreen HTML
+  if (target === 'chrome') {
+    await copyFile('src/offscreen/offscreen.html', `${outdir}/offscreen/offscreen.html`);
+  }
+}
+```
+
+**Content script format note:** The `content-script.js` entry point imports from `shared/constants.js` and `shared/matching.js`. After esbuild bundles with `format: 'iife'`, those imports are inlined — the output is a single classic-compatible IIFE file. The manifest lists only `content/content.js` (instead of the current 5-file array). This eliminates the global-variable dependency chain in the manifest.
+
+**ESM format for background/offscreen:** Service worker (`type: "module"`) and offscreen document (`<script type="module">`) already use ESM. The Firefox background script also uses `"type": "module"` in the manifest. ESM format bundles import statements inline without adding module boilerplate. This matches the existing structure.
+
+### Build Scripts in package.json
+
+```json
+{
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:chrome": "BROWSER_TARGET=chrome node scripts/build.mjs",
+    "build:firefox": "BROWSER_TARGET=firefox node scripts/build.mjs",
+    "test": "vitest run",
+    "generate-icons": "node scripts/generate-icons.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "pdfjs-dist": "^5.5.207",
+    "sharp": "^0.34.5",
+    "vitest": "^3.0.0"
+  }
+}
+```
+
+---
+
+## Platform-Specific Code Paths
+
+### Strategy: Platform-Specific Entry Points (Preferred)
+
+The cleanest approach is separate entry points per platform rather than `if (BROWSER_TARGET === 'chrome')` branches scattered through shared files. The divergence is large enough (offscreen document lifecycle vs. no offscreen document) that a unified entry point would be hard to follow.
+
+- `src/background/service-worker.js` — Chrome-only entry point; references `chrome.offscreen`, `declarativeContent`
+- `src/firefox/background.js` — Firefox-only entry point; no offscreen references, uses `tabs.onUpdated` for icon control
+
+Both import from the same `src/shared/` modules. The platform-specific code lives only at the entry point level.
+
+### Strategy: BROWSER_TARGET Define (For Minor Differences)
+
+For small differences within shared code (e.g., a single API call that differs between targets), esbuild's `define` option inlines a constant that the bundler uses for dead-code elimination:
+
+```javascript
+// src/shared/matching.js — hypothetical example of minor platform difference
+if (typeof BROWSER_TARGET !== 'undefined' && BROWSER_TARGET === 'chrome') {
+  // Chrome-specific behavior
+}
+```
+
+esbuild replaces `BROWSER_TARGET` with the literal string `"chrome"` or `"firefox"` at build time, then eliminates the dead branch. The `if` statement does not appear in the output bundle.
+
+**In practice, avoid this pattern for the offscreen/background split.** The difference is too large. Reserve `BROWSER_TARGET` defines for genuinely minor variations.
+
+### What Remains Chrome-Only
+
+| Code | Location | Why |
+|------|----------|-----|
+| `chrome.offscreen.createDocument()` | service-worker.js | API does not exist in Firefox |
+| `chrome.declarativeContent.onPageChanged` | service-worker.js | API does not exist in Firefox |
+| `offscreen/offscreen.html` | static asset | Chrome-only; not copied to dist/firefox |
+| `ensureOffscreenDocument()` | service-worker.js | Chrome-only lifecycle management |
+| `offscreen` permission | manifest.chrome.json | Chrome-only manifest permission |
+| `declarativeContent` permission | manifest.chrome.json | Chrome-only manifest permission |
+
+### What Remains Firefox-Only
+
+| Code | Location | Why |
+|------|----------|-----|
+| `tabs.onUpdated` icon enable/disable | firefox/background.js | `declarativeContent` alternative |
+| `tabs.onActivated` icon enable/disable | firefox/background.js | `declarativeContent` alternative |
+| `browser_specific_settings.gecko.id` | manifest.firefox.json | AMO signing requirement |
+| Inline PDF parsing in background | firefox/background.js | No offscreen document API |
+
+### What is Shared (Identical Between Targets)
+
+| Component | Status |
+|-----------|--------|
+| `src/shared/constants.js` | Bundled into every entry point |
+| `src/shared/matching.js` | Bundled into content (both), offscreen (Chrome), background (Firefox) |
+| `src/offscreen/pdf-parser.js` | Imported by Chrome's offscreen.js AND Firefox's background.js |
+| `src/offscreen/position-map-builder.js` | Same |
+| `src/content/content-script.js` | Same content bundle for both targets |
+| `src/content/citation-ui.js` | Same content bundle |
+| `src/content/paragraph-finder.js` | Same content bundle |
+| `src/popup/` | Identical in both targets (HTML + JS) |
+| `src/options/` | Identical in both targets (HTML + JS) |
+| `src/icons/` | Identical in both targets |
+| `src/lib/pdf.mjs` | Copied to both targets |
+| `src/lib/pdf.worker.mjs` | Copied to both targets |
+
+---
+
+## Data Flow Changes in v2.0
+
+### Chrome: No Runtime Change
+
+The Chrome message flow is identical to v1.2. The only change is that `shared/matching.js` is now bundled into the offscreen document instead of being duplicated inline. Runtime behavior is identical.
+
+### Firefox: Collapsed Message Flow
+
+```
+Firefox Content Script
+  → browser.runtime.sendMessage({ type: LOOKUP_POSITION, ... })
+    ↓
+Firefox Background Script (directly handles — no forwarding needed)
+  → reads IndexedDB for positionMap
+  → calls matchAndCite() from shared/matching.js
+  → browser.tabs.sendMessage(tabId, { type: CITATION_RESULT, ... })
+    ↓
+Firefox Content Script handles CITATION_RESULT
+```
+
+The Chrome pattern of "SW forwards to offscreen, offscreen responds to SW, SW forwards to tab" collapses to "background handles and responds directly."
+
+### IndexedDB: Shared Schema, Different Access Context
+
+Both Chrome (offscreen document) and Firefox (background script) access the same IndexedDB database `patent-cite-tool` with the same `pdfs` object store and record schema. No schema changes are needed for Firefox.
+
+**Important:** IndexedDB in a Firefox background event page persists across background script suspension/resumption. The data is not lost when the event page unloads. This matches Chrome's behavior (offscreen document is destroyed and recreated, but IndexedDB data persists).
+
+---
+
+## PDF.js Worker URL: Platform Difference
+
+`pdf-parser.js` currently sets:
+
+```javascript
+GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs');
+```
+
+This uses `chrome.runtime.getURL()` which works in both Chrome and Firefox (Firefox supports the `chrome.*` namespace for compatibility). No change needed — this line works in both targets.
+
+**Verification:** Firefox has supported `chrome.runtime.getURL()` since Firefox 45. The extension uses `browser.*` / `chrome.*` interchangeably. Both work.
+
+---
+
+## Component Inventory: New vs Modified vs Unchanged
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `src/shared/matching.js` | Extracted: normalizeText, matchAndCite, formatCitation, all helpers |
+| `src/firefox/background.js` | Firefox background: merged SW + offscreen logic, tabs-based icon control |
+| `src/manifests/manifest.chrome.json` | Chrome-specific manifest (moved from src/manifest.json) |
+| `src/manifests/manifest.firefox.json` | Firefox-specific manifest |
+| `scripts/build.mjs` | esbuild build script producing dist/chrome/ + dist/firefox/ |
+
+### Modified Files
+
+| File | What Changes |
+|------|-------------|
+| `src/shared/constants.js` | Add `export` keyword to `MSG`, `STATUS`, `PATENT_TYPE` |
+| `src/background/service-worker.js` | Import from `shared/constants.js` instead of inline duplication |
+| `src/offscreen/offscreen.js` | Import matching functions from `shared/matching.js` instead of duplicating |
+| `src/content/content-script.js` | Import constants from `shared/constants.js` (via bundle — no code change needed if esbuild resolves it) |
+| `package.json` | Add `esbuild` devDependency; add build scripts |
+
+### Deleted Files (After Build Pipeline Established)
+
+| File | Why |
+|------|-----|
+| `src/manifest.json` | Replaced by `src/manifests/manifest.chrome.json` + `manifest.firefox.json` |
+
+### Unchanged Files
+
+| File | Why Unchanged |
+|------|--------------|
+| `src/offscreen/pdf-parser.js` | Pure logic; imported by both offscreen.js and firefox/background.js |
+| `src/offscreen/position-map-builder.js` | Pure logic; shared |
+| `src/content/citation-ui.js` | Classic-script UI; unchanged |
+| `src/content/paragraph-finder.js` | DOM walking; unchanged |
+| `src/content/text-matcher.js` | **Either deleted** (logic moves to shared/matching.js) **or reduced to** thin import wrapper |
+| `src/popup/popup.html`, `popup.js` | No browser-specific differences |
+| `src/options/options.html`, `options.js` | No browser-specific differences |
+| `src/lib/pdf.mjs`, `pdf.worker.mjs` | Copied to both dist targets |
+| `tests/` directory | Test harness; unchanged |
+| `worker/` directory | Cloudflare Worker; unchanged |
+
+---
+
+## Build Order (Phase Dependencies)
+
+The v2.0 work has hard dependencies that dictate build order:
+
+```
+Step 1: Shared code extraction
+  Why first: All subsequent work depends on shared/matching.js and
+  shared/constants.js with exports. Firefox background.js and the
+  Chrome offscreen.js refactor both import from shared/.
+
+  - Create src/shared/matching.js (extract from text-matcher.js + offscreen.js)
+  - Add exports to src/shared/constants.js
+  - Update src/offscreen/offscreen.js to import from shared/matching.js
+  - Update src/background/service-worker.js to import from shared/constants.js
+  - Verify: existing Chrome extension still works (no dist/ yet; test via load unpacked)
+
+Step 2: esbuild pipeline (Chrome only)
+  Why second: Validate the build pipeline against the known-working Chrome target
+  before introducing Firefox. Catches build configuration errors without browser
+  compatibility noise.
+
+  - Write scripts/build.mjs for Chrome target only
+  - Create src/manifests/manifest.chrome.json (copy/rename existing manifest.json)
+  - Verify: dist/chrome/ loads and functions identically to pre-build src/
+  - Verify: 71-case test corpus still passes
+
+Step 3: Firefox background script
+  Why third: Requires shared code from Step 1. Introduce Firefox-specific
+  background.js with merged SW + offscreen logic + tabs-based icon control.
+
+  - Write src/firefox/background.js
+  - Create src/manifests/manifest.firefox.json
+  - Add Firefox target to scripts/build.mjs
+  - Verify: dist/firefox/ loads in Firefox, citation pipeline works
+
+Step 4: Cross-browser validation
+  Why last: Both targets must be working before validation makes sense.
+
+  - Load dist/chrome/ in Chrome, run test corpus cases manually
+  - Load dist/firefox/ in Firefox, run same cases
+  - Verify 71-case corpus passes on both platforms
+```
+
+**Critical constraint:** Do not attempt the Firefox port (Step 3) before the build pipeline validates against Chrome (Step 2). Firefox debugging is harder than Chrome debugging. A working Chrome build confirms the shared code extraction is correct before adding Firefox-specific complexity.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Testing Against Chrome APIs in Unit Tests
+### Anti-Pattern 1: Unified Entry Point with Platform Conditionals
 
-**What people do:** Write tests that call `chrome.storage.sync.get()` or `chrome.runtime.sendMessage()`, then mock the entire chrome namespace.
+**What people do:** Write a single `background.js` with `if (chrome.offscreen) { /* Chrome path */ } else { /* Firefox path */ }` branching throughout.
 
-**Why it's wrong for this project:** The valuable logic (text matching, position map building, citation formatting) has no Chrome API dependencies at all. Adding chrome mocks to test pure functions adds setup complexity with zero testing value. Mock boundaries should fall at the function level, not at the Chrome API level.
+**Why it's wrong:** The offscreen document split is fundamental — Chrome's service worker orchestrates a separate offscreen process. Firefox's background script is one process doing everything. Unifying these into a single file means every function has a conditional, the code is hard to read, and tests cannot easily isolate platform behavior.
 
-**Do this instead:** Test the pure functions directly. Accept that message-passing flows and storage interactions are validated by manual load-unpacked testing, not automated unit tests.
+**Do this instead:** Separate entry points (`src/background/service-worker.js` for Chrome, `src/firefox/background.js` for Firefox) sharing common modules from `src/shared/`. The build script selects the right entry point per target.
 
-### Anti-Pattern 2: Binary PDF Files as Test Fixtures
+### Anti-Pattern 2: Runtime API Detection Instead of Build-Time Branching
 
-**What people do:** Commit binary PDF files to the test fixtures directory and have tests run the full PDF.js extraction pipeline.
+**What people do:** Check `if (typeof chrome.offscreen !== 'undefined')` at runtime to detect browser.
 
-**Why it's wrong:** PDFs are large binary files (2-15 MB each) unsuitable for version control. PDF.js requires the worker URL to be configured (`GlobalWorkerOptions.workerSrc`), which depends on `chrome.runtime.getURL()` — a Chrome API. Running the full pipeline in tests requires extensive mocking infrastructure.
+**Why it's wrong:** API detection at runtime is fragile — Chrome/Firefox add and remove APIs between versions. Build-time branching via separate entry points is explicit and survives API changes without needing detection logic.
 
-**Do this instead:** Separate fixture generation (a one-time script that runs outside tests) from test execution. Tests consume pre-extracted PositionMap JSON files, not PDFs. The JSON fixtures are small, human-readable, and version-control friendly.
+**Do this instead:** Separate entry points per platform. The manifest declares the background script; the background script is the platform-specific entry.
 
-### Anti-Pattern 3: Modifying popup.js to Remove Settings Without Creating Options Page First
+### Anti-Pattern 3: Bundling pdf.worker.mjs with the Main Bundle
 
-**What people do:** Remove settings from the popup before the options page exists, leaving users with no way to change settings.
+**What people do:** Import `pdf.worker.mjs` from within the main PDF.js consumer module, letting esbuild bundle it inline.
 
-**Why it's wrong:** Even if options page work is in the same phase, the order matters. Users loading an intermediate build of the extension would lose access to settings.
+**Why it's wrong:** The PDF.js worker is a separate worker script that PDF.js loads via URL (`GlobalWorkerOptions.workerSrc`). It must exist as a standalone file at a known URL within the extension. If bundled inline, PDF.js cannot load it as a worker.
 
-**Do this instead:** Build and verify `options.html` / `options.js` first. Then strip settings from the popup and add the "Open Settings" link. Verify the full flow (popup link → options page → settings persist) before committing either change.
+**Do this instead:** Mark `pdf.mjs` and `pdf.worker.mjs` as `external` in the esbuild config (do not bundle them), and copy them as-is to `dist/{target}/lib/`. The `web_accessible_resources` manifest entry must include `lib/pdf.worker.mjs` so PDF.js can construct a worker URL from it.
 
-### Anti-Pattern 4: Changing Algorithm Logic Without Test Coverage First
+```javascript
+// scripts/build.mjs — mark PDF.js as external, handle via copy
+await esbuild.build({
+  external: ['../lib/pdf.mjs'],  // don't bundle pdf.mjs; import at runtime via relative path
+  ...
+});
+// Then copy pdf.mjs and pdf.worker.mjs to dist/{target}/lib/
+```
 
-**What people do:** Identify an accuracy failure, modify the matching algorithm, verify the one failing case passes, ship.
+**Alternative:** If `pdf-parser.js` imports `pdf.mjs` from `../lib/pdf.mjs`, esbuild will try to bundle it. Use `external: ['../lib/*']` or restructure the import to use a URL string instead of a module import for the worker case.
 
-**Why it's wrong for this milestone:** Algorithm changes in the matching pipeline can fix one case while silently breaking others (the matching functions have complex interactions between exact, whitespace-stripped, bookend, and fuzzy paths). Without test coverage, the regression surface is invisible.
+### Anti-Pattern 4: One Manifest with Platform Patches
 
-**Do this instead:** Write the failing case as a test fixture before touching the algorithm. Verify the test fails with current code. Fix the algorithm. Verify the new test passes and all existing tests still pass. This is the minimum viable regression harness for algorithm changes.
+**What people do:** Write a base manifest and apply JSON patches at build time to produce browser-specific variants.
+
+**Why it's wrong for this project:** The manifest differences between Chrome and Firefox are significant (different background keys, different permission sets, different WAR format). A patch-based approach requires a patching library and makes the effective manifest hard to read — you must mentally apply the patches to understand what Firefox sees.
+
+**Do this instead:** Maintain two readable manifest files in `src/manifests/`. Both are checked into source control. Diffs between them are immediately visible. The build script copies the right one. This is simpler and more transparent than a patch system.
 
 ---
 
-## Integration Constraints
+## Integration Points with Test Harness
 
-### Test Harness Boundary: What Vitest Can and Cannot Reach
+The existing Vitest test harness (tests/) is not affected by the build pipeline. Tests import directly from `src/` files (not from `dist/`). After shared code extraction:
 
-| Function | In File | Exportable? | Chrome APIs? | Testable in Vitest |
-|----------|---------|-------------|-------------|---------------------|
-| `matchAndCiteOffscreen()` | offscreen.js | After adding `export` | None | Yes |
-| `normalizeTextOffscreen()` | offscreen.js | After adding `export` | None | Yes |
-| `buildPositionMap()` | position-map-builder.js | Already exported | None | Yes |
-| `extractTextFromPdf()` | pdf-parser.js | Already exported | `chrome.runtime.getURL` | Requires patch |
-| `findParagraphCitation()` | paragraph-finder.js | After adding `export` | None | Yes (happy-dom env) |
-| `matchAndCite()` | text-matcher.js | No (classic script globals) | None | No (no export syntax) |
-| `lookupPosition()` | offscreen.js | No (uses IndexedDB) | None directly | No (IndexedDB deps) |
-| `handleLookupPosition()` | service-worker.js | No (uses chrome.tabs) | chrome.tabs, chrome.runtime | No |
-
-**For `extractTextFromPdf()` in fixture generation script only:** Patch `GlobalWorkerOptions.workerSrc = ''` before calling. PDF.js falls back to main-thread parsing when worker fails to load — acceptable for a one-time fixture generation script.
-
-### Options Page Storage Compatibility
-
-The options page must read and write the same `chrome.storage.sync` keys as the current popup. Current popup keys (from popup.js source):
-
-- `triggerMode` — string: `'floating-button'` | `'auto'` | `'context-menu'` | `'silent'`
-- `displayMode` — string: `'default'` | `'advanced'`
-- `includePatentNumber` — boolean
-
-No key migration needed. The options page JavaScript uses identical `chrome.storage.sync.get()` / `set()` calls. The popup JavaScript simplifies to only display-related reads and a button to open options.
-
-### Icon Asset Pipeline
-
-No build step. Icons are static PNG files dropped into `src/icons/`. The manifest references them by filename. Workflow:
-
-1. Design tool (Figma, Inkscape, etc.) exports: `icon-active-16.png`, `icon-active-32.png`, `icon-active-48.png`, `icon-active-128.png`, `icon-inactive-16.png`, `icon-inactive-32.png`, `icon-inactive-48.png`, `icon-inactive-128.png`
-2. Files placed in `src/icons/` (replacing existing placeholders)
-3. `manifest.json` updated to include `"32"` key in both `icons` and `action.default_icon` sections
-4. Load unpacked in Chrome, verify appearance at each size
+- Tests that previously imported `matchAndCiteOffscreen` from `src/offscreen/offscreen.js` should be updated to import `matchAndCite` from `src/shared/matching.js`
+- The `offscreen-matcher.test.js` file may need updating if function names change (the `Offscreen` suffix disappears when logic moves to shared/)
+- All other tests (position-map-builder, text-matcher, classify-result) are unaffected
 
 ---
 
 ## Sources
 
-- [Chrome Developers: Unit Testing Chrome Extensions](https://developer.chrome.com/docs/extensions/how-to/test/unit-testing) — HIGH confidence (official)
-- [Chrome Developers: Configure extension icons](https://developer.chrome.com/docs/extensions/develop/ui/configure-icons) — HIGH confidence (official)
-- [Chrome Developers: Manifest - Icons reference](https://developer.chrome.com/docs/extensions/reference/manifest/icons) — HIGH confidence (official)
-- [Chrome Developers: Give users options](https://developer.chrome.com/docs/extensions/develop/ui/options-page) — HIGH confidence (official)
-- [Chrome Developers: Supplying Images (Web Store)](https://developer.chrome.com/docs/webstore/images) — HIGH confidence (official; 440x280 small tile required for prominent placement, 1280x800 screenshots)
-- [Vitest: Getting Started](https://vitest.dev/guide/) — HIGH confidence (official)
-- [Vitest: Test Environment Configuration](https://vitest.dev/config/environment.html) — HIGH confidence (official; `node` and `happy-dom` environment options)
-- v1.1 extension source code — HIGH confidence (ground truth for existing architecture)
+- [MDN: Background scripts — Firefox MV3 background field options](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background) — HIGH confidence; Firefox background.scripts vs service_worker; persistent: false behavior
+- [MDN: Background scripts — DOM access in Firefox event pages](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Background_scripts) — HIGH confidence; Firefox background pages have `window` global and full DOM APIs
+- [MDN: Chrome incompatibilities — declarativeContent not in Firefox](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities) — HIGH confidence; declarativeContent explicitly listed as not implemented
+- [Firefox Extension Workshop: MV3 Migration Guide](https://extensionworkshop.com/documentation/develop/manifest-v3-migration-guide/) — HIGH confidence; background scripts vs service workers; no offscreen document support in Firefox
+- [MDN: browser_specific_settings — gecko ID required for AMO](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings) — HIGH confidence; gecko.id format requirements
+- [esbuild API documentation](https://esbuild.github.io/api/) — HIGH confidence; entryPoints, outdir, format (iife/esm), bundle, define options
+- [Chrome Developers: Offscreen Documents in MV3](https://developer.chrome.com/blog/Offscreen-Documents-in-Manifest-v3) — HIGH confidence; why offscreen exists in Chrome (service worker lacks DOM); not available in Firefox
+- [MDN: action.disable() — Firefox support confirmed](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/action/disable) — HIGH confidence; per-tab action disable/enable works in Firefox
+- Existing source code (v1.2) — HIGH confidence; ground truth for current architecture, duplication locations, Chrome API usage patterns
 
 ---
 
-*Architecture research for: Patent Citation Tool v1.2 — Store Polish + Accuracy Hardening*
-*Researched: 2026-03-02*
+*Architecture research for: Patent Citation Tool v2.0 — esbuild build pipeline + Firefox port*
+*Researched: 2026-03-03*

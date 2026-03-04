@@ -1,187 +1,293 @@
 # Pitfalls Research
 
-**Domain:** Chrome extension store submission + accuracy testing + algorithm improvement (v1.2 milestone)
-**Researched:** 2026-03-02
-**Confidence:** HIGH (Chrome Web Store policies verified against official docs) / HIGH (algorithm/testing pitfalls verified against existing code)
+**Domain:** Adding esbuild build pipeline and Firefox extension support to an existing Chrome MV3 extension
+**Researched:** 2026-03-03
+**Confidence:** HIGH (Firefox API gaps verified against MDN official docs + Firefox Extension Workshop) / HIGH (esbuild behavior verified against official docs + GitHub issues)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Missing Privacy Policy Blocks Submission (Purple Lithium Violation)
+### Pitfall 1: declarativeContent API Has No Firefox Equivalent
 
 **What goes wrong:**
-The extension is submitted to the Chrome Web Store without a publicly accessible privacy policy URL entered in the Developer Dashboard privacy section. The submission is rejected with a "Purple Lithium" policy violation. This happens even though the extension stores only parsed patent position maps (no PII) and syncs only user preferences (trigger mode, display mode, patent number prefix).
+The Chrome service worker uses `chrome.declarativeContent.onPageChanged` to enable the toolbar icon only on `patents.google.com/patent/US*` pages. Firefox has never implemented `declarativeContent` and has no planned timeline to do so ([Firefox bug 1435864](https://bugzil.la/1435864)). When the Firefox background script runs `chrome.declarativeContent.onPageChanged.addRules(...)`, it throws `TypeError: Cannot read properties of undefined` or silently does nothing, and the icon activation logic never fires. On Firefox, the icon stays enabled on all pages or stays disabled on all pages — depending on whether `chrome.action.disable()` was called.
 
 **Why it happens:**
-The privacy policy requirement triggers on the presence of `host_permissions` and data transmission, not just PII. This extension sends position map data to the Cloudflare Worker KV cache — that's "transmitting" data under Google's definition even though the payload is derived from public documents. The existing popup.js uses `chrome.storage.sync` for settings, which syncs across devices and therefore qualifies as data transmission. Developers building privacy-preserving tools incorrectly assume "no PII = no privacy policy required."
+Developers port the Chrome background script wholesale, assuming `declarativeContent` is a standard WebExtensions API. It is not. It is Chrome-only. Firefox's WebExtensions API compatibility tables list it as unsupported with no alternative mapping.
 
 **How to avoid:**
-Write a brief, accurate privacy policy (a single page is sufficient) and host it at a public stable URL (a GitHub Pages page, a Cloudflare Pages URL, or a dedicated domain path). The policy must state: (1) what data is stored locally (IndexedDB: parsed patent text position maps; chrome.storage.sync: user preferences), (2) what is transmitted to your server (parsed position map JSON sent to Cloudflare Worker for shared KV cache), (3) that no personal data, browsing history, or user identity is collected or transmitted. Link this URL in the Developer Dashboard privacy policy field before first submission.
+Replace the `declarativeContent` approach in the Firefox background script entirely. Use a content script URL match pattern (`"matches": ["https://patents.google.com/patent/US*"]`) to scope injection, and handle icon state inside the content script by sending a message to the background when a patent page is detected. The background script then calls `browser.action.enable(tabId)` on receipt. This is the established cross-browser pattern. The `chrome.action.enable()` / `chrome.action.disable()` API with a `tabId` argument is supported in Firefox.
 
 **Warning signs:**
-- Extension has `host_permissions` pointing to an external domain (pct.tonyrowles.com) — automatic flag for reviewer scrutiny
-- Extension uses `chrome.storage.sync` — syncs data cross-device, qualifies as transmission
-- The Developer Dashboard privacy section shows an empty privacy policy URL field
-- No privacy policy link exists anywhere reachable before submission
+- Service worker contains `chrome.declarativeContent` anywhere
+- Firefox background script logs `TypeError` or `Cannot read properties of undefined` on install
+- Icon state never changes in Firefox (always enabled or always disabled regardless of page URL)
+- Test: install extension in Firefox, navigate to a non-patent page — if the icon shows as active, `declarativeContent` replacement is missing
 
 **Phase to address:**
-Store Listing Assets phase — before submission is attempted. The privacy policy URL must exist before the Developer Dashboard form can be completed.
+Firefox Background Script phase — this is the single most critical API gap. It must be resolved before any Firefox testing is meaningful.
 
 ---
 
-### Pitfall 2: Data Disclosure Form Incomplete — Extension Suspended After 30 Days
+### Pitfall 2: offscreen API Does Not Exist in Firefox — PDF.js Must Run in Background Script
 
 **What goes wrong:**
-The extension passes initial review but is suspended 30 days later because the Data Use Disclosure form in the Developer Dashboard was not fully completed. Google requires explicit certification for each data type the extension handles. Missing or mismatched entries cause automated suspension without warning.
+The entire PDF fetch, parse, and IndexedDB cache workflow lives in `src/offscreen/offscreen.js`, which is loaded by Chrome's offscreen document API. Firefox has no offscreen API and no plans to implement it. When the Firefox background script calls `browser.offscreen.createDocument(...)`, it throws `TypeError: browser.offscreen is undefined`. The entire PDF pipeline — fetching, parsing via PDF.js, building position maps, storing in IndexedDB — becomes completely inoperative.
 
 **Why it happens:**
-The Data Use Disclosure form is separate from the privacy policy URL field and requires affirmative checkboxes for each data category. Developers fill in the privacy policy URL, consider themselves done, and never complete the disclosure form. The review team does not always catch this at initial review — suspension comes later via automated enforcement.
+The offscreen document API was introduced in Chrome MV3 specifically because service workers lack DOM access. Firefox's event page background script does have DOM access (it is not a service worker), making offscreen documents unnecessary on Firefox. Developers port the Chrome manifest pattern and assume the `offscreen` permission and API exist everywhere.
 
 **How to avoid:**
-In the Developer Dashboard privacy section, complete all four required elements: (1) single purpose description (one sentence: "generates column:line citations from highlighted text on Google Patents"), (2) permission justifications for each permission in the manifest — `declarativeContent`, `offscreen`, `activeTab`, `storage`, `contextMenus`, `clipboardWrite`, and the two host permissions; (3) certify that no remote code is executed (MV3 prohibits it); (4) complete the data collection checkboxes — for this extension: local storage yes (IndexedDB and chrome.storage.sync), transmission to server yes (position map to KV cache), no personal data, no PII, no sensitive categories.
+For Firefox, move all offscreen document logic directly into the background event page. The Firefox background script can import PDF.js, call `fetch()`, open IndexedDB, and run the full parse pipeline directly — none of this requires a separate document context. The build pipeline must produce two separate background scripts: `dist/chrome/background/service-worker.js` (which orchestrates offscreen creation) and `dist/firefox/background/background.js` (which contains the offscreen logic inlined). Shared parsing modules (`pdf-parser.js`, `position-map-builder.js`) should live in `src/shared/` and be imported by both.
 
 **Warning signs:**
-- Developer Dashboard shows orange or yellow warning badges in the privacy section
-- Any checkbox field in the Data Use Disclosure section left blank
-- Permission justification fields left empty or containing placeholder text
-- Submission confirmation does not mention privacy review completion
+- Firefox manifest contains `"offscreen"` in the `permissions` array — this will cause Firefox validation warnings
+- `browser.offscreen` is referenced anywhere in Firefox-targeted code
+- PDF.js import (`import * as pdfjsLib from '../lib/pdf.mjs'`) exists only in `offscreen.js` with no Firefox background equivalent
+- Citation lookups always fail in Firefox with "lookup-failed" error (offscreen never creates, messages never route)
 
 **Phase to address:**
-Store Listing Assets phase — as part of preparing the Developer Dashboard entry before first submission.
+Firefox Background Script phase — the entire offscreen logic must be rehosted before PDF citations work on Firefox at all.
 
 ---
 
-### Pitfall 3: Icon Set Missing Required 32px Size (Windows Degradation)
+### Pitfall 3: Chrome Manifest Format Is Rejected or Silently Broken by Firefox
 
 **What goes wrong:**
-The extension ships with 16px, 48px, and 128px icons (both active and inactive variants). Windows users see blurry or incorrectly scaled toolbar icons because 32px is not provided. On high-DPI Windows displays, Chrome scales the 16px icon up to 32px, producing a pixelated icon in the toolbar. The store listing looks unprofessional.
+The current `manifest.json` uses Chrome-specific keys that either cause Firefox validation errors at load time or silently corrupt behavior. Key conflicts:
+- `"background": { "service_worker": "...", "type": "module" }` — Firefox requires `"background": { "scripts": ["..."] }` or `"background": { "page": "..." }` for MV3 event pages. From Firefox 121+, Firefox will start the background page even when `service_worker` is present, but the service worker entry is ignored — meaning the Chrome service worker bundle is never executed unless `scripts` is also specified correctly.
+- `"permissions": ["offscreen", "declarativeContent"]` — both are Chrome-only. Firefox warns on unknown permissions; some cause silent rejection of the permission block in older Firefox versions.
+- `browser_specific_settings.gecko.id` is absent — Firefox requires this for `storage.sync` to function (sync data is keyed by add-on ID). Without it, `browser.storage.sync` silently fails to sync across devices in production.
 
 **Why it happens:**
-The Chrome Web Store technically requires only 128px for the store listing. The 32px size is documented as "Windows computers often require this size" but is not enforced at submission. The manifest currently declares only `16`, `48`, and `128` in both the `action.default_icon` and `icons` sections. The 32px gap is invisible on macOS/Linux during development but visible to a significant portion of users on Windows.
+A single `manifest.json` cannot cleanly serve both Chrome and Firefox. The natural shortcut of shipping one manifest causes divergence: Chrome ignores unknown Firefox keys; Firefox accepts but may ignore some Chrome-only keys. The difference between "ignores" and "silently corrupts behavior" is impossible to discover without per-browser testing.
 
 **How to avoid:**
-Add 32px variants for both active and inactive states alongside the existing sizes. The manifest `icons` and `action.default_icon` blocks should declare 16, 32, 48, and 128 sizes. Source artwork at 128px and scale down — do not scale up from 16px or 48px. PNG format required; SVG is not supported in any Chrome extension icon context.
+Maintain separate manifests: `src/manifest.chrome.json` and `src/manifest.firefox.json`. The esbuild pipeline copies the correct manifest into `dist/chrome/` and `dist/firefox/` respectively. The Firefox manifest must include:
+```json
+"background": { "scripts": ["background/background.js"] },
+"browser_specific_settings": { "gecko": { "id": "patent-cite@yourname.dev", "strict_min_version": "121.0" } }
+```
+and must omit `offscreen` and `declarativeContent` from the `permissions` array.
 
 **Warning signs:**
-- Manifest declares only 16, 48, 128 — no 32 entry
-- Icons directory has no 32px files
-- Testing done only on macOS or Linux, never on a Windows machine
-- Icons have file sizes that suggest they are resized rather than redrawn (e.g., the existing 79-byte 16px files suggest placeholder/generated icons rather than real artwork)
+- Single `manifest.json` used for both Chrome and Firefox builds without transformation
+- Firefox build directory contains `"service_worker"` key in manifest
+- `storage.sync` appears to work locally but fails to sync across Firefox devices (missing gecko ID)
+- `web-ext lint` reports warnings for unknown permissions (`offscreen`, `declarativeContent`)
 
 **Phase to address:**
-Icon Set phase — produce the full 16/32/48/128 set for both states in one pass. Do not add 32px as a later patch; get the complete set right the first time.
+Build Pipeline Setup phase — manifests must be split before any Firefox packaging occurs.
 
 ---
 
-### Pitfall 4: Screenshot and Promotional Image Sizing Mismatches Cause Store Listing Rejection
+### Pitfall 4: esbuild IIFE vs ESM Format — Content Scripts Cannot Use ESM
 
 **What goes wrong:**
-Screenshots uploaded to the Developer Dashboard are cropped or fail upload validation because they don't match required dimensions. The small promotional image (440x280) is omitted, causing the listing to rank lower in search results. Screenshots showing the extension popup in isolation convey nothing about how the tool works in context.
+Content scripts loaded via `content_scripts` in the manifest cannot be ES modules. If esbuild bundles them as `format: 'esm'` (producing `import`/`export` syntax), Chrome and Firefox silently refuse to inject them (no error, extension appears to load, but content script never runs). If esbuild uses code splitting (`splitting: true`) with `format: 'esm'` to share code between entry points, it generates chunk files with dynamic `import()` calls that content scripts cannot resolve. Citations never appear for any user.
 
 **Why it happens:**
-The Chrome Web Store image requirements are specific: screenshots must be exactly 1280x800 or 640x400 (no other sizes), the promotional image must be exactly 440x280. Extensions rank lower in store search if the promotional image is missing. Developers who have never submitted before assume "any screenshot works." Screenshots of a 280px-wide popup without the underlying Google Patents page provide no context for evaluating the extension.
+The natural instinct when bundling shared code across multiple entry points is to enable `splitting: true` with `format: 'esm'`. This is correct for background service workers (which support module-type in Chrome via `"type": "module"`) but wrong for content scripts. esbuild does not warn about this mismatch — it produces the output without error and the failure only appears at extension load time.
 
 **How to avoid:**
-Produce screenshots at exactly 1280x800 showing the full Google Patents page with a patent open, text selected, and the citation result visible. Capture both the floating button mode and the silent mode toast. Produce the 440x280 promotional image (even minimal text treatment on a solid background is acceptable). Do not include rounded corners, device frames, or padding on screenshots — the store displays them with its own container. Test image upload in the dashboard before the submission attempt.
+Use separate esbuild build configurations per entry point type:
+- Content scripts: `format: 'iife'`, `bundle: true`, `splitting: false` — all shared code is inlined into a single IIFE bundle. This means `text-matcher.js`, `paragraph-finder.js`, `citation-ui.js`, and any shared utilities are merged into one `content-script.bundle.js`.
+- Background service worker (Chrome): `format: 'esm'`, `bundle: true` — Chrome service workers support ESM when `"type": "module"` is declared in the manifest.
+- Background event page (Firefox): `format: 'iife'` or `format: 'esm'` with `bundle: true` (Firefox event pages loaded via `scripts` array support ESM if declared as module type, but IIFE is safer for compatibility).
+- Offscreen document (Chrome only): `format: 'esm'`, `bundle: true` — loaded via `<script type="module">` in `offscreen.html`.
 
 **Warning signs:**
-- Screenshots taken from browser dev tools at arbitrary zoom levels — pixel dimensions will not be exactly 1280x800
-- Promotional image field left blank in the Developer Dashboard
-- Screenshots show the popup in isolation with a blank background
-- Image upload in the dashboard returns a dimension error
+- Content script entry point configured with `format: 'esm'` or `splitting: true`
+- Browser console shows no errors but citation UI never appears
+- esbuild output for content script contains `import` statements or `export {}` at top level
+- Content script bundle file size is suspiciously small (only the entry point, shared code not inlined)
 
 **Phase to address:**
-Store Listing Assets phase — plan 1280x800 captures while the extension is running with real patent data, not after the patent page is closed.
+Build Pipeline Setup phase — format configuration must be verified before any other build work.
 
 ---
 
-### Pitfall 5: Test Fixtures That Don't Reflect Real Patent Diversity (False Accuracy Signal)
+### Pitfall 5: esbuild Path Flattening Breaks Extension Directory Structure
 
 **What goes wrong:**
-The automated test harness is built with 3-5 "friendly" patents — patents the developer already knows work correctly. The test suite passes 100%, creating confidence that the algorithm is reliable. The manual audit then discovers failure modes on older patents, chemical patents with subscript formulas, patents with unusually narrow columns, or patents where the claims section detection fails. The green test suite was measuring coverage of known-working cases, not real accuracy.
+esbuild with `outdir: 'dist/chrome'` and multiple entry points from different source subdirectories (`src/background/service-worker.js`, `src/content/content-script.js`, etc.) uses `outbase` to determine how to replicate the source directory structure. If `outbase` is not set, esbuild uses the lowest common ancestor of all entry point paths — which may be `src/` or even the repo root. This produces output paths like `dist/chrome/background/service-worker.js` correctly, but may also produce unexpected paths for shared modules or flatten nested structures. Manifest references to `background/service-worker.js` break if esbuild emits to a different path.
 
 **Why it happens:**
-It is natural to reach for patents already open in your browser to populate test fixtures. These are selection-biased toward patents that already work. The algorithm has several known weak points (fuzzy matching on long selections, bookend matching when prefix/suffix text repeats elsewhere in the specification, claims section detection via text markers) that will only surface with adversarial or unusual inputs. Testing happy paths produces false confidence.
+esbuild's path behavior with multiple entry points is not intuitive. The `outbase` option defaults to the lowest common ancestor directory of all entry points. Adding or removing an entry point can silently change `outbase` and shift all output paths, breaking manifest references.
 
 **How to avoid:**
-Build the test corpus with deliberate diversity: (1) at least two patents from before 2000, when PDF text layers and typesetting differ markedly from modern patents; (2) at least two chemical or biotech patents with subscript characters, Greek letters, and formula text; (3) at least one patent with a claims section containing dependent claims that produce complex column boundaries; (4) at least one patent where the specification is longer than 100 columns; (5) at least one patent where the selected text spans a column boundary; (6) at least one patent where the selected text appears more than once in the specification (disambiguation test). Include known-failing cases as expected-fail fixtures rather than excluding them.
+Explicitly set `outbase: 'src'` in the esbuild configuration. This ensures that `src/background/service-worker.js` always emits to `dist/chrome/background/service-worker.js` regardless of what other entry points are added. Verify the output structure against the manifest paths after every change to the entry point list.
 
 **Warning signs:**
-- All test patents are from the same technology domain
-- All test patents are from the same decade
-- No test case attempts to select text that spans a column boundary
-- No test case includes selection from the claims section specifically
-- Test suite was assembled by searching for patents the developer knows are working
+- esbuild emits files to unexpected paths (e.g., `dist/chrome/service-worker.js` instead of `dist/chrome/background/service-worker.js`)
+- Extension fails to load with "Could not load background script" error after build
+- Manifest references to `background/service-worker.js` but `dist/chrome/` only contains `service-worker.js` at root
 
 **Phase to address:**
-Test Harness phase — specify corpus diversity requirements before collecting fixtures, not after. Write the diversity checklist before selecting any patents.
+Build Pipeline Setup phase — verify the full output tree against manifest paths before any source migration.
 
 ---
 
-### Pitfall 6: Algorithm Fix Breaks Existing Working Cases (Regression Without Harness)
+### Pitfall 6: Module Type Mismatch Between Chrome Service Worker and Firefox Event Page
 
 **What goes wrong:**
-A parsing fix for an edge case (say, correcting claims section detection for patents that use "What is claimed:" instead of "What I claim:") inadvertently changes the column number assignment for the entire specification because the claims boundary offset shifts. Tests that previously expected `4:15` now produce `4:16`. The regression is not caught because there was no baseline fixture for the affected patent, and the algorithm change is shipped.
+The current Chrome service worker is declared as `"type": "module"` in the manifest, allowing it to use ES `import` statements. When porting to Firefox, the background event page is loaded via `"scripts": ["background/background.js"]` in the manifest. If the Firefox background script is an ES module bundle that contains top-level `import` or uses `export`, it fails unless the manifest includes `"background": { "type": "module" }`. In Firefox, `"type": "module"` in the background block is supported but the behavior differs: the script must be a single file (no importScripts), and Firefox's module service worker support is incomplete as of early 2026. Using `format: 'iife'` and `bundle: true` for the Firefox background avoids this entirely by inlining all imports.
 
 **Why it happens:**
-The position-map-builder.js algorithm has several interdependencies: two-column page detection feeds column boundary detection, which feeds line grouping, which feeds column number assignment, which feeds claims section tagging. A fix to any stage can silently propagate errors downstream. Without frozen expected outputs for a diverse patent corpus, there is no way to detect that a fix caused a regression until an attorney reports a wrong citation in a filing.
+Chrome's `"type": "module"` for service workers enables native ESM. Firefox's equivalent is fragile. Developers assume the same `type: module` pattern works cross-browser when it does not reliably.
 
 **How to avoid:**
-Before making any algorithm change, run the full test harness and record all outputs as the baseline. Make the change. Run the harness again. Diff all outputs. Any citation that changed must be manually verified against the actual PDF to confirm the change is an improvement and not a regression. The harness must store expected outputs as frozen strings, not computed on the fly. Do not accept a test run as "passing" unless all previously-passing cases still pass. If a fix causes a previously-passing case to change output, that change must be consciously approved as correct, not silently accepted.
+For the Firefox background script: use esbuild with `format: 'iife'` (or `format: 'esm'` only if `"type": "module"` is explicitly tested on Firefox). IIFE is the safe default that works without any manifest type declaration. The Firefox manifest `"background": { "scripts": ["background/background.js"] }` does not require a type field and IIFE output works directly.
 
 **Warning signs:**
-- Algorithm changes made without running the test harness first
-- Test expected outputs generated by running the current code (not verified against actual PDFs)
-- Test harness recomputes expected values rather than comparing against stored golden outputs
-- Algorithm changes made and tests updated in the same commit without manual PDF verification of the changed outputs
+- Firefox background script bundle contains top-level `import` or `export` without `"type": "module"` in manifest background block
+- Firefox console shows `SyntaxError: import declarations may only appear at top level of a module` in background script
+- Background script never loads in Firefox (silent failure, no message listeners registered)
 
 **Phase to address:**
-Test Harness phase — establish frozen golden outputs before the Algorithm Fix phase begins. The harness must exist and be running before any algorithm changes are made.
+Build Pipeline Setup phase — format choice must be validated before shared code extraction begins.
 
 ---
 
-### Pitfall 7: Overfitting Algorithm Fix to Specific Patent, Breaking General Case
+### Pitfall 7: Shared Code Duplication In Bundled Output Is Intentional for Content Scripts
 
 **What goes wrong:**
-The audit finds that a specific patent (say, US7,654,321) produces wrong column numbers because of an unusual header format. The algorithm is modified to handle that header. The fix works for US7,654,321 but makes a previously-correct assumption fragile — column number parsing now special-cases a pattern that happens to collide with normal content on other patents, producing wrong numbers for a class of patents that previously worked correctly.
+When esbuild bundles the content script as IIFE (required, as above), all shared code is inlined. If the background script and content script both import from `src/shared/`, the shared code appears in both bundles. Developers see this as waste and attempt to use `splitting: true` or dynamic imports to deduplicate. This breaks content scripts (see Pitfall 4). Alternatively, they attempt to load shared code as a separate file listed in `content_scripts.js` array — which works but requires the file to not use `export` statements (classic script restrictions).
 
 **Why it happens:**
-Patent PDFs are generated by many different typesetters and USPTO workflows across different eras. The position-map-builder.js uses heuristics (bimodal x-coordinate threshold of 0.3, column gap minimum of 5pt, line clustering tolerance of 3pt) that were calibrated on a small sample. When a fix is narrowly targeted at one failing patent, it is easy to create a condition that is too specific and collides with the general case elsewhere.
+The correct architecture for shared code in bundled extensions is: bundle-time deduplication for content scripts (inlined IIFE), runtime deduplication via ESM imports for background/offscreen. These are different strategies. Attempting to apply the ESM sharing strategy to content scripts causes failures.
 
 **How to avoid:**
-Before accepting any algorithm fix as final, run it against the full golden test corpus. If the fix improves accuracy for the failing patent but changes outputs for any previously-passing patent, treat that as a regression requiring investigation. Fixes should be parameterized where possible (e.g., adjusting a threshold rather than adding a special-case branch). When special-casing is unavoidable, add explicit comments documenting which patent class the special case handles and why it cannot be generalized.
+Accept that shared code is duplicated in the content script bundle. The shared modules (`text-matcher`, `paragraph-finder`, `constants`) are small relative to PDF.js — duplication overhead is negligible. If bundle size matters, configure esbuild `minify: true` for production builds. Do not attempt runtime deduplication between content script and background script.
 
 **Warning signs:**
-- Fix is written as `if (patentId === 'US7654321B2')` or equivalent identifier-based branching
-- Fix changes a global constant (like the 0.3 bimodal ratio threshold) without testing against all patents in the corpus
-- Fix adds a new regex pattern based on a single observed example without verifying the pattern does not match other content
-- The audit sample was small (fewer than 20 patents) and the fix was developed against only the failing subset
+- Build config uses `splitting: true` for an entry point that includes content scripts
+- Content script manifest entry lists multiple `.js` files that use `export` syntax
 
 **Phase to address:**
-Algorithm Fix phase — only after the test harness is established with a diverse corpus.
+Build Pipeline Setup phase — architecture decision must be made before shared code extraction begins.
 
 ---
 
-### Pitfall 8: Bookend Match False Positive on Repetitive Patent Prose
+### Pitfall 8: Regression When Moving From Multi-File Classic Scripts to Single Bundled File
 
 **What goes wrong:**
-The bookend matching algorithm finds a match that starts correctly but ends at the wrong location because the 50-character suffix appears multiple times in the specification. For patents with highly repetitive claim language ("wherein the device comprises" appears 30 times), the suffix search finds the first occurrence rather than the occurrence that corresponds to the correct span. This produces a citation that points to the right column but the wrong line range.
+The current manifest loads content scripts as an ordered array: `["shared/constants.js", "content/text-matcher.js", "content/paragraph-finder.js", "content/citation-ui.js", "content/content-script.js"]`. Each file executes as a classic script and shares globals. After bundling, a single `content-script.bundle.js` replaces all five files. The IIFE wraps everything, so top-level variables that were previously globals become local to the IIFE. Any code path that relied on cross-file global access (e.g., `window.MSG` or bare `MSG` from `constants.js`) now fails with `ReferenceError: MSG is not defined` inside the bundle.
 
 **Why it happens:**
-The bookend match in text-matcher.js searches for suffix text starting from `prefixIdx + BOOKEND_LEN` with no constraint on the actual span length other than `span <= maxSpan` (where `maxSpan = selStripped.length * 2`). If the same 50-character suffix phrase appears at multiple positions within the maxSpan range, the first found is used. Claims sections are particularly prone to this because dependent claim language is designed to be structurally repetitive.
+The current architecture uses a "dual-context constants" pattern (noted as a known `⚠️ Revisit` item in PROJECT.md). `constants.js` assigns to `const MSG = {...}` as a classic script, making it a global in Chrome. The other classic scripts read `MSG` as an implicit global. When esbuild bundles them together, esbuild treats them as modules and the IIFE wrapping makes `MSG` a local variable — but only if esbuild uses proper module semantics. If the source files have no `export`/`import` statements, esbuild treats them as scripts and may not wrap them, causing different behavior. The exact behavior depends on whether esbuild detects the files as modules or scripts.
 
 **How to avoid:**
-When testing with the harness, include at least three patents with highly repetitive claim language. Add a test case where the selected text is a dependent claim phrase that appears verbatim in at least two other claims. Verify the citation points to the expected line. If bookend false positives are found, the fix is to require the word overlap between the matched span and the actual selection to exceed a threshold (word-level scoring rather than just span length validation). The existing disambiguator in the offscreen text matcher uses word overlap scoring — that logic should be consulted.
+During shared code extraction (before bundling), explicitly convert all shared constants and utilities to proper ES modules with `export`. Import them in every file that needs them. After this conversion, esbuild correctly bundles them as modules and the IIFE wrapping is clean. Run the full 71-case test corpus against the bundled build before shipping. The migration sequence must be: (1) convert to ES modules with explicit imports, (2) verify tests pass with direct node execution, (3) bundle with esbuild, (4) verify tests pass against bundled output.
 
 **Warning signs:**
-- Selected text is from a claims section with dependent claims
-- The selection is a short phrase that appears more than once in the specification
-- Confidence is returned as 0.92 (bookend confidence level) but the citation does not match the expected location
-- No test cases in the harness cover selections from highly repetitive claims text
+- `ReferenceError` in browser console for `MSG`, `STATUS`, `PATENT_TYPE`, or other constants after bundling
+- Content script appears to load (no parse errors) but citation UI never appears
+- Test harness passes against source files but fails against bundled output
+- Background service worker duplicates constants inline (the current `service-worker.js` does this — a hint about the fragility)
 
 **Phase to address:**
-Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
+Shared Code Extraction phase — this phase must resolve the dual-context pattern before the build pipeline processes anything.
+
+---
+
+### Pitfall 9: Firefox IndexedDB Silently Fails in "Never Remember History" Mode
+
+**What goes wrong:**
+Firefox users with "Privacy & Security → History → Never Remember History" enabled (which is equivalent to permanent private browsing mode) experience silent IndexedDB failures. The `indexedDB.open()` call either throws or enters an encrypted session-only mode where data is lost on browser restart. In this mode, parsed patent position maps are stored successfully within a session but disappear on every restart. Users see the extension "re-parsing" every patent they visit, and blame the extension for being broken.
+
+**Why it happens:**
+Firefox's `IndexedDB` implementation is tied to cookie/storage acceptance settings. When persistent storage is disabled by the user's privacy settings, extension IndexedDB databases are either blocked or use volatile encrypted storage. This affects Chrome and Firefox differently — Chrome's extension IndexedDB is more isolated from these settings.
+
+**How to avoid:**
+Wrap all IndexedDB open calls in a try/catch. If `indexedDB.open()` fails or throws, fall back to in-memory storage for the session and log a warning. Do not crash the extension. Add a graceful degradation path: if IndexedDB is unavailable, proceed without a local cache (the Cloudflare KV cache still works). This degradation is already partially handled by the `CHECK_CACHE` / `CACHE_MISS` flow — ensure the fallthrough reaches the PDF fetch pipeline even when IndexedDB is unavailable. Consider detecting the condition on first use and storing a flag in `browser.storage.local` (which is more resilient than IndexedDB in these configurations).
+
+**Warning signs:**
+- Extension works for one session in Firefox then appears to "forget" parsed patents on restart
+- `indexedDB.open()` call in offscreen/background throws `DOMException` or `SecurityError` in Firefox
+- Extension behavior differs between Firefox normal mode and Firefox private browsing mode
+- Firefox user reports "always shows parsing indicator" even for patents visited before
+
+**Phase to address:**
+Firefox Background Script phase — IndexedDB error handling must be verified on Firefox with privacy settings enabled.
+
+---
+
+### Pitfall 10: PDF.js Worker Loading Requires web_accessible_resources — Firefox UUID Makes It Fragile
+
+**What goes wrong:**
+PDF.js requires a worker file (`pdf.worker.mjs`) that is loaded from the extension package. The current manifest correctly lists this in `web_accessible_resources`. However, Firefox uses random UUIDs for extension resource URLs (`moz-extension://«random-UUID»/lib/pdf.worker.mjs`) that change per Firefox installation (and may change on update). Chrome uses a stable extension ID (`chrome-extension://«id»/lib/pdf.worker.mjs`). If the PDF.js worker URL is constructed from `chrome.runtime.getURL('lib/pdf.worker.mjs')`, this works correctly on both browsers — `browser.runtime.getURL()` returns the correct browser-specific URL. But if the URL is hardcoded anywhere, it breaks on Firefox.
+
+Additionally, Firefox's random UUID prevents adding the extension URL to any external server's CSP policy — this is a known limitation but does not affect this extension since the worker is loaded locally.
+
+**Why it happens:**
+PDF.js worker loading often involves setting `pdfjsLib.GlobalWorkerOptions.workerSrc`. Developers sometimes hardcode the path or use a relative path. In extension contexts, relative paths are not valid for worker loading — the full `moz-extension://` or `chrome-extension://` URL must be used. The correct pattern is `pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs')` (the `chrome` namespace works in Firefox too via compatibility shim).
+
+**How to avoid:**
+Always use `chrome.runtime.getURL('lib/pdf.worker.mjs')` (or `browser.runtime.getURL`) to set `workerSrc`. Never hardcode extension resource paths. Verify that `lib/pdf.worker.mjs` is included in `web_accessible_resources` in both the Chrome and Firefox manifests. After bundling, verify the worker file is present at the declared path in the dist output.
+
+**Warning signs:**
+- PDF.js throws `InvalidPDFException` or fails to initialize worker in Firefox
+- Browser console shows "Failed to load worker" or `moz-extension://` URL 404 in Firefox
+- `GlobalWorkerOptions.workerSrc` is set to a relative path or hardcoded string
+- `lib/pdf.worker.mjs` absent from `web_accessible_resources` in Firefox manifest
+
+**Phase to address:**
+Firefox Background Script phase — verify PDF.js worker initialization works after background script consolidation.
+
+---
+
+### Pitfall 11: Firefox storage.sync Requires browser_specific_settings.gecko.id
+
+**What goes wrong:**
+The extension uses `chrome.storage.sync` for user settings (trigger mode, display mode, patent number prefix). On Firefox, `browser.storage.sync` silently fails to sync data across devices if the extension does not have a `browser_specific_settings.gecko.id` declared in the manifest. The API calls succeed locally (data is written and read within the same Firefox instance) but synchronization never occurs. This is a silent failure — no error is thrown.
+
+**Why it happens:**
+Firefox's sync storage implementation keys data to the add-on ID. Without a stable ID declared in `browser_specific_settings`, Firefox cannot associate the data with a specific extension for sync purposes. Chrome uses the extension's CRX ID which is always present. Firefox add-on IDs must be explicitly declared for unsigned or development extensions.
+
+**How to avoid:**
+Add to the Firefox manifest:
+```json
+"browser_specific_settings": {
+  "gecko": {
+    "id": "patent-cite-tool@yourname.dev",
+    "strict_min_version": "121.0"
+  }
+}
+```
+Use a real email-format string or any string up to 80 characters. This ID also determines the extension's UUID on Firefox — choose it before publishing and do not change it, as changing the ID breaks existing storage.sync data for all users.
+
+**Warning signs:**
+- Settings saved in Firefox do not appear on a second Firefox installation after sync
+- `browser.storage.sync.set()` succeeds but `browser.storage.sync.get()` returns defaults after browser restart
+- Firefox manifest does not contain `browser_specific_settings` key
+- `web-ext lint` warns about missing add-on ID for signed extensions
+
+**Phase to address:**
+Firefox manifest split phase — the gecko ID must be chosen before any Firefox release.
+
+---
+
+### Pitfall 12: Bundled Output Breaks Vitest Tests That Import Source Files Directly
+
+**What goes wrong:**
+The existing Vitest test harness imports source files directly (e.g., `import { matchAndCite } from '../src/content/text-matcher.js'`). After the shared code extraction refactor, these imports change paths (modules move to `src/shared/`). After the esbuild build step, tests that relied on source file import paths break if the test harness is reconfigured to test bundled output instead of source. The 71-case golden baseline must continue to pass throughout all refactoring stages. If tests are broken during refactoring and only fixed at the end, intermediate regressions go undetected.
+
+**Why it happens:**
+Refactoring module boundaries (moving files, adding `export` statements, changing import paths) is done as a single large PR. Tests are not run between individual moves. By the time the refactor is complete, many small path breaks have accumulated and it is impossible to identify which individual change introduced a regression.
+
+**How to avoid:**
+Use a "strangler fig" migration: move one module at a time and run the full test harness after each move. The test harness must continue testing source files (not bundled output) throughout refactoring — bundled output testing is a separate concern. Add a smoke test that loads the bundled content script in a jsdom environment and verifies that `chrome.runtime.sendMessage` is called when `GENERATE_CITATION` is triggered. Keep the 71-case harness as the primary regression gate: if it passes before and after each commit, the refactor is safe.
+
+**Warning signs:**
+- Multiple source files moved in a single commit without running tests between moves
+- Vitest shows `Cannot find module '../src/content/text-matcher.js'` after refactoring
+- Test harness is temporarily disabled or marked `.skip` "to fix later"
+- 71-case golden outputs change unexpectedly during refactoring (path or logic changed accidentally)
+
+**Phase to address:**
+Shared Code Extraction phase — establish the test-after-each-move discipline as the first rule of the refactor.
 
 ---
 
@@ -189,11 +295,11 @@ Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Duplicated matching functions (content + offscreen) | Avoids build step; each context gets what it needs | Bug fixes must be applied in two places; functions can diverge silently | Acceptable until a discrepancy bug appears; a build step with shared module eliminates this |
-| Dual-context constants module (classic script + ES module from same file) | Single source of truth for constants | Caused bugs in v1.0; non-obvious dual-import mechanism | Acceptable as-is for v1.2; revisit if adding constants triggers another bug |
-| Popup contains settings UI (not a dedicated options page) | Zero additional HTML file | Options are buried in popup; users do not discover them by right-clicking "Options"; limited vertical space for future settings | Acceptable for v1.2 scope; options page migration needed when settings count exceeds ~5 |
-| Test corpus generated from PDFs fetched at test time | No static PDF files to commit to repo | Test outcomes change if Google Patents or USPTO changes the PDF | Freeze position maps as test fixtures rather than raw PDFs; raw PDFs are 5-30 MB and change |
-| Icons generated programmatically at small sizes | Fast to produce | Real artwork reads as professional in store listing; generated icons read as unfinished | Unacceptable for store submission — invest in real icon design |
+| Single manifest for Chrome and Firefox with Chrome-specific keys | Simpler to maintain | Firefox silently ignores or errors on Chrome-only keys; `declarativeContent` and `offscreen` cause failures | Never — manifests must be split. The cost of debugging silent Firefox failures far exceeds the split-manifest maintenance cost |
+| Keeping duplicate constants in service-worker.js vs shared/constants.js | Avoids refactoring the dual-context pattern | Bug fixes to message types must be applied in two places; already caused issues (noted in PROJECT.md) | Never for v2.0 — shared code extraction is a v2.0 goal |
+| Using `chrome` namespace directly instead of `browser` polyfill | No extra dependency | Firefox requires explicit chrome→browser shim or must be tested that chrome works; subtle behavioral differences around promises | Acceptable IF Chrome MV3 is the primary target and Firefox compatibility is verified manually. For long-term maintenance, prefer the polyfill |
+| Skipping source maps in bundled output | Faster build | Debugging Firefox background script becomes very difficult; Firefox has known issues finding extension source maps | Acceptable for release builds; unacceptable for development builds — always generate source maps in dev mode |
+| Testing only Chrome build after shared code extraction | Faster iteration | Firefox-specific failures (event page lifecycle, IndexedDB, missing APIs) are caught only at Firefox testing phase, not during extraction | Unacceptable — run Firefox smoke test after each extraction step |
 
 ---
 
@@ -201,11 +307,12 @@ Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Chrome Web Store Developer Dashboard | Filling privacy policy URL, considering submission ready | Complete all four subsections: single purpose, permission justifications, remote code declaration, data use checkboxes — before submitting |
-| chrome.storage.sync for settings | Assuming sync storage contains expected defaults on first run | Always use `chrome.storage.sync.get({ triggerMode: 'floating-button', displayMode: 'default', includePatentNumber: false }, ...)` with a defaults object — popup.js already does this correctly |
-| Cloudflare Worker URL in extension package | Assuming reviewers won't notice or test external calls | The Worker URL (pct.tonyrowles.com) is visible in the extension package; reviewers may test it; ensure it behaves correctly and has no open SSRF vulnerabilities during review period |
-| Icon sizes between manifest `icons` and `action.default_icon` | Keeping both sections in sync manually | These are separate declarations; `icons` is for extension management page and store; `action.default_icon` is for the toolbar; both need 16, 32, 48, 128 entries with correct paths |
-| chrome.storage.sync vs chrome.storage.local for settings | Mixing which settings go to which store | Settings that should roam with user (trigger mode, display mode, patent number prefix) belong in sync; cached patent data belongs in local (or IndexedDB). Popup.js already uses sync for settings — do not move them to local |
+| Firefox extension + storage.sync | Using storage.sync without gecko ID in manifest | Add `browser_specific_settings.gecko.id` to Firefox manifest before first sync storage use |
+| esbuild + multiple manifests | Copying manifest into dist as-is | Use build script to select and copy correct manifest (`manifest.chrome.json` → `dist/chrome/manifest.json`, `manifest.firefox.json` → `dist/firefox/manifest.json`) |
+| PDF.js worker in Firefox background | Assuming workerSrc path resolves the same as Chrome | Always use `chrome.runtime.getURL('lib/pdf.worker.mjs')` — works in both browsers; never hardcode |
+| Cloudflare Worker proxy (pct.tonyrowles.com) | Assuming Firefox uses same fetch behavior as Chrome offscreen | Firefox background script fetch works identically — no CORS differences for extension contexts. But verify the CORS headers on the Cloudflare Worker allow `moz-extension://` origins if checking Origin header |
+| esbuild + content scripts | Using `splitting: true` for all entry points uniformly | Configure content script entry points separately with `splitting: false`, `format: 'iife'` |
+| Firefox + clipboardWrite | Assuming clipboard API works on http pages | `navigator.clipboard.writeText()` is restricted to HTTPS pages in both browsers; Google Patents is HTTPS so this is safe — but document the HTTPS dependency |
 
 ---
 
@@ -213,9 +320,10 @@ Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Fuzzy Levenshtein match on selections > 100 chars | UI hangs for 2-3 seconds when user highlights a long passage | The code already guards: `if (n === 0 || n > 100) return null` in fuzzySubstringMatch — maintain this guard in any refactor | Any refactor that increases the needle size limit or removes the guard |
-| Test harness fetching live PDFs for each test run | Test suite takes 30-60 seconds to run; flaky on network errors | Store frozen position maps (not raw PDFs) as JSON fixtures; run matching against frozen data | First time a test is added that fetches from Google Patents at runtime |
-| Levenshtein dp array allocation inside hot loop | Memory allocation in innermost loop causes GC pauses on long patent specs | Current implementation allocates `Array.from({ length: m + 1 }, ...)` — acceptable for n<=100; do not remove the n>100 guard | If guard is removed and n becomes 200+, GC pauses become noticeable |
+| Inlining PDF.js into content script bundle | Content script bundle becomes 1MB+, injected on every Google Patents page load | PDF.js must NOT be a content script dependency — it belongs only in the background/offscreen context. Verify the content script entry point does not transitively import from `lib/pdf.mjs` | At the moment esbuild's dependency graph traversal pulls in pdf.mjs through a shared import |
+| Firefox event page suspended mid-parse | PDF parse starts, event page suspends after 5s idle, parse result is never received | Register all message listeners at top level (not inside async functions or setTimeout). The current service-worker.js already does this correctly — preserve the pattern in Firefox background | If message listeners are accidentally registered inside `async function main()` or similar |
+| IndexedDB open blocking background startup | Background script awaits IndexedDB initialization before registering message listeners | Register message listeners synchronously at top level; initialize IndexedDB lazily on first use | Any refactor that moves `chrome.runtime.onMessage.addListener` inside an async init function |
+| esbuild rebuilding entire multi-entry bundle on every file change | Dev iteration is slow (2-3s rebuild on every save instead of <100ms) | Use esbuild `watch` mode or configure `incremental: true`; split large bundles into independent build targets so a content script change does not rebuild the offscreen bundle | When the build script is naively `esbuild --bundle src/background/service-worker.js src/content/content-script.js ...` as one invocation |
 
 ---
 
@@ -223,9 +331,9 @@ Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Store listing description containing inaccurate capability claims | Reviewer rejects for misleading description; "Red Nickel" violation | Write description precisely: "generates column:line citations from selected text on Google Patents for granted US patents"; do not imply it works on non-US patents or non-Google-Patents pages |
-| Privacy policy that claims no data transmission when KV cache is active | Misrepresentation violation; suspension if discovered | Privacy policy must explicitly mention the Cloudflare Workers KV cache: "parsed patent structure data (position maps, not personal data) is transmitted to a shared cache server to benefit future users" |
-| Reviewer testing the extension on a non-US patent page and finding it non-functional | "Yellow Magnesium" broken functionality violation | The `manifest.json` `content_scripts.matches` already restricts to `https://patents.google.com/patent/US*`; ensure the popup also explains this scope clearly |
+| Including `PROXY_TOKEN` (Cloudflare Worker auth token) in the bundled and minified extension package | Token is visible in minified output via extension package inspection; any user can extract it and make direct calls to the Cloudflare Worker | This is an existing risk in v1.x. The token is a shared secret that protects the KV cache write endpoint — consider rotating it after v2.0 ships and evaluate if IP allowlisting on the Cloudflare Worker is feasible |
+| Firefox extension ID collision | If another extension uses the same gecko ID, Firefox may behave unpredictably with storage.sync | Use a unique, non-guessable ID in email format tied to a domain you control (e.g., `patent-cite-tool@yourname.dev`) |
+| esbuild minification exposing hardcoded secrets in source maps | Source maps (if shipped) expose original source including the proxy token | Never ship source maps in release builds. Use `NODE_ENV=production` guard to omit source maps from release packaging |
 
 ---
 
@@ -233,25 +341,24 @@ Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| "Silent (Ctrl+C)" option name without explanation | Users who select silent mode do not understand why clicking the floating button no longer appears; they think the extension is broken | Add a brief description below the trigger mode selector when "silent" is selected, e.g., "Highlight text and press Ctrl+C — citation is appended automatically" |
-| Settings in popup disappear when popup closes | Users change trigger mode but cannot verify the change persisted | Add a subtle confirmation ("Saved") that appears briefly after each setting change; popup.js currently has no save feedback |
-| Status message "PDF analyzed for US1234567B2 — 47 columns, 1,203 lines mapped" | Patent professionals understand this; non-professionals (paralegals) may not know what "columns" means in context | Acceptable for this audience; patent attorneys know the two-column spec format well |
-| Options discoverable only via popup — no right-click "Options" path | Power users expect right-click "Options" to open a settings page; popup-only settings are non-standard | Add `options_page` or `options_ui` entry to manifest pointing to the popup or a dedicated options page; even pointing to the popup HTML is sufficient to make right-click "Options" work |
+| Firefox icon never activates due to declarativeContent gap | Firefox users see the icon as always-active or always-inactive; clicking on non-patent pages shows confusing popup state | Replace declarativeContent with content-script-driven `action.enable(tabId)` — icon activates reliably on patent pages only |
+| Firefox background event page suspended during long PDF parse | Parse progress appears to hang; user sees spinner indefinitely | The parse itself runs to completion (event page stays alive during active async operations); ensure the message listener that receives PARSE_RESULT is registered at top level so it can restart the event page if needed |
+| Extension appears to work in Firefox (installs, icon shows) but citations never generate | Users report "broken extension" without useful error message | Add a Firefox-specific error path: if `browser.offscreen` is undefined and the background script does not contain the PDF pipeline, log a clear console error and send a user-visible error message to the content script |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Privacy policy:** URL exists and is accessible without login — verify by opening it in a private browsing window before submitting
-- [ ] **Developer Dashboard privacy section:** All four subsections complete (single purpose, permission justifications, remote code declaration, data use checkboxes) — not just the privacy policy URL field
-- [ ] **32px icons:** Both active and inactive 32px variants exist and are declared in the manifest `icons` and `action.default_icon` sections
-- [ ] **Promotional image:** 440x280px image uploaded in Developer Dashboard — absence causes lower store ranking even if submission succeeds
-- [ ] **Screenshots:** At least one screenshot shows the full Google Patents page with a patent open and a citation visible, not just the popup in isolation
-- [ ] **Test corpus diversity:** Corpus includes pre-2000 patents, chemical patents, cross-column selections, and repeated-phrase selections — not just modern software patents
-- [ ] **Golden outputs frozen:** Test harness compares against stored expected strings, not against outputs computed by the current code at test time
-- [ ] **Baseline recorded before algorithm changes:** Full harness run with all outputs recorded before any algorithm fix begins
-- [ ] **Options discoverability:** Right-clicking the extension icon and selecting "Options" reaches a settings surface (requires `options_page` or `options_ui` in manifest)
-- [ ] **Store description accuracy:** Description does not claim capabilities for patent types or pages not covered by `content_scripts.matches`
+- [ ] **declarativeContent replaced:** Firefox build has no reference to `chrome.declarativeContent`; icon activates correctly only on patent pages in Firefox
+- [ ] **offscreen logic ported:** Firefox background script contains the full PDF fetch + parse + IndexedDB pipeline; `browser.offscreen` is never referenced in Firefox code
+- [ ] **Manifests split:** `dist/chrome/manifest.json` and `dist/firefox/manifest.json` are distinct files; Firefox manifest has `browser_specific_settings.gecko.id` and no `offscreen`/`declarativeContent` permissions
+- [ ] **Content script format:** esbuild produces content script bundle as IIFE (not ESM); no `import`/`export` statements in content script output
+- [ ] **outbase set:** esbuild build config explicitly sets `outbase: 'src'`; output paths match manifest references exactly
+- [ ] **PDF.js workerSrc:** Uses `chrome.runtime.getURL('lib/pdf.worker.mjs')` — not a relative path or hardcoded string; works in Firefox
+- [ ] **Gecko ID set:** Firefox manifest `browser_specific_settings.gecko.id` is a unique, stable identifier
+- [ ] **71-case test corpus:** All 71 tests pass against bundled Chrome output before Firefox porting begins; all 71 tests pass against Firefox output after porting
+- [ ] **IndexedDB graceful degradation:** IndexedDB errors are caught and the extension falls back to session-only caching rather than crashing
+- [ ] **No source maps in release zip:** Release packaging script explicitly omits `*.js.map` files from the zip
 
 ---
 
@@ -259,12 +366,13 @@ Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Rejected for missing privacy policy | LOW | Write privacy policy, host it, add URL to dashboard, resubmit — 3-7 day review cycle |
-| Rejected for incomplete data disclosure form | LOW | Complete dashboard privacy section checkboxes, resubmit — same review cycle |
-| Rejected for broken functionality (reviewer tested wrong page) | LOW-MEDIUM | Add prominent "US patents only" language to description and popup; resubmit with support ticket explaining scope |
-| Algorithm fix causes citation regression discovered post-release | HIGH | Roll back the fix in a new extension version; submit update (1-7 day review cycle); notify any known users via store listing update notes |
-| Bookend false positive found post-release affecting claims citations | MEDIUM | Add word-overlap scoring to bookend match; freeze the failing case as a new golden test; ship fix version |
-| Store screenshots rejected for wrong dimensions | LOW | Retake at exact 1280x800; re-upload via dashboard; no full resubmission required for asset-only changes |
+| declarativeContent not replaced — Firefox icon broken | LOW | Implement content-script-driven `action.enable(tabId)` pattern; test takes ~2 hours |
+| offscreen logic not ported — Firefox PDF pipeline dead | HIGH | Full migration of offscreen.js into Firefox background script; 1-2 days of work plus regression testing |
+| Content scripts bundled as ESM — silent injection failure | LOW | Change esbuild format to `iife` for content script entry; rebuild and test; ~30 minutes |
+| outbase misconfigured — manifest path mismatches | LOW | Add `outbase: 'src'` to build config; verify output tree; ~1 hour |
+| 71-case regression after shared code extraction | MEDIUM | Git bisect the extraction commits; identify which module move caused the regression; fix the import path or logic error; 2-4 hours |
+| Firefox gecko ID missing — storage.sync not syncing | LOW | Add ID to Firefox manifest and rebuild; no data migration needed for development builds; for production it must be set before first release |
+| IndexedDB broken for "never remember history" users | MEDIUM | Add try/catch around IndexedDB open; route to in-memory fallback; test with Firefox in permanent private browsing mode; ~4 hours |
 
 ---
 
@@ -272,29 +380,40 @@ Test Harness phase (to detect), Algorithm Fix phase (to resolve if detected).
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Missing privacy policy | Store Listing Assets | Privacy policy URL opens without login before submission |
-| Incomplete data disclosure form | Store Listing Assets | All four developer dashboard privacy subsections show complete status |
-| Missing 32px icons | Icon Set | Manifest declares 16/32/48/128 for both action and general icons; files exist at all paths |
-| Screenshot/promo image sizing | Store Listing Assets | Upload succeeds in dashboard without dimension errors; promotional image field shows uploaded image |
-| Test fixtures not representing real diversity | Test Harness | Corpus checklist (pre-2000, chemical, cross-column, repetitive claims) verified before harness is called complete |
-| Algorithm fix causing regression | Algorithm Fix | Zero previously-passing test cases change output without manual PDF verification of the new output |
-| Bookend false positive on repetitive claims | Test Harness (detect) / Algorithm Fix (resolve) | At least two test cases cover dependent claim selections with repetitive language |
-| Options not right-click discoverable | Options Page UX | `options_page` or `options_ui` declared in manifest; right-click "Options" navigates to a settings surface |
+| declarativeContent not supported in Firefox | Firefox Background Script | Install Firefox build on a non-patent page: icon must be disabled. Navigate to patent page: icon must activate |
+| offscreen API unavailable in Firefox | Firefox Background Script | Generate a citation on Firefox: position map must be built and citation must appear |
+| Chrome-specific manifest keys breaking Firefox | Build Pipeline Setup (manifest split) | `web-ext lint` passes with zero warnings; Firefox loads extension without errors |
+| Content scripts bundled as ESM | Build Pipeline Setup | Inspect bundle output: no `import`/`export` at top level of content script file |
+| esbuild path flattening | Build Pipeline Setup | Compare `dist/chrome/` tree against manifest path references; every path must resolve |
+| Module type mismatch for Firefox background | Build Pipeline Setup | Firefox background loads without SyntaxError; message listeners register on install |
+| Shared code duplication confusion | Build Pipeline Setup | Content script bundle is a single IIFE file; no chunk imports |
+| Global scope regression from classic→IIFE bundling | Shared Code Extraction | All 71 golden tests pass against bundled output |
+| Firefox IndexedDB in private mode | Firefox Background Script | Test with Firefox "Never remember history" setting: extension degrades gracefully, no crash |
+| PDF.js worker path fragility | Firefox Background Script | PDF loads and parses correctly on Firefox; no console errors about worker URL |
+| Missing gecko ID | Firefox manifest split | `browser.storage.sync` persists across two Firefox instances (or test with `web-ext` dev install) |
+| Bundled output breaks Vitest tests | Shared Code Extraction | All 71 tests pass after every individual module move, not just at the end |
 
 ---
 
 ## Sources
 
-- [Chrome Web Store Program Policies](https://developer.chrome.com/docs/webstore/program-policies/policies) — Permission requirements, single purpose, misleading content (verified 2026-03-02)
-- [Chrome Web Store Troubleshooting / Violation Codes](https://developer.chrome.com/docs/webstore/troubleshooting) — Blue Argon, Yellow Magnesium, Purple Lithium, Purple Potassium, Yellow Zinc violation categories
-- [Chrome Web Store User Data FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq) — Privacy policy trigger conditions, what "handling data" means for local-only extensions
-- [Chrome Web Store Dashboard Privacy Fields](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy) — Four required fields: single purpose, permission justifications, remote code, data use checkboxes
-- [Chrome Web Store Images](https://developer.chrome.com/docs/webstore/images) — Screenshot dimensions (1280x800 or 640x400), promotional image (440x280), 128px store icon
-- [Chrome Extension Configure Icons](https://developer.chrome.com/docs/extensions/develop/ui/configure-icons) — 16/32/48/128 sizes; 32px required for Windows; SVG not supported
-- Chrome Web Store first-person submission account ("TraceMind Blog") — Privacy policy required even for local-only extensions; reviewer onboarding gap caused initial rejection
-- Project source code audit: src/manifest.json, src/popup/popup.js, src/content/text-matcher.js, src/offscreen/position-map-builder.js — Identified missing 32px icons, settings-in-popup pattern, bookend match vulnerability
+- [MDN: Chrome incompatibilities](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities) — declarativeContent unsupported (bug 1435864); content script global scope differences; web_accessible_resources UUID behavior; data cloning differences (HIGH confidence, official docs)
+- [Firefox Extension Workshop: MV3 Migration Guide](https://extensionworkshop.com/documentation/develop/manifest-v3-migration-guide/) — background script format; gecko ID requirement; host_permissions as optional permission (HIGH confidence, official docs)
+- [MDN: Background scripts](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Background_scripts) — event page lifecycle; suspension behavior; state loss; storage.session vs storage.local (HIGH confidence, official docs)
+- [MDN: storage.sync](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync) — gecko ID requirement for sync to function (HIGH confidence, official docs)
+- [MDN: background manifest key](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background) — Firefox uses scripts array; service_worker ignored before Firefox 121 (HIGH confidence, official docs)
+- [esbuild API docs](https://esbuild.github.io/api/) — format options (iife/esm/cjs); outbase; splitting; multiple entry points behavior (HIGH confidence, official docs)
+- [esbuild FAQ](https://esbuild.github.io/faq/) — IIFE format for browser global scope safety (HIGH confidence, official docs)
+- [Firefox Bugzilla 1435864](https://bugzil.la/1435864) — declarativeContent not implemented in Firefox (HIGH confidence, official bug tracker)
+- [Firefox Bugzilla 1406675](https://bugzilla.mozilla.org/show_bug.cgi?id=1406675) — IndexedDB broken when cookies disabled (MEDIUM confidence, bug report)
+- [Firefox Bugzilla 1841806](https://bugzilla.mozilla.org/show_bug.cgi?id=1841806) — IndexedDB not working in private browsing mode for extensions (MEDIUM confidence, bug report)
+- [GitHub: mozilla/webextension-polyfill](https://github.com/mozilla/webextension-polyfill) — chrome vs browser namespace shim (HIGH confidence, official Mozilla project)
+- [w3c/webextensions issue #156](https://github.com/w3c/webextensions/issues/156) — ES modules in content scripts proposal (MEDIUM confidence, standards discussion)
+- [esbuild GitHub issue #1025](https://github.com/evanw/esbuild/issues/1025) — shared dependencies between builds (MEDIUM confidence, maintainer response)
+- [codestudy.net: MV3 background scripts vs service workers in Firefox](https://www.codestudy.net/blog/manifest-v3-background-scripts-service-worker-on-firefox/) — Firefox 121 service_worker + scripts behavior (MEDIUM confidence, community article verified against MDN)
+- Project source audit: `src/background/service-worker.js`, `src/manifest.json`, `src/offscreen/offscreen.js`, `src/shared/constants.js` — identified declarativeContent dependency, offscreen pattern, dual-context constants, inline message type duplication (HIGH confidence, direct code inspection)
 
 ---
-*Pitfalls research for: Chrome extension store submission, accuracy testing, and algorithm improvement*
-*Researched: 2026-03-02*
-*Milestone: v1.2 Store Polish + Accuracy Hardening*
+*Pitfalls research for: esbuild build pipeline and Firefox extension port of an existing Chrome MV3 extension*
+*Researched: 2026-03-03*
+*Milestone: v2.0 Firefox Port*

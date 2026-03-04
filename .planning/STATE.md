@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: executing
-last_updated: "2026-03-04T17:37:04.724Z"
-last_activity: 2026-03-04 — Phase 16-02 complete (Firefox esbuild build pipeline, dist/firefox/ complete)
+last_updated: "2026-03-04T23:52:05.525Z"
+last_activity: 2026-03-04 — Phase 16-03 complete (Firefox human verification — all FOX requirements confirmed)
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 75
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 16 of 17 (Firefox Extension)
-Plan: 02 complete — Firefox esbuild build pipeline (dist/firefox/ full output)
-Status: In Progress — ready for Plan 03 (Firefox testing)
-Last activity: 2026-03-04 — Phase 16-02 complete (Firefox esbuild pipeline, dist/firefox/ complete)
+Plan: 03 complete — Firefox human verification (all FOX requirements confirmed in real browser)
+Status: Phase 16 COMPLETE — all 3 plans done, ready for Phase 17
+Last activity: 2026-03-04 — Phase 16-03 complete (Firefox human UAT: icon activation, citation generation, IndexedDB degradation all verified)
 
-Progress: [█████████░] 88% (v2.0 Phase 16 Plan 02 complete)
+Progress: [██████████] 100% (v2.0 Phase 16 complete — all FOX requirements satisfied)
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Progress: [█████████░] 88% (v2.0 Phase 16 Plan 02 complete)
 | Phase 15-esbuild-build-pipeline P03 | 10 | 2 tasks | 2 files |
 | Phase 16-firefox-extension P01 | 4 | 2 tasks | 3 files |
 | Phase 16-firefox-extension P02 | 2min | 2 tasks | 1 files |
+| Phase 16-firefox-extension P03 | 5min | 2 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 16-firefox-extension]: Firefox manifest.firefox.json: tabs permission + wasm-unsafe-eval CSP added for PDF.js WebAssembly support
 - [Phase 16-firefox-extension]: Object entry point syntax (not outbase) for Firefox ESM bundle prevents dist/firefox/firefox/background.js path double-nesting
 - [Phase 16-firefox-extension]: external: ['../lib/pdf.mjs'] in Firefox ESM config — relative to dist/firefox/background/ output location, resolves to dist/firefox/lib/pdf.mjs at runtime
+- [Phase 16-firefox-extension]: Firefox extension human UAT passed — user confirmed all FOX requirements (FOX-01 through FOX-05) satisfied in real Firefox browser: load without errors, icon activation, column:line citations matching Chrome output, wasm-unsafe-eval CSP for PDF.js, IndexedDB degradation to in-memory Map
 
 ### Pending Todos
 
@@ -80,9 +82,9 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 16 risk]: Firefox event page lifecycle during active PDF.js parse is MEDIUM confidence — empirical test needed during implementation
+- [Phase 16 risk RESOLVED]: Firefox event page lifecycle — human UAT confirmed PDF.js parses successfully with no lifecycle interruption
 - [Phase 16 risk RESOLVED]: PDF.js WASM + Firefox CSP — wasm-unsafe-eval added to manifest.firefox.json content_security_policy in Plan 01
-- [Phase 16 risk]: Cloudflare Worker CORS may need moz-extension:// origin explicitly allowed — verify in Phase 16
+- [Phase 16 risk RESOLVED]: Cloudflare Worker CORS — human UAT confirmed citation generation works, no CORS errors encountered with moz-extension:// origin
 
 ### Quick Tasks Completed
 
@@ -92,6 +94,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-04 — Phase 16 Plan 02 complete (Firefox esbuild pipeline: dist/firefox/ with ESM background, IIFE content, popup, options, icons, lib)
-Status: Phase 16 Plan 02 complete — ready for Plan 03 (Firefox testing / load in about:debugging)
-Next: `/gsd:execute-phase 16 03` (Firefox testing and verification)
+Last activity: 2026-03-04 — Phase 16 Plan 03 complete (Firefox human verification: all FOX requirements confirmed in real browser)
+Status: Phase 16 COMPLETE — Firefox MV3 extension fully built and verified
+Next: Phase 17 (release / store submission packaging)

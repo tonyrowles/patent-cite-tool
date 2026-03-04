@@ -67,28 +67,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SHARED-01 | — | Pending |
-| SHARED-02 | — | Pending |
-| SHARED-03 | — | Pending |
-| BUILD-01 | — | Pending |
-| BUILD-02 | — | Pending |
-| BUILD-03 | — | Pending |
-| BUILD-04 | — | Pending |
-| BUILD-05 | — | Pending |
-| FOX-01 | — | Pending |
-| FOX-02 | — | Pending |
-| FOX-03 | — | Pending |
-| FOX-04 | — | Pending |
-| FOX-05 | — | Pending |
-| VALID-01 | — | Pending |
-| VALID-02 | — | Pending |
-| VALID-03 | — | Pending |
+| SHARED-01 | Phase 14 | Pending |
+| SHARED-02 | Phase 14 | Pending |
+| SHARED-03 | Phase 14 | Pending |
+| BUILD-01 | Phase 15 | Pending |
+| BUILD-02 | Phase 15 | Pending |
+| BUILD-03 | Phase 15 | Pending |
+| BUILD-04 | Phase 15 | Pending |
+| BUILD-05 | Phase 15 | Pending |
+| FOX-01 | Phase 16 | Pending |
+| FOX-02 | Phase 16 | Pending |
+| FOX-03 | Phase 16 | Pending |
+| FOX-04 | Phase 16 | Pending |
+| FOX-05 | Phase 16 | Pending |
+| VALID-01 | Phase 17 | Pending |
+| VALID-02 | Phase 17 | Pending |
+| VALID-03 | Phase 17 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 (pending roadmap creation)
+- Mapped to phases: 16
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after initial definition*
+*Last updated: 2026-03-03 after roadmap creation (phases 14-17)*

@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Store Polish + Accuracy Hardening
-status: completed
-last_updated: "2026-03-03T23:15:05.267Z"
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-03-04T00:03:02.391Z"
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 12
-  completed_plans: 12
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -40,6 +40,7 @@ All 6 phases (8-13), 12 plans complete.
 ### Decisions
 
 All v1.0, v1.1, and v1.2 decisions archived in PROJECT.md Key Decisions table.
+- [Phase quick]: Used gutter markers as ground truth for line numbering instead of cumulative gap counting
 
 ### Pending Todos
 

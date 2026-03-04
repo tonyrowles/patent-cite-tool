@@ -18,8 +18,8 @@ Requirements for Firefox port milestone. Each maps to roadmap phases.
 ### Shared Code
 
 - [ ] **SHARED-01**: Matching functions consolidated into single `src/shared/matching.js` — no duplication
-- [ ] **SHARED-02**: Constants exported as ES module from `src/shared/constants.js`
-- [ ] **SHARED-03**: Content scripts, background script, and offscreen document all import from shared modules
+- [x] **SHARED-02**: Constants exported as ES module from `src/shared/constants.js`
+- [x] **SHARED-03**: Content scripts, background script, and offscreen document all import from shared modules
 
 ### Firefox Extension
 
@@ -68,8 +68,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SHARED-01 | Phase 14 | Pending |
-| SHARED-02 | Phase 14 | Pending |
-| SHARED-03 | Phase 14 | Pending |
+| SHARED-02 | Phase 14 | Complete |
+| SHARED-03 | Phase 14 | Complete |
 | BUILD-01 | Phase 15 | Pending |
 | BUILD-02 | Phase 15 | Pending |
 | BUILD-03 | Phase 15 | Pending |

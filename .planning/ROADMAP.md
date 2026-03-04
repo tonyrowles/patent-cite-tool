@@ -46,12 +46,12 @@ Full details: `.planning/milestones/v1.2-ROADMAP.md`
 
 </details>
 
-### 🚧 v2.0 Firefox Port (In Progress)
+### v2.0 Firefox Port (In Progress)
 
 **Milestone Goal:** Rearchitect with an esbuild build pipeline, deduplicate shared code, and produce a fully functional Firefox extension alongside the existing Chrome extension.
 
 - [ ] **Phase 14: Shared Code Extraction** — Deduplicate matching and constants into src/shared/; Chrome still works unbuilt
-- [ ] **Phase 15: esbuild Build Pipeline** — src/ → dist/chrome/ and dist/firefox/ scaffolding; built Chrome output matches current
+- [ ] **Phase 15: esbuild Build Pipeline** — src/ -> dist/chrome/ and dist/firefox/ scaffolding; built Chrome output matches current
 - [ ] **Phase 16: Firefox Extension** — Manifest, background script absorbing offscreen logic, API adaptations
 - [ ] **Phase 17: Cross-Browser Validation** — Both platforms pass the 71-case test corpus and real-patent spot-check
 
@@ -66,7 +66,10 @@ Full details: `.planning/milestones/v1.2-ROADMAP.md`
   2. src/shared/constants.js exports MSG, STATUS, and PATENT_TYPE as ES module named exports
   3. Chrome content scripts, offscreen.js, and service-worker.js all import from src/shared/ — no local duplicates
   4. The 71-case Vitest corpus passes without modification after the refactor (Chrome loads from src/ as before)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 14-01-PLAN.md — Create shared ESM modules (constants + matching), wire constants consumers, add smoke tests
+- [ ] 14-02-PLAN.md — Wire matching consumers (offscreen + content wrapper), migrate test imports, verify deduplication
 
 ### Phase 15: esbuild Build Pipeline
 **Goal**: A single build script produces dist/chrome/ and dist/firefox/ scaffolding from src/; the Chrome build is functionally identical to loading from src/ directly
@@ -119,7 +122,7 @@ Full details: `.planning/milestones/v1.2-ROADMAP.md`
 | 11. Options Page Polish | v1.2 | 2/2 | Complete | 2026-03-03 |
 | 12. Store Listing and Submission | v1.2 | 2/2 | Complete | 2026-03-03 |
 | 13. Offscreen Wrap-Hyphen Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
-| 14. Shared Code Extraction | v2.0 | 0/? | Not started | - |
+| 14. Shared Code Extraction | v2.0 | 0/2 | Not started | - |
 | 15. esbuild Build Pipeline | v2.0 | 0/? | Not started | - |
 | 16. Firefox Extension | v2.0 | 0/? | Not started | - |
 | 17. Cross-Browser Validation | v2.0 | 0/? | Not started | - |

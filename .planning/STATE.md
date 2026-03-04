@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: planning
-last_updated: "2026-03-04T07:59:00.165Z"
-last_activity: 2026-03-03 — v2.0 roadmap created (phases 14-17)
+last_updated: "2026-03-04T08:06:00Z"
+last_activity: 2026-03-04 — Phase 15 Plan 02 complete (esbuild build pipeline)
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 25
 ---
 
 # Project State
@@ -24,12 +24,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: 14 of 17 (Shared Code Extraction)
-Plan: — (not started)
-Status: Ready to plan
-Last activity: 2026-03-03 — v2.0 roadmap created (phases 14-17)
+Phase: 15 of 17 (esbuild Build Pipeline)
+Plan: 02 complete — Phase 15 complete
+Status: In progress
+Last activity: 2026-03-04 — Phase 15-02 complete (esbuild build pipeline, npm scripts, dist/ outputs)
 
-Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
+Progress: [██░░░░░░░░] 25% (v2.0 milestone)
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 14-shared-code-extraction P01 | 4 | 2 tasks | 7 files |
 | Phase 14-shared-code-extraction P02 | 6 | 2 tasks | 5 files |
 | Phase 15-esbuild-build-pipeline P01 | 2 | 2 tasks | 7 files |
+| Phase 15-esbuild-build-pipeline P02 | 5 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,9 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 14-shared-code-extraction]: offscreen.js imports only matchAndCite from shared/matching.js (normalizeText not needed as separate import; matchAndCite handles it internally)
 - [Phase 15-esbuild-build-pipeline]: Wrapper files (constants-globals.js, text-matcher.js) deleted — Phase 14 transitional files no longer needed with ES module imports
 - [Phase 15-esbuild-build-pipeline]: Firefox manifest uses scripts array (not service_worker key) for background; omits offscreen and declarativeContent permissions; content scripts point to bundled content.js
+- [Phase 15-esbuild-build-pipeline P02]: external: ['../lib/pdf.mjs'] path is relative to output file location (dist/chrome/offscreen/); resolves correctly to dist/chrome/lib/pdf.mjs at runtime
+- [Phase 15-esbuild-build-pipeline P02]: No globalName on IIFE bundle — content scripts are pure side-effects; (() => {}) wrapper sufficient
+- [Phase 15-esbuild-build-pipeline P02]: build:firefox produces manifest-only dist/firefox/ scaffold — Phase 16 adds actual JS bundles
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-03 - v2.0 roadmap created
-Status: Ready to plan Phase 14
-Next: `/gsd:plan-phase 14`
+Last activity: 2026-03-04 — Phase 15 Plan 02 complete (esbuild build pipeline)
+Status: Phase 15 complete — ready for Phase 16 Firefox Port
+Next: `/gsd:plan-phase 16` (Firefox Port)

@@ -10,10 +10,10 @@ Requirements for Firefox port milestone. Each maps to roadmap phases.
 ### Build Pipeline
 
 - [x] **BUILD-01**: esbuild script produces `dist/chrome/` from `src/` with correct bundle formats (IIFE for content scripts, ESM for background/offscreen)
-- [ ] **BUILD-02**: Static assets (HTML, icons, pdf.mjs, pdf.worker.mjs) are copied to dist output
-- [ ] **BUILD-03**: Chrome manifest is copied/generated into `dist/chrome/`
+- [x] **BUILD-02**: Static assets (HTML, icons, pdf.mjs, pdf.worker.mjs) are copied to dist output
+- [x] **BUILD-03**: Chrome manifest is copied/generated into `dist/chrome/`
 - [x] **BUILD-04**: Built Chrome extension is functionally identical to current raw source
-- [ ] **BUILD-05**: Vitest 71-case test corpus passes against built Chrome output
+- [x] **BUILD-05**: Vitest 71-case test corpus passes against built Chrome output
 
 ### Shared Code
 
@@ -71,10 +71,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHARED-02 | Phase 14 | Complete |
 | SHARED-03 | Phase 14 | Complete |
 | BUILD-01 | Phase 15 | Complete |
-| BUILD-02 | Phase 15 | Pending |
-| BUILD-03 | Phase 15 | Pending |
+| BUILD-02 | Phase 15 | Complete |
+| BUILD-03 | Phase 15 | Complete |
 | BUILD-04 | Phase 15 | Complete |
-| BUILD-05 | Phase 15 | Pending |
+| BUILD-05 | Phase 15 | Complete |
 | FOX-01 | Phase 16 | Pending |
 | FOX-02 | Phase 16 | Pending |
 | FOX-03 | Phase 16 | Pending |

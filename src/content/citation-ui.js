@@ -1,11 +1,9 @@
 /**
  * Shadow DOM UI components for the Patent Citation Tool.
  *
- * This is a classic script (NOT an ES module). Loaded via manifest
- * content_scripts array before content-script.js. All functions are
- * available as globals in the content script context.
+ * ES module. Bundled by esbuild into an IIFE alongside content-script.js.
  *
- * Provides:
+ * Exports:
  *   showFloatingButton(rect, onClick)   - Small "Cite" button near selection
  *   showCitationPopup(citation, rect, confidence, displayMode, matchedText) - Citation result
  *   showErrorPopup(errorMessage, rect)  - Error message popup
@@ -45,7 +43,7 @@ function getCitationHost() {
 /**
  * Remove all citation UI from the page.
  */
-function dismissCitationUI() {
+export function dismissCitationUI() {
   if (citationHost && document.body.contains(citationHost)) {
     citationHost.remove();
     citationHost = null;
@@ -59,7 +57,7 @@ function dismissCitationUI() {
  * @param {DOMRect} rect - Bounding rect of the selection range.
  * @param {Function} onClick - Callback to generate the citation.
  */
-function showFloatingButton(rect, onClick) {
+export function showFloatingButton(rect, onClick) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -109,7 +107,7 @@ function showFloatingButton(rect, onClick) {
  * @param {string} displayMode - 'default' or 'advanced'.
  * @param {string} [matchedText] - Matched text for advanced display.
  */
-function showCitationPopup(citation, rect, confidence, displayMode, matchedText) {
+export function showCitationPopup(citation, rect, confidence, displayMode, matchedText) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -221,7 +219,7 @@ function showCitationPopup(citation, rect, confidence, displayMode, matchedText)
  * @param {string} errorMessage - Error text to display.
  * @param {DOMRect} rect - Bounding rect near which to show the error.
  */
-function showErrorPopup(errorMessage, rect) {
+export function showErrorPopup(errorMessage, rect) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -255,7 +253,7 @@ function showErrorPopup(errorMessage, rect) {
  *
  * @param {DOMRect} rect - Bounding rect near which to show the indicator.
  */
-function showLoadingIndicator(rect) {
+export function showLoadingIndicator(rect) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -289,7 +287,7 @@ function showLoadingIndicator(rect) {
  * @param {string} citation - The citation text that was appended.
  * @param {DOMRect} rect - Bounding rect of the selection for positioning.
  */
-function showSuccessToast(citation, rect) {
+export function showSuccessToast(citation, rect) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -332,7 +330,7 @@ function showSuccessToast(citation, rect) {
  * @param {string} reason - The failure reason text.
  * @param {DOMRect} rect - Bounding rect of the selection for positioning.
  */
-function showFailureToast(reason, rect) {
+export function showFailureToast(reason, rect) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');

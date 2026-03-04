@@ -1,12 +1,18 @@
 /**
  * Content script for the Patent Citation Tool extension.
  *
- * Runs on patents.google.com/patent/US* pages (injected after constants.js).
+ * ES module entry point, bundled by esbuild into an IIFE (content.js).
+ * Runs on patents.google.com/patent/US* pages.
  * Extracts patent info from the URL and finds the PDF download link in the DOM.
- *
- * NOTE: This is a classic script (not an ES module). Constants from
- * shared/constants.js are available as globals (MSG, STATUS, PATENT_TYPE).
  */
+
+import { MSG, PATENT_TYPE } from '../shared/constants.js';
+import { findParagraphCitation } from './paragraph-finder.js';
+import {
+  showFloatingButton, showCitationPopup, showErrorPopup,
+  showLoadingIndicator, showSuccessToast, showFailureToast,
+  dismissCitationUI
+} from './citation-ui.js';
 
 /**
  * Extract patent ID, type, and kind code from the current URL.

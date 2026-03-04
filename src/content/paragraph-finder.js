@@ -1,15 +1,10 @@
 /**
  * DOM-based paragraph citation for published patent applications.
  *
- * This is a classic script (NOT an ES module). It is loaded via the
- * manifest content_scripts array before content-script.js, making its
- * functions available as globals in the content script context.
+ * ES module. Bundled by esbuild into an IIFE alongside content-script.js.
  *
- * Provides:
+ * Exports:
  *   findParagraphCitation(selection) - main entry point
- *   buildParagraphMap()              - scans DOM for paragraph markers
- *   findParagraphForNode(node, map)  - locates paragraph for a DOM node
- *   formatAppCitation(start, end)    - formats the citation string
  */
 
 /**
@@ -21,7 +16,7 @@
  * @param {Selection} selection - The current text selection
  * @returns {{ citation: string, confidence: number } | null}
  */
-function findParagraphCitation(selection) {
+export function findParagraphCitation(selection) {
   if (!selection || selection.rangeCount === 0) return null;
 
   const range = selection.getRangeAt(0);

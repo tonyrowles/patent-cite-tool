@@ -23,11 +23,11 @@ Requirements for Firefox port milestone. Each maps to roadmap phases.
 
 ### Firefox Extension
 
-- [ ] **FOX-01**: Firefox MV3 manifest with `browser_specific_settings.gecko.id` and correct permissions
-- [ ] **FOX-02**: Firefox background script absorbs offscreen document logic (PDF fetch, parse, IndexedDB, matching)
-- [ ] **FOX-03**: Icon activation via `tabs.onUpdated` URL matching replaces Chrome's `declarativeContent`
+- [x] **FOX-01**: Firefox MV3 manifest with `browser_specific_settings.gecko.id` and correct permissions
+- [x] **FOX-02**: Firefox background script absorbs offscreen document logic (PDF fetch, parse, IndexedDB, matching)
+- [x] **FOX-03**: Icon activation via `tabs.onUpdated` URL matching replaces Chrome's `declarativeContent`
 - [ ] **FOX-04**: esbuild produces `dist/firefox/` alongside `dist/chrome/`
-- [ ] **FOX-05**: IndexedDB graceful degradation for Firefox private browsing / "Never remember history"
+- [x] **FOX-05**: IndexedDB graceful degradation for Firefox private browsing / "Never remember history"
 
 ### Validation
 
@@ -75,11 +75,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BUILD-03 | Phase 15 | Complete |
 | BUILD-04 | Phase 15 | Complete |
 | BUILD-05 | Phase 15 | Complete |
-| FOX-01 | Phase 16 | Pending |
-| FOX-02 | Phase 16 | Pending |
-| FOX-03 | Phase 16 | Pending |
+| FOX-01 | Phase 16 | Complete |
+| FOX-02 | Phase 16 | Complete |
+| FOX-03 | Phase 16 | Complete |
 | FOX-04 | Phase 16 | Pending |
-| FOX-05 | Phase 16 | Pending |
+| FOX-05 | Phase 16 | Complete |
 | VALID-01 | Phase 17 | Pending |
 | VALID-02 | Phase 17 | Pending |
 | VALID-03 | Phase 17 | Pending |

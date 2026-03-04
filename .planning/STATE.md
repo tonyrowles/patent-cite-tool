@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: completed
-last_updated: "2026-03-04T08:17:52.811Z"
+last_updated: "2026-03-04T17:32:59.583Z"
 last_activity: 2026-03-04 — Phase 15-03 complete (human UAT verification of dist/chrome/ built extension)
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 8
+  completed_plans: 6
   percent: 100
 ---
 
@@ -24,12 +24,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: 15 of 17 (esbuild Build Pipeline)
-Plan: 03 complete — Phase 15 fully complete (all 3 plans done, BUILD-01 through BUILD-05 satisfied)
-Status: Complete — ready for Phase 16
-Last activity: 2026-03-04 — Phase 15-03 complete (human UAT verification of dist/chrome/ built extension)
+Phase: 16 of 17 (Firefox Extension)
+Plan: 01 complete — Firefox pdf-pipeline.js + background.js + manifest update
+Status: In Progress — ready for Plan 02 (esbuild Firefox build pipeline)
+Last activity: 2026-03-04 — Phase 16-01 complete (Firefox source files created)
 
-Progress: [██████████] 100% (v2.0 Phase 15 complete)
+Progress: [████████░░] 75% (v2.0 Phase 16 Plan 01 complete)
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: [██████████] 100% (v2.0 Phase 15 complete)
 | Phase 15-esbuild-build-pipeline P01 | 2 | 2 tasks | 7 files |
 | Phase 15-esbuild-build-pipeline P02 | 5 | 2 tasks | 2 files |
 | Phase 15-esbuild-build-pipeline P03 | 10 | 2 tasks | 2 files |
+| Phase 16-firefox-extension P01 | 4 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 15-esbuild-build-pipeline P02]: No globalName on IIFE bundle — content scripts are pure side-effects; (() => {}) wrapper sufficient
 - [Phase 15-esbuild-build-pipeline P02]: build:firefox produces manifest-only dist/firefox/ scaffold — Phase 16 adds actual JS bundles
 - [Phase 15-esbuild-build-pipeline]: BUILD-04 satisfied by human UAT — user loaded dist/chrome/ in Chrome, generated citations on real Google Patents pages, confirmed functionally identical to src/ version
+- [Phase 16-firefox-extension]: Firefox background uses tabs.onUpdated URL matching for icon activation — declarativeContent not supported in Firefox
+- [Phase 16-firefox-extension]: IndexedDB degradation uses detect-once idbAvailable flag — on first InvalidStateError/UnknownError all IDB ops silently skipped, positionMapCache Map used as fallback
+- [Phase 16-firefox-extension]: Firefox manifest.firefox.json: tabs permission + wasm-unsafe-eval CSP added for PDF.js WebAssembly support
 
 ### Pending Todos
 
@@ -74,7 +78,7 @@ None.
 ### Blockers/Concerns
 
 - [Phase 16 risk]: Firefox event page lifecycle during active PDF.js parse is MEDIUM confidence — empirical test needed during implementation
-- [Phase 16 risk]: PDF.js WASM + Firefox CSP may require wasm-unsafe-eval in manifest.firefox.json — test in Phase 16
+- [Phase 16 risk RESOLVED]: PDF.js WASM + Firefox CSP — wasm-unsafe-eval added to manifest.firefox.json content_security_policy in Plan 01
 - [Phase 16 risk]: Cloudflare Worker CORS may need moz-extension:// origin explicitly allowed — verify in Phase 16
 
 ### Quick Tasks Completed
@@ -85,6 +89,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-04 — Phase 15 Plan 03 complete (human UAT: dist/chrome/ verified working)
-Status: Phase 15 fully complete — ready for Phase 16 Firefox Port
-Next: `/gsd:plan-phase 16` (Firefox Port)
+Last activity: 2026-03-04 — Phase 16 Plan 01 complete (Firefox source files: pdf-pipeline.js, background.js, manifest update)
+Status: Phase 16 Plan 01 complete — ready for Plan 02 (esbuild Firefox bundle configuration)
+Next: `/gsd:execute-phase 16 02` (Firefox esbuild build pipeline)

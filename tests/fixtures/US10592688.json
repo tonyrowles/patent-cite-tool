@@ -2726,7 +2726,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "links, and a first view of the examination form is generated",
     "hasWrapHyphen": false,
     "x": 311.76,
@@ -2738,7 +2738,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "for display to a first user having a first role. The first view",
     "hasWrapHyphen": false,
     "x": 312.7200008665555,
@@ -2750,7 +2750,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "fields. The method further comprises receiving data input",
     "hasWrapHyphen": false,
     "x": 313.2000037052035,
@@ -2762,7 +2762,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "into at least some of the first subset of data fields of the first",
     "hasWrapHyphen": false,
     "x": 312.24000248238957,
@@ -2774,7 +2774,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "view of the examination form , and generating second",
     "hasWrapHyphen": false,
     "x": 311.28000145430684,
@@ -2786,7 +2786,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "different view of the examination form for display to a",
     "hasWrapHyphen": false,
     "x": 310.79999939382145,
@@ -2798,7 +2798,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "wherein the second view",
     "hasWrapHyphen": false,
     "x": 436.320014098764,
@@ -2810,7 +2810,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "is configured to receive data in a second subset of the data",
     "hasWrapHyphen": false,
     "x": 312.479994272786,
@@ -2822,7 +2822,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "fields, wherein the first subset ofdata fields includes at least",
     "hasWrapHyphen": false,
     "x": 312.4799911737802,
@@ -2834,7 +2834,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "one data field notincluded in the second subsetofdata fields.",
     "hasWrapHyphen": false,
     "x": 310.7999823820582,
@@ -2846,7 +2846,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "Data input into at least some of the second subset of data",
     "hasWrapHyphen": false,
     "x": 311.5200144012321,
@@ -2870,7 +2870,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 30,
+    "lineNumber": 32,
     "text": "received . The method further includes determining one or",
     "hasWrapHyphen": false,
     "x": 311.2800063052704,
@@ -2942,7 +2942,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 36,
+    "lineNumber": 38,
     "text": "comparison ofmedical examination results is provided. The",
     "hasWrapHyphen": false,
     "x": 312.2399952,
@@ -2954,7 +2954,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 37,
+    "lineNumber": 39,
     "text": "method includes storing a first medical examination form in",
     "hasWrapHyphen": false,
     "x": 309.5999988367944,
@@ -2966,7 +2966,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 39,
+    "lineNumber": 41,
     "text": "one or more data fields having data associated with first",
     "hasWrapHyphen": false,
     "x": 311.2800035393395,
@@ -2978,7 +2978,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 40,
+    "lineNumber": 42,
     "text": "imaging data generated for a firstmedical examination . The",
     "hasWrapHyphen": false,
     "x": 311.75999988877817,
@@ -2990,7 +2990,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 41,
+    "lineNumber": 43,
     "text": "method further includes generating a secondmedical exami",
     "hasWrapHyphen": false,
     "x": 309.60001399076924,
@@ -3002,7 +3002,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 42,
+    "lineNumber": 44,
     "text": "nation form based on the first medical form , the second",
     "hasWrapHyphen": false,
     "x": 311.999984484876,
@@ -3014,7 +3014,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 44,
+    "lineNumber": 46,
     "text": "first medical form , and further comprising additional data",
     "hasWrapHyphen": false,
     "x": 312.0000016985885,
@@ -3026,7 +3026,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 45,
+    "lineNumber": 47,
     "text": "fields configured to receive data associated with second",
     "hasWrapHyphen": false,
     "x": 312.23999659535065,
@@ -3038,7 +3038,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 46,
+    "lineNumber": 48,
     "text": "imaging data generated for a second medical examination.",
     "hasWrapHyphen": false,
     "x": 312.7200155353006,
@@ -3050,7 +3050,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 47,
+    "lineNumber": 49,
     "text": "The first imaging data, the second imaging data, and the",
     "hasWrapHyphen": false,
     "x": 313.20000537408004,
@@ -3062,7 +3062,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 48,
+    "lineNumber": 50,
     "text": ", and data",
     "hasWrapHyphen": false,
     "x": 490.3200203877074,
@@ -3074,7 +3074,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 49,
+    "lineNumber": 51,
     "text": "associated with the second imaging data into the additional",
     "hasWrapHyphen": false,
     "x": 310.8000213558259,
@@ -3086,7 +3086,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 50,
+    "lineNumber": 52,
     "text": "data fields is then received.",
     "hasWrapHyphen": false,
     "x": 312.24000063094985,
@@ -3098,7 +3098,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 51,
+    "lineNumber": 53,
     "text": "In still another embodiment, a system for creating",
     "hasWrapHyphen": false,
     "x": 320.1600070560921,
@@ -3110,7 +3110,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 52,
+    "lineNumber": 54,
     "text": "dynamic medical examination forms is provided. The sys",
     "hasWrapHyphen": false,
     "x": 311.0400008405127,
@@ -3122,7 +3122,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 54,
+    "lineNumber": 56,
     "text": "medical examination form in a memory, the first medical",
     "hasWrapHyphen": false,
     "x": 310.07999849618733,
@@ -3134,7 +3134,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 55,
+    "lineNumber": 57,
     "text": "examination form comprising one ormore data fields having",
     "hasWrapHyphen": false,
     "x": 311.51999690118095,
@@ -3146,7 +3146,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 56,
+    "lineNumber": 58,
     "text": "data associated with first imaging data generated for a first",
     "hasWrapHyphen": false,
     "x": 310.7999952,
@@ -3158,7 +3158,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 57,
+    "lineNumber": 59,
     "text": "medical examination. The system further includes a second",
     "hasWrapHyphen": false,
     "x": 309.5999783538423,
@@ -3170,7 +3170,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 59,
+    "lineNumber": 61,
     "text": "tion form based on the first medical form , the second",
     "hasWrapHyphen": false,
     "x": 312.00000590075183,
@@ -3182,7 +3182,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 60,
+    "lineNumber": 62,
     "text": "medical form comprising the data fields and data from the",
     "hasWrapHyphen": false,
     "x": 310.55999592623016,
@@ -3194,7 +3194,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 61,
+    "lineNumber": 63,
     "text": "first medical form , and further comprising additional data",
     "hasWrapHyphen": false,
     "x": 311.76001124789803,
@@ -3206,7 +3206,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 62,
+    "lineNumber": 64,
     "text": "fields configured to receive data associated with second",
     "hasWrapHyphen": false,
     "x": 312.0000061353797,
@@ -3218,7 +3218,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 63,
+    "lineNumber": 65,
     "text": "medical examination. A",
     "hasWrapHyphen": false,
     "x": 440.63998081148185,
@@ -3230,7 +3230,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 64,
+    "lineNumber": 66,
     "text": "third module is configured to display the first imaging data ,",
     "hasWrapHyphen": false,
     "x": 312.2399813428428,
@@ -3242,7 +3242,7 @@
   {
     "page": 34,
     "column": 2,
-    "lineNumber": 65,
+    "lineNumber": 67,
     "text": "the second imaging data ,and the second medical form at the",
     "hasWrapHyphen": false,
     "x": 312.4800088671744,
@@ -7286,7 +7286,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "referred to herein as “ views” of the medical examination",
     "hasWrapHyphen": false,
     "x": 311.27999922180004,
@@ -7298,7 +7298,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "form . Thus, an examination form may have multiple views",
     "hasWrapHyphen": false,
     "x": 312.47999999999996,
@@ -7310,7 +7310,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "each based on a similar template, but each potentially",
     "hasWrapHyphen": false,
     "x": 311.5200097150459,
@@ -7322,7 +7322,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "exporting differentdata . In the example provided in FIG . 1B ,",
     "hasWrapHyphen": false,
     "x": 311.5199952,
@@ -7334,7 +7334,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "various views are defined for the medical examination form",
     "hasWrapHyphen": false,
     "x": 311.51997031528913,
@@ -7346,7 +7346,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "170: a physician view 172, a technologist view 174, a nurse",
     "hasWrapHyphen": false,
     "x": 312.7199928906636,
@@ -7358,7 +7358,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "view 176, and a billing view 178. While specific viewsbased",
     "hasWrapHyphen": false,
     "x": 312.4799898814785,
@@ -7370,7 +7370,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "appreciated that different views may be defined based on",
     "hasWrapHyphen": false,
     "x": 311.5200096,
@@ -7382,7 +7382,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "almost any attribute. For example, a doctor may be pre",
     "hasWrapHyphen": false,
     "x": 311.51999970039094,
@@ -7394,7 +7394,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "sented with one view ofthe form before the actualassociated",
     "hasWrapHyphen": false,
     "x": 311.5199841070867,
@@ -7406,7 +7406,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "medical examination takes place, while hemay be presented",
     "hasWrapHyphen": false,
     "x": 310.3199830373779,
@@ -7418,7 +7418,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "taken place and a technologisthas entered examination data.",
     "hasWrapHyphen": false,
     "x": 312.48001833856705,
@@ -7430,7 +7430,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "In some embodiments, the different viewsmay be used to",
     "hasWrapHyphen": false,
     "x": 320.3999724373325,
@@ -7442,7 +7442,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "protect or ensure the reliability of data entered into the",
     "hasWrapHyphen": false,
     "x": 311.51998272258527,
@@ -7454,7 +7454,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "medical examination form . For example , fields in a medical",
     "hasWrapHyphen": false,
     "x": 309.8400004981029,
@@ -7466,7 +7466,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "fields which prevent a user from saving an updated form",
     "hasWrapHyphen": false,
     "x": 312.96000767165134,
@@ -7478,7 +7478,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "unless they have entered appropriate data in the required",
     "hasWrapHyphen": false,
     "x": 311.76001439999993,
@@ -7490,7 +7490,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "data entry fields. Other fields may be protected from access",
     "hasWrapHyphen": false,
     "x": 312.0000022803986,
@@ -7502,7 +7502,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "or modification so that unauthorized users do not inadver",
     "hasWrapHyphen": false,
     "x": 311.5199999617925,
@@ -7514,7 +7514,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": ") change data in an examination",
     "hasWrapHyphen": false,
     "x": 411.84000093599997,
@@ -7526,7 +7526,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "form .",
     "hasWrapHyphen": false,
     "x": 311.9999802134034,
@@ -7538,7 +7538,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "Alternatively, a single examination form may be pre",
     "hasWrapHyphen": false,
     "x": 320.8799865738667,
@@ -7550,7 +7550,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "sented to a single or various different intended users . As yet",
     "hasWrapHyphen": false,
     "x": 311.5199886713832,
@@ -7562,7 +7562,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "another alternative, a single examination form may be",
     "hasWrapHyphen": false,
     "x": 311.5199940429919,
@@ -7574,7 +7574,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "with different accessible",
     "hasWrapHyphen": false,
     "x": 439.2000031908571,
@@ -7586,7 +7586,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "or editable fields depending on the user, or other configu",
     "hasWrapHyphen": false,
     "x": 311.76000532367374,
@@ -7598,7 +7598,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "rable conditions. Therefore, one can define a \" view of an",
     "hasWrapHyphen": false,
     "x": 311.03999827727165,
@@ -7610,7 +7610,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "examination form ” as an instance of an examination form",
     "hasWrapHyphen": false,
     "x": 312.2400072,
@@ -7622,7 +7622,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "created from an examination form template . One of more",
     "hasWrapHyphen": false,
     "x": 311.75999250500536,
@@ -7634,7 +7634,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "the life cycle of an examination, and in addition, there may",
     "hasWrapHyphen": false,
     "x": 311.76002032000923,
@@ -7646,7 +7646,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "be multiple different examination forms for any particular",
     "hasWrapHyphen": false,
     "x": 310.5599914853423,
@@ -7658,7 +7658,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "examination .",
     "hasWrapHyphen": false,
     "x": 311.52000995396156,
@@ -7670,7 +7670,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "FIG . 2 is a high level flowchart of a process by which",
     "hasWrapHyphen": false,
     "x": 320.4000025632,
@@ -7682,7 +7682,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "medical examination formsmay be created accord",
     "hasWrapHyphen": false,
     "x": 342.9600020643987,
@@ -7694,7 +7694,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "ing to one or more embodiments . The process shown in FIG .",
     "hasWrapHyphen": false,
     "x": 312.0000192,
@@ -7706,7 +7706,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "2 is typically performed by the dynamic medical examina",
     "hasWrapHyphen": false,
     "x": 312.7199876453664,
@@ -7718,7 +7718,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "tion forms software 151, executing on the examination",
     "hasWrapHyphen": false,
     "x": 311.76000331064444,
@@ -7730,7 +7730,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "forms computing device 150 (or other computing device).",
     "hasWrapHyphen": false,
     "x": 311.99999019367465,
@@ -7742,7 +7742,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "will readily appreciate that",
     "hasWrapHyphen": false,
     "x": 428.88006954615605,
@@ -7754,7 +7754,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "the process may be performed bymore software distributed",
     "hasWrapHyphen": false,
     "x": 311.5200043408903,
@@ -7766,7 +7766,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "across a plurality of systems. In one embodiment,a software",
     "hasWrapHyphen": false,
     "x": 311.2800085403119,
@@ -7778,7 +7778,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "application that is installed on the computing system 150",
     "hasWrapHyphen": false,
     "x": 312.48000445807077,
@@ -7790,7 +7790,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "may generate various user interfaces for interfacing with an",
     "hasWrapHyphen": false,
     "x": 310.32000842079975,
@@ -7802,7 +7802,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "multiple software modules that interface with one another,",
     "hasWrapHyphen": false,
     "x": 309.5999948926061,
@@ -7814,7 +7814,7 @@
   {
     "page": 37,
     "column": 8,
-    "lineNumber": 67,
+    "lineNumber": 68,
     "text": "such as a template creation module , template selection",
     "hasWrapHyphen": false,
     "x": 311.52000296896705,
@@ -18110,7 +18110,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": ", such as radiobuttons, checkboxes ,",
     "hasWrapHyphen": false,
     "x": 382.0799952,
@@ -18122,7 +18122,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "required fields, etc. can be employed in the examination",
     "hasWrapHyphen": false,
     "x": 311.99999796623376,
@@ -18134,7 +18134,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "form design . As noted above, certain data entered into the",
     "hasWrapHyphen": false,
     "x": 312.0000022803986,
@@ -18146,7 +18146,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "examination form may be exported to a physicians report. In",
     "hasWrapHyphen": false,
     "x": 311.7599976570122,
@@ -18158,7 +18158,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "one embodiment, data is only exported if information is",
     "hasWrapHyphen": false,
     "x": 311.7600089563152,
@@ -18170,7 +18170,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "no information is placed in the",
     "hasWrapHyphen": false,
     "x": 417.60001933310923,
@@ -18182,7 +18182,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "text area next to the Dose -Length Product 1068, when the",
     "hasWrapHyphen": false,
     "x": 311.5199920377917,
@@ -18194,7 +18194,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "contents of Section 2 are imported into a physician's reading",
     "hasWrapHyphen": false,
     "x": 311.5200058310649,
@@ -18206,7 +18206,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "report, the entire text area will be omitted. In this way, the",
     "hasWrapHyphen": false,
     "x": 311.2800017996263,
@@ -18218,7 +18218,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "physician's reading report will not have the appearance of a",
     "hasWrapHyphen": false,
     "x": 311.5199992972824,
@@ -18230,7 +18230,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": ", in part, from a form .",
     "hasWrapHyphen": false,
     "x": 433.4400188999998,
@@ -18242,7 +18242,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "Turning now to FIG . 10F, an example of an examination",
     "hasWrapHyphen": false,
     "x": 322.32000359999995,
@@ -18266,7 +18266,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "is provided for receiving data from a technologist. In this",
     "hasWrapHyphen": false,
     "x": 311.03999999999996,
@@ -18278,7 +18278,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "example , the data may be entered into the examination form",
     "hasWrapHyphen": false,
     "x": 312.2399920424318,
@@ -18326,7 +18326,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 33,
+    "lineNumber": 35,
     "text": "then be automatically exported into a physicians report,",
     "hasWrapHyphen": false,
     "x": 328.5600308839535,
@@ -18350,7 +18350,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 35,
+    "lineNumber": 37,
     "text": "report. As discussed above, some portions of the examina",
     "hasWrapHyphen": false,
     "x": 311.2799918577081,
@@ -18362,7 +18362,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 36,
+    "lineNumber": 38,
     "text": "tion form may be automatically completed when the form is",
     "hasWrapHyphen": false,
     "x": 312.2400005703972,
@@ -18386,7 +18386,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 38,
+    "lineNumber": 40,
     "text": ") has been automatically",
     "hasWrapHyphen": false,
     "x": 433.9200001483058,
@@ -18398,7 +18398,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 39,
+    "lineNumber": 41,
     "text": "imported from a data source.As the procedure is completed,",
     "hasWrapHyphen": false,
     "x": 311.75998696996606,
@@ -18410,7 +18410,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 40,
+    "lineNumber": 42,
     "text": "the examination form may be updated to import supplies that",
     "hasWrapHyphen": false,
     "x": 311.7599873966203,
@@ -18422,7 +18422,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 41,
+    "lineNumber": 43,
     "text": "were used during procedure.",
     "hasWrapHyphen": false,
     "x": 310.56002626383406,
@@ -18434,7 +18434,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 42,
+    "lineNumber": 44,
     "text": "After a technologist has finished using the examination",
     "hasWrapHyphen": false,
     "x": 320.1599962251046,
@@ -18446,7 +18446,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 43,
+    "lineNumber": 45,
     "text": "physician's reportmay be automatically generated to",
     "hasWrapHyphen": false,
     "x": 338.1600079264583,
@@ -18458,7 +18458,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 44,
+    "lineNumber": 46,
     "text": "include data exported from the examination form as previ",
     "hasWrapHyphen": false,
     "x": 311.5199969238612,
@@ -18470,7 +18470,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 45,
+    "lineNumber": 47,
     "text": "ously discussed. FIG . 10G is an example of a user interface",
     "hasWrapHyphen": false,
     "x": 310.8000011122829,
@@ -18482,7 +18482,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 46,
+    "lineNumber": 48,
     "text": "that a physician may use to evaluate a physician's report. In",
     "hasWrapHyphen": false,
     "x": 311.7599951690246,
@@ -18494,7 +18494,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 47,
+    "lineNumber": 49,
     "text": "this example , a completed examination form 1080 dis",
     "hasWrapHyphen": false,
     "x": 311.7599868715891,
@@ -18506,7 +18506,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 49,
+    "lineNumber": 51,
     "text": "is displayed on the right. The reading physician may define",
     "hasWrapHyphen": false,
     "x": 312.2400122850808,
@@ -18518,7 +18518,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 50,
+    "lineNumber": 52,
     "text": "preferences such that both the examination form 1080 and",
     "hasWrapHyphen": false,
     "x": 312.23999679013366,
@@ -18530,7 +18530,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 51,
+    "lineNumber": 53,
     "text": "reading report 1090 are simultaneously displayed. In some",
     "hasWrapHyphen": false,
     "x": 311.5199998701274,
@@ -18542,7 +18542,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 52,
+    "lineNumber": 54,
     "text": "embodiments, the physician may be provided extensive",
     "hasWrapHyphen": false,
     "x": 312.7199793465454,
@@ -18554,7 +18554,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 53,
+    "lineNumber": 55,
     "text": "displayed data. For",
     "hasWrapHyphen": false,
     "x": 457.43998425264766,
@@ -18566,7 +18566,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 54,
+    "lineNumber": 56,
     "text": "example, a physician may prefer not to have an examination",
     "hasWrapHyphen": false,
     "x": 311.52001435866003,
@@ -18578,7 +18578,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 55,
+    "lineNumber": 57,
     "text": "form displayed at all, butmay set his preferences to simply",
     "hasWrapHyphen": false,
     "x": 312.7199991896611,
@@ -18590,7 +18590,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 56,
+    "lineNumber": 58,
     "text": "see the physician's report on the right with the examination",
     "hasWrapHyphen": false,
     "x": 311.52000374467485,
@@ -18602,7 +18602,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 57,
+    "lineNumber": 59,
     "text": "form mapped data already imported.",
     "hasWrapHyphen": false,
     "x": 312.2400263685999,
@@ -18614,7 +18614,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 58,
+    "lineNumber": 60,
     "text": "In this example, the physician's report 1090 contains",
     "hasWrapHyphen": false,
     "x": 321.119991445716,
@@ -18626,7 +18626,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 59,
+    "lineNumber": 61,
     "text": "information 1092 that did not come from the examination",
     "hasWrapHyphen": false,
     "x": 311.759997861696,
@@ -18638,7 +18638,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 60,
+    "lineNumber": 62,
     "text": "form ,but instead came from other datamapping. Depending",
     "hasWrapHyphen": false,
     "x": 311.75998518139147,
@@ -18650,7 +18650,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 61,
+    "lineNumber": 63,
     "text": "on the specific implementation , the physician may have the",
     "hasWrapHyphen": false,
     "x": 310.79999636419274,
@@ -18662,7 +18662,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 62,
+    "lineNumber": 64,
     "text": "right to edit the physician's report 1090 directly, or may edit",
     "hasWrapHyphen": false,
     "x": 311.76000609001346,
@@ -18674,7 +18674,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 63,
+    "lineNumber": 65,
     "text": "1080 and then resend the data to the",
     "hasWrapHyphen": false,
     "x": 394.55999901359996,
@@ -18686,7 +18686,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 64,
+    "lineNumber": 66,
     "text": "physician's report. In addition, a physician might make",
     "hasWrapHyphen": false,
     "x": 311.52000244868566,
@@ -18698,7 +18698,7 @@
   {
     "page": 44,
     "column": 22,
-    "lineNumber": 65,
+    "lineNumber": 67,
     "text": "variousmeasurements or annotations of associated medical",
     "hasWrapHyphen": false,
     "x": 311.28001846958745,
@@ -22670,7 +22670,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "in response to a request to view the examination form by",
     "hasWrapHyphen": false,
     "x": 321.83998945009773,
@@ -22682,7 +22682,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "a first user:",
     "hasWrapHyphen": false,
     "x": 329.52000038684827,
@@ -22694,7 +22694,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "determine a first role associated with the first user;",
     "hasWrapHyphen": false,
     "x": 329.99999405614034,
@@ -22718,7 +22718,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "form for display to the first user based on the first",
     "hasWrapHyphen": false,
     "x": 338.399999154,
@@ -22730,7 +22730,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "role associated with the first user, wherein the first",
     "hasWrapHyphen": false,
     "x": 339.11999341515786,
@@ -22754,7 +22754,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "first subset of the one ormore information fields of",
     "hasWrapHyphen": false,
     "x": 339.1200202616621,
@@ -22814,7 +22814,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 29,
+    "lineNumber": 31,
     "text": "dynamically store the data input into the at least some",
     "hasWrapHyphen": false,
     "x": 330.00000074999997,
@@ -22838,7 +22838,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 31,
+    "lineNumber": 33,
     "text": "fields in association with the respective information",
     "hasWrapHyphen": false,
     "x": 338.63999112310967,
@@ -22850,7 +22850,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 32,
+    "lineNumber": 34,
     "text": "fields of the examination form ;",
     "hasWrapHyphen": false,
     "x": 340.07999919870235,
@@ -22862,7 +22862,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 33,
+    "lineNumber": 35,
     "text": "generate a medical report based on a portion of the data",
     "hasWrapHyphen": false,
     "x": 330.48000188083273,
@@ -22874,7 +22874,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 34,
+    "lineNumber": 36,
     "text": "input into the examination form by the first user,",
     "hasWrapHyphen": false,
     "x": 338.64000480000004,
@@ -22886,7 +22886,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 35,
+    "lineNumber": 37,
     "text": "wherein :",
     "hasWrapHyphen": false,
     "x": 337.6799930717143,
@@ -22898,7 +22898,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 36,
+    "lineNumber": 38,
     "text": "information associated with at least some of the one",
     "hasWrapHyphen": false,
     "x": 339.12000127075726,
@@ -22922,7 +22922,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 38,
+    "lineNumber": 40,
     "text": "form is included in the medical report in respec",
     "hasWrapHyphen": false,
     "x": 348.2399985524026,
@@ -22934,7 +22934,7 @@
   {
     "page": 47,
     "column": 28,
-    "lineNumber": 39,
+    "lineNumber": 41,
     "text": "tive locations as indicated by the examination",
     "hasWrapHyphen": false,
     "x": 347.7599976690989,

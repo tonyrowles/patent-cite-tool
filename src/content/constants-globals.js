@@ -1,12 +1,7 @@
-/**
- * Shared constants for the Patent Citation Tool extension.
- *
- * Pure ES module — import these in service worker and other ESM contexts.
- * Content scripts use src/content/constants-globals.js (classic script wrapper)
- * which defines MSG, STATUS, and PATENT_TYPE as globals without import/export.
- */
+// Classic script wrapper — defines MSG/STATUS/PATENT_TYPE as globals for content scripts.
+// Source of truth: src/shared/constants.js — keep in sync until Phase 15 esbuild replaces this file.
 
-export const MSG = {
+const MSG = {
   PATENT_PAGE_DETECTED: 'patent-page-detected',
   PDF_LINK_FOUND: 'pdf-link-found',
   PDF_LINK_NOT_FOUND: 'pdf-link-not-found',
@@ -26,7 +21,7 @@ export const MSG = {
   UPLOAD_TO_CACHE: 'upload-to-cache',
 };
 
-export const STATUS = {
+const STATUS = {
   IDLE: 'idle',
   FETCHING: 'fetching',
   READY: 'ready',
@@ -37,7 +32,7 @@ export const STATUS = {
   UNAVAILABLE: 'unavailable',
 };
 
-export const PATENT_TYPE = {
+const PATENT_TYPE = {
   GRANT: 'grant',
   APPLICATION: 'application',
 };

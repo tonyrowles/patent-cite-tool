@@ -120,6 +120,20 @@ None - no external service configuration required.
 - Firefox manifest is complete and accurate; Phase 16 does not need to modify it
 - Phase 15-02 can proceed to implement the esbuild build script
 
+## Self-Check: PASSED
+
+All files verified present:
+- src/content/content-script.js: FOUND
+- src/content/citation-ui.js: FOUND
+- src/content/paragraph-finder.js: FOUND
+- src/manifest.firefox.json: FOUND
+- vitest.config.js: FOUND
+- .planning/phases/15-esbuild-build-pipeline/15-01-SUMMARY.md: FOUND
+
+Commits verified:
+- e842838: feat(15-01): convert content scripts to ES module imports/exports - FOUND
+- 7d2d34c: feat(15-01): delete wrapper files, create Firefox manifest, add dist/ to .gitignore - FOUND
+
 ---
 *Phase: 15-esbuild-build-pipeline*
 *Completed: 2026-03-04*

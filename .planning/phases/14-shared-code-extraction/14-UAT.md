@@ -1,9 +1,9 @@
 ---
-status: complete
+status: diagnosed
 phase: 14-shared-code-extraction
 source: 14-01-SUMMARY.md, 14-02-SUMMARY.md
 started: 2026-03-03T00:00:00Z
-updated: 2026-03-03T00:01:00Z
+updated: 2026-03-03T00:02:00Z
 ---
 
 ## Current Test
@@ -41,11 +41,15 @@ skipped: 0
 ## Gaps
 
 - truth: "Content script constants (MSG, STATUS, PATENT_TYPE) available as globals on Google Patents pages"
-  status: failed
+  status: false_positive
   reason: "User reported: Uncaught referenceerror: msg is not defined"
   severity: blocker
   test: 3
-  root_cause: ""
-  artifacts: []
+  root_cause: "NOT A BUG — test design issue. Chrome MV3 content scripts run in an isolated world (default). DevTools console defaults to the main page context ('top'), where content script globals are invisible. The constants-globals.js file correctly defines MSG/STATUS/PATENT_TYPE in the content script's isolated world. Extension tests 1 and 2 confirm the constants work (citations succeed, which requires MSG). To verify manually: switch DevTools console context dropdown from 'top' to the extension's content script context."
+  artifacts:
+    - path: "src/content/constants-globals.js"
+      issue: "Defines globals correctly — no code issue"
+    - path: "src/manifest.json"
+      issue: "No world property = ISOLATED (correct default)"
   missing: []
-  debug_session: ""
+  debug_session: ".planning/debug/msg-not-defined-console.md"

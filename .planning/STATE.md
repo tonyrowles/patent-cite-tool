@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
-status: executing
-last_updated: "2026-03-04T23:52:05.525Z"
-last_activity: 2026-03-04 — Phase 16-03 complete (Firefox human verification — all FOX requirements confirmed)
+status: completed
+last_updated: "2026-03-04T23:57:04.117Z"
+last_activity: "2026-03-04 — Phase 16-03 complete (Firefox human UAT: icon activation, citation generation, IndexedDB degradation all verified)"
 progress:
   total_phases: 4
   completed_phases: 3

@@ -50,8 +50,14 @@ None.
 
 - TECH DEBT: Matching functions duplicated between content script and offscreen due to MV3 module constraints (carried forward from v1.0)
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Fix off-by-2 error in patent column line number calculation | 2026-03-03 | f5b86dd | [1-fix-off-by-2-error-in-patent-column-line](./quick/1-fix-off-by-2-error-in-patent-column-line/) |
+
 ## Session Continuity
 
-Last session: 2026-03-03
+Last activity: 2026-03-03 - Completed quick task 1: Fix off-by-2 error in patent column line number calculation
 Status: v1.2 milestone completed and archived
 Next: `/gsd:new-milestone` to start next milestone

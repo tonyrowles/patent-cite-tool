@@ -4,6 +4,16 @@
 
 A Chrome extension for patent professionals that generates precise column:line citations (for granted patents) or paragraph citations (for published applications) by highlighting text on Google Patents. Supports silent clipboard mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker, and shared server-side cache via Cloudflare KV. Store-ready with three-state toolbar icons, dedicated options page, hosted privacy policy, and 100% accuracy on a 71-case test corpus.
 
+## Current Milestone: v2.0 Firefox Port
+
+**Goal:** Rearchitect the extension with an esbuild build pipeline, deduplicate shared code, and produce a fully functional Firefox port alongside the existing Chrome extension.
+
+**Target features:**
+- esbuild build pipeline producing dist/chrome/ and dist/firefox/
+- Shared code extraction (matching, constants, PDF parsing) eliminating duplication tech debt
+- Firefox extension with background script absorbing Chrome's offscreen document logic
+- Cross-browser validation against the 71-case test corpus
+
 ## Core Value
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
@@ -38,19 +48,27 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 
 ### Active
 
-<!-- Next milestone TBD -->
+<!-- v2.0 Firefox Port -->
 
-- [ ] Chrome Web Store screenshot (1280x800) and promotional tile (440x280)
-- [ ] Chrome Web Store submission and review
-- [ ] Configurable citation format (4:5-20 vs col. 4, ll. 5-20 vs column 4, lines 5-20)
-- [ ] Keyboard shortcut for citation (e.g., Ctrl+Shift+C)
-- [ ] Batch citation mode — queue multiple citations and copy all at once
-- [ ] Patent family cache reuse — continuation patents share specification text
+- [ ] esbuild build pipeline — src/ → dist/chrome/ and dist/firefox/
+- [ ] Extract shared code into src/shared/ — deduplicate matching functions, constants, PDF parsing
+- [ ] Firefox extension — manifest, background script absorbing offscreen logic, API adaptations
+- [ ] Cross-browser validation — both platforms pass test corpus
+
+### Future
+
+- Chrome Web Store screenshot (1280x800) and promotional tile (440x280)
+- Chrome Web Store submission and review
+- Configurable citation format (4:5-20 vs col. 4, ll. 5-20 vs column 4, lines 5-20)
+- Keyboard shortcut for citation (e.g., Ctrl+Shift+C)
+- Batch citation mode — queue multiple citations and copy all at once
+- Patent family cache reuse — continuation patents share specification text
 
 ### Out of Scope
 
 - Running OCR on patents — only parse pre-existing OCR/text layers (only ~2-5% of patents lack text layers)
-- Mobile browser support — Chrome desktop extension only
+- ~~Mobile browser support — Chrome desktop extension only~~
+- Mobile browser support — desktop browser extensions only (Chrome + Firefox)
 - Citation management or organization features — just copy the citation
 - Non-US patents — completely different document formats and citation conventions
 - AI-powered patent summarization — different product category
@@ -77,7 +95,7 @@ Tech stack: Chrome MV3, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API
 
 ## Constraints
 
-- **Platform**: Chrome extension (Manifest V3)
+- **Platform**: Chrome + Firefox extensions (Manifest V3 / WebExtensions)
 - **Performance**: In-browser PDF.js parsing in offscreen document — fast enough for real-time use
 - **Data source**: Google Patents PDF primary; USPTO eGrant API fallback via Cloudflare Workers proxy; Cloudflare KV shared cache
 - **Accuracy**: Best-effort matching with confidence indication — citations go into legal filings
@@ -112,4 +130,4 @@ Tech stack: Chrome MV3, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
 
 ---
-*Last updated: 2026-03-03 after v1.2 milestone*
+*Last updated: 2026-03-03 after v2.0 milestone started*

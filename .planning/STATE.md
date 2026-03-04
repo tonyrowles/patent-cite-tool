@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: unknown
-last_updated: "2026-03-04T00:03:02.391Z"
+milestone: v2.0
+milestone_name: Firefox Port
+status: defining_requirements
+last_updated: "2026-03-03"
 progress:
   total_phases: 0
   completed_phases: 0
@@ -18,12 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Planning next milestone
+**Current focus:** Defining requirements for v2.0 Firefox Port
 
 ## Current Position
 
-Milestone v1.2 Store Polish + Accuracy Hardening — SHIPPED 2026-03-03
-All 6 phases (8-13), 12 plans complete.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-03 — Milestone v2.0 started
 
 ## Performance Metrics
 
@@ -48,7 +50,7 @@ None.
 
 ### Blockers/Concerns
 
-- TECH DEBT: Matching functions duplicated between content script and offscreen due to MV3 module constraints (carried forward from v1.0)
+- TECH DEBT: Matching functions duplicated between content script and offscreen due to MV3 module constraints (to be resolved in v2.0 Phase 15)
 
 ### Quick Tasks Completed
 
@@ -58,6 +60,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-03 - Completed quick task 1: Fix off-by-2 error in patent column line number calculation
-Status: v1.2 milestone completed and archived
-Next: `/gsd:new-milestone` to start next milestone
+Last activity: 2026-03-03 - Milestone v2.0 Firefox Port started
+Status: Defining requirements
+Next: Define requirements → create roadmap

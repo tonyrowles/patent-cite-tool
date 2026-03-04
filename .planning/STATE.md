@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: planning
-last_updated: "2026-03-04T05:40:43.522Z"
+last_updated: "2026-03-04T05:44:18.762Z"
 last_activity: 2026-03-03 — v2.0 roadmap created (phases 14-17)
 progress:
   total_phases: 4

@@ -122,7 +122,7 @@ Plans:
 | 11. Options Page Polish | v1.2 | 2/2 | Complete | 2026-03-03 |
 | 12. Store Listing and Submission | v1.2 | 2/2 | Complete | 2026-03-03 |
 | 13. Offscreen Wrap-Hyphen Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
-| 14. Shared Code Extraction | 2/2 | Complete   | 2026-03-04 | - |
+| 14. Shared Code Extraction | 2/2 | Complete    | 2026-03-04 | - |
 | 15. esbuild Build Pipeline | v2.0 | 0/? | Not started | - |
 | 16. Firefox Extension | v2.0 | 0/? | Not started | - |
 | 17. Cross-Browser Validation | v2.0 | 0/? | Not started | - |

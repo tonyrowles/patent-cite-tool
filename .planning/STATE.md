@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
-status: planning
-last_updated: "2026-03-04T08:06:00Z"
-last_activity: 2026-03-04 — Phase 15 Plan 02 complete (esbuild build pipeline)
+status: executing
+last_updated: "2026-03-04T08:12:25.602Z"
+last_activity: 2026-03-04 — Phase 15-02 complete (esbuild build pipeline, npm scripts, dist/ outputs)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 25
 ---
 
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 15 of 17 (esbuild Build Pipeline)
-Plan: 02 complete — Phase 15 complete
-Status: In progress
-Last activity: 2026-03-04 — Phase 15-02 complete (esbuild build pipeline, npm scripts, dist/ outputs)
+Plan: 03 complete — Phase 15 fully complete (all 3 plans done, BUILD-01 through BUILD-05 satisfied)
+Status: Complete — ready for Phase 16
+Last activity: 2026-03-04 — Phase 15-03 complete (human UAT verification of dist/chrome/ built extension)
 
-Progress: [██░░░░░░░░] 25% (v2.0 milestone)
+Progress: [██████████] 100% (v2.0 Phase 15 complete)
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Progress: [██░░░░░░░░] 25% (v2.0 milestone)
 | Phase 14-shared-code-extraction P02 | 6 | 2 tasks | 5 files |
 | Phase 15-esbuild-build-pipeline P01 | 2 | 2 tasks | 7 files |
 | Phase 15-esbuild-build-pipeline P02 | 5 | 2 tasks | 2 files |
+| Phase 15-esbuild-build-pipeline P03 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,7 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 15-esbuild-build-pipeline P02]: external: ['../lib/pdf.mjs'] path is relative to output file location (dist/chrome/offscreen/); resolves correctly to dist/chrome/lib/pdf.mjs at runtime
 - [Phase 15-esbuild-build-pipeline P02]: No globalName on IIFE bundle — content scripts are pure side-effects; (() => {}) wrapper sufficient
 - [Phase 15-esbuild-build-pipeline P02]: build:firefox produces manifest-only dist/firefox/ scaffold — Phase 16 adds actual JS bundles
+- [Phase 15-esbuild-build-pipeline]: BUILD-04 satisfied by human UAT — user loaded dist/chrome/ in Chrome, generated citations on real Google Patents pages, confirmed functionally identical to src/ version
 
 ### Pending Todos
 
@@ -83,6 +85,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-04 — Phase 15 Plan 02 complete (esbuild build pipeline)
-Status: Phase 15 complete — ready for Phase 16 Firefox Port
+Last activity: 2026-03-04 — Phase 15 Plan 03 complete (human UAT: dist/chrome/ verified working)
+Status: Phase 15 fully complete — ready for Phase 16 Firefox Port
 Next: `/gsd:plan-phase 16` (Firefox Port)

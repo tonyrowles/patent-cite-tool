@@ -3,7 +3,7 @@
  *
  * Produces:
  *   dist/chrome/  — IIFE content bundle + ESM background/offscreen + static assets + transformed manifest
- *   dist/firefox/ — Firefox manifest only (JS bundles added in Phase 16)
+ *   dist/firefox/ — IIFE content bundle + ESM background/popup/options + static assets + Firefox manifest
  *
  * Usage:
  *   node scripts/build.js                  # build both targets
@@ -112,14 +112,74 @@ async function buildChrome({ sourcemaps = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Firefox esbuild configs
+// ---------------------------------------------------------------------------
+
+function getFirefoxIifeConfig({ sourcemap = false } = {}) {
+  return {
+    entryPoints: ['src/content/content-script.js'],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    outfile: 'dist/firefox/content/content.js',
+    sourcemap,
+  };
+}
+
+function getFirefoxEsmConfig({ sourcemap = false } = {}) {
+  return {
+    entryPoints: [
+      { in: 'src/firefox/background.js', out: 'background/service-worker' },
+      { in: 'src/popup/popup.js', out: 'popup/popup' },
+      { in: 'src/options/options.js', out: 'options/options' },
+    ],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    outdir: 'dist/firefox',
+    sourcemap,
+    // CRITICAL: prevent esbuild from bundling the 3MB PDF.js library.
+    // background.js imports it at runtime from the copied dist/firefox/lib/ directory.
+    // NOTE: Do NOT use outbase here — object entry point syntax controls output paths directly.
+    // With outbase:'src', src/firefox/background.js would output to dist/firefox/firefox/background.js (WRONG).
+    external: ['../lib/pdf.mjs'],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Firefox static asset copy
+// ---------------------------------------------------------------------------
+
+function copyFirefoxStaticAssets() {
+  fs.cpSync('src/icons', 'dist/firefox/icons', { recursive: true });
+  // CRITICAL: pdf.mjs + pdf.worker.mjs must be in dist/firefox/lib/ for PDF.js to work
+  fs.cpSync('src/lib', 'dist/firefox/lib', { recursive: true });
+
+  // HTML files — ensure output directories exist
+  fs.mkdirSync('dist/firefox/popup', { recursive: true });
+  fs.mkdirSync('dist/firefox/options', { recursive: true });
+
+  fs.copyFileSync('src/popup/popup.html', 'dist/firefox/popup/popup.html');
+  fs.copyFileSync('src/options/options.html', 'dist/firefox/options/options.html');
+  // NOTE: Do NOT copy offscreen.html — Firefox has no offscreen document API
+}
+
+// ---------------------------------------------------------------------------
 // Firefox build
 // ---------------------------------------------------------------------------
 
-function buildFirefox() {
+async function buildFirefox({ sourcemaps = false } = {}) {
   const start = Date.now();
 
   fs.mkdirSync('dist/firefox', { recursive: true });
   fs.copyFileSync('src/manifest.firefox.json', 'dist/firefox/manifest.json');
+
+  await Promise.all([
+    esbuild.build(getFirefoxIifeConfig({ sourcemap: sourcemaps })),
+    esbuild.build(getFirefoxEsmConfig({ sourcemap: sourcemaps })),
+  ]);
+
+  copyFirefoxStaticAssets();
 
   const elapsed = Date.now() - start;
   console.log(`Built firefox in ${elapsed}ms`);
@@ -168,11 +228,11 @@ async function main() {
   } else if (chromeOnly) {
     await buildChrome();
   } else if (firefoxOnly) {
-    buildFirefox();
+    await buildFirefox();
   } else {
     // Default: build both targets
     await buildChrome();
-    buildFirefox();
+    await buildFirefox();
   }
 }
 

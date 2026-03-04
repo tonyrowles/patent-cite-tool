@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
-status: completed
-last_updated: "2026-03-04T17:32:59.583Z"
-last_activity: 2026-03-04 — Phase 15-03 complete (human UAT verification of dist/chrome/ built extension)
+status: executing
+last_updated: "2026-03-04T17:37:04.724Z"
+last_activity: 2026-03-04 — Phase 16-02 complete (Firefox esbuild build pipeline, dist/firefox/ complete)
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 8
-  completed_plans: 6
-  percent: 100
+  completed_plans: 7
+  percent: 75
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 16 of 17 (Firefox Extension)
-Plan: 01 complete — Firefox pdf-pipeline.js + background.js + manifest update
-Status: In Progress — ready for Plan 02 (esbuild Firefox build pipeline)
-Last activity: 2026-03-04 — Phase 16-01 complete (Firefox source files created)
+Plan: 02 complete — Firefox esbuild build pipeline (dist/firefox/ full output)
+Status: In Progress — ready for Plan 03 (Firefox testing)
+Last activity: 2026-03-04 — Phase 16-02 complete (Firefox esbuild pipeline, dist/firefox/ complete)
 
-Progress: [████████░░] 75% (v2.0 Phase 16 Plan 01 complete)
+Progress: [█████████░] 88% (v2.0 Phase 16 Plan 02 complete)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [████████░░] 75% (v2.0 Phase 16 Plan 01 complete)
 | Phase 15-esbuild-build-pipeline P02 | 5 | 2 tasks | 2 files |
 | Phase 15-esbuild-build-pipeline P03 | 10 | 2 tasks | 2 files |
 | Phase 16-firefox-extension P01 | 4 | 2 tasks | 3 files |
+| Phase 16-firefox-extension P02 | 2min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 16-firefox-extension]: Firefox background uses tabs.onUpdated URL matching for icon activation — declarativeContent not supported in Firefox
 - [Phase 16-firefox-extension]: IndexedDB degradation uses detect-once idbAvailable flag — on first InvalidStateError/UnknownError all IDB ops silently skipped, positionMapCache Map used as fallback
 - [Phase 16-firefox-extension]: Firefox manifest.firefox.json: tabs permission + wasm-unsafe-eval CSP added for PDF.js WebAssembly support
+- [Phase 16-firefox-extension]: Object entry point syntax (not outbase) for Firefox ESM bundle prevents dist/firefox/firefox/background.js path double-nesting
+- [Phase 16-firefox-extension]: external: ['../lib/pdf.mjs'] in Firefox ESM config — relative to dist/firefox/background/ output location, resolves to dist/firefox/lib/pdf.mjs at runtime
 
 ### Pending Todos
 
@@ -89,6 +92,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-04 — Phase 16 Plan 01 complete (Firefox source files: pdf-pipeline.js, background.js, manifest update)
-Status: Phase 16 Plan 01 complete — ready for Plan 02 (esbuild Firefox bundle configuration)
-Next: `/gsd:execute-phase 16 02` (Firefox esbuild build pipeline)
+Last activity: 2026-03-04 — Phase 16 Plan 02 complete (Firefox esbuild pipeline: dist/firefox/ with ESM background, IIFE content, popup, options, icons, lib)
+Status: Phase 16 Plan 02 complete — ready for Plan 03 (Firefox testing / load in about:debugging)
+Next: `/gsd:execute-phase 16 03` (Firefox testing and verification)

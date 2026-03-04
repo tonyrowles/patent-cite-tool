@@ -11,7 +11,9 @@ import {
   formatCitation,
   fuzzySubstringMatch,
   levenshtein,
-} from '../../src/content/text-matcher.js';
+  findAllOccurrences,
+  pickBestByContext,
+} from '../../src/shared/matching.js';
 
 import { TEST_CASES } from '../test-cases.js';
 import { classifyResult } from '../helpers/classify-result.js';
@@ -21,7 +23,7 @@ import { classifyResult } from '../helpers/classify-result.js';
 // ============================================================================
 
 describe('smoke: imports', () => {
-  it('all 8 text-matcher.js functions are importable', () => {
+  it('all 10 shared/matching.js functions are importable', () => {
     const fns = {
       whitespaceStrippedMatch,
       bookendMatch,
@@ -31,6 +33,8 @@ describe('smoke: imports', () => {
       formatCitation,
       fuzzySubstringMatch,
       levenshtein,
+      findAllOccurrences,
+      pickBestByContext,
     };
     for (const [name, fn] of Object.entries(fns)) {
       expect(typeof fn, `${name} should be a function`).toBe('function');

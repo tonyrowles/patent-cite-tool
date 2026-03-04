@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: planning
-last_updated: "2026-03-04T05:31:38.324Z"
+last_updated: "2026-03-04T05:40:43.522Z"
 last_activity: 2026-03-03 — v2.0 roadmap created (phases 14-17)
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -42,6 +42,7 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | v1.2 Store Polish + Accuracy Hardening | 6 | 12 | 2 days |
 | v2.0 Firefox Port | 4 | TBD | — |
 | Phase 14-shared-code-extraction P01 | 4 | 2 tasks | 7 files |
+| Phase 14-shared-code-extraction P02 | 6 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -54,6 +55,8 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [v2.0 scope]: Build-time minification deferred — keep source readable for extension store review
 - [Phase 14-shared-code-extraction]: MSG has 17 keys (13 original + 4 cache) — plan spec listed 16 but service-worker.js is canonical
 - [Phase 14-shared-code-extraction]: Classic script wrapper pattern: content/constants-globals.js duplicates constants as globals for content scripts until Phase 15 esbuild
+- [Phase 14-shared-code-extraction]: Golden baseline updated for repetitive-text corpus tests: shared/matching.js defaults to last occurrence when no context (old text-matcher.js used first-occurrence indexOf)
+- [Phase 14-shared-code-extraction]: offscreen.js imports only matchAndCite from shared/matching.js (normalizeText not needed as separate import; matchAndCite handles it internally)
 
 ### Pending Todos
 

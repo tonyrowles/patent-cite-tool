@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node scripts/build.js",
+    "build:chrome": "node scripts/build.js --chrome-only",
+    "build:firefox": "node scripts/build.js --firefox-only",
+    "dev": "node scripts/build.js --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "update-golden": "node scripts/update-golden.js --confirm",
@@ -10,6 +14,7 @@
     "generate-icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.27.0",
     "pdfjs-dist": "^5.5.207",
     "sharp": "^0.34.5",
     "vitest": "^3.0.0"

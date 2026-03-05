@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: completed
-last_updated: "2026-03-05T00:33:19.909Z"
-last_activity: "2026-03-04 — Phase 16-03 complete (Firefox human UAT: icon activation, citation generation, IndexedDB degradation all verified)"
+last_updated: "2026-03-05T01:05:40.490Z"
+last_activity: 2026-03-05 — Phase 17-01 complete (cross-browser vitest configs + web-ext lint wired into npm test)
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 9
-  percent: 100
+  completed_plans: 10
+  percent: 90
 ---
 
 # Project State
@@ -50,6 +50,7 @@ Progress: [█████████░] 90% (Phase 17 Plan 01 complete — cr
 | Phase 16-firefox-extension P02 | 2min | 2 tasks | 1 files |
 | Phase 16-firefox-extension P03 | 5min | 2 tasks | 0 files |
 | Phase 17-cross-browser-validation P01 | 2min | 2 tasks | 5 files |
+| Phase 17-cross-browser-validation P02 | multi-session | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,7 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 17-cross-browser-validation]: vitest resolve.alias regex pattern intercepts src/shared/matching.js imports and redirects to dist/ bundle without modifying test files
 - [Phase 17-cross-browser-validation]: web-ext lint uses --ignore-files 'lib/**' with no --warnings-as-errors; VALID-02 requires 0 errors only; 11 warnings are intentional extension patterns
 - [Phase 17-cross-browser-validation]: npm test is now full validation pipeline: build + test:src + test:chrome + test:firefox + test:lint
+- [Phase 17-cross-browser-validation]: US6324676 substituted for US11427642 as cross-column spot-check case — fixture offset discrepancy on US11427642 would mislead verifier; US6324676 baseline set to 1:66-2:2 matching actual browser output
 
 ### Pending Todos
 

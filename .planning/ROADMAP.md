@@ -73,7 +73,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 ### v2.2 Matching Robustness (Phases 20-22)
 
 - [x] **Phase 20: OCR Normalization and Concat Refactor** - Extract buildConcat, add normalizeOcr as Tier 0b preprocessing (completed 2026-03-05)
-- [ ] **Phase 21: Gutter-Tolerant Matching** - Add gutterTolerantMatch as Tier 5 fallback with confidence ceiling
+- [x] **Phase 21: Gutter-Tolerant Matching** - Add gutterTolerantMatch as Tier 5 fallback with confidence ceiling (completed 2026-03-05)
 - [ ] **Phase 22: Validation and Golden Baseline** - Add US6324676 test cases and verify merged/split-word coverage
 
 ## Phase Details
@@ -100,7 +100,7 @@ Plans:
   1. A selection that previously failed all of Tiers 1-4 due to embedded gutter numbers in the concat now resolves via Tier 5 with confidence reported as 0.85 (yellow UI indicator)
   2. Selections from chemical patents (US9688736, US10472384) that contain numbers legitimately in patent text are not incorrectly stripped — all 71 existing baseline cases pass unchanged
   3. `gutterTolerantMatch` uses a space-anchored strip pattern so only space-isolated standalone multiples of 5 are removed, not numbers embedded in measurement values or patent identifiers
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 21-01-PLAN.md — TDD: stripGutterNumbers + gutterTolerantMatch as Tier 5 with cascade replay
 
@@ -139,5 +139,5 @@ Plans:
 | 18. Core CI Workflow | v2.1 | 1/1 | Complete | 2026-03-05 |
 | 19. CI Hardening | v2.1 | 1/1 | Complete | 2026-03-05 |
 | 20. OCR Normalization and Concat Refactor | 2/2 | Complete    | 2026-03-05 | — |
-| 21. Gutter-Tolerant Matching | v2.2 | 0/1 | Not started | — |
+| 21. Gutter-Tolerant Matching | 1/1 | Complete   | 2026-03-05 | — |
 | 22. Validation and Golden Baseline | v2.2 | 0/? | Not started | — |

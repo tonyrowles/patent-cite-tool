@@ -9,7 +9,7 @@ Requirements for matching robustness milestone. Each maps to roadmap phases.
 
 ### Matching
 
-- [ ] **MATCH-01**: Matching pipeline tolerates stray gutter line numbers (multiples of 5, 5–65) in concat text by stripping them as a Tier 5 fallback when Tiers 1–4 fail, with confidence capped at 0.85 (yellow UI)
+- [x] **MATCH-01**: Matching pipeline tolerates stray gutter line numbers (multiples of 5, 5–65) in concat text by stripping them as a Tier 5 fallback when Tiers 1–4 fail, with confidence capped at 0.85 (yellow UI)
 - [x] **MATCH-02**: Common OCR character confusions (case errors like s→S, bigram substitutions like rn→m, cl→d) are normalized before the matching cascade via a dedicated `normalizeOcr` function applied to both selection and concat
 - [x] **MATCH-03**: Concat-building logic is extracted from `matchAndCite` into a shared `buildConcat` helper returning `{concat, boundaries}`, integrating `normalizeOcr` internally
 
@@ -43,7 +43,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MATCH-01 | Phase 21 | Pending |
+| MATCH-01 | Phase 21 | Complete |
 | MATCH-02 | Phase 20 | Complete |
 | MATCH-03 | Phase 20 | Complete |
 | VALID-01 | Phase 22 | Pending |

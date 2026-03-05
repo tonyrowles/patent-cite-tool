@@ -2,17 +2,7 @@
 
 ## What This Is
 
-A Chrome extension for patent professionals that generates precise column:line citations (for granted patents) or paragraph citations (for published applications) by highlighting text on Google Patents. Supports silent clipboard mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker, and shared server-side cache via Cloudflare KV. Store-ready with three-state toolbar icons, dedicated options page, hosted privacy policy, and 100% accuracy on a 71-case test corpus.
-
-## Current Milestone: v2.0 Firefox Port
-
-**Goal:** Rearchitect the extension with an esbuild build pipeline, deduplicate shared code, and produce a fully functional Firefox port alongside the existing Chrome extension.
-
-**Target features:**
-- esbuild build pipeline producing dist/chrome/ and dist/firefox/
-- Shared code extraction (matching, constants, PDF parsing) eliminating duplication tech debt
-- Firefox extension with background script absorbing Chrome's offscreen document logic
-- Cross-browser validation against the 71-case test corpus
+A cross-browser extension (Chrome + Firefox) for patent professionals that generates precise column:line citations (for granted patents) or paragraph citations (for published applications) by highlighting text on Google Patents. Built with an esbuild pipeline from shared source code, supports silent clipboard mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker, shared server-side cache via Cloudflare KV, and 100% accuracy on a 71-case cross-browser test corpus.
 
 ## Core Value
 
@@ -46,19 +36,23 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - ✓ Manual accuracy audit across 8 patent categories (71 cases) — v1.2
 - ✓ Algorithm fixes: gutter contamination strip and wrap-hyphen normalization — v1.2
 
+### Validated
+
+- ✓ esbuild build pipeline — src/ → dist/chrome/ and dist/firefox/ — v2.0
+- ✓ Shared code extraction into src/shared/ — zero duplication between Chrome/Firefox — v2.0
+- ✓ Firefox MV3 extension with background script absorbing offscreen logic — v2.0
+- ✓ IndexedDB graceful degradation for Firefox private browsing — v2.0
+- ✓ Cross-browser validation — 71-case corpus passes both builds + web-ext lint — v2.0
+
 ### Active
 
-<!-- v2.0 Firefox Port -->
-
-- [ ] esbuild build pipeline — src/ → dist/chrome/ and dist/firefox/
-- [ ] Extract shared code into src/shared/ — deduplicate matching functions, constants, PDF parsing
-- [ ] Firefox extension — manifest, background script absorbing offscreen logic, API adaptations
-- [ ] Cross-browser validation — both platforms pass test corpus
+(No active requirements — next milestone not yet defined)
 
 ### Future
 
 - Chrome Web Store screenshot (1280x800) and promotional tile (440x280)
 - Chrome Web Store submission and review
+- Firefox Add-ons (AMO) submission and review
 - Configurable citation format (4:5-20 vs col. 4, ll. 5-20 vs column 4, lines 5-20)
 - Keyboard shortcut for citation (e.g., Ctrl+Shift+C)
 - Batch citation mode — queue multiple citations and copy all at once
@@ -75,12 +69,16 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - Inline PDF viewer/annotator — Google Patents already shows the PDF
 - Raw PDF storage in KV — PDFs are 5-30 MB; store parsed position maps only (10-100 KB)
 - Cache/fallback status indicators in UI — deferred, not essential for core workflow
-- Full ESM module unification / build step — export keyword approach works; build pipeline deferred
+- ~~Full ESM module unification / build step~~ — completed in v2.0 (esbuild pipeline)
+- Safari extension — different extension model (Xcode required)
+- webextension-polyfill — Firefox supports chrome.* natively; unnecessary dependency
+- Build-time minification — keep source readable for extension store review
 
 ## Context
 
-Shipped v1.2 with 4,500 LOC (JavaScript/HTML/CSS/JSON).
-Tech stack: Chrome MV3, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API, Cloudflare Workers, Cloudflare KV, Vitest, sharp.
+Shipped v2.0 with 7,600 LOC (JavaScript/HTML/CSS/JSON) across 32 source files.
+Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest, web-ext, sharp.
+Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules in src/shared/ (constants, matching). Firefox uses background script instead of offscreen document.
 
 - **Google Patents HTML vs PDF mismatch**: Handled with fuzzy matching (exact → whitespace-stripped → punctuation-agnostic → bookend → Levenshtein). Long selections (>500 chars) may fail when texts genuinely diverge.
 - **Patent PDF structure**: Cover page → preliminary material → figures → two-column specification. Bimodal x-coordinate analysis detects spec pages; dynamic gutter detection finds column boundaries.
@@ -110,8 +108,14 @@ Tech stack: Chrome MV3, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API
 | Document-wide column numbering from PDF headers | Printed column numbers are authoritative vs sequential counting | ✓ Good — matches attorney convention |
 | Word-overlap scoring for disambiguation | Character-level scoring fails on HTML/PDF whitespace divergence | ✓ Good — robust disambiguation |
 | Bookend matching for long selections | Full fuzzy match hangs on >100 chars; first/last 50 chars with span validation | ✓ Good — handles most long selections |
-| Dual-context constants module | Classic script globals + ES module import from same file | ⚠️ Revisit — caused bugs, may benefit from build step |
-| Duplicated matching functions (content + offscreen) | Offscreen ES module cannot share classic script globals | ⚠️ Revisit — tech debt, consider build step |
+| ~~Dual-context constants module~~ | ~~Classic script globals + ES module import from same file~~ | Resolved in v2.0 — esbuild bundles shared ESM modules |
+| ~~Duplicated matching functions (content + offscreen)~~ | ~~Offscreen ES module cannot share classic script globals~~ | Resolved in v2.0 — src/shared/matching.js is single source |
+| esbuild with IIFE content scripts + ESM background | Content scripts cannot use ES modules in Chrome MV3; IIFE wrapping works | ✓ Good — clean bundle separation |
+| Separate Chrome/Firefox manifests | Too many differences (permissions, CSP, background key) for patch approach | ✓ Good — clear separation of concerns |
+| Firefox background script absorbs offscreen logic | Firefox has no offscreen API; background script can use full APIs | ✓ Good — simpler architecture for Firefox |
+| IndexedDB detect-once degradation | Single idbAvailable flag on first error; all IDB ops silently skipped | ✓ Good — graceful private browsing support |
+| Per-target vitest alias configs | Redirect src/shared imports to dist/ bundles without modifying test files | ✓ Good — proves bundling correctness |
+| No webextension-polyfill | Firefox natively supports chrome.* namespace | ✓ Good — zero extra dependencies |
 | Local-only caching via IndexedDB | Cloud cache adds backend complexity; local sufficient for MVP | ✓ Good for v1 |
 | Citation format: 4:5-20 shorthand | User preference for compact format | ✓ Good — shipped as default |
 | Pre-compute citation on mouseup for silent mode | Copy event must be synchronous; async lookup impossible in copy handler | ✓ Good — fast, no visible delay |
@@ -130,4 +134,4 @@ Tech stack: Chrome MV3, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
 
 ---
-*Last updated: 2026-03-03 after v2.0 milestone started*
+*Last updated: 2026-03-05 after v2.0 milestone*

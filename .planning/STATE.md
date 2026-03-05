@@ -3,33 +3,32 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: completed
-last_updated: "2026-03-05T01:09:46.312Z"
-last_activity: 2026-03-05 — Phase 17-01 complete (cross-browser vitest configs + web-ext lint wired into npm test)
+last_updated: "2026-03-05"
+last_activity: 2026-03-05 — v2.0 milestone archived
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 10
   completed_plans: 10
-  percent: 90
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-03)
+See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 14 — Shared Code Extraction (ready to plan)
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 17 of 17 (Cross-Browser Validation)
-Plan: 01 complete — Cross-browser test infrastructure (71/71 corpus, web-ext lint 0 errors)
-Status: Phase 17 Plan 01 COMPLETE — VALID-01 and VALID-02 satisfied; npm test is single-command validator
-Last activity: 2026-03-05 — Phase 17-01 complete (cross-browser vitest configs + web-ext lint wired into npm test)
+Phase: All v2.0 phases complete (14-17)
+Status: v2.0 Firefox Port SHIPPED — all 16 requirements satisfied, milestone archived
+Last activity: 2026-03-05 — v2.0 milestone archived
 
-Progress: [█████████░] 90% (Phase 17 Plan 01 complete — cross-browser validation infrastructure permanent)
+Progress: [██████████] 100% (v2.0 complete)
 
 ## Performance Metrics
 
@@ -40,48 +39,13 @@ Progress: [█████████░] 90% (Phase 17 Plan 01 complete — cr
 | v1.0 MVP | 4 | 8 | ~3 days |
 | v1.1 Silent Mode + Infrastructure | 3 | 8 | 1 day |
 | v1.2 Store Polish + Accuracy Hardening | 6 | 12 | 2 days |
-| v2.0 Firefox Port | 4 | TBD | — |
-| Phase 14-shared-code-extraction P01 | 4 | 2 tasks | 7 files |
-| Phase 14-shared-code-extraction P02 | 6 | 2 tasks | 5 files |
-| Phase 15-esbuild-build-pipeline P01 | 2 | 2 tasks | 7 files |
-| Phase 15-esbuild-build-pipeline P02 | 5 | 2 tasks | 2 files |
-| Phase 15-esbuild-build-pipeline P03 | 10 | 2 tasks | 2 files |
-| Phase 16-firefox-extension P01 | 4 | 2 tasks | 3 files |
-| Phase 16-firefox-extension P02 | 2min | 2 tasks | 1 files |
-| Phase 16-firefox-extension P03 | 5min | 2 tasks | 0 files |
-| Phase 17-cross-browser-validation P01 | 2min | 2 tasks | 5 files |
-| Phase 17-cross-browser-validation P02 | multi-session | 2 tasks | 2 files |
+| v2.0 Firefox Port | 4 | 10 | ~2 days |
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
-
-- [v2.0 scope]: webextension-polyfill excluded — Firefox natively supports chrome.* API
-- [v2.0 scope]: Two separate manifests (Chrome + Firefox) — differences too numerous for patch approach
-- [v2.0 scope]: Build-time minification deferred — keep source readable for extension store review
-- [Phase 14-shared-code-extraction]: MSG has 17 keys (13 original + 4 cache) — plan spec listed 16 but service-worker.js is canonical
-- [Phase 14-shared-code-extraction]: Classic script wrapper pattern: content/constants-globals.js duplicates constants as globals for content scripts until Phase 15 esbuild
-- [Phase 14-shared-code-extraction]: Golden baseline updated for repetitive-text corpus tests: shared/matching.js defaults to last occurrence when no context (old text-matcher.js used first-occurrence indexOf)
-- [Phase 14-shared-code-extraction]: offscreen.js imports only matchAndCite from shared/matching.js (normalizeText not needed as separate import; matchAndCite handles it internally)
-- [Phase 15-esbuild-build-pipeline]: Wrapper files (constants-globals.js, text-matcher.js) deleted — Phase 14 transitional files no longer needed with ES module imports
-- [Phase 15-esbuild-build-pipeline]: Firefox manifest uses scripts array (not service_worker key) for background; omits offscreen and declarativeContent permissions; content scripts point to bundled content.js
-- [Phase 15-esbuild-build-pipeline P02]: external: ['../lib/pdf.mjs'] path is relative to output file location (dist/chrome/offscreen/); resolves correctly to dist/chrome/lib/pdf.mjs at runtime
-- [Phase 15-esbuild-build-pipeline P02]: No globalName on IIFE bundle — content scripts are pure side-effects; (() => {}) wrapper sufficient
-- [Phase 15-esbuild-build-pipeline P02]: build:firefox produces manifest-only dist/firefox/ scaffold — Phase 16 adds actual JS bundles
-- [Phase 15-esbuild-build-pipeline]: BUILD-04 satisfied by human UAT — user loaded dist/chrome/ in Chrome, generated citations on real Google Patents pages, confirmed functionally identical to src/ version
-- [Phase 16-firefox-extension]: Firefox background uses tabs.onUpdated URL matching for icon activation — declarativeContent not supported in Firefox
-- [Phase 16-firefox-extension]: IndexedDB degradation uses detect-once idbAvailable flag — on first InvalidStateError/UnknownError all IDB ops silently skipped, positionMapCache Map used as fallback
-- [Phase 16-firefox-extension]: Firefox manifest.firefox.json: tabs permission + wasm-unsafe-eval CSP added for PDF.js WebAssembly support
-- [Phase 16-firefox-extension]: Object entry point syntax (not outbase) for Firefox ESM bundle prevents dist/firefox/firefox/background.js path double-nesting
-- [Phase 16-firefox-extension]: external: ['../lib/pdf.mjs'] in Firefox ESM config — relative to dist/firefox/background/ output location, resolves to dist/firefox/lib/pdf.mjs at runtime
-- [Phase 16-firefox-extension]: Firefox extension human UAT passed — user confirmed all FOX requirements (FOX-01 through FOX-05) satisfied in real Firefox browser: load without errors, icon activation, column:line citations matching Chrome output, wasm-unsafe-eval CSP for PDF.js, IndexedDB degradation to in-memory Map
-- [Phase 17-cross-browser-validation]: Per-target test-export ESM bundles (chrome/firefox) prove each dist/ build's bundling did not corrupt matching logic
-- [Phase 17-cross-browser-validation]: vitest resolve.alias regex pattern intercepts src/shared/matching.js imports and redirects to dist/ bundle without modifying test files
-- [Phase 17-cross-browser-validation]: web-ext lint uses --ignore-files 'lib/**' with no --warnings-as-errors; VALID-02 requires 0 errors only; 11 warnings are intentional extension patterns
-- [Phase 17-cross-browser-validation]: npm test is now full validation pipeline: build + test:src + test:chrome + test:firefox + test:lint
-- [Phase 17-cross-browser-validation]: US6324676 substituted for US11427642 as cross-column spot-check case — fixture offset discrepancy on US11427642 would mislead verifier; US6324676 baseline set to 1:66-2:2 matching actual browser output
+All v1.0–v2.0 decisions archived in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
@@ -89,9 +53,7 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 16 risk RESOLVED]: Firefox event page lifecycle — human UAT confirmed PDF.js parses successfully with no lifecycle interruption
-- [Phase 16 risk RESOLVED]: PDF.js WASM + Firefox CSP — wasm-unsafe-eval added to manifest.firefox.json content_security_policy in Plan 01
-- [Phase 16 risk RESOLVED]: Cloudflare Worker CORS — human UAT confirmed citation generation works, no CORS errors encountered with moz-extension:// origin
+None — all v2.0 risks resolved.
 
 ### Quick Tasks Completed
 
@@ -101,6 +63,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-05 — Phase 17 Plan 01 complete (cross-browser vitest configs + web-ext lint pipeline)
-Status: Phase 17 Plan 01 COMPLETE — VALID-01, VALID-02 satisfied; npm test is permanent single-command validator
-Next: Phase 17 Plan 02 (if exists) or project complete
+Last activity: 2026-03-05 — v2.0 milestone archived
+Status: v2.0 SHIPPED — ready for next milestone
+Next: `/gsd:new-milestone` when ready to plan next version

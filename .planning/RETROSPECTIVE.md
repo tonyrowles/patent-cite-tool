@@ -141,6 +141,53 @@
 
 ---
 
+## Milestone: v2.0 — Firefox Port
+
+**Shipped:** 2026-03-05
+**Phases:** 4 | **Plans:** 10 | **Commits:** 52
+
+### What Was Built
+- Shared code extraction — constants + matching consolidated into src/shared/, eliminating all Chrome/Firefox duplication
+- esbuild build pipeline — single `npm run build` produces dist/chrome/ (IIFE content + ESM background) and dist/firefox/ (ESM background absorbing offscreen logic)
+- Firefox MV3 extension with background script orchestrator, IndexedDB graceful degradation, and tabs.onUpdated icon activation
+- Cross-browser test infrastructure — per-target vitest alias configs proving each dist/ build's bundling correctness
+- web-ext lint integration and spot-check verification script for human cross-browser validation
+- Build-time manifest transformation eliminating manual Chrome/Firefox manifest sync
+
+### What Worked
+- Phased architecture evolution (extract → build → port → validate) kept each phase focused and independently verifiable
+- Phase 14's shared code extraction cleanly resolved v1.0/v1.2's duplicated matching functions tech debt — the build step v1.0 lesson 2 predicted
+- Human UAT for Phase 15 (Chrome dist/) and Phase 16 (Firefox) caught no issues — architecture was sound before browser testing
+- Per-target vitest alias configs elegantly proved bundling correctness without modifying any test files
+- IndexedDB detect-once degradation pattern was clean — single flag, graceful fallback to in-memory Map
+
+### What Was Inefficient
+- ROADMAP.md plan checkboxes STILL fell out of sync (17-01, 17-02 show `[ ]` in archived roadmap despite being complete) — 4th consecutive milestone with this issue
+- Phase 17-02 spot-check required multi-session execution due to user-paced browser operations — could be streamlined with Playwright
+- US11427642 cross-column test fixture had off-by-2 offset vs browser rendering; required mid-plan substitution to US6324676
+- Summary files lack structured one-liner fields (same issue as v1.1) — automated extraction still fails
+
+### Patterns Established
+- src/shared/ → esbuild → dist/{chrome,firefox}/ as the canonical build architecture
+- IIFE wrapping for content scripts (Chrome MV3 limitation), ESM for background/offscreen
+- Object entry point syntax in esbuild to control output directory nesting
+- external: ['../lib/pdf.mjs'] relative path pattern for runtime-resolved PDF.js imports
+- web-ext lint with --ignore-files 'lib/**' to skip vendored PDF.js warnings
+
+### Key Lessons
+1. **Shared code extraction should precede any port.** Phase 14 before Phase 16 was the right sequencing — porting with duplicated code would have doubled the work and doubled the bugs.
+2. **esbuild is the right complexity level for extension builds.** No webpack config maze, fast builds, clear IIFE/ESM output control. The build script is ~200 lines and fully understood.
+3. **Firefox's chrome.* compatibility eliminates most porting work.** No polyfill needed. The real differences are: offscreen API (Chrome-only), declarativeContent (Chrome-only), background scripts array syntax, and CSP for WASM.
+4. **Per-target test configs beat test file duplication.** Vitest resolve.alias redirects prove each build's integrity without maintaining separate test suites.
+5. **Automated milestone audits continue to add value.** v2.0 audit confirmed 16/16 requirements before archival — caught no gaps this time, but the confidence is worth the cost.
+
+### Cost Observations
+- Model mix: balanced profile (sonnet for execution agents, opus for orchestration)
+- Sessions: ~5 across 2 days
+- Notable: Phases 14-16 plans executed in 2-5 minutes each. Phase 17-02 (spot-check) was multi-session due to user-paced browser testing. Phase 15-03 and 16-03 (human verification) were fast because architecture was already correct.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -150,6 +197,7 @@
 | v1.0 | 79 | 4 | Initial development — established patterns |
 | v1.1 | ~20 | 3 | Infrastructure + parallel execution — wave-based plans |
 | v1.2 | 69 | 6 | Test infrastructure + audit-driven gap closure |
+| v2.0 | 52 | 4 | Build pipeline + cross-browser architecture |
 
 ### Cumulative Quality
 
@@ -158,12 +206,14 @@
 | v1.0 | 0 | ~95% (manual) | Long selections >500 chars may fail |
 | v1.1 | 0 | ~95% (manual) | Duplicated matching functions |
 | v1.2 | 95 | 100% (71-case corpus) | Manual screenshot/tile assets pending |
+| v2.0 | 303 | 100% (71-case × 3 targets) | Store submissions pending |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. **Code duplication creates integration gaps.** v1.0 predicted build step would help; v1.2 confirmed it when offscreen.js diverged from text-matcher.js. Third time this pattern caused issues.
-2. **Human-verify checkpoints catch bugs that code review misses.** Confirmed in all three milestones.
-3. **New middleware must be wired into ALL code paths.** v1.1 cache routing bug, v1.2 wrap-hyphen offscreen gap — same class of bug.
-4. **Test infrastructure investment pays off immediately.** v1.2 golden baseline enabled confident algorithm changes with zero regressions.
-5. **ROADMAP.md plan checkboxes fall out of sync.** Observed in v1.1 and v1.2 — needs automation or removal.
+1. **Code duplication creates integration gaps.** v1.0 predicted build step would help; v1.2 confirmed it; v2.0 finally resolved it with shared modules + esbuild. Pattern closed.
+2. **Human-verify checkpoints catch bugs that code review misses.** Confirmed in all four milestones. v2.0 human UAT found zero issues — architecture was sound.
+3. **New middleware must be wired into ALL code paths.** v1.1 cache routing bug, v1.2 wrap-hyphen offscreen gap — same class of bug. v2.0's shared module architecture eliminates this class of bug.
+4. **Test infrastructure investment pays off immediately.** v1.2 golden baseline enabled confident algorithm changes; v2.0 cross-browser configs proved bundling correctness.
+5. **ROADMAP.md plan checkboxes fall out of sync.** Observed in v1.1, v1.2, and v2.0 — 4th consecutive milestone. Needs automation or removal.
 6. **E2E browser testing is essential for extension development.** Integration bugs invisible to code review in all milestones.
+7. **Phased architecture evolution beats big-bang rewrites.** v2.0's extract → build → port → validate sequence kept each phase independently verifiable.

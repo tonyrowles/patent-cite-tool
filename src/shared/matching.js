@@ -22,6 +22,87 @@ export function normalizeText(text) {
 }
 
 /**
+ * Prose-safe OCR substitution pairs.
+ * Only patterns that cannot appear in real English or identifier text are included.
+ * 1/l/I and 0/O are excluded due to identifier collision risk.
+ */
+const OCR_PAIRS = [
+  ['rn', 'm'],
+  ['cl', 'd'],
+  ['cI', 'd'],
+  ['vv', 'w'],
+  ['li', 'h'],
+];
+
+/**
+ * Apply OCR normalization to a single text string.
+ * Returns {text, changed} — text is the normalized string, changed indicates
+ * whether any substitution was made.
+ */
+export function normalizeOcr(text) {
+  let result = text;
+  for (const [from, to] of OCR_PAIRS) {
+    result = result.split(from).join(to);
+  }
+  return { text: result, changed: result !== text };
+}
+
+/**
+ * Build the concatenated string and boundary map from a positionMap.
+ * Extracts the inline concat loop from matchAndCite so it can be shared
+ * by multiple matching strategies (Phase 20+).
+ *
+ * Applies normalizeText first (existing behavior), then normalizeOcr after
+ * wrap-hyphen detection (new in Phase 20) but before appending to concat.
+ * This preserves exact behavior for wrap-hyphen cases in the baseline.
+ *
+ * @param {Array} positionMap - Array of position map entries.
+ * @returns {{ concat: string, boundaries: Array, changedRanges: Array }}
+ */
+export function buildConcat(positionMap) {
+  let concat = '';
+  const boundaries = [];
+  const changedRanges = [];
+
+  for (let i = 0; i < positionMap.length; i++) {
+    const entry = positionMap[i];
+    let lineText = normalizeText(entry.text);
+
+    // Detect wrap hyphens: previous line ends with a hyphen-like character
+    // and this line starts with a lowercase letter (same column).
+    // Check RAW text (before normalization) because soft hyphens (U+00AD)
+    // get stripped by normalization, making them invisible in the concat.
+    const prev = positionMap[i - 1];
+    const prevIsWrapHyphen = prev && prev.column === entry.column && /^[a-z]/.test(lineText) && (
+      prev.hasWrapHyphen ||
+      concat.endsWith('-') ||
+      /[-\u00AD\u2010\u2011\u2012]\s*$/.test(prev.text)
+    );
+
+    if (prevIsWrapHyphen) {
+      // Strip any trailing hyphen from concat (may already be gone if soft hyphen)
+      concat = concat.replace(/-$/, '');
+    } else if (concat.length > 0) {
+      concat += ' ';
+    }
+
+    // Apply OCR normalization AFTER wrap-hyphen detection but BEFORE appending
+    const { text: ocrText, changed } = normalizeOcr(lineText);
+    lineText = ocrText;
+
+    const charStart = concat.length;
+    concat += lineText;
+    boundaries.push({ charStart, charEnd: concat.length, entryIdx: i });
+
+    if (changed) {
+      changedRanges.push({ start: charStart, end: concat.length });
+    }
+  }
+
+  return { concat, boundaries, changedRanges };
+}
+
+/**
  * Find all occurrences of needle in haystack.
  * @returns {number[]} Array of start positions.
  */
@@ -400,35 +481,13 @@ export function matchAndCite(selectedText, positionMap, contextBefore = '', cont
   // After:  "transactions, borne by consumers" (matches PDF concat)
   normalized = normalized.replace(/- ([a-z])/g, '$1');
 
-  let concat = '';
-  const boundaries = [];
+  // Apply OCR normalization to the selected text so it matches the OCR-normalized
+  // concat built by buildConcat. Both sides transform identically: clean text is
+  // unaffected (no OCR patterns present), OCR-corrupted PDF text now matches the
+  // correct HTML-selected text after both go through the same transformation.
+  normalized = normalizeOcr(normalized).text;
 
-  for (let i = 0; i < positionMap.length; i++) {
-    const entry = positionMap[i];
-    let lineText = normalizeText(entry.text);
-
-    // Detect wrap hyphens: previous line ends with a hyphen-like character
-    // and this line starts with a lowercase letter (same column).
-    // Check RAW text (before normalization) because soft hyphens (U+00AD)
-    // get stripped by normalization, making them invisible in the concat.
-    const prev = positionMap[i - 1];
-    const prevIsWrapHyphen = prev && prev.column === entry.column && /^[a-z]/.test(lineText) && (
-      prev.hasWrapHyphen ||
-      concat.endsWith('-') ||
-      /[-\u00AD\u2010\u2011\u2012]\s*$/.test(prev.text)
-    );
-
-    if (prevIsWrapHyphen) {
-      // Strip any trailing hyphen from concat (may already be gone if soft hyphen)
-      concat = concat.replace(/-$/, '');
-    } else if (concat.length > 0) {
-      concat += ' ';
-    }
-
-    const charStart = concat.length;
-    concat += lineText;
-    boundaries.push({ charStart, charEnd: concat.length, entryIdx: i });
-  }
+  const { concat, boundaries, changedRanges } = buildConcat(positionMap);
 
   // Exact normalized match — find all occurrences and disambiguate by context
   const allPositions = findAllOccurrences(concat, normalized);

@@ -227,4 +227,48 @@ describe('shared/matching.js', () => {
       expect(result.concat).toBe('communication');
     });
   });
+
+  describe('matchAndCite OCR integration', () => {
+    it('resolves OCR-confused selection against clean concat', () => {
+      const positionMap = [
+        { text: 'communication is key', column: 1, lineNumber: 10, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      // 'cornrnunication' has 'rn' OCR confusion (rn -> m) and 'rn' again, should resolve to 'communication'
+      const result = matchAndCite('cornrnunication is key', positionMap);
+      expect(result).not.toBeNull();
+      expect(result.citation).toBe('1:10');
+      expect(result.confidence).toBe(0.98);
+    });
+
+    it('no penalty when selection has no OCR patterns', () => {
+      const positionMap = [
+        { text: 'communication is key', column: 1, lineNumber: 10, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = matchAndCite('communication is key', positionMap);
+      expect(result).not.toBeNull();
+      expect(result.confidence).toBe(1.0);
+    });
+
+    it('penalty fires when both sides have same OCR error (selChanged is true)', () => {
+      // When both sides have the same OCR error, selChanged is true so penalty applies
+      const positionMap = [
+        { text: 'cornrnunication is key', column: 1, lineNumber: 10, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = matchAndCite('cornrnunication is key', positionMap);
+      expect(result).not.toBeNull();
+      // selChanged is true (selection had OCR pattern), penalty fires
+      expect(result.confidence).toBe(0.98);
+    });
+
+    it('OCR penalty is flat 0.02 even with multiple OCR pairs', () => {
+      // 'communication and drawing' is the clean text
+      // Selection: 'cornrnunication and cIrawing' (rn->m, cI->d substitutions)
+      const positionMap = [
+        { text: 'communication and drawing', column: 1, lineNumber: 5, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = matchAndCite('cornrnunication and cIrawing', positionMap);
+      expect(result).not.toBeNull();
+      expect(result.confidence).toBe(0.98); // flat 0.02 penalty, not 0.04 (2x)
+    });
+  });
 });

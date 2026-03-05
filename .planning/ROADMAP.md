@@ -74,7 +74,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
 - [x] **Phase 20: OCR Normalization and Concat Refactor** - Extract buildConcat, add normalizeOcr as Tier 0b preprocessing (completed 2026-03-05)
 - [x] **Phase 21: Gutter-Tolerant Matching** - Add gutterTolerantMatch as Tier 5 fallback with confidence ceiling (completed 2026-03-05)
-- [ ] **Phase 22: Validation and Golden Baseline** - Add US6324676 test cases and verify merged/split-word coverage
+- [x] **Phase 22: Validation and Golden Baseline** - Add US6324676 test cases and verify merged/split-word coverage (completed 2026-03-05)
 
 ## Phase Details
 
@@ -113,7 +113,7 @@ Plans:
   2. The updated `tests/golden/baseline.json` shows only additions — `git diff` reveals no modifications to any of the 71 existing entries
   3. Merged-word pattern (e.g., `FPGAuse` vs `FPGA use`) and split-word pattern (e.g., `US ING` vs `USING`) are confirmed handled by whitespace-stripped matching via a targeted test case, or a dedicated handling step is added if the test fails
   4. Full CI passes on both Chrome and Firefox builds after all baseline additions
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 22-01-PLAN.md — Add 4 validated test cases (3 US6324676 OCR/split-word + 1 synthetic gutter) to golden baseline, update spot-check script, full CI validation
 
@@ -142,4 +142,4 @@ Plans:
 | 19. CI Hardening | v2.1 | 1/1 | Complete | 2026-03-05 |
 | 20. OCR Normalization and Concat Refactor | 2/2 | Complete    | 2026-03-05 | — |
 | 21. Gutter-Tolerant Matching | 1/1 | Complete    | 2026-03-05 | — |
-| 22. Validation and Golden Baseline | v2.2 | 0/1 | Not started | — |
+| 22. Validation and Golden Baseline | 1/1 | Complete   | 2026-03-05 | — |

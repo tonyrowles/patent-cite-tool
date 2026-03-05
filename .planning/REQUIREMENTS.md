@@ -15,8 +15,8 @@ Requirements for matching robustness milestone. Each maps to roadmap phases.
 
 ### Validation
 
-- [ ] **VALID-01**: US6324676 has 3–5 test cases covering confirmed OCR error patterns, with manually verified expected citations added to the golden baseline
-- [ ] **VALID-02**: Merged words (`FPGAuse`→`FPGA use`) and split words (`US ING`→`USING`) are verified as handled by existing whitespace-stripped matching — dedicated step added only if tests fail
+- [x] **VALID-01**: US6324676 has 3–5 test cases covering confirmed OCR error patterns, with manually verified expected citations added to the golden baseline
+- [x] **VALID-02**: Merged words (`FPGAuse`→`FPGA use`) and split words (`US ING`→`USING`) are verified as handled by existing whitespace-stripped matching — dedicated step added only if tests fail
 
 ## Future Requirements
 
@@ -46,8 +46,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MATCH-01 | Phase 21 | Complete |
 | MATCH-02 | Phase 20 | Complete |
 | MATCH-03 | Phase 20 | Complete |
-| VALID-01 | Phase 22 | Pending |
-| VALID-02 | Phase 22 | Pending |
+| VALID-01 | Phase 22 | Complete |
+| VALID-02 | Phase 22 | Complete |
 
 **Coverage:**
 - v2.2 requirements: 5 total

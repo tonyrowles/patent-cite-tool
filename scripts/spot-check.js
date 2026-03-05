@@ -1,7 +1,7 @@
 /**
  * spot-check.js — Cross-browser verification guide for the Patent Citation Tool.
  *
- * Prints expected citations for 5 representative patents spanning the key test
+ * Prints expected citations for 8 representative cases spanning the key test
  * categories. Use this output to verify that both the Chrome and Firefox
  * extensions produce correct, identical citations on real Google Patents pages.
  *
@@ -38,11 +38,14 @@ const { matchAndCite } = await import('../src/shared/matching.js');
 // ---------------------------------------------------------------------------
 
 const SPOT_CHECK_IDS = [
-  'US11427642-spec-short-1',   // modern-short
-  'US5440748-spec-long',       // pre2000-long
-  'US9688736-chemical-seq',    // chemical
-  'US6324676-cross-col',       // cross-column
-  'US7346586-claims-repetitive', // repetitive/claims
+  'US11427642-spec-short-1',      // modern-short (existing)
+  'US5440748-spec-long',          // pre2000-long (existing)
+  'US9688736-chemical-seq',       // chemical (existing)
+  'US6324676-cross-col',          // cross-column (existing)
+  'US7346586-claims-repetitive',  // repetitive/claims (existing)
+  'US6324676-ocr-diverge-1',      // ocr/merged-word (NEW)
+  'US6324676-split-word',         // ocr/split-word (NEW)
+  'synthetic-gutter-1',           // gutter/Tier 5 (NEW)
 ];
 
 // ---------------------------------------------------------------------------
@@ -72,7 +75,7 @@ for (let i = 0; i < SPOT_CHECK_IDS.length; i++) {
   const tc = TEST_CASES.find(t => t.id === id);
 
   if (!tc) {
-    console.log(`\n[${i + 1}/5] ERROR: Test case not found: ${id}`);
+    console.log(`\n[${i + 1}/${SPOT_CHECK_IDS.length}] ERROR: Test case not found: ${id}`);
     allFound = false;
     continue;
   }
@@ -87,7 +90,7 @@ for (let i = 0; i < SPOT_CHECK_IDS.length; i++) {
   try {
     positionMap = JSON.parse(readFileSync(fixturePath, 'utf-8'));
   } catch (err) {
-    console.log(`\n[${i + 1}/5] ERROR: Could not load fixture for ${id}: ${err.message}`);
+    console.log(`\n[${i + 1}/${SPOT_CHECK_IDS.length}] ERROR: Could not load fixture for ${id}: ${err.message}`);
     allFound = false;
     continue;
   }
@@ -101,7 +104,7 @@ for (let i = 0; i < SPOT_CHECK_IDS.length; i++) {
   }
 
   // Display
-  console.log(`\n[${i + 1}/5] ${patentNumber}  (${tc.category})`);
+  console.log(`\n[${i + 1}/${SPOT_CHECK_IDS.length}] ${patentNumber}  (${tc.category})`);
   console.log(`  URL:              ${googleUrl}`);
   console.log(`  Select this text:`);
   console.log(`  "${tc.selectedText}"`);
@@ -131,6 +134,6 @@ if (!allFound) {
   console.log('WARNING: One or more test cases produced a null citation.');
   console.log('         Investigate before marking VALID-03 complete.\n');
 } else {
-  console.log('All 5 expected citations generated successfully.');
+  console.log(`All ${SPOT_CHECK_IDS.length} expected citations generated successfully.`);
   console.log('Proceed with manual browser verification using the checklist above.\n');
 }

@@ -4,9 +4,15 @@ on:
   push:
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to build and attach release assets for'
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref && github.ref || github.run_id }}
@@ -19,6 +25,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -66,3 +74,13 @@ jobs:
           name: patent-cite-firefox
           path: patent-cite-firefox.zip
           retention-days: 30
+
+      - name: Attach assets to GitHub release
+        if: success() && inputs.tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ inputs.tag }}" \
+            patent-cite-chrome.zip \
+            patent-cite-firefox.zip \
+            --clobber

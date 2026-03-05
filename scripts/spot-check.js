@@ -41,7 +41,7 @@ const SPOT_CHECK_IDS = [
   'US11427642-spec-short-1',   // modern-short
   'US5440748-spec-long',       // pre2000-long
   'US9688736-chemical-seq',    // chemical
-  'US11427642-cross-col',      // cross-column
+  'US6324676-cross-col',       // cross-column
   'US7346586-claims-repetitive', // repetitive/claims
 ];
 

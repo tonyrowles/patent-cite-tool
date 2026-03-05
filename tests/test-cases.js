@@ -30,6 +30,8 @@ export const CATEGORIES = {
   'cross-column': 'Selection spanning column boundary',
   'claims': 'Selection from claims section',
   'repetitive': 'Selection with highly-repeated phrases',
+  'ocr': 'OCR divergence — HTML clean text vs PDF OCR artifact',
+  'gutter': 'Synthetic gutter-number validation',
 };
 
 export const TEST_CASES = [
@@ -538,4 +540,53 @@ export const TEST_CASES = [
     selectedText: 'The invention claimed is : 1. A ceria -zirconia-based composite oxide oxygen storage material, which oxygen storage material has a molar ratio of 15 to claim 4 covering an inside wall of a metal or ceramic cerium and zirconium, by cerium /(cerium + zirconium ), of 0.33 to 0.90,',
     category: 'claims',
   },
+
+  // =========================================================================
+  // OCR divergence cases — US6324676 (FPGA customizable, 2001)
+  // =========================================================================
+  {
+    id: 'US6324676-ocr-diverge-1',
+    patentFile: './tests/fixtures/US6324676.json',
+    selectedText: 'memories within an FPGA use Static random access memory',
+    category: 'ocr',
+  },
+  {
+    id: 'US6324676-ocr-diverge-2',
+    patentFile: './tests/fixtures/US6324676.json',
+    selectedText: 'macroS will function. Thus, macro Vendors can freely distribute locked macroS as long as the key to the macro is',
+    category: 'ocr',
+  },
+  {
+    id: 'US6324676-split-word',
+    patentFile: './tests/fixtures/US6324676.json',
+    selectedText: 'provide macros having high performance, flexibility, and low gate count.',
+    category: 'ocr',
+  },
+
+  // =========================================================================
+  // Synthetic gutter-number validation
+  // =========================================================================
+  {
+    id: 'synthetic-gutter-1',
+    patentFile: './tests/fixtures/synthetic-gutter.json',
+    selectedText: 'receptor exclusively expressed on plasma cells and plasmablasts. BCMA is a receptor for two ligands in the',
+    category: 'gutter',
+  },
 ];
+
+// =========================================================================
+// KNOWN GAP (not a TEST_CASES entry): s->S case errors
+// =========================================================================
+// US6324676 has widespread s->S OCR artifacts (macroS, blockS, acceSS).
+// When HTML selectedText uses correct lowercase ('macros') and PDF has 'macroS',
+// normalizeOcr does NOT bridge the gap (s->S not in OCR_PAIRS by design).
+// The algorithm still resolves at 0.96 via punctuation-agnostic alpha match,
+// but this is NOT normalizeOcr working -- it's a different fallback path.
+//
+// Example:
+//   selectedText: 'programming and enabling licensed macros in an FPGA.'
+//   fixture: 'programming and enabling licensed macroS in an FPGA.' (col 1, line 33)
+//   result: { citation: '1:33', confidence: 0.96 } -- via alpha-strip fallback
+//
+// s->S normalization is deferred to a future OCR phase per VALID-01 decision.
+// OCR-03 requirement covers bounded substitution if US6324676 validation requires it.

@@ -282,5 +282,9 @@
   "US10987654-claims": {
     "citation": "9:13-17",
     "confidence": 1
-  }
+  },
+  "US6324676-ocr-diverge-1": { "citation": "2:12", "confidence": 0.99 },
+  "US6324676-ocr-diverge-2": { "citation": "3:12-13", "confidence": 0.99 },
+  "US6324676-split-word": { "citation": "2:67-3:2", "confidence": 0.96 },
+  "synthetic-gutter-1": { "citation": "1:26-27", "confidence": 0.85 }
 }

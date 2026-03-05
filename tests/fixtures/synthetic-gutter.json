@@ -1,0 +1,26 @@
+[
+  {
+    "page": 11,
+    "column": 1,
+    "lineNumber": 26,
+    "text": "receptor exclusively expressed 25 on plasma cells and plasmablasts.",
+    "hasWrapHyphen": false,
+    "x": 77.04000330656449,
+    "y": 451.46137919999995,
+    "width": 215.51998609903262,
+    "height": 14.05714296,
+    "section": "description"
+  },
+  {
+    "page": 11,
+    "column": 1,
+    "lineNumber": 27,
+    "text": "BCMA is a receptor for two ligands in the",
+    "hasWrapHyphen": false,
+    "x": 77.2799997936096,
+    "y": 438.72156648,
+    "width": 215.52000878646646,
+    "height": 14.3688312,
+    "section": "description"
+  }
+]

@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: completed
-last_updated: "2026-03-05T01:05:40.490Z"
+last_updated: "2026-03-05T01:09:46.312Z"
 last_activity: 2026-03-05 — Phase 17-01 complete (cross-browser vitest configs + web-ext lint wired into npm test)
 progress:
   total_phases: 4

@@ -10,6 +10,8 @@ import {
   fuzzySubstringMatch,
   levenshtein,
   matchAndCite,
+  normalizeOcr,
+  buildConcat,
 } from '../../src/shared/matching.js';
 
 describe('shared/matching.js', () => {
@@ -96,6 +98,133 @@ describe('shared/matching.js', () => {
       expect(result).toHaveProperty('startEntry');
       expect(result).toHaveProperty('endEntry');
       expect(result).toHaveProperty('confidence');
+    });
+  });
+
+  describe('normalizeOcr', () => {
+    it('exports normalizeOcr as a function', () => {
+      expect(typeof normalizeOcr).toBe('function');
+    });
+
+    it('applies rn->m: cornrnunication -> communication', () => {
+      const result = normalizeOcr('cornrnunication');
+      expect(result.text).toBe('communication');
+      expect(result.changed).toBe(true);
+    });
+
+    it('applies cl->d: claw -> daw', () => {
+      const result = normalizeOcr('claw');
+      expect(result.text).toBe('daw');
+      expect(result.changed).toBe(true);
+    });
+
+    it('applies cI->d: recIaim -> redaim', () => {
+      const result = normalizeOcr('recIaim');
+      expect(result.text).toBe('redaim');
+      expect(result.changed).toBe(true);
+    });
+
+    it('applies vv->w: savvy -> sawy', () => {
+      const result = normalizeOcr('savvy');
+      expect(result.text).toBe('sawy');
+      expect(result.changed).toBe(true);
+    });
+
+    it('applies li->h: limp -> hmp', () => {
+      const result = normalizeOcr('limp');
+      expect(result.text).toBe('hmp');
+      expect(result.changed).toBe(true);
+    });
+
+    it('returns changed: false when no OCR patterns present', () => {
+      const result = normalizeOcr('hello world');
+      expect(result.text).toBe('hello world');
+      expect(result.changed).toBe(false);
+    });
+
+    it('returns {text: \'\', changed: false} for empty string', () => {
+      const result = normalizeOcr('');
+      expect(result.text).toBe('');
+      expect(result.changed).toBe(false);
+    });
+
+    it('returns object with .text and .changed properties', () => {
+      const result = normalizeOcr('test');
+      expect(result).toHaveProperty('text');
+      expect(result).toHaveProperty('changed');
+    });
+  });
+
+  describe('buildConcat', () => {
+    it('exports buildConcat as a function', () => {
+      expect(typeof buildConcat).toBe('function');
+    });
+
+    it('returns {concat, boundaries, changedRanges} for simple 2-entry positionMap', () => {
+      const positionMap = [
+        { text: 'The quick brown fox', column: 1, lineNumber: 5, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'jumps over the lazy dog', column: 1, lineNumber: 6, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = buildConcat(positionMap);
+      expect(result).toHaveProperty('concat');
+      expect(result).toHaveProperty('boundaries');
+      expect(result).toHaveProperty('changedRanges');
+    });
+
+    it('produces correct concat string for 2-entry positionMap', () => {
+      const positionMap = [
+        { text: 'The quick brown fox', column: 1, lineNumber: 5, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'jumps over the lazy dog', column: 1, lineNumber: 6, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = buildConcat(positionMap);
+      expect(result.concat).toBe('The quick brown fox jumps over the lazy dog');
+    });
+
+    it('produces boundaries with length 2 for 2-entry positionMap', () => {
+      const positionMap = [
+        { text: 'The quick brown fox', column: 1, lineNumber: 5, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'jumps over the lazy dog', column: 1, lineNumber: 6, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = buildConcat(positionMap);
+      expect(result.boundaries).toHaveLength(2);
+    });
+
+    it('produces boundaries with correct shape {charStart, charEnd, entryIdx}', () => {
+      const positionMap = [
+        { text: 'The quick brown fox', column: 1, lineNumber: 5, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'jumps over the lazy dog', column: 1, lineNumber: 6, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = buildConcat(positionMap);
+      expect(result.boundaries[0]).toHaveProperty('charStart');
+      expect(result.boundaries[0]).toHaveProperty('charEnd');
+      expect(result.boundaries[0]).toHaveProperty('entryIdx');
+    });
+
+    it('produces empty changedRanges when no OCR patterns present', () => {
+      const positionMap = [
+        { text: 'The quick brown fox', column: 1, lineNumber: 5, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'jumps over the lazy dog', column: 1, lineNumber: 6, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = buildConcat(positionMap);
+      expect(result.changedRanges).toHaveLength(0);
+    });
+
+    it('produces changedRanges entry when OCR pattern is present in entry text', () => {
+      const positionMap = [
+        { text: 'cornrnunication', column: 1, lineNumber: 1, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = buildConcat(positionMap);
+      expect(result.changedRanges).toHaveLength(1);
+    });
+
+    it('handles wrap-hyphen: strips trailing hyphen when next entry starts lowercase in same column', () => {
+      const positionMap = [
+        { text: 'communi-', column: 1, lineNumber: 1, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'cation', column: 1, lineNumber: 2, page: 1, section: 'spec', hasWrapHyphen: false },
+      ];
+      const result = buildConcat(positionMap);
+      // The hyphen at the end of 'communi-' should be stripped and words joined
+      expect(result.concat).toBe('communication');
     });
   });
 });

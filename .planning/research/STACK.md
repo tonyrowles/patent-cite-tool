@@ -1,381 +1,148 @@
 # Stack Research
 
-**Domain:** Browser Extension Build Pipeline + Firefox Port
-**Researched:** 2026-03-03
-**Confidence:** HIGH (esbuild config, Firefox manifest differences, web-ext CLI) / MEDIUM (webextension-polyfill integration patterns with this codebase's dual-context module system)
+**Domain:** GitHub Actions CI/CD Pipeline for Browser Extension (Chrome + Firefox MV3)
+**Researched:** 2026-03-04
+**Confidence:** HIGH (all action versions verified against GitHub releases; Node.js version guidance verified against GitHub changelog; caching strategy verified against official setup-node docs)
 
 ---
 
 ## Milestone Context
 
-This document covers ONLY NEW stack additions for v2.0. Do not re-research the existing validated stack:
-- Chrome MV3, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API — validated
-- Cloudflare Workers + KV, USPTO proxy — deployed and working
-- Vitest test harness, sharp icon generator — operational
-- 4,500 LOC JavaScript/HTML/CSS/JSON in `src/`
+This document covers ONLY NEW stack additions for v2.1. The following are already validated and must not be re-researched:
 
-Current `src/` structure to be built by the new pipeline:
-- `src/background/service-worker.js` — Chrome service worker (ES module)
-- `src/content/*.js` — Content scripts (classic scripts loaded via manifest; shared/constants.js is first)
-- `src/offscreen/offscreen.js`, `pdf-parser.js`, `position-map-builder.js` — ES modules for PDF parsing
-- `src/shared/constants.js` — Dual-context: ES module AND classic script globals
-- `src/lib/pdf.mjs`, `pdf.worker.mjs` — Pre-compiled PDF.js library files (copy only, do not bundle)
-- `src/popup/`, `src/options/` — HTML pages with associated JS
-- `src/icons/*.png` — Static image assets
-- `src/manifest.json` — Chrome manifest (template for both targets)
+- Chrome + Firefox MV3 extensions, esbuild build pipeline (`npm run build` → `dist/chrome/` + `dist/firefox/`)
+- Vitest test suite (71-case corpus), web-ext lint, PDF.js, Cloudflare Workers/KV, Shadow DOM, IndexedDB
 
-Focus: esbuild pipeline, Firefox manifest, Firefox background script (absorbing offscreen logic), webextension-polyfill, web-ext CLI.
+Existing npm scripts that CI will invoke directly:
+
+```
+npm run build        → node scripts/build.js (both targets)
+npm run test:src     → vitest run (source tests)
+npm run test:chrome  → vitest run --config vitest.config.chrome.js
+npm run test:firefox → vitest run --config vitest.config.firefox.js
+npm run test:lint    → npx web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'
+```
+
+The full `npm test` command chains all of the above. CI may call them individually to parallelize or get better job-level failure reporting.
 
 ---
 
-## Core Technologies — New for v2.0
+## Recommended Stack
 
-### Core Framework
+### Core Technologies
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| esbuild | 0.27.3 | JavaScript bundler producing `dist/chrome/` and `dist/firefox/` | Fastest bundler available. No configuration framework needed — a single `build.mjs` Node script drives the entire pipeline. Supports IIFE (required for content scripts) and ESM formats. Browser-version targeting. 1Password reported 90% build time reduction vs Webpack. Native watch mode via `context.watch()`. No plugins required for this codebase. |
-| webextension-polyfill | 0.12.0 | Normalize `browser.*` API to promise-based on Chrome; no-op on Firefox | Mozilla-maintained. Allows writing `browser.runtime.sendMessage()` once instead of `chrome.runtime.sendMessage()`. On Firefox, detects native `browser` namespace and does nothing. On Chrome, wraps `chrome.*` callbacks as Promises. Required for any code that calls extension APIs cross-browser. |
-| web-ext | 9.3.0 | Firefox extension development: load, auto-reload, and package | Mozilla's official CLI. `web-ext run --source-dir dist/firefox/` loads extension into a temporary Firefox profile, auto-reloads on file changes. `web-ext build` produces a signed-ready `.zip` for AMO submission. As of v7.0.0, exports native ES modules only (Node 14+ required). |
+| `actions/checkout` | v6 | Fetch repo code in CI | Latest stable. v6 (the current major) runs on Node.js 24, requires Actions Runner 2.329.0+. GitHub-hosted runners meet this automatically. Uses SHA pinning or `@v6` major tag. |
+| `actions/setup-node` | v6 | Install Node.js and enable npm cache | Latest stable as of 2026-03-04 (v6.3.0). Supports `cache: 'npm'` built-in which caches `~/.npm` (the npm cache directory) — not `node_modules`. This is GitHub's recommended caching approach. Includes automatic caching when `packageManager` field is set in package.json (that field is NOT set in this project, so explicit `cache: 'npm'` is required). |
+| `actions/upload-artifact` | v7 | Upload Chrome/Firefox `.zip` build artifacts | Latest stable. v7 adds optional `archive: false` for direct file uploads (not needed here since we want to upload pre-made `.zip` files as-is). For zipped artifacts uploaded with compression disabled, use `compression-level: 0` to avoid double-zipping. v3 deprecated and removed as of early 2025. |
+| Node.js runtime | 22 (LTS) | Run build, test, and packaging scripts | Node 24 became the default for GitHub Actions runners starting June 2, 2026. Node 20 EOL is April 2026. Node 22 is the current stable LTS with the longest remaining support window before the June runner transition. Using `node-version: '22'` pins explicitly regardless of runner default changes. Do NOT use a version matrix — this project has no cross-version compatibility concern; single-version CI is faster and simpler. |
+
+### Supporting Tools
+
+| Tool | Version | Purpose | When to Use |
+|------|---------|---------|-------------|
+| `zip` (shell built-in) | System (Ubuntu 24.04) | Package `dist/chrome/` and `dist/firefox/` into store-ready `.zip` files | Built into `ubuntu-latest` (Ubuntu 24.04). No separate action needed. Run as `zip -r artifact-name.zip dist/chrome/` in a `run:` step. This avoids an external action dependency for a one-line operation. |
+| `web-ext` | 9.4.0 | Firefox extension lint | Already invoked via `npx web-ext` in the existing `test:lint` script. In CI, `npx web-ext` will pull the latest version unless `web-ext` is a devDependency. Prefer adding it as a pinned devDependency (see Installation below) to prevent silent version drift in CI. |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| `build.mjs` (custom Node script) | Orchestrates esbuild calls for both browser targets | No framework needed. Node ESM script called via `npm run build`. Pass `--watch` arg to enable `context.watch()` mode. |
-| npm scripts | Trigger build variants | `build:chrome`, `build:firefox`, `build:all`, `dev:chrome`, `dev:firefox` |
+| `ubuntu-latest` runner | CI execution environment | Points to Ubuntu 24.04 as of January 2025. Has `zip`, Node.js, and git pre-installed. No self-hosted runner needed for this workload. |
+| `concurrency` group | Cancel superseded PR runs | Use `${{ github.workflow }}-${{ github.head_ref || github.run_id }}` as group key. Set `cancel-in-progress: true`. The `|| github.run_id` fallback ensures push-to-main runs are NOT cancelled (each gets a unique run ID), while PR runs ARE cancelled when new commits are pushed to the same branch. |
 
 ---
 
-## esbuild Configuration
+## Workflow Design
 
-### Key Design Decisions
+### Trigger Configuration
 
-**Format: IIFE for content scripts, ESM for everything else**
-
-Content scripts loaded via manifest `js:[]` array cannot be ES modules — they run as classic scripts in the page context. esbuild must produce IIFE bundles for them. All other extension contexts (service worker, offscreen, popup, options, background) can use ESM.
-
-Critical: esbuild code splitting (`splitting: true`) only works with ESM format. Since content scripts require IIFE, each content script entry point bundles its own copy of shared code. For this codebase, `shared/constants.js` is small enough that duplication is acceptable. This eliminates the need for code splitting.
-
-**Entry points per browser target**
-
-The build script calls esbuild twice — once for Chrome output, once for Firefox output. The file lists are nearly identical; the difference is:
-- Chrome: includes `offscreen/offscreen.js` as an entry point
-- Firefox: includes `background/background.js` (a new Firefox-specific file) instead of offscreen entry
-- Chrome manifest uses `"service_worker"` key; Firefox manifest uses `"scripts"` array
-
-**pdf.worker.mjs: copy, never bundle**
-
-`src/lib/pdf.mjs` and `src/lib/pdf.worker.mjs` are pre-compiled by the PDF.js project. They must be copied to the output directory unchanged. Bundling them would break their internal module references. Use `fs.cpSync` in the build script — no esbuild plugin needed.
-
-### Annotated Build Script Pattern
-
-```javascript
-// build.mjs — project root
-import * as esbuild from 'esbuild';
-import { cpSync, mkdirSync, copyFileSync } from 'fs';
-
-const watch = process.argv.includes('--watch');
-const target = process.argv.find(a => a.startsWith('--target='))?.split('=')[1] ?? 'all';
-
-// Shared esbuild options for all entry points
-const sharedOptions = {
-  bundle: true,
-  minify: !watch,        // Minify in production builds; skip in watch mode for readable output
-  sourcemap: watch,      // Source maps only in dev (not in extension artifacts)
-  logLevel: 'info',
-};
-
-// Content scripts: must be IIFE (not ES modules) for manifest injection
-const contentScriptOptions = {
-  ...sharedOptions,
-  format: 'iife',
-  target: ['chrome120', 'firefox128'],  // Both browsers understand modern JS; no transpilation needed
-  entryPoints: [
-    'src/content/content-script.js',    // esbuild resolves its imports transitively
-  ],
-  // Note: shared/constants.js is imported by content-script.js after extraction from classic global pattern
-  outdir: 'dist/chrome/content',        // Changed per target
-};
-
-// ESM entry points: service worker, offscreen, popup, options
-const esmOptions = {
-  ...sharedOptions,
-  format: 'esm',
-  target: ['chrome120', 'firefox128'],
-  entryPoints: [
-    'src/background/service-worker.js',
-    'src/popup/popup.js',
-    'src/options/options.js',
-  ],
-  outdir: 'dist/chrome',               // Changed per target
-};
-
-// Copy static assets (manifests, HTML, icons, lib files)
-function copyStaticAssets(browserTarget) {
-  const outDir = `dist/${browserTarget}`;
-  mkdirSync(`${outDir}/lib`, { recursive: true });
-  mkdirSync(`${outDir}/icons`, { recursive: true });
-  // PDF.js pre-compiled — never bundle
-  cpSync('src/lib', `${outDir}/lib`, { recursive: true });
-  cpSync('src/icons', `${outDir}/icons`, { recursive: true });
-  cpSync('src/popup/popup.html', `${outDir}/popup/popup.html`);
-  cpSync('src/options/options.html', `${outDir}/options/options.html`);
-  // For offscreen: Chrome only
-  if (browserTarget === 'chrome') {
-    cpSync('src/offscreen/offscreen.html', `${outDir}/offscreen/offscreen.html`);
-  }
-  // Target-specific manifest
-  cpSync(`src/manifest.${browserTarget}.json`, `${outDir}/manifest.json`);
-}
+```yaml
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
 ```
 
-**Why `target: ['chrome120', 'firefox128']`:** Both these versions fully support modern JS (async/await, optional chaining, nullish coalescing, ES2022+). Setting this target tells esbuild not to downcompile modern syntax, keeping output readable and small. These are conservative minimums — both browsers are well past these versions in 2026.
+This runs on every push to any branch AND on PRs to main. The PR trigger avoids duplicate runs for push-and-PR on the same commit. The `push: branches: ['**']` ensures feature branches get CI without opening a PR.
 
-### Separate Manifests
+### Concurrency (Cancel Superseded Runs)
 
-Maintain two manifest source files:
-- `src/manifest.chrome.json` — Chrome version (existing `manifest.json` content; uses `"service_worker"`)
-- `src/manifest.firefox.json` — Firefox version (uses `"scripts"` array, adds `browser_specific_settings`)
-
-The build script copies the appropriate manifest to `dist/{target}/manifest.json`.
-
----
-
-## Firefox Manifest Differences
-
-### Background: `service_worker` vs `scripts`
-
-Chrome MV3 requires a service worker. Firefox MV3 uses non-persistent background pages (event pages) — not service workers. Firefox event pages have DOM access; Chrome service workers do not. This is why the offscreen document trick exists in Chrome.
-
-**Chrome manifest:**
-```json
-"background": {
-  "service_worker": "background/service-worker.js",
-  "type": "module"
-}
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 ```
 
-**Firefox manifest:**
-```json
-"background": {
-  "scripts": ["background/background.js"],
-  "type": "module"
-}
+- `github.head_ref` is set for PR runs (the source branch name) — PR runs for the same branch cancel each other
+- `github.run_id` is used for push runs (unique per run) — push-to-main runs do NOT cancel each other
+- `cancel-in-progress: true` — safe here because CI produces artifacts but does not deploy to production
+
+### Recommended Job Structure
+
+```yaml
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:src
+      - run: npm run test:chrome
+      - run: npm run test:firefox
+      - run: npm run test:lint
+      - name: Package Chrome extension
+        run: cd dist/chrome && zip -r ../../patent-cite-chrome.zip .
+      - name: Package Firefox extension
+        run: cd dist/firefox && zip -r ../../patent-cite-firefox.zip .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: patent-cite-chrome-${{ github.sha }}
+          path: patent-cite-chrome.zip
+          compression-level: 0
+          retention-days: 30
+      - uses: actions/upload-artifact@v7
+        with:
+          name: patent-cite-firefox-${{ github.sha }}
+          path: patent-cite-firefox.zip
+          compression-level: 0
+          retention-days: 30
 ```
 
-Note: Chrome 121+ and Firefox 121+ theoretically support declaring both `service_worker` and `scripts` in one manifest, with each browser using what it understands. This approach allows a single manifest file. However, maintaining separate manifests is clearer and avoids edge cases in older browser versions and AMO linter behavior. **Recommendation: separate manifests.**
+**Single job rationale:** The build step produces artifacts consumed by test steps. Splitting into separate jobs would require `upload-artifact` + `download-artifact` between jobs. A single job avoids this overhead while keeping the workflow simple — the total CI time for this project (build + tests + packaging) is well under 5 minutes.
 
-### Firefox-Required Fields
-
-```json
-"browser_specific_settings": {
-  "gecko": {
-    "id": "patent-cite-tool@example.com",
-    "strict_min_version": "128.0",
-    "data_collection_permissions": {
-      "required": ["none"]
-    }
-  }
-}
-```
-
-- **`gecko.id`**: Mandatory for AMO submission. Use email-format or GUID. Choose one now and keep it permanent — the ID is tied to the AMO listing.
-- **`strict_min_version: "128.0"`**: Firefox 128 is when full MV3 support landed (July 2024). Targeting 128+ ensures all MV3 APIs are available. Firefox 109 had initial MV3 support but is too old to target in 2026.
-- **`data_collection_permissions`**: Mandatory for all new extensions submitted to AMO after November 3, 2025. This extension collects no personal data, so `"required": ["none"]` is correct.
-
-### Permissions Differences
-
-**Remove from Firefox manifest:**
-- `"declarativeContent"` — Not implemented in Firefox. Chrome uses it to enable the toolbar action on matching URLs. Firefox alternative: use `activeTab` + `tabs.onUpdated` listener in the background script, or rely solely on `content_scripts` `matches` to determine when to activate. For this extension, the content script already runs only on `patents.google.com/patent/US*` via `matches`, so `declarativeContent` is optional even in Chrome — it was used to control icon visibility. Firefox will use a `tabs.onUpdated` listener in the background script instead.
-- `"offscreen"` — No offscreen document API in Firefox. Remove entirely.
-
-**Keep in Firefox manifest:**
-- `"activeTab"`, `"storage"`, `"contextMenus"`, `"clipboardWrite"` — All supported in Firefox MV3.
-
-### No `web_accessible_resources.use_dynamic_url`
-
-Firefox does not support the `use_dynamic_url` property. The existing Chrome manifest does not use this property, so no change needed.
-
----
-
-## Firefox Background Script
-
-### The Core Difference: No Offscreen Document API
-
-Chrome's `chrome.offscreen` API creates a hidden HTML page with DOM access — used in this extension to run PDF.js in a context where `fetch()` and `document` are available from the service worker context.
-
-Firefox has no `chrome.offscreen` API. Instead, the Firefox event page (background script) runs in a full page context with DOM and `fetch()` natively available. **PDF.js can run directly in the Firefox background script — no offscreen workaround needed.**
-
-### Firefox Background Script Strategy
-
-Create `src/background/background.firefox.js`:
-- Absorbs the PDF parsing logic currently in `src/offscreen/offscreen.js` and `src/offscreen/pdf-parser.js`
-- Handles the same `chrome.runtime.onMessage` listener as the offscreen document
-- Can use `fetch()`, `document`, and `importScripts`-equivalent patterns directly
-- Uses `browser.*` API (via webextension-polyfill) for cross-browser call signatures
-
-The Chrome service worker continues to delegate PDF work to the offscreen document via `chrome.runtime.sendMessage`. The Firefox background script handles it inline.
-
-### Event Page Lifecycle Warning
-
-Firefox event pages in MV3 are non-persistent — they unload after a period of inactivity (similar to Chrome service workers). State stored in module-level variables is lost on unload. Use `browser.storage.local` for any state that must survive between events. The existing Chrome code already uses `IndexedDB` for patent cache, which survives background script unloads on both platforms.
-
----
-
-## webextension-polyfill Integration
-
-### What It Does
-
-On Chrome: wraps `chrome.*` callback-based APIs to return Promises, and exposes them under the `browser.*` namespace.
-On Firefox: detects the native `browser` namespace already exists and does nothing (no-op).
-
-Result: code written with `browser.runtime.sendMessage()` works on both browsers.
-
-### Usage Pattern in This Codebase
-
-After esbuild bundles the code, `webextension-polyfill` is imported at the top of each script that calls extension APIs:
-
-```javascript
-// In background scripts, popup, options — anywhere chrome.* is called
-import browser from 'webextension-polyfill';
-
-// Then use browser.* instead of chrome.*
-const settings = await browser.storage.sync.get(['triggerMode']);
-browser.runtime.onMessage.addListener((msg) => { /* ... */ });
-```
-
-**Content scripts:** The polyfill can also be injected into content scripts. However, content scripts in this extension primarily use `chrome.runtime.sendMessage()` (the callback form). The simplest approach is to bundle the polyfill into the content script bundle and replace `chrome.*` calls with `browser.*`.
-
-### Bundling the Polyfill
-
-esbuild resolves the polyfill as a normal npm dependency:
-
-```javascript
-// esbuild entry point imports this naturally
-import browser from 'webextension-polyfill';
-```
-
-esbuild will inline the polyfill into each bundle that imports it. Since content scripts are IIFE bundles and background/popup are ESM bundles, each bundle gets its own copy. The polyfill is ~10 KB minified — acceptable for extension bundles.
-
-**Alternative pattern (not recommended here):** Inject polyfill as a separate manifest `js` entry before content scripts. This avoids duplication across bundles but requires the polyfill to run as a classic script, which conflicts with the package's ESM export. The esbuild bundling approach is simpler.
-
-### Verification of MV3 Compatibility
-
-webextension-polyfill 0.12.0 supports MV3. The Mozilla Discourse documentation confirms the promise-style `browser.*` API works for both MV2 and MV3 and is tested on the last stable Chrome and Firefox versions. On Firefox, it is literally a no-op, so compatibility risk is zero on that side. On Chrome MV3, the wrapping works correctly.
-
-**Confidence: MEDIUM** — Version 0.12.0 confirmed as latest from npm search results (libraries.io shows 0.12.0 as current). MV3 compatibility confirmed via Mozilla documentation. This codebase's specific API calls (runtime.sendMessage, storage.sync, action.setIcon, tabs.query) should be verified against the polyfill's API surface during implementation — particularly `chrome.action` (MV3 replacement for `chrome.browserAction`).
-
----
-
-## web-ext CLI
-
-### Purpose
-
-`web-ext` is Mozilla's official tool for Firefox extension development. It handles:
-1. Loading an unpacked extension into a temporary Firefox profile (without manual about:debugging)
-2. Watching for file changes and auto-reloading
-3. Packaging the extension into a `.zip` suitable for AMO submission
-
-### Key Commands
-
-```bash
-# Load extension from dist/firefox/ and open Firefox with auto-reload
-npx web-ext run --source-dir dist/firefox/
-
-# Package dist/firefox/ into a zip for AMO submission
-npx web-ext build --source-dir dist/firefox/ --artifacts-dir artifacts/
-
-# Lint the Firefox extension for AMO compliance
-npx web-ext lint --source-dir dist/firefox/
-```
-
-**Important:** web-ext should point to `dist/firefox/` (the built output), not `src/`. The extension must be built by esbuild first. The development workflow is: `npm run build:firefox -- --watch` in one terminal, `npx web-ext run --source-dir dist/firefox/ --no-reload` in another (web-ext watches its own source dir; esbuild rebuild triggers browser reload automatically).
-
-### Version Note
-
-web-ext 9.3.0 is the latest as of 2026-03-03. As of v7.0.0, web-ext exports native ES modules only — Node.js 14+ required (not a concern since the project already uses `"type": "module"` in package.json).
-
-### Install as Dev Dependency
-
-```bash
-npm install -D web-ext
-```
-
-This keeps the version pinned for the project team and avoids relying on a globally installed version.
-
----
-
-## PDF.js in Firefox
-
-### No Changes Required
-
-Firefox's background script (event page) has full DOM and `fetch()` access. PDF.js runs in this context without modification. The existing PDF.js v5 code (pdf.mjs + pdf.worker.mjs) works in Firefox background scripts the same way it works in Chrome's offscreen document — both are essentially browser page contexts with Web Worker support.
-
-`pdf.worker.mjs` is registered via `workerSrc` in the PDF.js initialization. The file must be `web_accessible_resources` listed in the manifest so Firefox can load it:
-
-```json
-"web_accessible_resources": [
-  {
-    "resources": ["lib/pdf.worker.mjs"],
-    "matches": ["<all_urls>"]
-  }
-]
-```
-
-This already exists in the Chrome manifest and should be copied unchanged to the Firefox manifest.
-
-**Confidence: HIGH** — Firefox background scripts have DOM access (confirmed via MDN). PDF.js is a Mozilla project and is tested against Firefox. No browser-specific configuration is needed.
-
----
-
-## What NOT to Add
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| WXT framework | Abstracts esbuild config, adds magic. This codebase is 4,500 LOC of plain JS — a custom build.mjs is 50-100 lines and fully transparent. WXT adds a framework dependency for little gain. | Custom `build.mjs` script |
-| Parcel | Zero-config bundler, but extension support requires the `@parcel/config-webextension` package. Less control over output format per entry point (IIFE vs ESM). Hard to customize for the pdf.worker.mjs copy requirement. | esbuild with explicit config |
-| Vite | Dev server-centric. Extension mode requires `vite-plugin-web-extension` plugin. Adds Vite config layer on top of Rollup on top of esbuild. Unnecessary indirection. | esbuild directly |
-| Rollup | Slower than esbuild; requires more plugins for extension use cases; no native watch API comparable to esbuild's context API. | esbuild |
-| webextension-polyfill-ts | The TypeScript wrapper around webextension-polyfill. This project uses plain JavaScript. The TS types are not needed; the runtime library is the same. | webextension-polyfill directly |
-| `@types/webextension-polyfill` | TypeScript types — not needed for a plain JS project. | N/A |
-| esbuild-plugin-copy | Adds a dependency for what is a 5-line `fs.cpSync` call in the build script. | `fs.cpSync` in `build.mjs` |
-| Code splitting (`splitting: true`) | Only works with ESM format. Content scripts must be IIFE. Enabling splitting for ESM entry points while using IIFE for content scripts requires two separate esbuild calls — which is already the plan. Splitting is not needed because shared code (constants) is small. | Duplicate shared code in bundles (acceptable at this scale) |
-| Single shared manifest with both `service_worker` and `scripts` | Theoretically supported in Chrome 121+/Firefox 121+, but adds linter risk, obscures intent, and is poorly documented. | Separate `manifest.chrome.json` and `manifest.firefox.json` |
-| Babel | Not needed. esbuild's `target` option handles syntax downcompilation. The existing code uses no syntax beyond what Chrome 120/Firefox 128 support natively. | esbuild `target` option |
+**`compression-level: 0` rationale:** The uploaded paths are already `.zip` files. If GitHub compresses them during upload, the download is a `.zip.zip` which stores reviewers open. Setting `compression-level: 0` instructs upload-artifact to store the file as-is.
 
 ---
 
 ## Installation
 
 ```bash
-# New dev dependencies for v2.0
-npm install -D esbuild webextension-polyfill web-ext
+# Add web-ext as pinned devDependency (it is currently invoked via npx in test:lint)
+npm install -D web-ext
 ```
 
-**Resulting package.json devDependencies addition:**
+**No other new npm packages are needed.** The GitHub Actions actions (checkout, setup-node, upload-artifact) are not npm packages — they are referenced only in the `.github/workflows/*.yml` file.
+
+**Resulting package.json change:**
 ```json
 {
   "devDependencies": {
     "esbuild": "^0.27.3",
-    "web-ext": "^9.3.0",
-    "webextension-polyfill": "^0.12.0"
+    "pdfjs-dist": "^5.5.207",
+    "sharp": "^0.34.5",
+    "vitest": "^3.0.0",
+    "web-ext": "^9.4.0"
   }
 }
 ```
-
-Note: `webextension-polyfill` is technically a runtime dependency of the extension (it ships inside the bundle), but since esbuild inlines it at build time, no separate `dependencies` entry is needed. It functions as a dev dependency in the npm sense.
-
----
-
-## Version Compatibility
-
-| Package | Version | Compatible With | Notes |
-|---------|---------|-----------------|-------|
-| esbuild | 0.27.3 | Node.js 18+ | Latest as of 2026-03-03. Breaking changes between major versions are rare — minor/patch safe to update. |
-| webextension-polyfill | 0.12.0 | Chrome MV3, Firefox MV3, Safari | Latest on npm. `@types/webextension-polyfill` at 0.12.5 if TS is ever added. |
-| web-ext | 9.3.0 | Node.js 14+, Firefox desktop | Latest as of 2026-03-03 (published ~12 days ago). ES module only since v7.0.0. |
-| pdf.mjs / pdf.worker.mjs | v5 (existing) | Chrome + Firefox | No changes. Pre-compiled files are copied unchanged. |
 
 ---
 
@@ -383,30 +150,56 @@ Note: `webextension-polyfill` is technically a runtime dependency of the extensi
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| Custom `build.mjs` | WXT framework | If starting a new extension from scratch with TypeScript + React + complex multi-target needs |
-| esbuild | Vite | If building a web app (not extension) where dev server HMR matters more than build simplicity |
-| Separate manifests | Single merged manifest | If you need to support more than two targets and the manifest differences are minimal — not the case here due to `declarativeContent` and `offscreen` permission differences |
-| `browser.*` via polyfill | Conditional `chrome` vs `browser` checks | When polyfill is unavailable (e.g., userscripts). Using the polyfill everywhere is cleaner. |
-| `web-ext run` | `about:debugging` manual load | Manual loading is acceptable for one-off tests; web-ext is required for auto-reload during development |
+| `actions/setup-node@v6` with `cache: 'npm'` | `actions/cache` directly caching `~/.npm` | When you need custom cache key logic beyond `package-lock.json` hash (e.g., OS + node version matrix). Not needed here — single Node version, single OS. |
+| Single CI job | Split into build + test + package jobs | When individual stages take >10 min or when parallelizing test suites matters. At 71 test cases, Vitest runs in under 10 seconds — job split adds overhead without benefit. |
+| `zip` shell command | `montudor/action-zip` or `Zip Release` action | Third-party zip actions add a dependency for a one-line operation. Use shell `zip` unless cross-platform (Windows) is needed. |
+| Node.js 22 | Node.js 24 | Node 24 is appropriate if deploying after June 2026 when it becomes the runner default. Pinning to 22 provides stability through the transition period and matches the current LTS schedule. |
+| `actions/upload-artifact@v7` | `actions/upload-artifact@v4` | v4 is still functional but v7 is current. v7 adds the `archive: false` direct upload mode which is useful if packaging is ever refactored. No reason to use v4 on a new workflow. |
+| `ubuntu-latest` | `ubuntu-24.04` (explicit) | Explicit version is appropriate if you want to prevent automatic runner OS upgrades. `ubuntu-latest` is acceptable here because the workflow uses only standard shell tools (`zip`, `npm`) that are stable across Ubuntu LTS versions. |
+
+---
+
+## What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `actions/cache` manual configuration | `actions/setup-node@v6` with `cache: 'npm'` already handles `~/.npm` caching with the correct `package-lock.json`-based key. Adding a separate `actions/cache` step creates redundancy and risk of key conflicts. | `setup-node` built-in `cache: 'npm'` |
+| Caching `node_modules` directly | `npm ci` deletes `node_modules` before installing, so a restored `node_modules` cache is discarded immediately — wasted restore time. Cross-version cache poisoning risk. | Cache `~/.npm` via `setup-node cache: 'npm'` |
+| Node.js version matrix (`[20, 22, 24]`) | This is not a library — it is a browser extension. There is no cross-version compatibility concern. A matrix triples CI time with zero benefit. | Single version pin (`node-version: '22'`) |
+| `kewisch/action-web-ext` | A third-party action for web-ext lint. The existing `npm run test:lint` script already runs web-ext lint correctly. Adding a new action for something the project's own script already does introduces unnecessary external dependency. | `npm run test:lint` (calls `npx web-ext lint`) |
+| Separate lint job | Running lint as a separate job requires a separate checkout + npm install. Since lint takes <5 seconds, the job setup overhead exceeds the lint time. | Include lint as a step in the single CI job |
+| `actions/download-artifact` | Not needed in a single-job workflow. Only needed if packaging artifacts flow between separate jobs. | Single job with all steps sequential |
+| Store submission actions (chrome-webstore-upload-action, etc.) | Out of scope for v2.1 milestone. Store submission requires API keys and review processes not addressed by this milestone. | Defer to future milestone |
+| `.env` files or secret injection | This CI pipeline builds and tests only. No runtime secrets are needed for `npm run build` or `vitest run`. | N/A |
+
+---
+
+## Version Compatibility
+
+| Package | Version | Compatible With | Notes |
+|---------|---------|-----------------|-------|
+| `actions/checkout` | v6 | Actions Runner 2.329.0+ | GitHub-hosted runners always meet this threshold. |
+| `actions/setup-node` | v6.3.0 | Node 20/22/24, npm, yarn, pnpm | Built-in `cache: 'npm'` requires `package-lock.json` to be present (it is). Automatic caching does NOT activate because `packageManager` field is absent from this project's `package.json` — explicit `cache: 'npm'` is required. |
+| `actions/upload-artifact` | v7 | Actions Runner 2.327.1+ | GitHub-hosted runners always meet this. `compression-level: 0` parameter available since v4. |
+| `web-ext` | 9.4.0 | Node.js 20+ (20 EOL April 2026; use 22) | v9.4.0 is "likely the last release officially supporting Node 20" per release notes. Works on Node 22/24. ESM-only since web-ext v7.0.0 — compatible with this project's `"type": "module"` package.json. |
+| `vitest` | 3.2.4 (installed) | Node.js 20+ | Node 22 is within the supported range. |
+| `esbuild` | 0.27.3 (installed) | Node.js 18+ | Node 22 is within the supported range. |
 
 ---
 
 ## Sources
 
-- [esbuild API documentation](https://esbuild.github.io/api/) — format options, target, entryPoints, bundle, outdir (HIGH confidence)
-- [1Password blog: new extension build system](https://1password.com/blog/new-extension-build-system) — real-world esbuild extension build patterns, 90% build time reduction (MEDIUM confidence — industry case study, May 2024)
-- [webextension-polyfill GitHub](https://github.com/mozilla/webextension-polyfill) — usage patterns, no-op behavior on Firefox, MV3 compatibility (HIGH confidence — Mozilla-maintained)
-- [webextension-polyfill on npm / libraries.io](https://libraries.io/npm/webextension-polyfill) — version 0.12.0 confirmed current (HIGH confidence)
-- [Firefox Extension Workshop: web-ext command reference](https://extensionworkshop.com/documentation/develop/web-ext-command-reference/) — --source-dir, --artifacts-dir, watch mode, build command (HIGH confidence — official Mozilla docs, updated December 2025)
-- [web-ext on npm](https://www.npmjs.com/package/web-ext) — version 9.3.0 confirmed as latest (HIGH confidence)
-- [Firefox Extension Workshop: MV3 migration guide](https://extensionworkshop.com/documentation/develop/manifest-v3-migration-guide/) — background scripts vs service workers, Firefox-specific manifest fields (HIGH confidence — official Mozilla docs)
-- [MDN: browser_specific_settings](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings) — gecko.id requirement, strict_min_version, data_collection_permissions (November 2025 change) (HIGH confidence — official MDN)
-- [MDN: Background scripts](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Background_scripts) — DOM access in Firefox event pages, fetch availability, event page lifecycle (HIGH confidence — official MDN)
-- [MDN: Chrome incompatibilities](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities) — declarativeContent not in Firefox (HIGH confidence)
-- [Mozilla Discourse: webextension-polyfill MV3](https://discourse.mozilla.org/t/how-to-use-browser-polyfill-for-mv3-cross-browser-web-extension/137839) — MV3 usage confirmation (MEDIUM confidence — community forum)
-- [esbuild GitHub releases](https://github.com/evanw/esbuild/releases) — version 0.27.3 as latest (HIGH confidence)
+- [GitHub releases: actions/checkout](https://github.com/actions/checkout/releases) — v6 confirmed as latest (HIGH confidence, checked 2026-03-04)
+- [GitHub releases: actions/setup-node](https://github.com/actions/setup-node/releases) — v6.3.0 confirmed as latest (HIGH confidence, checked 2026-03-04)
+- [setup-node advanced usage docs](https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md) — `cache: 'npm'` caches `~/.npm` not `node_modules`; automatic caching requires `packageManager` field (HIGH confidence, official docs)
+- [GitHub releases: actions/upload-artifact](https://github.com/actions/upload-artifact/releases) — v7.0.0 confirmed as latest (HIGH confidence, checked 2026-03-04)
+- [GitHub changelog: upload-artifact v7 non-zipped artifacts](https://github.blog/changelog/2026-02-26-github-actions-now-supports-uploading-and-downloading-non-zipped-artifacts/) — v7 `archive: false` feature, `compression-level: 0` for pre-zipped files (HIGH confidence)
+- [GitHub changelog: Node 20 deprecation on Actions runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/) — Node 24 becomes runner default June 2, 2026; Node 20 EOL April 2026 (HIGH confidence)
+- [GitHub changelog: ubuntu-latest = Ubuntu 24.04](https://github.blog/changelog/2024-09-25-actions-new-images-and-ubuntu-latest-changes/) — `ubuntu-latest` points to Ubuntu 24.04 since January 2025 (HIGH confidence)
+- [GitHub releases: mozilla/web-ext](https://github.com/mozilla/web-ext/releases) — v9.4.0 confirmed as latest as of 2026-03-04 (HIGH confidence)
+- [GitHub Actions concurrency docs / community discussion](https://generalreasoning.com/blog/2025/02/05/github-actions-concurrency.html) — `head_ref || run_id` pattern for PR vs push differentiation (MEDIUM confidence — verified against community pattern, matches GitHub official concurrency docs behavior)
 
 ---
 
-*Stack research for: Patent Citation Tool v2.0 — esbuild Build Pipeline + Firefox Port*
-*Researched: 2026-03-03*
+*Stack research for: Patent Citation Tool v2.1 — GitHub Actions CI/CD Pipeline*
+*Researched: 2026-03-04*

@@ -1,753 +1,433 @@
 # Architecture Research
 
-**Domain:** Multi-browser extension build pipeline — Chrome MV3 + Firefox MV3 port with esbuild
-**Researched:** 2026-03-03
-**Confidence:** HIGH (Firefox API differences verified against MDN/Extension Workshop; esbuild API verified against official docs; existing code verified from source)
+**Domain:** GitHub Actions CI/CD pipeline for cross-browser extension with esbuild + Vitest
+**Researched:** 2026-03-04
+**Confidence:** HIGH
 
 ---
 
-## Existing Architecture (v1.2 — Ground Truth from Source)
+## Context: What Already Exists
 
-Before describing changes, this is the verified current state:
+This is v2.1 research. The existing system is already working:
 
-```
-Google Patents Tab                    Chrome Extension Context
-+---------------------+     msg      +----------------------+
-| Content Script       |------------>| Service Worker        |
-| (classic scripts)    |<------------| (ES module)           |
-|                      |     msg     | - Message router      |
-| constants.js (glob)  |             | - Offscreen lifecycle |
-| text-matcher.js      |             | - chrome.storage.local|
-| paragraph-finder.js  |             +----------+-----------+
-| citation-ui.js       |                        |
-| content-script.js    |             msg (both directions)
-+---------------------+              +----------v-----------+
-                                     | Offscreen Document    |
-                                     | (ES modules only)     |
-                                     | offscreen.js          |
-                                     | pdf-parser.js         |
-                                     | position-map-builder.js
-                                     | - Fetch PDF blob      |
-                                     | - Store in IndexedDB  |
-                                     | - Parse with PDF.js   |
-                                     | - Build PositionMap   |
-                                     | - Run text matching   |
-                                     | - Upload to KV cache  |
-                                     +----------+-----------+
-                                                |
-                              +-----------------+------------------+
-                              |                                    |
-                   +----------v-----------+         +--------------v-------+
-                   | IndexedDB             |         | Cloudflare Worker     |
-                   | patent-cite-tool v1   |         | pct.tonyrowles.com    |
-                   | pdfs store            |         | GET/POST /cache/{id}  |
-                   +----------------------+         | GET /pdf?patent={id}  |
-                                                    +----------------------+
-```
+- `npm run build` → calls `node scripts/build.js` → produces `dist/chrome/` + `dist/firefox/`
+- `npm test` → runs `npm run build && npm run test:src && npm run test:chrome && npm run test:firefox && npm run test:lint`
+  - `test:src` → `vitest run` (default config, 71 test cases from source)
+  - `test:chrome` → `vitest run --config vitest.config.chrome.js` (validates bundled chrome dist)
+  - `test:firefox` → `vitest run --config vitest.config.firefox.js` (validates bundled firefox dist)
+  - `test:lint` → `npx web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'`
+- The full `npm test` command already chains build → test in the right order
 
-### Current Tech Debt (What v2.0 Fixes)
-
-| Problem | Root Cause | v2.0 Resolution |
-|---------|-----------|-----------------|
-| `matchAndCite` duplicated in `text-matcher.js` AND `offscreen.js` | Content scripts are classic scripts; offscreen is ES module — they cannot share code without a build step | Extract to `src/shared/matching.js`; bundle into each target |
-| `MSG`/`STATUS`/`PATENT_TYPE` constants duplicated in `service-worker.js` AND `shared/constants.js` | Service worker couldn't ES-import `constants.js` originally (classic script design) | Import from `src/shared/constants.js` in all contexts after bundling |
-| `offscreen.js` has Chrome-only APIs (`chrome.offscreen.createDocument`) | Chrome MV3 architecture requirement | Firefox port absorbs this logic into background script directly |
+The CI/CD pipeline does not redesign anything. It wraps what already works.
 
 ---
 
-## v2.0 Target Architecture
-
-### Chrome: Service Worker + Offscreen (Unchanged Structure)
-
-Chrome keeps its existing separation because MV3 service workers lack DOM access. The offscreen document provides the DOM context needed by PDF.js. Build pipeline consolidates the code but the runtime separation remains.
+## System Overview
 
 ```
-Chrome Runtime
-+---------------------------+     +---------------------------+
-| Service Worker (SW)       |     | Offscreen Document        |
-| dist/chrome/background/   |<--->| dist/chrome/offscreen/    |
-| service-worker.js         |     | offscreen.js              |
-| (bundled ES module)       |     | (bundled ES module)       |
-|                           |     | pdf.mjs + pdf.worker.mjs  |
-| Imports:                  |     | IndexedDB operations      |
-|   shared/constants        |     | Fetch + parse pipeline    |
-|   (bundled in)            |     | Text matching             |
-+---------------------------+     +---------------------------+
-```
-
-### Firefox: Background Script Absorbs Offscreen
-
-Firefox MV3 background scripts run as event pages (non-persistent pages with DOM access). They have full access to: `fetch`, `IndexedDB`, DOM APIs. There is no offscreen document API in Firefox. The background script directly executes what Chrome required an offscreen document for.
-
-```
-Firefox Runtime
-+------------------------------------------+
-| Background Script (Event Page)           |
-| dist/firefox/background/background.js    |
-| (bundled ES module)                      |
-|                                          |
-| Everything Chrome splits between SW and  |
-| Offscreen lives here in Firefox:         |
-| - Message routing (was service-worker.js)|
-| - Fetch PDF blob (was offscreen.js)      |
-| - IndexedDB operations (was offscreen.js)|
-| - PDF.js parsing (was offscreen.js)      |
-| - Text matching (was offscreen.js)       |
-| - KV cache operations (was offscreen.js) |
-| pdf.mjs + pdf.worker.mjs (copied)        |
-+------------------------------------------+
-```
-
-### Content Scripts: Identical in Both Targets
-
-Content scripts are classic scripts in both Chrome and Firefox (injected via manifest `content_scripts`). They use the same DOM-based paragraph finding and citation UI. esbuild bundles the shared matching code into `content.js` for each target.
-
----
-
-## Directory Structure
-
-### Source Tree (src/)
-
-```
-src/
-├── background/
-│   └── service-worker.js           # Chrome-specific: SW + offscreen lifecycle
-├── content/
-│   ├── content-script.js           # Both targets
-│   ├── citation-ui.js              # Both targets
-│   └── paragraph-finder.js         # Both targets
-├── firefox/
-│   └── background.js               # Firefox-specific: merged SW + offscreen logic
-├── offscreen/
-│   ├── offscreen.js                # Chrome-specific: Chrome offscreen document
-│   ├── pdf-parser.js               # Shared logic (imported by offscreen + firefox/background)
-│   └── position-map-builder.js     # Shared logic
-├── shared/
-│   ├── constants.js                # Single source for MSG, STATUS, PATENT_TYPE
-│   └── matching.js                 # Extracted: normalizeText, matchAndCite, formatCitation
-│                                   #   (replaces duplication between text-matcher and offscreen)
-├── lib/
-│   ├── pdf.mjs                     # PDF.js (copied to both dist targets)
-│   └── pdf.worker.mjs              # PDF.js worker (web_accessible_resources)
-├── icons/                          # PNG assets (copied to both dist targets)
-├── popup/
-│   ├── popup.html
-│   └── popup.js
-├── options/
-│   ├── options.html
-│   └── options.js
-├── manifests/
-│   ├── manifest.chrome.json        # Chrome MV3 manifest
-│   └── manifest.firefox.json       # Firefox MV3 manifest
-└── offscreen/
-    └── offscreen.html              # Chrome-only HTML host for offscreen document
-```
-
-**Rationale for `src/manifests/` subdirectory:** The two manifests differ enough that a merge/patch approach adds complexity with no benefit. Separate source manifests are readable, diffable, and independently maintainable. The build script copies the correct one to each dist target.
-
-**Rationale for `src/firefox/background.js`:** Firefox needs a single background entry point that combines service-worker.js behavior with offscreen.js behavior. Keeping it in `src/firefox/` makes the platform-specific nature explicit rather than burying it in a shared directory.
-
-### Build Output (dist/)
-
-```
-dist/
-├── chrome/
-│   ├── manifest.json               # From src/manifests/manifest.chrome.json
-│   ├── background/
-│   │   └── service-worker.js       # Bundled: service-worker.js + shared imports
-│   ├── content/
-│   │   └── content.js              # Bundled: content-script + text-matcher + paragraph-finder
-│   │                               #   + citation-ui + shared/matching + shared/constants
-│   ├── offscreen/
-│   │   ├── offscreen.html          # Copied
-│   │   └── offscreen.js            # Bundled: offscreen.js + pdf-parser + position-map-builder
-│   │                               #   + shared/matching + shared/constants
-│   ├── popup/
-│   │   ├── popup.html              # Copied
-│   │   └── popup.js                # Bundled
-│   ├── options/
-│   │   ├── options.html            # Copied
-│   │   └── options.js              # Bundled
-│   ├── icons/                      # Copied
-│   └── lib/
-│       ├── pdf.mjs                 # Copied
-│       └── pdf.worker.mjs          # Copied
-└── firefox/
-    ├── manifest.json               # From src/manifests/manifest.firefox.json
-    ├── background/
-    │   └── background.js           # Bundled: firefox/background.js + pdf-parser
-    │                               #   + position-map-builder + shared/matching
-    │                               #   + shared/constants
-    ├── content/
-    │   └── content.js              # Same bundle recipe as Chrome content.js
-    ├── popup/
-    │   ├── popup.html              # Copied (identical)
-    │   └── popup.js                # Bundled (identical recipe)
-    ├── options/
-    │   ├── options.html            # Copied (identical)
-    │   └── options.js              # Bundled (identical recipe)
-    ├── icons/                      # Copied (identical)
-    └── lib/
-        ├── pdf.mjs                 # Copied
-        └── pdf.worker.mjs          # Copied
-```
-
-**Content script bundling note:** In current v1.2, content scripts are classic scripts loaded via manifest array order (`constants.js`, `text-matcher.js`, `paragraph-finder.js`, `citation-ui.js`, `content-script.js`). After bundling, the manifest lists a single `content.js` that includes all of these in correct order. The bundle format must be `iife` (not `esm`) because content scripts cannot use `import` at runtime.
-
----
-
-## Manifest Differences: Chrome vs Firefox
-
-### Chrome manifest (src/manifests/manifest.chrome.json)
-
-```json
-{
-  "manifest_version": 3,
-  "permissions": [
-    "declarativeContent",
-    "offscreen",
-    "activeTab",
-    "storage",
-    "contextMenus",
-    "clipboardWrite"
-  ],
-  "background": {
-    "service_worker": "background/service-worker.js",
-    "type": "module"
-  },
-  "content_scripts": [{
-    "matches": ["https://patents.google.com/patent/US*"],
-    "js": ["content/content.js"],
-    "run_at": "document_idle"
-  }],
-  "web_accessible_resources": [{
-    "resources": ["lib/pdf.worker.mjs", "offscreen/offscreen.html"],
-    "matches": ["<all_urls>"]
-  }]
-}
-```
-
-### Firefox manifest (src/manifests/manifest.firefox.json)
-
-```json
-{
-  "manifest_version": 3,
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "patent-cite-tool@yourname.com",
-      "strict_min_version": "109.0"
-    }
-  },
-  "permissions": [
-    "activeTab",
-    "storage",
-    "contextMenus",
-    "clipboardWrite"
-  ],
-  "background": {
-    "scripts": ["background/background.js"],
-    "type": "module"
-  },
-  "content_scripts": [{
-    "matches": ["https://patents.google.com/patent/US*"],
-    "js": ["content/content.js"],
-    "run_at": "document_idle"
-  }],
-  "web_accessible_resources": [{
-    "resources": ["lib/pdf.worker.mjs"],
-    "matches": ["https://patents.google.com/*"]
-  }]
-}
-```
-
-**Key manifest differences explained:**
-
-| Field | Chrome | Firefox | Reason |
-|-------|--------|---------|--------|
-| `declarativeContent` permission | Required | **Omit** | Firefox does not implement `declarativeContent` API |
-| `offscreen` permission | Required | **Omit** | No offscreen document API in Firefox |
-| `background.service_worker` | Used | **Not used** | Firefox ignores `service_worker`; use `background.scripts` |
-| `background.scripts` | Not needed | `["background/background.js"]` | Firefox uses event page (non-persistent background script) |
-| `browser_specific_settings.gecko` | Not needed | **Required** | Firefox AMO requires gecko ID for signing |
-| `web_accessible_resources[].extension_ids` | Optional | **Use `matches` instead** | Firefox requires `matches` not `extension_ids` for WAR |
-| `offscreen/offscreen.html` in WAR | Required | **Omit** | No offscreen document in Firefox |
-
----
-
-## Mapping Chrome Offscreen Logic to Firefox Background
-
-Chrome's offscreen document was created because MV3 service workers lack DOM access. Firefox event pages have DOM access natively. Every operation in `offscreen.js` can run directly in `firefox/background.js`.
-
-### Message Flow: Chrome vs Firefox
-
-**Chrome flow:**
-
-```
-Content Script
-  → chrome.runtime.sendMessage(LOOKUP_POSITION)
-  → Service Worker handles, forwards to Offscreen
-  → Offscreen does IndexedDB read + matching
-  → Offscreen sends CITATION_RESULT
-  → Service Worker forwards to content script tab
-```
-
-**Firefox flow (collapsed):**
-
-```
-Content Script
-  → browser.runtime.sendMessage(LOOKUP_POSITION)
-  → Background script handles directly
-  → Background script does IndexedDB read + matching
-  → Background script sends CITATION_RESULT to tab
-```
-
-The Firefox background.js is the union of service-worker.js + offscreen.js:
-
-- **From service-worker.js:** All `chrome.runtime.onMessage` handlers, declarative content rules replacement (see below), context menu setup, icon management via `browser.action.setIcon`
-- **From offscreen.js:** All PDF fetch/parse/match/cache functions, IndexedDB operations, Cloudflare Worker interactions
-
-The `ensureOffscreenDocument()` function and all `chrome.offscreen.*` calls are **Chrome-only** — they are not present in firefox/background.js at all.
-
-### `declarativeContent` Replacement in Firefox
-
-Chrome uses `declarativeContent.onPageChanged` to enable the toolbar icon only on `patents.google.com/patent/US*` pages. Firefox does not implement this API.
-
-**Firefox alternative:** Use `tabs.onUpdated` to listen for URL changes and call `action.enable()`/`action.disable()` per tab. Start with action disabled globally (set `"enabled": false` on the `action` key in manifest, or call `browser.action.disable()` on startup with no tabId to disable for all tabs by default), then enable per tab as URLs match.
-
-```javascript
-// firefox/background.js — replaces declarativeContent rules
-browser.action.disable(); // disable globally on startup
-
-browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.url) {
-    if (/^https:\/\/patents\.google\.com\/patent\/US/.test(changeInfo.url)) {
-      browser.action.enable(tabId);
-    } else {
-      browser.action.disable(tabId);
-    }
-  }
-});
-
-browser.tabs.onActivated.addListener(async ({ tabId }) => {
-  const tab = await browser.tabs.get(tabId);
-  if (/^https:\/\/patents\.google\.com\/patent\/US/.test(tab.url || '')) {
-    browser.action.enable(tabId);
-  } else {
-    browser.action.disable(tabId);
-  }
-});
-```
-
-**Confidence: HIGH** — `browser.action.disable(tabId)` and `browser.action.enable(tabId)` are confirmed supported in Firefox MV3.
-
----
-
-## Shared Code Extraction via Bundling
-
-### What Gets Extracted to src/shared/
-
-**`src/shared/constants.js` (already exists, modify):**
-Currently written as a classic script with no export. After v2.0: add ES module exports. The file still works as a classic script (exports are silently ignored when loaded as classic script), but the service worker and Firefox background can now `import` from it.
-
-```javascript
-// src/shared/constants.js — add exports
-export const MSG = { ... };
-export const STATUS = { ... };
-export const PATENT_TYPE = { ... };
-```
-
-**`src/shared/matching.js` (new file):**
-Extract the duplicated matching logic that currently exists in both `content/text-matcher.js` (classic-script globals) and `offscreen/offscreen.js` (ES module functions with `Offscreen` suffix). After extraction:
-
-- `src/shared/matching.js` — single authoritative copy, ES module exports
-- `src/content/text-matcher.js` — deleted or reduced to a thin wrapper (or the file is removed entirely and content.js imports from shared)
-- `src/offscreen/offscreen.js` — imports from shared/matching instead of defining its own copies
-
-**Functions that move to shared/matching.js:**
-
-| Function | Currently in | After |
-|----------|-------------|-------|
-| `normalizeText` / `normalizeTextOffscreen` | Both files (duplicated) | `shared/matching.js` as `normalizeText` |
-| `matchAndCite` / `matchAndCiteOffscreen` | Both files (duplicated) | `shared/matching.js` as `matchAndCite` |
-| `formatCitation` / `formatCitationOffscreen` | Both files (duplicated) | `shared/matching.js` as `formatCitation` |
-| `resolveMatch` / `resolveMatchOffscreen` | Both files (duplicated) | `shared/matching.js` as `resolveMatch` |
-| `whitespaceStrippedMatch` | Both files (duplicated) | `shared/matching.js` |
-| `bookendMatch` | Both files (duplicated) | `shared/matching.js` |
-| `fuzzySubstringMatch` / `fuzzySubstringMatchOffscreen` | Both files (duplicated) | `shared/matching.js` |
-| `findAllOccurrences` | Both files (duplicated) | `shared/matching.js` |
-| `pickBestByContext` | Offscreen only | `shared/matching.js` |
-| `levenshtein` / `levenshteinOffscreen` | Both files (duplicated) | `shared/matching.js` |
-
-**After extraction, esbuild bundles shared/matching.js into every bundle that needs it.** There is no runtime module sharing — each bundle is self-contained. This is correct for extensions: content scripts, background scripts, and offscreen documents cannot share a module instance at runtime anyway.
-
----
-
-## esbuild Build Script
-
-The build script lives at `scripts/build.mjs` (sibling to existing `scripts/generate-icons.mjs`).
-
-### Entry Points Per Target
-
-```javascript
-// scripts/build.mjs
-import * as esbuild from 'esbuild';
-import { cp, mkdir, copyFile } from 'fs/promises';
-
-const targets = ['chrome', 'firefox'];
-
-for (const target of targets) {
-  const outdir = `dist/${target}`;
-  await mkdir(outdir, { recursive: true });
-
-  // JavaScript bundles
-  await esbuild.build({
-    entryPoints: target === 'chrome'
-      ? {
-          'background/service-worker': 'src/background/service-worker.js',
-          'offscreen/offscreen': 'src/offscreen/offscreen.js',
-          'content/content': 'src/content/content-script.js',
-          'popup/popup': 'src/popup/popup.js',
-          'options/options': 'src/options/options.js',
-        }
-      : {
-          'background/background': 'src/firefox/background.js',
-          'content/content': 'src/content/content-script.js',
-          'popup/popup': 'src/popup/popup.js',
-          'options/options': 'src/options/options.js',
-        },
-    bundle: true,
-    outdir,
-    format: 'esm',   // service-worker and background use ESM; see content note
-    platform: 'browser',
-    define: {
-      'BROWSER_TARGET': JSON.stringify(target),
-    },
-  });
-
-  // Content script needs IIFE format (not ESM) — separate build call
-  await esbuild.build({
-    entryPoints: { 'content/content': 'src/content/content-script.js' },
-    bundle: true,
-    outdir,
-    format: 'iife',  // classic script injection — cannot use ESM at runtime
-    platform: 'browser',
-    define: { 'BROWSER_TARGET': JSON.stringify(target) },
-  });
-
-  // Copy static assets
-  await cp('src/icons', `${outdir}/icons`, { recursive: true });
-  await cp('src/lib', `${outdir}/lib`, { recursive: true });
-  await copyFile(`src/popup/popup.html`, `${outdir}/popup/popup.html`);
-  await copyFile(`src/options/options.html`, `${outdir}/options/options.html`);
-  await copyFile(
-    `src/manifests/manifest.${target}.json`,
-    `${outdir}/manifest.json`
-  );
-
-  // Chrome-only: copy offscreen HTML
-  if (target === 'chrome') {
-    await copyFile('src/offscreen/offscreen.html', `${outdir}/offscreen/offscreen.html`);
-  }
-}
-```
-
-**Content script format note:** The `content-script.js` entry point imports from `shared/constants.js` and `shared/matching.js`. After esbuild bundles with `format: 'iife'`, those imports are inlined — the output is a single classic-compatible IIFE file. The manifest lists only `content/content.js` (instead of the current 5-file array). This eliminates the global-variable dependency chain in the manifest.
-
-**ESM format for background/offscreen:** Service worker (`type: "module"`) and offscreen document (`<script type="module">`) already use ESM. The Firefox background script also uses `"type": "module"` in the manifest. ESM format bundles import statements inline without adding module boilerplate. This matches the existing structure.
-
-### Build Scripts in package.json
-
-```json
-{
-  "scripts": {
-    "build": "node scripts/build.mjs",
-    "build:chrome": "BROWSER_TARGET=chrome node scripts/build.mjs",
-    "build:firefox": "BROWSER_TARGET=firefox node scripts/build.mjs",
-    "test": "vitest run",
-    "generate-icons": "node scripts/generate-icons.mjs"
-  },
-  "devDependencies": {
-    "esbuild": "^0.24.0",
-    "pdfjs-dist": "^5.5.207",
-    "sharp": "^0.34.5",
-    "vitest": "^3.0.0"
-  }
-}
+GitHub Push / PR Event
+         |
+         v
++-------------------------+
+|  GitHub Actions Runner   |
+|  (ubuntu-latest)         |
+|                          |
+|  1. Checkout             |
+|  2. Setup Node.js + npm  |  -- cached by package-lock.json hash
+|  3. npm ci               |
+|  4. npm run build        |  -- esbuild: src/ -> dist/chrome/ + dist/firefox/
+|  5. npm run test:src     |  -- vitest (source tests, no dist dependency)
+|  6. npm run test:chrome  |  -- vitest (chrome dist alias tests)
+|  7. npm run test:firefox |  -- vitest (firefox dist alias tests)
+|  8. web-ext lint         |  -- Firefox manifest + bundle validation
+|  9. zip dist/chrome/     |  -- produce chrome.zip
+| 10. zip dist/firefox/    |  -- produce firefox.zip
+| 11. upload-artifact      |  -- chrome.zip + firefox.zip retained 90 days
++-------------------------+
+         |
+         v
+  Artifacts downloadable
+  from Actions run summary
 ```
 
 ---
 
-## Platform-Specific Code Paths
+## Recommended Workflow Structure: Single Job
 
-### Strategy: Platform-Specific Entry Points (Preferred)
+**Use a single job, not a matrix or multi-job pipeline.**
 
-The cleanest approach is separate entry points per platform rather than `if (BROWSER_TARGET === 'chrome')` branches scattered through shared files. The divergence is large enough (offscreen document lifecycle vs. no offscreen document) that a unified entry point would be hard to follow.
+### Why Single Job (Not Matrix)
 
-- `src/background/service-worker.js` — Chrome-only entry point; references `chrome.offscreen`, `declarativeContent`
-- `src/firefox/background.js` — Firefox-only entry point; no offscreen references, uses `tabs.onUpdated` for icon control
+Matrix strategy exists for testing across multiple environments (Node versions, OS variants, browser targets). This project has no environment variable — there is one Node version, one OS, and both browser targets are produced by the same build command. A matrix would split what is inherently one sequential operation: build → test → package.
 
-Both import from the same `src/shared/` modules. The platform-specific code lives only at the entry point level.
+### Why Single Job (Not Multi-Job)
 
-### Strategy: BROWSER_TARGET Define (For Minor Differences)
+Multi-job pipelines (e.g., a `build` job feeding artifacts to a `test` job via `upload-artifact` / `download-artifact`) are useful when jobs can run in parallel or when different jobs need different environments. Here:
 
-For small differences within shared code (e.g., a single API call that differs between targets), esbuild's `define` option inlines a constant that the bundler uses for dead-code elimination:
+- Tests **require** the dist/ output — test:chrome and test:firefox read from `dist/chrome/` and `dist/firefox/` respectively
+- Build must precede all three test variants
+- All steps need the same Node.js environment and the same `node_modules/`
 
-```javascript
-// src/shared/matching.js — hypothetical example of minor platform difference
-if (typeof BROWSER_TARGET !== 'undefined' && BROWSER_TARGET === 'chrome') {
-  // Chrome-specific behavior
-}
-```
+A multi-job pipeline would require uploading `dist/` as an artifact from the build job and downloading it in the test job — adding 30–60 seconds of artifact transfer overhead for no benefit. The entire run is under 60 seconds as a single job.
 
-esbuild replaces `BROWSER_TARGET` with the literal string `"chrome"` or `"firefox"` at build time, then eliminates the dead branch. The `if` statement does not appear in the output bundle.
-
-**In practice, avoid this pattern for the offscreen/background split.** The difference is too large. Reserve `BROWSER_TARGET` defines for genuinely minor variations.
-
-### What Remains Chrome-Only
-
-| Code | Location | Why |
-|------|----------|-----|
-| `chrome.offscreen.createDocument()` | service-worker.js | API does not exist in Firefox |
-| `chrome.declarativeContent.onPageChanged` | service-worker.js | API does not exist in Firefox |
-| `offscreen/offscreen.html` | static asset | Chrome-only; not copied to dist/firefox |
-| `ensureOffscreenDocument()` | service-worker.js | Chrome-only lifecycle management |
-| `offscreen` permission | manifest.chrome.json | Chrome-only manifest permission |
-| `declarativeContent` permission | manifest.chrome.json | Chrome-only manifest permission |
-
-### What Remains Firefox-Only
-
-| Code | Location | Why |
-|------|----------|-----|
-| `tabs.onUpdated` icon enable/disable | firefox/background.js | `declarativeContent` alternative |
-| `tabs.onActivated` icon enable/disable | firefox/background.js | `declarativeContent` alternative |
-| `browser_specific_settings.gecko.id` | manifest.firefox.json | AMO signing requirement |
-| Inline PDF parsing in background | firefox/background.js | No offscreen document API |
-
-### What is Shared (Identical Between Targets)
-
-| Component | Status |
-|-----------|--------|
-| `src/shared/constants.js` | Bundled into every entry point |
-| `src/shared/matching.js` | Bundled into content (both), offscreen (Chrome), background (Firefox) |
-| `src/offscreen/pdf-parser.js` | Imported by Chrome's offscreen.js AND Firefox's background.js |
-| `src/offscreen/position-map-builder.js` | Same |
-| `src/content/content-script.js` | Same content bundle for both targets |
-| `src/content/citation-ui.js` | Same content bundle |
-| `src/content/paragraph-finder.js` | Same content bundle |
-| `src/popup/` | Identical in both targets (HTML + JS) |
-| `src/options/` | Identical in both targets (HTML + JS) |
-| `src/icons/` | Identical in both targets |
-| `src/lib/pdf.mjs` | Copied to both targets |
-| `src/lib/pdf.worker.mjs` | Copied to both targets |
+**Exception:** If in a future milestone the workflow needs to run store publishing (web store API calls with secrets), that belongs in a separate job gated on the test job passing. Not needed for v2.1.
 
 ---
 
-## Data Flow Changes in v2.0
+## Workflow File Structure
 
-### Chrome: No Runtime Change
-
-The Chrome message flow is identical to v1.2. The only change is that `shared/matching.js` is now bundled into the offscreen document instead of being duplicated inline. Runtime behavior is identical.
-
-### Firefox: Collapsed Message Flow
+### File Location
 
 ```
-Firefox Content Script
-  → browser.runtime.sendMessage({ type: LOOKUP_POSITION, ... })
-    ↓
-Firefox Background Script (directly handles — no forwarding needed)
-  → reads IndexedDB for positionMap
-  → calls matchAndCite() from shared/matching.js
-  → browser.tabs.sendMessage(tabId, { type: CITATION_RESULT, ... })
-    ↓
-Firefox Content Script handles CITATION_RESULT
+.github/
+└── workflows/
+    └── ci.yml          # Single workflow file for v2.1
 ```
 
-The Chrome pattern of "SW forwards to offscreen, offscreen responds to SW, SW forwards to tab" collapses to "background handles and responds directly."
+No `.github/workflows/` directory exists yet. It must be created.
 
-### IndexedDB: Shared Schema, Different Access Context
+### Trigger Configuration
 
-Both Chrome (offscreen document) and Firefox (background script) access the same IndexedDB database `patent-cite-tool` with the same `pdfs` object store and record schema. No schema changes are needed for Firefox.
+```yaml
+on:
+  push:
+    branches: ['**']     # Every branch push triggers CI
+  pull_request:
+    branches: [main]     # PRs targeting main get CI
+```
 
-**Important:** IndexedDB in a Firefox background event page persists across background script suspension/resumption. The data is not lost when the event page unloads. This matches Chrome's behavior (offscreen document is destroyed and recreated, but IndexedDB data persists).
+**Rationale:** Every push catches regressions immediately regardless of branch. PRs to main get validation before merge. This matches the milestone requirement: "triggered on push (all branches) and PRs to main."
+
+Do not trigger on `tags` — no release pipeline in v2.1.
+
+### Job Structure
+
+```yaml
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test (source)
+        run: npm run test:src
+
+      - name: Test (chrome dist)
+        run: npm run test:chrome
+
+      - name: Test (firefox dist)
+        run: npm run test:firefox
+
+      - name: Lint (web-ext)
+        run: npm run test:lint
+
+      - name: Package chrome
+        run: cd dist/chrome && zip -r ../../patent-cite-tool-chrome.zip .
+
+      - name: Package firefox
+        run: cd dist/firefox && zip -r ../../patent-cite-tool-firefox.zip .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-zips
+          path: |
+            patent-cite-tool-chrome.zip
+            patent-cite-tool-firefox.zip
+          retention-days: 90
+```
 
 ---
 
-## PDF.js Worker URL: Platform Difference
+## Integration Points
 
-`pdf-parser.js` currently sets:
+### Integration Point 1: npm scripts (no changes needed)
 
-```javascript
-GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs');
+The existing `package.json` scripts already define every CI step correctly. CI calls them directly — it does not reimplement build or test logic.
+
+| CI Step | npm script | What it does |
+|---------|-----------|--------------|
+| Build | `npm run build` | `node scripts/build.js` — esbuild Chrome + Firefox + test-export bundles |
+| Source tests | `npm run test:src` | `vitest run` — default config, tests source directly |
+| Chrome dist tests | `npm run test:chrome` | `vitest run --config vitest.config.chrome.js` — uses dist/chrome alias |
+| Firefox dist tests | `npm run test:firefox` | `vitest run --config vitest.config.firefox.js` — uses dist/firefox alias |
+| Firefox lint | `npm run test:lint` | `npx web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'` |
+
+**Critical:** Do not run `npm test` (the combined script) in CI. Run each sub-script separately. This produces distinct step labels in the Actions UI, making failures immediately locatable without reading logs.
+
+### Integration Point 2: dist/ directory (build produces, tests consume)
+
+The build step produces `dist/chrome/` and `dist/firefox/`. The three test steps and the lint step consume those directories. The packaging steps zip them. This is a strict linear dependency — all downstream steps fail if build fails.
+
+```
+npm run build
+  └── dist/chrome/          ← test:chrome reads dist/chrome/matching-exports.js
+  └── dist/firefox/         ← test:firefox reads dist/firefox/matching-exports.js
+                            ← test:lint reads dist/firefox/ manifest + bundles
 ```
 
-This uses `chrome.runtime.getURL()` which works in both Chrome and Firefox (Firefox supports the `chrome.*` namespace for compatibility). No change needed — this line works in both targets.
+GitHub Actions steps within a single job share the filesystem — no artifact transfer needed between build and test steps.
 
-**Verification:** Firefox has supported `chrome.runtime.getURL()` since Firefox 45. The extension uses `browser.*` / `chrome.*` interchangeably. Both work.
+### Integration Point 3: npm ci (dependency installation)
+
+Use `npm ci` (not `npm install`) in CI. `npm ci`:
+- Reads `package-lock.json` exactly — deterministic installs
+- Deletes `node_modules/` before installing — no stale deps
+- Fails if `package-lock.json` is out of sync with `package.json` — catches missed commits
+
+Pair with `actions/setup-node@v4`'s built-in npm cache (`cache: 'npm'`). This caches `~/.npm` keyed on `package-lock.json` hash, reducing `npm ci` from ~30s to ~3s on cache hits.
+
+### Integration Point 4: artifact packaging (new script, not npm script)
+
+Packaging runs as inline shell commands in the workflow — no new npm script needed.
+
+```bash
+cd dist/chrome && zip -r ../../patent-cite-tool-chrome.zip .
+cd dist/firefox && zip -r ../../patent-cite-tool-firefox.zip .
+```
+
+The `cd` + relative path pattern avoids the `upload-artifact` double-zip issue. The action receives `.zip` files, not directories, so it wraps them without re-zipping.
+
+**Do not use `web-ext build` for Firefox packaging** — `web-ext build` produces an `.xpi` and validates/re-lints during pack. For a store-ready artifact, a simple `zip` is sufficient and avoids running lint twice. The lint step earlier in the pipeline already validates the Firefox bundle.
+
+### Integration Point 5: artifact retention
+
+```yaml
+uses: actions/upload-artifact@v4
+with:
+  retention-days: 90
+```
+
+90 days covers a typical store review cycle (Chrome Web Store: 2-7 days, AMO: up to 30 days for manual review). Artifacts older than 90 days auto-delete. This is the maximum allowed without an enterprise plan.
+
+Upload both zips as a single named artifact (`extension-zips`) rather than two separate artifact uploads. Single artifact keeps the Actions summary clean. Both files appear in the same download.
 
 ---
 
-## Component Inventory: New vs Modified vs Unchanged
+## Data Flow: Trigger to Artifact
 
-### New Files
+```
+git push / PR open
+       |
+       v
+GitHub triggers ci.yml workflow
+       |
+       v
+Runner: ubuntu-latest
+  actions/checkout@v4
+    → working directory = repo root
+  actions/setup-node@v4 (node 20, npm cache)
+    → ~/.npm cached from package-lock.json hash
+  npm ci
+    → node_modules/ installed (cache hit: ~3s, miss: ~30s)
+  npm run build
+    → node scripts/build.js
+    → dist/chrome/ created (esbuild: IIFE content + ESM background/offscreen/popup/options)
+    → dist/firefox/ created (esbuild: IIFE content + ESM background/popup/options)
+    → dist/chrome/matching-exports.js created (test export bundle)
+    → dist/firefox/matching-exports.js created (test export bundle)
+  npm run test:src
+    → vitest run (vitest.config.js: reads src/ directly)
+    → 71 test cases
+  npm run test:chrome
+    → vitest run --config vitest.config.chrome.js
+    → alias: src/shared/matching.js → dist/chrome/matching-exports.js
+    → proves chrome bundle has correct matching logic
+  npm run test:firefox
+    → vitest run --config vitest.config.firefox.js
+    → alias: src/shared/matching.js → dist/firefox/matching-exports.js
+    → proves firefox bundle has correct matching logic
+  npm run test:lint
+    → npx web-ext lint --source-dir dist/firefox
+    → validates manifest + bundle against Firefox Extension Workshop rules
+  cd dist/chrome && zip -r ../../patent-cite-tool-chrome.zip .
+    → creates patent-cite-tool-chrome.zip at repo root
+  cd dist/firefox && zip -r ../../patent-cite-tool-firefox.zip .
+    → creates patent-cite-tool-firefox.zip at repo root
+  actions/upload-artifact@v4
+    → uploads both zips as artifact "extension-zips"
+    → retained 90 days
+       |
+       v
+  GitHub Actions run summary shows:
+  - Step-by-step pass/fail
+  - "extension-zips" artifact download link
+  - Both .zip files available for manual install/submission
+```
 
-| File | Purpose |
-|------|---------|
-| `src/shared/matching.js` | Extracted: normalizeText, matchAndCite, formatCitation, all helpers |
-| `src/firefox/background.js` | Firefox background: merged SW + offscreen logic, tabs-based icon control |
-| `src/manifests/manifest.chrome.json` | Chrome-specific manifest (moved from src/manifest.json) |
-| `src/manifests/manifest.firefox.json` | Firefox-specific manifest |
-| `scripts/build.mjs` | esbuild build script producing dist/chrome/ + dist/firefox/ |
+---
 
-### Modified Files
+## New Files to Create
 
-| File | What Changes |
-|------|-------------|
-| `src/shared/constants.js` | Add `export` keyword to `MSG`, `STATUS`, `PATENT_TYPE` |
-| `src/background/service-worker.js` | Import from `shared/constants.js` instead of inline duplication |
-| `src/offscreen/offscreen.js` | Import matching functions from `shared/matching.js` instead of duplicating |
-| `src/content/content-script.js` | Import constants from `shared/constants.js` (via bundle — no code change needed if esbuild resolves it) |
-| `package.json` | Add `esbuild` devDependency; add build scripts |
+| File | Type | Purpose |
+|------|------|---------|
+| `.github/workflows/ci.yml` | New | The entire CI/CD pipeline |
+| `.github/` (directory) | New | GitHub Actions parent directory |
+| `.github/workflows/` (directory) | New | Workflows directory |
 
-### Deleted Files (After Build Pipeline Established)
+**No other files need to be created or modified.** All build and test logic is already in `scripts/build.js`, `package.json`, and the Vitest config files.
 
-| File | Why |
-|------|-----|
-| `src/manifest.json` | Replaced by `src/manifests/manifest.chrome.json` + `manifest.firefox.json` |
+---
 
-### Unchanged Files
+## Files NOT to Modify
 
-| File | Why Unchanged |
+| File | Why unchanged |
 |------|--------------|
-| `src/offscreen/pdf-parser.js` | Pure logic; imported by both offscreen.js and firefox/background.js |
-| `src/offscreen/position-map-builder.js` | Pure logic; shared |
-| `src/content/citation-ui.js` | Classic-script UI; unchanged |
-| `src/content/paragraph-finder.js` | DOM walking; unchanged |
-| `src/content/text-matcher.js` | **Either deleted** (logic moves to shared/matching.js) **or reduced to** thin import wrapper |
-| `src/popup/popup.html`, `popup.js` | No browser-specific differences |
-| `src/options/options.html`, `options.js` | No browser-specific differences |
-| `src/lib/pdf.mjs`, `pdf.worker.mjs` | Copied to both dist targets |
-| `tests/` directory | Test harness; unchanged |
-| `worker/` directory | Cloudflare Worker; unchanged |
+| `package.json` | Scripts already correct for CI; no changes needed |
+| `scripts/build.js` | Build script works as-is |
+| `vitest.config.js` | Source test config is fine |
+| `vitest.config.chrome.js` | Chrome dist test config is fine |
+| `vitest.config.firefox.js` | Firefox dist test config is fine |
+| All `src/` files | CI does not affect source |
+| All `tests/` files | CI does not affect tests |
 
 ---
 
-## Build Order (Phase Dependencies)
+## Architectural Patterns
 
-The v2.0 work has hard dependencies that dictate build order:
+### Pattern 1: Fail Fast — Steps in Dependency Order
 
+**What:** Order workflow steps so the cheapest, most-likely-to-fail checks run first and failures stop the pipeline immediately (GitHub Actions default: step failure aborts remaining steps).
+
+**When to use:** Always — this is the standard CI ordering principle.
+
+**Trade-offs:** No parallelism within a single job; but all steps here are sequential by dependency anyway. The only "parallel" opportunity is test:src vs test:chrome/test:firefox, but they run in under 10 seconds combined — parallelizing adds complexity for no meaningful speedup.
+
+**Order rationale:**
 ```
-Step 1: Shared code extraction
-  Why first: All subsequent work depends on shared/matching.js and
-  shared/constants.js with exports. Firefox background.js and the
-  Chrome offscreen.js refactor both import from shared/.
-
-  - Create src/shared/matching.js (extract from text-matcher.js + offscreen.js)
-  - Add exports to src/shared/constants.js
-  - Update src/offscreen/offscreen.js to import from shared/matching.js
-  - Update src/background/service-worker.js to import from shared/constants.js
-  - Verify: existing Chrome extension still works (no dist/ yet; test via load unpacked)
-
-Step 2: esbuild pipeline (Chrome only)
-  Why second: Validate the build pipeline against the known-working Chrome target
-  before introducing Firefox. Catches build configuration errors without browser
-  compatibility noise.
-
-  - Write scripts/build.mjs for Chrome target only
-  - Create src/manifests/manifest.chrome.json (copy/rename existing manifest.json)
-  - Verify: dist/chrome/ loads and functions identically to pre-build src/
-  - Verify: 71-case test corpus still passes
-
-Step 3: Firefox background script
-  Why third: Requires shared code from Step 1. Introduce Firefox-specific
-  background.js with merged SW + offscreen logic + tabs-based icon control.
-
-  - Write src/firefox/background.js
-  - Create src/manifests/manifest.firefox.json
-  - Add Firefox target to scripts/build.mjs
-  - Verify: dist/firefox/ loads in Firefox, citation pipeline works
-
-Step 4: Cross-browser validation
-  Why last: Both targets must be working before validation makes sense.
-
-  - Load dist/chrome/ in Chrome, run test corpus cases manually
-  - Load dist/firefox/ in Firefox, run same cases
-  - Verify 71-case corpus passes on both platforms
+npm ci           # fast (~3s cached), must precede everything
+npm run build    # ~5s, must precede dist-dependent tests
+test:src         # ~3s, source-only — catches logic errors before dist tests
+test:chrome      # ~3s, catches chrome bundle regressions
+test:firefox     # ~3s, catches firefox bundle regressions
+test:lint        # ~5s, catches manifest/bundle format errors
+package chrome   # instant, only runs if all tests pass
+package firefox  # instant, only runs if all tests pass
+upload artifact  # ~5s, only runs if packaging succeeds
 ```
 
-**Critical constraint:** Do not attempt the Firefox port (Step 3) before the build pipeline validates against Chrome (Step 2). Firefox debugging is harder than Chrome debugging. A working Chrome build confirms the shared code extraction is correct before adding Firefox-specific complexity.
+### Pattern 2: Separate Step Labels for Each Test Suite
+
+**What:** Run `test:src`, `test:chrome`, `test:firefox`, and `test:lint` as separate `run:` steps with distinct `name:` labels, rather than calling `npm test` (which chains them silently).
+
+**When to use:** Any time a combined command hides which sub-step failed.
+
+**Trade-offs:** Slightly more YAML lines. Benefit: the Actions UI shows exactly which test suite failed with a red X on that step, without requiring log inspection.
+
+**Example:**
+```yaml
+- name: Test (source)           # GitHub shows this label in the step list
+  run: npm run test:src
+
+- name: Test (chrome dist)      # Red X on exactly this step if chrome bundle broke
+  run: npm run test:chrome
+
+- name: Test (firefox dist)
+  run: npm run test:firefox
+
+- name: Lint (web-ext)          # Distinct from vitest steps — different failure meaning
+  run: npm run test:lint
+```
+
+### Pattern 3: npm ci with Cached ~/.npm
+
+**What:** `actions/setup-node@v4` with `cache: 'npm'` automatically caches `~/.npm` keyed on `hashFiles('**/package-lock.json')`. On cache hit, `npm ci` skips downloading packages and reinstalls from cache.
+
+**When to use:** All Node.js CI workflows. No exceptions.
+
+**Trade-offs:** Cache key invalidates on any `package-lock.json` change, triggering a full download. This is correct behavior — dependency changes should re-download.
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+    cache: 'npm'       # automatically uses package-lock.json as cache key
+- run: npm ci          # uses cached ~/.npm on hit; ~3s vs ~30s
+```
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Unified Entry Point with Platform Conditionals
+### Anti-Pattern 1: Running `npm test` in CI Instead of Individual Scripts
 
-**What people do:** Write a single `background.js` with `if (chrome.offscreen) { /* Chrome path */ } else { /* Firefox path */ }` branching throughout.
+**What people do:** `run: npm test` — the combined script that chains all steps.
 
-**Why it's wrong:** The offscreen document split is fundamental — Chrome's service worker orchestrates a separate offscreen process. Firefox's background script is one process doing everything. Unifying these into a single file means every function has a conditional, the code is hard to read, and tests cannot easily isolate platform behavior.
+**Why it's wrong:** When `vitest.config.firefox.js` fails, the CI log shows "npm test failed" and you must open the log and scroll to find which sub-command failed. There is no per-step status indicator.
 
-**Do this instead:** Separate entry points (`src/background/service-worker.js` for Chrome, `src/firefox/background.js` for Firefox) sharing common modules from `src/shared/`. The build script selects the right entry point per target.
+**Do this instead:** Run each sub-script as a separate step with an explicit `name:`. GitHub Actions shows a step-by-step timeline in the UI. Failures are immediately visible without log inspection.
 
-### Anti-Pattern 2: Runtime API Detection Instead of Build-Time Branching
+### Anti-Pattern 2: Using a Matrix for Two Browser Targets
 
-**What people do:** Check `if (typeof chrome.offscreen !== 'undefined')` at runtime to detect browser.
+**What people do:** Define a matrix `browser: [chrome, firefox]` and run build + test per matrix leg.
 
-**Why it's wrong:** API detection at runtime is fragile — Chrome/Firefox add and remove APIs between versions. Build-time branching via separate entry points is explicit and survives API changes without needing detection logic.
+**Why it's wrong:** Both browser targets come from the same `npm run build` command. Splitting into a matrix forces `npm ci` and `npm run build` to run twice — once per matrix leg. The builds are not independent; `npm run build` always produces both targets together.
 
-**Do this instead:** Separate entry points per platform. The manifest declares the background script; the background script is the platform-specific entry.
+**Do this instead:** Single job. `npm run build` runs once and produces both `dist/chrome/` and `dist/firefox/`. Each test step reads the already-built dist.
 
-### Anti-Pattern 3: Bundling pdf.worker.mjs with the Main Bundle
+### Anti-Pattern 3: Multi-Job Pipeline for Build → Test
 
-**What people do:** Import `pdf.worker.mjs` from within the main PDF.js consumer module, letting esbuild bundle it inline.
+**What people do:** Job 1 builds, uploads `dist/` as artifact. Job 2 downloads `dist/` and runs tests.
 
-**Why it's wrong:** The PDF.js worker is a separate worker script that PDF.js loads via URL (`GlobalWorkerOptions.workerSrc`). It must exist as a standalone file at a known URL within the extension. If bundled inline, PDF.js cannot load it as a worker.
+**Why it's wrong:** Artifact upload/download adds 30–60 seconds to total runtime. For a pipeline that runs in under 60 seconds total, this doubles the runtime. The only reason to split across jobs is to enable parallelism or use different environments — neither applies here.
 
-**Do this instead:** Mark `pdf.mjs` and `pdf.worker.mjs` as `external` in the esbuild config (do not bundle them), and copy them as-is to `dist/{target}/lib/`. The `web_accessible_resources` manifest entry must include `lib/pdf.worker.mjs` so PDF.js can construct a worker URL from it.
+**Do this instead:** Single job. Steps share the filesystem. No artifact transfer needed between build and test.
 
-```javascript
-// scripts/build.mjs — mark PDF.js as external, handle via copy
-await esbuild.build({
-  external: ['../lib/pdf.mjs'],  // don't bundle pdf.mjs; import at runtime via relative path
-  ...
-});
-// Then copy pdf.mjs and pdf.worker.mjs to dist/{target}/lib/
-```
+### Anti-Pattern 4: Double-Zipping the Extension
 
-**Alternative:** If `pdf-parser.js` imports `pdf.mjs` from `../lib/pdf.mjs`, esbuild will try to bundle it. Use `external: ['../lib/*']` or restructure the import to use a URL string instead of a module import for the worker case.
+**What people do:** Create `dist/chrome/` → zip it → upload the zip to `upload-artifact`. `upload-artifact` then zips the zip, producing `patent-cite-tool-chrome.zip.zip`.
 
-### Anti-Pattern 4: One Manifest with Platform Patches
+**Why it's wrong:** Chrome Web Store and AMO cannot install `.zip.zip`. The user must unzip twice.
 
-**What people do:** Write a base manifest and apply JSON patches at build time to produce browser-specific variants.
+**Do this instead:** `cd dist/chrome && zip -r ../../patent-cite-tool-chrome.zip .` creates a zip file at the repo root. `upload-artifact` receives a `.zip` file path (not a directory) and wraps it in the Actions artifact container without re-zipping.
 
-**Why it's wrong for this project:** The manifest differences between Chrome and Firefox are significant (different background keys, different permission sets, different WAR format). A patch-based approach requires a patching library and makes the effective manifest hard to read — you must mentally apply the patches to understand what Firefox sees.
+### Anti-Pattern 5: Using `npm install` Instead of `npm ci` in CI
 
-**Do this instead:** Maintain two readable manifest files in `src/manifests/`. Both are checked into source control. Diffs between them are immediately visible. The build script copies the right one. This is simpler and more transparent than a patch system.
+**What people do:** `run: npm install` in the workflow.
+
+**Why it's wrong:** `npm install` may resolve to different dependency versions than `package-lock.json` specifies (if `package.json` has `^` ranges and a newer compatible version exists). CI should be deterministic.
+
+**Do this instead:** `npm ci` reads `package-lock.json` exactly. Fails if lockfile is out of sync. Always correct in CI.
 
 ---
 
-## Integration Points with Test Harness
+## Scaling Considerations
 
-The existing Vitest test harness (tests/) is not affected by the build pipeline. Tests import directly from `src/` files (not from `dist/`). After shared code extraction:
+These apply if the project grows beyond its current scope.
 
-- Tests that previously imported `matchAndCiteOffscreen` from `src/offscreen/offscreen.js` should be updated to import `matchAndCite` from `src/shared/matching.js`
-- The `offscreen-matcher.test.js` file may need updating if function names change (the `Offscreen` suffix disappears when logic moves to shared/)
-- All other tests (position-map-builder, text-matcher, classify-result) are unaffected
+| Concern | Now (v2.1) | If test suite grows to 500+ cases | If store submission is added |
+|---------|-----------|----------------------------------|------------------------------|
+| Total CI time | ~60s | Add `--reporter=verbose` for better failure context; time stays under 2 min | Add separate `release` job gated on `ci` job, triggered only on tags |
+| Test parallelism | Not needed | Consider Vitest `--reporter=json` + sharding if >3 min | No change to CI structure |
+| Secrets management | None needed | None needed | `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`, `FIREFOX_JWT_ISSUER`, `FIREFOX_JWT_SECRET` in repository secrets |
+| Workflow complexity | Single job | Single job still fine | Second job with `needs: ci` and `if: startsWith(github.ref, 'refs/tags/')` |
 
 ---
 
 ## Sources
 
-- [MDN: Background scripts — Firefox MV3 background field options](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background) — HIGH confidence; Firefox background.scripts vs service_worker; persistent: false behavior
-- [MDN: Background scripts — DOM access in Firefox event pages](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Background_scripts) — HIGH confidence; Firefox background pages have `window` global and full DOM APIs
-- [MDN: Chrome incompatibilities — declarativeContent not in Firefox](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities) — HIGH confidence; declarativeContent explicitly listed as not implemented
-- [Firefox Extension Workshop: MV3 Migration Guide](https://extensionworkshop.com/documentation/develop/manifest-v3-migration-guide/) — HIGH confidence; background scripts vs service workers; no offscreen document support in Firefox
-- [MDN: browser_specific_settings — gecko ID required for AMO](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings) — HIGH confidence; gecko.id format requirements
-- [esbuild API documentation](https://esbuild.github.io/api/) — HIGH confidence; entryPoints, outdir, format (iife/esm), bundle, define options
-- [Chrome Developers: Offscreen Documents in MV3](https://developer.chrome.com/blog/Offscreen-Documents-in-Manifest-v3) — HIGH confidence; why offscreen exists in Chrome (service worker lacks DOM); not available in Firefox
-- [MDN: action.disable() — Firefox support confirmed](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/action/disable) — HIGH confidence; per-tab action disable/enable works in Firefox
-- Existing source code (v1.2) — HIGH confidence; ground truth for current architecture, duplication locations, Chrome API usage patterns
+- [GitHub Actions: Understanding GitHub Actions](https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions) — triggers, job structure, step execution — HIGH confidence
+- [actions/setup-node official docs](https://github.com/actions/setup-node) — `cache: 'npm'`, `node-version`, lockfile-based cache key — HIGH confidence
+- [actions/upload-artifact@v4](https://github.com/actions/upload-artifact/tree/v4/) — `path`, `retention-days`, `name`, double-zip behavior — HIGH confidence
+- [GitHub Blog: Get started with v4 of GitHub Actions Artifacts](https://github.blog/news-insights/product-news/get-started-with-v4-of-github-actions-artifacts/) — v4 GA, performance improvements, deprecation of v3 — HIGH confidence
+- [GitHub Changelog: upload-artifact v4 GA (Dec 2023)](https://github.blog/changelog/2023-12-14-github-actions-artifacts-v4-is-now-generally-available/) — version confirmation — HIGH confidence
+- [GitHub Docs: Caching dependencies to speed up workflows](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows) — cache limits, key strategy — HIGH confidence
+- [DEV Community: Simplify Browser Extension Deployment with GitHub Actions](https://dev.to/jellyfith/simplify-browser-extension-deployment-with-github-actions-37ob) — real-world extension CI workflow patterns — MEDIUM confidence
+- [Steve Kinney: Setting Up GitHub Actions to Run Vitest](https://stevekinney.com/courses/testing/continuous-integration) — Vitest + Actions integration, caching, job structure — MEDIUM confidence
+- [GitHub Docs: Job dependencies with needs:](https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions) — sequential job patterns — HIGH confidence
+- Existing `package.json` and `scripts/build.js` — ground truth for what CI needs to call — HIGH confidence
 
 ---
 
-*Architecture research for: Patent Citation Tool v2.0 — esbuild build pipeline + Firefox port*
-*Researched: 2026-03-03*
+*Architecture research for: Patent Citation Tool v2.1 — GitHub Actions CI/CD Pipeline*
+*Researched: 2026-03-04*

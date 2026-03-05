@@ -1,293 +1,265 @@
 # Pitfalls Research
 
-**Domain:** Adding esbuild build pipeline and Firefox extension support to an existing Chrome MV3 extension
-**Researched:** 2026-03-03
-**Confidence:** HIGH (Firefox API gaps verified against MDN official docs + Firefox Extension Workshop) / HIGH (esbuild behavior verified against official docs + GitHub issues)
+**Domain:** Adding GitHub Actions CI/CD pipeline to an existing cross-browser browser extension project (esbuild, Vitest, web-ext)
+**Researched:** 2026-03-04
+**Confidence:** HIGH (GitHub Actions workflow behavior, npm caching, artifact handling verified against official docs and GitHub community discussions) / HIGH (esbuild and Vitest CI integration verified against official docs and known issues) / MEDIUM (web-ext lint behavior in CI verified via mozilla/web-ext issue tracker)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: declarativeContent API Has No Firefox Equivalent
+### Pitfall 1: Tests Run Before Build Completes — dist/ Is Missing or Stale
 
 **What goes wrong:**
-The Chrome service worker uses `chrome.declarativeContent.onPageChanged` to enable the toolbar icon only on `patents.google.com/patent/US*` pages. Firefox has never implemented `declarativeContent` and has no planned timeline to do so ([Firefox bug 1435864](https://bugzil.la/1435864)). When the Firefox background script runs `chrome.declarativeContent.onPageChanged.addRules(...)`, it throws `TypeError: Cannot read properties of undefined` or silently does nothing, and the icon activation logic never fires. On Firefox, the icon stays enabled on all pages or stays disabled on all pages — depending on whether `chrome.action.disable()` was called.
+The Vitest configs (`vitest.config.chrome.js` and `vitest.config.firefox.js`) resolve imports from `dist/chrome/matching-exports.js` and `dist/firefox/matching-exports.js` respectively. If the workflow runs `npm run test:chrome` before `npm run build` completes, Vitest fails with `Cannot find module './dist/chrome/matching-exports.js'`. Worse: if `dist/` is cached from a previous run, the test suite silently validates stale bundled code rather than the current commit's output. Both scenarios produce incorrect CI results — one fails loudly and the other passes incorrectly.
 
 **Why it happens:**
-Developers port the Chrome background script wholesale, assuming `declarativeContent` is a standard WebExtensions API. It is not. It is Chrome-only. Firefox's WebExtensions API compatibility tables list it as unsupported with no alternative mapping.
+GitHub Actions steps are sequential by default, but the ordering is specified manually in the workflow YAML. First-time workflow authors often model CI after local dev where `npm test` already runs `npm run build` first (as specified in `package.json`: `"test": "npm run build && npm run test:src && ..."`). When workflow steps are written individually, the build dependency is easy to omit. Caching `dist/` to speed up repeated builds makes the stale artifact problem invisible.
 
 **How to avoid:**
-Replace the `declarativeContent` approach in the Firefox background script entirely. Use a content script URL match pattern (`"matches": ["https://patents.google.com/patent/US*"]`) to scope injection, and handle icon state inside the content script by sending a message to the background when a patent page is detected. The background script then calls `browser.action.enable(tabId)` on receipt. This is the established cross-browser pattern. The `chrome.action.enable()` / `chrome.action.disable()` API with a `tabId` argument is supported in Firefox.
+Never cache `dist/`. Always run build as an explicit step before any test step. The full sequence in the workflow must be:
+1. `npm ci` (install dependencies)
+2. `npm run build` (produces `dist/chrome/` and `dist/firefox/` and `dist/chrome/matching-exports.js`)
+3. `npm run test:src` (tests source-level imports — does not require dist/)
+4. `npm run test:chrome` (requires `dist/chrome/matching-exports.js`)
+5. `npm run test:firefox` (requires `dist/firefox/matching-exports.js`)
+6. `npm run test:lint` (requires `dist/firefox/` for web-ext lint)
+
+Only `~/.npm` (the npm cache) should be cached, never `node_modules/` or `dist/`.
 
 **Warning signs:**
-- Service worker contains `chrome.declarativeContent` anywhere
-- Firefox background script logs `TypeError` or `Cannot read properties of undefined` on install
-- Icon state never changes in Firefox (always enabled or always disabled regardless of page URL)
-- Test: install extension in Firefox, navigate to a non-patent page — if the icon shows as active, `declarativeContent` replacement is missing
+- Workflow runs `test:chrome` or `test:firefox` in a step before a `build` step
+- `dist/` directory appears in the cache key definition
+- `vitest.config.chrome.js` alias resolution fails with `ENOENT` in CI logs
+- Tests pass in CI but the diff under review includes algorithm changes — suspect stale dist/ if no rebuild step
 
 **Phase to address:**
-Firefox Background Script phase — this is the single most critical API gap. It must be resolved before any Firefox testing is meaningful.
+CI Workflow Setup (Phase 1) — the build-before-test ordering must be the first constraint enforced in the workflow YAML.
 
 ---
 
-### Pitfall 2: offscreen API Does Not Exist in Firefox — PDF.js Must Run in Background Script
+### Pitfall 2: npm cache Misconfiguration Causes Spurious Cache Misses or Broken Installs
 
 **What goes wrong:**
-The entire PDF fetch, parse, and IndexedDB cache workflow lives in `src/offscreen/offscreen.js`, which is loaded by Chrome's offscreen document API. Firefox has no offscreen API and no plans to implement it. When the Firefox background script calls `browser.offscreen.createDocument(...)`, it throws `TypeError: browser.offscreen is undefined`. The entire PDF pipeline — fetching, parsing via PDF.js, building position maps, storing in IndexedDB — becomes completely inoperative.
+Two opposite failure modes exist:
+- **Caching `node_modules/` directly**: `npm ci` deletes `node_modules/` before installing, so caching it and then running `npm ci` negates the cache entirely (cache restore wasted, full install anyway). Native binaries like `esbuild` and `sharp` are architecture-specific; a cached `node_modules/` from a macOS dev machine silently produces broken binaries on the Linux runner.
+- **Wrong cache key**: Using `${{ runner.os }}-node-modules` without `hashFiles('package-lock.json')` means the cache never invalidates when dependencies change. A stale cache will serve the old `esbuild` binary after a version bump, causing subtle build differences without any error.
 
 **Why it happens:**
-The offscreen document API was introduced in Chrome MV3 specifically because service workers lack DOM access. Firefox's event page background script does have DOM access (it is not a service worker), making offscreen documents unnecessary on Firefox. Developers port the Chrome manifest pattern and assume the `offscreen` permission and API exist everywhere.
+The official GitHub Actions documentation recommends caching `~/.npm` (the global npm cache) keyed to `package-lock.json`, but tutorials and Stack Overflow answers often show `node_modules/` caching because it appears faster. The difference is not obvious until native binaries or cross-platform issues surface.
 
 **How to avoid:**
-For Firefox, move all offscreen document logic directly into the background event page. The Firefox background script can import PDF.js, call `fetch()`, open IndexedDB, and run the full parse pipeline directly — none of this requires a separate document context. The build pipeline must produce two separate background scripts: `dist/chrome/background/service-worker.js` (which orchestrates offscreen creation) and `dist/firefox/background/background.js` (which contains the offscreen logic inlined). Shared parsing modules (`pdf-parser.js`, `position-map-builder.js`) should live in `src/shared/` and be imported by both.
+Use `actions/setup-node` with the `cache: 'npm'` option. This automatically caches `~/.npm` keyed to `package-lock.json`, and runs `npm ci` fresh each time. Never manually cache `node_modules/` or `dist/`. The correct pattern:
 
-**Warning signs:**
-- Firefox manifest contains `"offscreen"` in the `permissions` array — this will cause Firefox validation warnings
-- `browser.offscreen` is referenced anywhere in Firefox-targeted code
-- PDF.js import (`import * as pdfjsLib from '../lib/pdf.mjs'`) exists only in `offscreen.js` with no Firefox background equivalent
-- Citation lookups always fail in Firefox with "lookup-failed" error (offscreen never creates, messages never route)
-
-**Phase to address:**
-Firefox Background Script phase — the entire offscreen logic must be rehosted before PDF citations work on Firefox at all.
-
----
-
-### Pitfall 3: Chrome Manifest Format Is Rejected or Silently Broken by Firefox
-
-**What goes wrong:**
-The current `manifest.json` uses Chrome-specific keys that either cause Firefox validation errors at load time or silently corrupt behavior. Key conflicts:
-- `"background": { "service_worker": "...", "type": "module" }` — Firefox requires `"background": { "scripts": ["..."] }` or `"background": { "page": "..." }` for MV3 event pages. From Firefox 121+, Firefox will start the background page even when `service_worker` is present, but the service worker entry is ignored — meaning the Chrome service worker bundle is never executed unless `scripts` is also specified correctly.
-- `"permissions": ["offscreen", "declarativeContent"]` — both are Chrome-only. Firefox warns on unknown permissions; some cause silent rejection of the permission block in older Firefox versions.
-- `browser_specific_settings.gecko.id` is absent — Firefox requires this for `storage.sync` to function (sync data is keyed by add-on ID). Without it, `browser.storage.sync` silently fails to sync across devices in production.
-
-**Why it happens:**
-A single `manifest.json` cannot cleanly serve both Chrome and Firefox. The natural shortcut of shipping one manifest causes divergence: Chrome ignores unknown Firefox keys; Firefox accepts but may ignore some Chrome-only keys. The difference between "ignores" and "silently corrupts behavior" is impossible to discover without per-browser testing.
-
-**How to avoid:**
-Maintain separate manifests: `src/manifest.chrome.json` and `src/manifest.firefox.json`. The esbuild pipeline copies the correct manifest into `dist/chrome/` and `dist/firefox/` respectively. The Firefox manifest must include:
-```json
-"background": { "scripts": ["background/background.js"] },
-"browser_specific_settings": { "gecko": { "id": "patent-cite@yourname.dev", "strict_min_version": "121.0" } }
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: '22'
+    cache: 'npm'
+- run: npm ci
 ```
-and must omit `offscreen` and `declarativeContent` from the `permissions` array.
+
+The `cache: 'npm'` option in `setup-node` handles the cache key (`${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}`) automatically.
 
 **Warning signs:**
-- Single `manifest.json` used for both Chrome and Firefox builds without transformation
-- Firefox build directory contains `"service_worker"` key in manifest
-- `storage.sync` appears to work locally but fails to sync across Firefox devices (missing gecko ID)
-- `web-ext lint` reports warnings for unknown permissions (`offscreen`, `declarativeContent`)
+- Workflow YAML contains `actions/cache` with `path: node_modules`
+- Cache key does not include `hashFiles('package-lock.json')`
+- `esbuild` binary error: `The package "esbuild-linux-64" could not be found` after cache restore
+- Build succeeds in CI but produces different output than local builds (native binary version mismatch)
 
 **Phase to address:**
-Build Pipeline Setup phase — manifests must be split before any Firefox packaging occurs.
+CI Workflow Setup (Phase 1) — cache configuration is the first performance decision and must be correct before any other steps are optimized.
 
 ---
 
-### Pitfall 4: esbuild IIFE vs ESM Format — Content Scripts Cannot Use ESM
+### Pitfall 3: Double-Zipping the Extension Package in Artifacts
 
 **What goes wrong:**
-Content scripts loaded via `content_scripts` in the manifest cannot be ES modules. If esbuild bundles them as `format: 'esm'` (producing `import`/`export` syntax), Chrome and Firefox silently refuse to inject them (no error, extension appears to load, but content script never runs). If esbuild uses code splitting (`splitting: true`) with `format: 'esm'` to share code between entry points, it generates chunk files with dynamic `import()` calls that content scripts cannot resolve. Citations never appear for any user.
+`actions/upload-artifact` always wraps uploaded content in a zip. If the workflow creates a zip file (e.g., `chrome-extension.zip`) and then uploads it with `upload-artifact`, the downloaded artifact is `chrome-extension.zip.zip` — a zip containing a zip. Store submission portals expect a single flat zip containing the extension files, not a nested archive. The inner zip has the correct extension structure; the outer zip is the artifact wrapper. Developers submitting to the Chrome Web Store or AMO receive confusing validation errors about zip structure.
 
 **Why it happens:**
-The natural instinct when bundling shared code across multiple entry points is to enable `splitting: true` with `format: 'esm'`. This is correct for background service workers (which support module-type in Chrome via `"type": "module"`) but wrong for content scripts. esbuild does not warn about this mismatch — it produces the output without error and the failure only appears at extension load time.
+`upload-artifact`'s auto-zipping behavior is not obvious. The action was designed to transfer files between jobs, not to produce store-ready archives. When using `web-ext build` to produce a zip, developers naturally upload the resulting zip file, triggering the double-zip.
 
 **How to avoid:**
-Use separate esbuild build configurations per entry point type:
-- Content scripts: `format: 'iife'`, `bundle: true`, `splitting: false` — all shared code is inlined into a single IIFE bundle. This means `text-matcher.js`, `paragraph-finder.js`, `citation-ui.js`, and any shared utilities are merged into one `content-script.bundle.js`.
-- Background service worker (Chrome): `format: 'esm'`, `bundle: true` — Chrome service workers support ESM when `"type": "module"` is declared in the manifest.
-- Background event page (Firefox): `format: 'iife'` or `format: 'esm'` with `bundle: true` (Firefox event pages loaded via `scripts` array support ESM if declared as module type, but IIFE is safer for compatibility).
-- Offscreen document (Chrome only): `format: 'esm'`, `bundle: true` — loaded via `<script type="module">` in `offscreen.html`.
+Upload the `dist/` directory directly, not a pre-created zip. `upload-artifact` will zip the directory and the downloaded artifact will unzip to the extension files. If a store-ready zip is needed as an explicit artifact, upload the directory contents not the zip file:
 
-**Warning signs:**
-- Content script entry point configured with `format: 'esm'` or `splitting: true`
-- Browser console shows no errors but citation UI never appears
-- esbuild output for content script contains `import` statements or `export {}` at top level
-- Content script bundle file size is suspiciously small (only the entry point, shared code not inlined)
+```yaml
+# Option A: Upload the dist directory (download produces a zip of the extension files)
+- uses: actions/upload-artifact@v4
+  with:
+    name: chrome-extension
+    path: dist/chrome/
 
-**Phase to address:**
-Build Pipeline Setup phase — format configuration must be verified before any other build work.
-
----
-
-### Pitfall 5: esbuild Path Flattening Breaks Extension Directory Structure
-
-**What goes wrong:**
-esbuild with `outdir: 'dist/chrome'` and multiple entry points from different source subdirectories (`src/background/service-worker.js`, `src/content/content-script.js`, etc.) uses `outbase` to determine how to replicate the source directory structure. If `outbase` is not set, esbuild uses the lowest common ancestor of all entry point paths — which may be `src/` or even the repo root. This produces output paths like `dist/chrome/background/service-worker.js` correctly, but may also produce unexpected paths for shared modules or flatten nested structures. Manifest references to `background/service-worker.js` break if esbuild emits to a different path.
-
-**Why it happens:**
-esbuild's path behavior with multiple entry points is not intuitive. The `outbase` option defaults to the lowest common ancestor directory of all entry points. Adding or removing an entry point can silently change `outbase` and shift all output paths, breaking manifest references.
-
-**How to avoid:**
-Explicitly set `outbase: 'src'` in the esbuild configuration. This ensures that `src/background/service-worker.js` always emits to `dist/chrome/background/service-worker.js` regardless of what other entry points are added. Verify the output structure against the manifest paths after every change to the entry point list.
-
-**Warning signs:**
-- esbuild emits files to unexpected paths (e.g., `dist/chrome/service-worker.js` instead of `dist/chrome/background/service-worker.js`)
-- Extension fails to load with "Could not load background script" error after build
-- Manifest references to `background/service-worker.js` but `dist/chrome/` only contains `service-worker.js` at root
-
-**Phase to address:**
-Build Pipeline Setup phase — verify the full output tree against manifest paths before any source migration.
-
----
-
-### Pitfall 6: Module Type Mismatch Between Chrome Service Worker and Firefox Event Page
-
-**What goes wrong:**
-The current Chrome service worker is declared as `"type": "module"` in the manifest, allowing it to use ES `import` statements. When porting to Firefox, the background event page is loaded via `"scripts": ["background/background.js"]` in the manifest. If the Firefox background script is an ES module bundle that contains top-level `import` or uses `export`, it fails unless the manifest includes `"background": { "type": "module" }`. In Firefox, `"type": "module"` in the background block is supported but the behavior differs: the script must be a single file (no importScripts), and Firefox's module service worker support is incomplete as of early 2026. Using `format: 'iife'` and `bundle: true` for the Firefox background avoids this entirely by inlining all imports.
-
-**Why it happens:**
-Chrome's `"type": "module"` for service workers enables native ESM. Firefox's equivalent is fragile. Developers assume the same `type: module` pattern works cross-browser when it does not reliably.
-
-**How to avoid:**
-For the Firefox background script: use esbuild with `format: 'iife'` (or `format: 'esm'` only if `"type": "module"` is explicitly tested on Firefox). IIFE is the safe default that works without any manifest type declaration. The Firefox manifest `"background": { "scripts": ["background/background.js"] }` does not require a type field and IIFE output works directly.
-
-**Warning signs:**
-- Firefox background script bundle contains top-level `import` or `export` without `"type": "module"` in manifest background block
-- Firefox console shows `SyntaxError: import declarations may only appear at top level of a module` in background script
-- Background script never loads in Firefox (silent failure, no message listeners registered)
-
-**Phase to address:**
-Build Pipeline Setup phase — format choice must be validated before shared code extraction begins.
-
----
-
-### Pitfall 7: Shared Code Duplication In Bundled Output Is Intentional for Content Scripts
-
-**What goes wrong:**
-When esbuild bundles the content script as IIFE (required, as above), all shared code is inlined. If the background script and content script both import from `src/shared/`, the shared code appears in both bundles. Developers see this as waste and attempt to use `splitting: true` or dynamic imports to deduplicate. This breaks content scripts (see Pitfall 4). Alternatively, they attempt to load shared code as a separate file listed in `content_scripts.js` array — which works but requires the file to not use `export` statements (classic script restrictions).
-
-**Why it happens:**
-The correct architecture for shared code in bundled extensions is: bundle-time deduplication for content scripts (inlined IIFE), runtime deduplication via ESM imports for background/offscreen. These are different strategies. Attempting to apply the ESM sharing strategy to content scripts causes failures.
-
-**How to avoid:**
-Accept that shared code is duplicated in the content script bundle. The shared modules (`text-matcher`, `paragraph-finder`, `constants`) are small relative to PDF.js — duplication overhead is negligible. If bundle size matters, configure esbuild `minify: true` for production builds. Do not attempt runtime deduplication between content script and background script.
-
-**Warning signs:**
-- Build config uses `splitting: true` for an entry point that includes content scripts
-- Content script manifest entry lists multiple `.js` files that use `export` syntax
-
-**Phase to address:**
-Build Pipeline Setup phase — architecture decision must be made before shared code extraction begins.
-
----
-
-### Pitfall 8: Regression When Moving From Multi-File Classic Scripts to Single Bundled File
-
-**What goes wrong:**
-The current manifest loads content scripts as an ordered array: `["shared/constants.js", "content/text-matcher.js", "content/paragraph-finder.js", "content/citation-ui.js", "content/content-script.js"]`. Each file executes as a classic script and shares globals. After bundling, a single `content-script.bundle.js` replaces all five files. The IIFE wraps everything, so top-level variables that were previously globals become local to the IIFE. Any code path that relied on cross-file global access (e.g., `window.MSG` or bare `MSG` from `constants.js`) now fails with `ReferenceError: MSG is not defined` inside the bundle.
-
-**Why it happens:**
-The current architecture uses a "dual-context constants" pattern (noted as a known `⚠️ Revisit` item in PROJECT.md). `constants.js` assigns to `const MSG = {...}` as a classic script, making it a global in Chrome. The other classic scripts read `MSG` as an implicit global. When esbuild bundles them together, esbuild treats them as modules and the IIFE wrapping makes `MSG` a local variable — but only if esbuild uses proper module semantics. If the source files have no `export`/`import` statements, esbuild treats them as scripts and may not wrap them, causing different behavior. The exact behavior depends on whether esbuild detects the files as modules or scripts.
-
-**How to avoid:**
-During shared code extraction (before bundling), explicitly convert all shared constants and utilities to proper ES modules with `export`. Import them in every file that needs them. After this conversion, esbuild correctly bundles them as modules and the IIFE wrapping is clean. Run the full 71-case test corpus against the bundled build before shipping. The migration sequence must be: (1) convert to ES modules with explicit imports, (2) verify tests pass with direct node execution, (3) bundle with esbuild, (4) verify tests pass against bundled output.
-
-**Warning signs:**
-- `ReferenceError` in browser console for `MSG`, `STATUS`, `PATENT_TYPE`, or other constants after bundling
-- Content script appears to load (no parse errors) but citation UI never appears
-- Test harness passes against source files but fails against bundled output
-- Background service worker duplicates constants inline (the current `service-worker.js` does this — a hint about the fragility)
-
-**Phase to address:**
-Shared Code Extraction phase — this phase must resolve the dual-context pattern before the build pipeline processes anything.
-
----
-
-### Pitfall 9: Firefox IndexedDB Silently Fails in "Never Remember History" Mode
-
-**What goes wrong:**
-Firefox users with "Privacy & Security → History → Never Remember History" enabled (which is equivalent to permanent private browsing mode) experience silent IndexedDB failures. The `indexedDB.open()` call either throws or enters an encrypted session-only mode where data is lost on browser restart. In this mode, parsed patent position maps are stored successfully within a session but disappear on every restart. Users see the extension "re-parsing" every patent they visit, and blame the extension for being broken.
-
-**Why it happens:**
-Firefox's `IndexedDB` implementation is tied to cookie/storage acceptance settings. When persistent storage is disabled by the user's privacy settings, extension IndexedDB databases are either blocked or use volatile encrypted storage. This affects Chrome and Firefox differently — Chrome's extension IndexedDB is more isolated from these settings.
-
-**How to avoid:**
-Wrap all IndexedDB open calls in a try/catch. If `indexedDB.open()` fails or throws, fall back to in-memory storage for the session and log a warning. Do not crash the extension. Add a graceful degradation path: if IndexedDB is unavailable, proceed without a local cache (the Cloudflare KV cache still works). This degradation is already partially handled by the `CHECK_CACHE` / `CACHE_MISS` flow — ensure the fallthrough reaches the PDF fetch pipeline even when IndexedDB is unavailable. Consider detecting the condition on first use and storing a flag in `browser.storage.local` (which is more resilient than IndexedDB in these configurations).
-
-**Warning signs:**
-- Extension works for one session in Firefox then appears to "forget" parsed patents on restart
-- `indexedDB.open()` call in offscreen/background throws `DOMException` or `SecurityError` in Firefox
-- Extension behavior differs between Firefox normal mode and Firefox private browsing mode
-- Firefox user reports "always shows parsing indicator" even for patents visited before
-
-**Phase to address:**
-Firefox Background Script phase — IndexedDB error handling must be verified on Firefox with privacy settings enabled.
-
----
-
-### Pitfall 10: PDF.js Worker Loading Requires web_accessible_resources — Firefox UUID Makes It Fragile
-
-**What goes wrong:**
-PDF.js requires a worker file (`pdf.worker.mjs`) that is loaded from the extension package. The current manifest correctly lists this in `web_accessible_resources`. However, Firefox uses random UUIDs for extension resource URLs (`moz-extension://«random-UUID»/lib/pdf.worker.mjs`) that change per Firefox installation (and may change on update). Chrome uses a stable extension ID (`chrome-extension://«id»/lib/pdf.worker.mjs`). If the PDF.js worker URL is constructed from `chrome.runtime.getURL('lib/pdf.worker.mjs')`, this works correctly on both browsers — `browser.runtime.getURL()` returns the correct browser-specific URL. But if the URL is hardcoded anywhere, it breaks on Firefox.
-
-Additionally, Firefox's random UUID prevents adding the extension URL to any external server's CSP policy — this is a known limitation but does not affect this extension since the worker is loaded locally.
-
-**Why it happens:**
-PDF.js worker loading often involves setting `pdfjsLib.GlobalWorkerOptions.workerSrc`. Developers sometimes hardcode the path or use a relative path. In extension contexts, relative paths are not valid for worker loading — the full `moz-extension://` or `chrome-extension://` URL must be used. The correct pattern is `pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs')` (the `chrome` namespace works in Firefox too via compatibility shim).
-
-**How to avoid:**
-Always use `chrome.runtime.getURL('lib/pdf.worker.mjs')` (or `browser.runtime.getURL`) to set `workerSrc`. Never hardcode extension resource paths. Verify that `lib/pdf.worker.mjs` is included in `web_accessible_resources` in both the Chrome and Firefox manifests. After bundling, verify the worker file is present at the declared path in the dist output.
-
-**Warning signs:**
-- PDF.js throws `InvalidPDFException` or fails to initialize worker in Firefox
-- Browser console shows "Failed to load worker" or `moz-extension://` URL 404 in Firefox
-- `GlobalWorkerOptions.workerSrc` is set to a relative path or hardcoded string
-- `lib/pdf.worker.mjs` absent from `web_accessible_resources` in Firefox manifest
-
-**Phase to address:**
-Firefox Background Script phase — verify PDF.js worker initialization works after background script consolidation.
-
----
-
-### Pitfall 11: Firefox storage.sync Requires browser_specific_settings.gecko.id
-
-**What goes wrong:**
-The extension uses `chrome.storage.sync` for user settings (trigger mode, display mode, patent number prefix). On Firefox, `browser.storage.sync` silently fails to sync data across devices if the extension does not have a `browser_specific_settings.gecko.id` declared in the manifest. The API calls succeed locally (data is written and read within the same Firefox instance) but synchronization never occurs. This is a silent failure — no error is thrown.
-
-**Why it happens:**
-Firefox's sync storage implementation keys data to the add-on ID. Without a stable ID declared in `browser_specific_settings`, Firefox cannot associate the data with a specific extension for sync purposes. Chrome uses the extension's CRX ID which is always present. Firefox add-on IDs must be explicitly declared for unsigned or development extensions.
-
-**How to avoid:**
-Add to the Firefox manifest:
-```json
-"browser_specific_settings": {
-  "gecko": {
-    "id": "patent-cite-tool@yourname.dev",
-    "strict_min_version": "121.0"
-  }
-}
+# Option B: Create zip explicitly with zip CLI, then upload the directory
+# (Never upload a pre-created .zip file to upload-artifact)
 ```
-Use a real email-format string or any string up to 80 characters. This ID also determines the extension's UUID on Firefox — choose it before publishing and do not change it, as changing the ID breaks existing storage.sync data for all users.
+
+Alternatively, create the zip explicitly during the submission step using `zip -r` and upload it as a release asset (not a workflow artifact) if store submission is the goal.
 
 **Warning signs:**
-- Settings saved in Firefox do not appear on a second Firefox installation after sync
-- `browser.storage.sync.set()` succeeds but `browser.storage.sync.get()` returns defaults after browser restart
-- Firefox manifest does not contain `browser_specific_settings` key
-- `web-ext lint` warns about missing add-on ID for signed extensions
+- Workflow runs `web-ext build` and then uploads the resulting `.zip` file with `upload-artifact`
+- Downloaded artifact is named `extension-name.zip.zip`
+- Store validator rejects the zip with "invalid archive structure" or "expected manifest at root"
+- Artifact path in YAML ends in `.zip`
 
 **Phase to address:**
-Firefox manifest split phase — the gecko ID must be chosen before any Firefox release.
+CI Artifact Packaging (Phase 2) — upload strategy must be decided before the first packaging step is written.
 
 ---
 
-### Pitfall 12: Bundled Output Breaks Vitest Tests That Import Source Files Directly
+### Pitfall 4: web-ext lint Fails on PDF.js Library Files in CI
 
 **What goes wrong:**
-The existing Vitest test harness imports source files directly (e.g., `import { matchAndCite } from '../src/content/text-matcher.js'`). After the shared code extraction refactor, these imports change paths (modules move to `src/shared/`). After the esbuild build step, tests that relied on source file import paths break if the test harness is reconfigured to test bundled output instead of source. The 71-case golden baseline must continue to pass throughout all refactoring stages. If tests are broken during refactoring and only fixed at the end, intermediate regressions go undetected.
+`web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'` is the current `test:lint` command. In CI, `web-ext lint` may still emit errors or warnings about `dist/firefox/lib/pdf.mjs` and `dist/firefox/lib/pdf.worker.mjs` — the pre-compiled PDF.js library files. The `--ignore-files` flag in web-ext has documented behavioral edge cases: when a file listed in `ignore-files` is also referenced in the manifest's `web_accessible_resources`, the linter may emit `MANIFEST_CONTENT_SCRIPT_FILE_NOT_FOUND` or `DANGEROUS_EVAL` warnings from inside the PDF.js minified source. These warnings cause the lint step to exit with a non-zero code, failing CI.
 
 **Why it happens:**
-Refactoring module boundaries (moving files, adding `export` statements, changing import paths) is done as a single large PR. Tests are not run between individual moves. By the time the refactor is complete, many small path breaks have accumulated and it is impossible to identify which individual change introduced a regression.
+`web-ext lint` is designed for authored extension code. Pre-compiled third-party libraries like PDF.js contain patterns (eval, dynamic imports, minified code patterns) that trigger linter rules. The `--ignore-files` glob pattern applies to the file exclusion list but the interaction with manifest-referenced files is incomplete — the linter still inspects manifest-referenced files for security warnings.
 
 **How to avoid:**
-Use a "strangler fig" migration: move one module at a time and run the full test harness after each move. The test harness must continue testing source files (not bundled output) throughout refactoring — bundled output testing is a separate concern. Add a smoke test that loads the bundled content script in a jsdom environment and verifies that `chrome.runtime.sendMessage` is called when `GENERATE_CITATION` is triggered. Keep the 71-case harness as the primary regression gate: if it passes before and after each commit, the refactor is safe.
+Use `web-ext lint` with explicit ignore patterns tested against the actual CI environment before merging. Verify the exact lint output by running `npx web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'` locally against a built dist. If warnings are generated, add them to a `--warnings-as-errors` allowlist or upgrade the ignore pattern. Consider using `--no-warnings` only for known safe third-party libraries. The lint step must exit cleanly in CI; warnings-as-errors behavior must be configured explicitly.
+
+If PDF.js warnings persist despite `--ignore-files`, use the web-ext config file approach: create a `.web-ext-config.cjs` at the project root that explicitly ignores the library directory:
+
+```javascript
+module.exports = {
+  ignoreFiles: ['lib/**', 'matching-exports.js'],
+};
+```
 
 **Warning signs:**
-- Multiple source files moved in a single commit without running tests between moves
-- Vitest shows `Cannot find module '../src/content/text-matcher.js'` after refactoring
-- Test harness is temporarily disabled or marked `.skip` "to fix later"
-- 71-case golden outputs change unexpectedly during refactoring (path or logic changed accidentally)
+- CI lint step fails with warnings about `lib/pdf.mjs` or `lib/pdf.worker.mjs`
+- `DANGEROUS_EVAL` or `UNSAFE_EVAL` warning appears in CI but not in local lint run (different web-ext versions)
+- web-ext version in CI differs from locally installed version (version pinning missing)
+- `--ignore-files` pattern uses forward slashes that work locally on macOS but not on the Linux runner
 
 **Phase to address:**
-Shared Code Extraction phase — establish the test-after-each-move discipline as the first rule of the refactor.
+CI Workflow Setup (Phase 1) — lint configuration must be validated against the built dist before the workflow is finalized.
+
+---
+
+### Pitfall 5: Workflow Triggers Fire Twice on PRs to Main
+
+**What goes wrong:**
+A workflow configured with both `on: push` (all branches) and `on: pull_request` (to main) runs twice when a PR branch is pushed: once for the `push` event on the feature branch, and once for the `pull_request` event targeting main. For this project, the doubling is mostly harmless (no side effects beyond wasted runner minutes), but the redundant runs clutter the PR status checks UI and consume free-tier minutes faster.
+
+**Why it happens:**
+The naive "run on everything" configuration does not account for the fact that pushing commits to a PR branch triggers both events. The `push` event fires for the branch; the `pull_request` event fires for the PR. GitHub treats them as separate events with separate workflow runs.
+
+**How to avoid:**
+Scope the triggers explicitly for this project's needs:
+- `on: push` — run on all branches (catches developer pushes before a PR is opened)
+- `on: pull_request` — run only when targeting `main`; use `branches: [main]`
+
+This is still somewhat redundant (a PR branch push triggers both), but acceptable for a single-developer project where free-tier minutes are ample. The alternative is to use only `on: pull_request` (no `on: push`) if CI is only needed for PRs, or to use concurrency groups to cancel redundant runs.
+
+The v2.1 requirement states "triggered on push (all branches) and PRs to main" — this is the correct configuration; just be aware of the double-run behavior.
+
+**Warning signs:**
+- PR status checks show two entries for the same workflow (one from push, one from pull_request)
+- Runner minutes being consumed at roughly 2x expected rate
+- `pull_request` branch filter incorrectly filters on the source branch instead of the base branch
+
+**Phase to address:**
+CI Workflow Setup (Phase 1) — trigger configuration is the first section of the workflow YAML.
+
+---
+
+### Pitfall 6: Node Version Mismatch Between Local Dev and CI Causes Native Binary Failures
+
+**What goes wrong:**
+`esbuild` and `sharp` (used by `generate-icons.mjs`) are native binaries. esbuild ships separate binaries per platform/architecture (`esbuild-linux-64`, `esbuild-darwin-arm64`, etc.). If `package-lock.json` was generated on macOS (ARM64) and the CI runner is `ubuntu-latest` (x86_64), the lockfile may contain references to the wrong platform's binary. `npm ci` on the Linux runner will attempt to install the macOS binary, fail, and fall back to a platform rebuild — which may succeed or fail depending on whether build tools are available.
+
+Separately, if the local Node version is 18 and CI uses Node 22, native module ABI compatibility issues can occur with `sharp`.
+
+**Why it happens:**
+`package-lock.json` in npm 7+ is a single-platform lockfile by default. When `npm ci` is run on a different platform/architecture, npm resolves the correct platform binary at install time, which may differ from what's in the lockfile. This causes a lockfile integrity check warning or failure.
+
+**How to avoid:**
+Pin Node version in the workflow explicitly. Use the same major Node version as local development:
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: '22'
+    cache: 'npm'
+```
+
+Run `npm ci` (not `npm install`) in CI — it honors the lockfile and produces a clean install. If `npm ci` warns about platform-specific binary resolution, regenerate `package-lock.json` on a Linux machine (or via CI itself) to produce a cross-platform lockfile.
+
+Note: `sharp` is only used in `generate-icons.mjs`, which is not part of the CI pipeline (icon generation is a manual step). If `sharp` causes installation issues, it can be excluded from CI using `npm ci --ignore-scripts` with care, or the generate-icons script can be made optional in CI.
+
+**Warning signs:**
+- `npm ci` emits warnings about platform-specific optional dependencies being skipped
+- `esbuild` throws `Error: The package "esbuild-linux-64" could not be found` in CI
+- CI build succeeds locally but fails with native module errors in the runner
+- Node version in `engines` field of `package.json` differs from `node-version` in workflow YAML
+
+**Phase to address:**
+CI Workflow Setup (Phase 1) — Node version pinning is part of the first workflow step.
+
+---
+
+### Pitfall 7: Artifact Names Must Be Unique Within a Workflow Run
+
+**What goes wrong:**
+`actions/upload-artifact@v4` does not allow uploading to the same artifact name twice within a single workflow run. If the workflow uploads Chrome and Firefox extension zips separately, they must have distinct names (`chrome-extension-v1.2.3` and `firefox-extension-v1.2.3`). If both use the same name, the second upload fails with `An artifact with this name already exists`.
+
+**Why it happens:**
+The v4 artifact action changed behavior from v3: v3 allowed appending to the same artifact name; v4 treats artifact names as immutable within a run. Workflows copied from v3-era tutorials silently produce this error when updated to v4.
+
+**How to avoid:**
+Name artifacts distinctly:
+```yaml
+- uses: actions/upload-artifact@v4
+  with:
+    name: chrome-extension
+    path: dist/chrome/
+
+- uses: actions/upload-artifact@v4
+  with:
+    name: firefox-extension
+    path: dist/firefox/
+```
+
+Include the version from `manifest.json` in the artifact name if versioned artifacts are needed: `name: chrome-extension-${{ steps.version.outputs.version }}`.
+
+**Warning signs:**
+- Single `name:` value used for multiple `upload-artifact` steps in the same job
+- Error: `An artifact with this name already exists for the associated workflow run`
+- Workflow was adapted from an older tutorial using `actions/upload-artifact@v2` or `@v3`
+
+**Phase to address:**
+CI Artifact Packaging (Phase 2) — artifact naming is defined when the packaging steps are written.
+
+---
+
+### Pitfall 8: Vitest Hangs Indefinitely in CI — No Timeout Configured
+
+**What goes wrong:**
+Vitest can hang in GitHub Actions without producing a failure exit code in specific scenarios: when a test opens an async resource that is never closed (file handles, timers), when the Vitest worker pool fails to initialize, or when `vitest run` waits for a hanging worker process. GitHub Actions has a default job timeout of 6 hours — a hanging Vitest process will consume the full 6 hours of runner time before the job is cancelled, burning runner credits and blocking PR merge.
+
+**Why it happens:**
+Vitest's worker pool spawns Node.js worker threads for each test file. In rare cases (especially with large fixture files or resource-intensive tests), worker initialization can hang rather than fail. The issue is documented in the Vitest GitHub discussions (`#5507`, `#5506`). This project runs 71 patent test cases with large fixture files — the risk is higher than for small test suites.
+
+**How to avoid:**
+Set an explicit `timeout-minutes` on the test job:
+
+```yaml
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+```
+
+Ten minutes is generous for a Vitest suite that runs in seconds locally. If CI consistently takes longer, investigate why — it should not. The timeout converts a hang from a 6-hour runner burn to a clean 10-minute failure.
+
+**Warning signs:**
+- CI job runs for more than 5 minutes without completing (local test suite runs in under 30 seconds)
+- Job log shows Vitest output stopped mid-run with no error
+- Job eventually cancelled with "The job exceeded the maximum execution time" after hours
+
+**Phase to address:**
+CI Workflow Setup (Phase 1) — set `timeout-minutes` on the job when the workflow is first created.
 
 ---
 
@@ -295,11 +267,11 @@ Shared Code Extraction phase — establish the test-after-each-move discipline a
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Single manifest for Chrome and Firefox with Chrome-specific keys | Simpler to maintain | Firefox silently ignores or errors on Chrome-only keys; `declarativeContent` and `offscreen` cause failures | Never — manifests must be split. The cost of debugging silent Firefox failures far exceeds the split-manifest maintenance cost |
-| Keeping duplicate constants in service-worker.js vs shared/constants.js | Avoids refactoring the dual-context pattern | Bug fixes to message types must be applied in two places; already caused issues (noted in PROJECT.md) | Never for v2.0 — shared code extraction is a v2.0 goal |
-| Using `chrome` namespace directly instead of `browser` polyfill | No extra dependency | Firefox requires explicit chrome→browser shim or must be tested that chrome works; subtle behavioral differences around promises | Acceptable IF Chrome MV3 is the primary target and Firefox compatibility is verified manually. For long-term maintenance, prefer the polyfill |
-| Skipping source maps in bundled output | Faster build | Debugging Firefox background script becomes very difficult; Firefox has known issues finding extension source maps | Acceptable for release builds; unacceptable for development builds — always generate source maps in dev mode |
-| Testing only Chrome build after shared code extraction | Faster iteration | Firefox-specific failures (event page lifecycle, IndexedDB, missing APIs) are caught only at Firefox testing phase, not during extraction | Unacceptable — run Firefox smoke test after each extraction step |
+| Caching `dist/` between CI runs | Faster CI by skipping rebuild | Tests validate stale bundled output, not the current commit; regressions go undetected | Never — build must always run fresh from source |
+| Using `npm install` instead of `npm ci` in CI | Supports lock-file-free setups | Non-deterministic installs; different package versions between CI runs; slow (resolves dependency graph each run) | Never in CI — always use `npm ci` |
+| Pinning action versions to major tag (`@v4`) instead of commit SHA | Easier to update | Tag can be moved by maintainer to include breaking changes; supply chain risk (documented ArtiPACKED vulnerability) | Acceptable for well-maintained official actions (`actions/*`, `setup-node`). Use SHA pinning only if repo has strict supply-chain requirements |
+| Omitting `timeout-minutes` from jobs | Simpler YAML | Hanging test process consumes up to 6 hours of runner time per incident | Never — always set a generous but finite timeout |
+| Single workflow file for all CI jobs | Simpler to manage | All jobs run sequentially if in one job; cannot parallelize build and test | Acceptable for this project's scale — sequential steps in one job are fine |
 
 ---
 
@@ -307,12 +279,12 @@ Shared Code Extraction phase — establish the test-after-each-move discipline a
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Firefox extension + storage.sync | Using storage.sync without gecko ID in manifest | Add `browser_specific_settings.gecko.id` to Firefox manifest before first sync storage use |
-| esbuild + multiple manifests | Copying manifest into dist as-is | Use build script to select and copy correct manifest (`manifest.chrome.json` → `dist/chrome/manifest.json`, `manifest.firefox.json` → `dist/firefox/manifest.json`) |
-| PDF.js worker in Firefox background | Assuming workerSrc path resolves the same as Chrome | Always use `chrome.runtime.getURL('lib/pdf.worker.mjs')` — works in both browsers; never hardcode |
-| Cloudflare Worker proxy (pct.tonyrowles.com) | Assuming Firefox uses same fetch behavior as Chrome offscreen | Firefox background script fetch works identically — no CORS differences for extension contexts. But verify the CORS headers on the Cloudflare Worker allow `moz-extension://` origins if checking Origin header |
-| esbuild + content scripts | Using `splitting: true` for all entry points uniformly | Configure content script entry points separately with `splitting: false`, `format: 'iife'` |
-| Firefox + clipboardWrite | Assuming clipboard API works on http pages | `navigator.clipboard.writeText()` is restricted to HTTPS pages in both browsers; Google Patents is HTTPS so this is safe — but document the HTTPS dependency |
+| `actions/upload-artifact@v4` + pre-built zip | Uploading a `.zip` file creates a double-zip (`extension.zip.zip`) | Upload the extension directory directly; the action wraps it into a single zip automatically |
+| `actions/setup-node` + `npm ci` | Manually configuring `actions/cache` for `node_modules/` instead of using the built-in cache option | Use `cache: 'npm'` in `setup-node` — it handles cache key generation from `package-lock.json` automatically |
+| `web-ext lint` + PDF.js library files | Running lint without `--ignore-files 'lib/**'` generates false positives from PDF.js minified code | Always pass `--ignore-files 'lib/**'` or configure `.web-ext-config.cjs`; verify lint passes against a fresh `dist/` build in CI |
+| `vitest run` + multiple configs | Running `npm run test:chrome` before `npm run build` — dist alias targets are missing | Enforce build step before any Vitest step; never parallelize build and test steps |
+| GitHub Actions triggers + PRs | Using both `on: push` and `on: pull_request` without concurrency groups causes duplicate runs | Use `concurrency` groups to cancel in-progress runs when a new push arrives, or accept the duplication for a solo-developer project |
+| `actions/upload-artifact@v4` + duplicate names | Two steps uploading to the same artifact name in one job fails silently or errors | Use distinct names: `chrome-extension` and `firefox-extension` |
 
 ---
 
@@ -320,10 +292,10 @@ Shared Code Extraction phase — establish the test-after-each-move discipline a
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Inlining PDF.js into content script bundle | Content script bundle becomes 1MB+, injected on every Google Patents page load | PDF.js must NOT be a content script dependency — it belongs only in the background/offscreen context. Verify the content script entry point does not transitively import from `lib/pdf.mjs` | At the moment esbuild's dependency graph traversal pulls in pdf.mjs through a shared import |
-| Firefox event page suspended mid-parse | PDF parse starts, event page suspends after 5s idle, parse result is never received | Register all message listeners at top level (not inside async functions or setTimeout). The current service-worker.js already does this correctly — preserve the pattern in Firefox background | If message listeners are accidentally registered inside `async function main()` or similar |
-| IndexedDB open blocking background startup | Background script awaits IndexedDB initialization before registering message listeners | Register message listeners synchronously at top level; initialize IndexedDB lazily on first use | Any refactor that moves `chrome.runtime.onMessage.addListener` inside an async init function |
-| esbuild rebuilding entire multi-entry bundle on every file change | Dev iteration is slow (2-3s rebuild on every save instead of <100ms) | Use esbuild `watch` mode or configure `incremental: true`; split large bundles into independent build targets so a content script change does not rebuild the offscreen bundle | When the build script is naively `esbuild --bundle src/background/service-worker.js src/content/content-script.js ...` as one invocation |
+| Caching `node_modules/` instead of `~/.npm` | Cache hit but `npm ci` deletes it immediately; no speedup | Use `setup-node` with `cache: 'npm'` which caches `~/.npm` and keeps `npm ci` correct | Every CI run — the trap is silent, just wasteful |
+| Rebuilding both Chrome and Firefox when only one changed | Full 2× build time for every push | For this project, build time is under 10 seconds — not worth splitting; if it grows, separate Chrome and Firefox into jobs with path filters | When build time exceeds 2 minutes |
+| Running `npm run test` (which rebuilds) instead of split steps | Build runs twice — once in the build step and again inside `npm run test` | In CI, run build once explicitly, then run each test command individually | Any time the full `npm test` script is used as a CI step |
+| Large fixture files checked into git causing slow checkouts | `actions/checkout` takes longer than the build | Fixture files in `tests/fixtures/` are already in the repo and reasonable in size; not a current problem | If patent fixture PDFs are added as binary blobs |
 
 ---
 
@@ -331,34 +303,37 @@ Shared Code Extraction phase — establish the test-after-each-move discipline a
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Including `PROXY_TOKEN` (Cloudflare Worker auth token) in the bundled and minified extension package | Token is visible in minified output via extension package inspection; any user can extract it and make direct calls to the Cloudflare Worker | This is an existing risk in v1.x. The token is a shared secret that protects the KV cache write endpoint — consider rotating it after v2.0 ships and evaluate if IP allowlisting on the Cloudflare Worker is feasible |
-| Firefox extension ID collision | If another extension uses the same gecko ID, Firefox may behave unpredictably with storage.sync | Use a unique, non-guessable ID in email format tied to a domain you control (e.g., `patent-cite-tool@yourname.dev`) |
-| esbuild minification exposing hardcoded secrets in source maps | Source maps (if shipped) expose original source including the proxy token | Never ship source maps in release builds. Use `NODE_ENV=production` guard to omit source maps from release packaging |
+| Uploading the entire workspace directory as an artifact | Git token from `.git/hidden-config` is included in the artifact (ArtiPACKED vulnerability); publicly readable on open repos | Always specify exact paths in `upload-artifact`; never use `.` or `./` as the `path` |
+| Using `pull_request_target` instead of `pull_request` for CI | `pull_request_target` runs with elevated permissions and can read org secrets; fork PRs can abuse this | This project only needs `pull_request` (no elevated permissions required for build/test CI) |
+| Secrets in workflow environment variables printed to logs | Build logs are public on public repos; `echo $SECRET` or `-v` flags expose secret values | Use `${{ secrets.* }}` syntax; never echo secrets; this project has no secrets needed in CI (build is self-contained) |
+| Extension zip artifact containing source maps | Source maps reverse-engineer the minified extension code, exposing business logic and the Cloudflare proxy token | Ensure `sourcemap: false` in production build (already the case in `scripts/build.js` when not in watch mode); verify no `.js.map` files appear in `dist/` during build |
 
 ---
 
 ## UX Pitfalls
 
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Firefox icon never activates due to declarativeContent gap | Firefox users see the icon as always-active or always-inactive; clicking on non-patent pages shows confusing popup state | Replace declarativeContent with content-script-driven `action.enable(tabId)` — icon activates reliably on patent pages only |
-| Firefox background event page suspended during long PDF parse | Parse progress appears to hang; user sees spinner indefinitely | The parse itself runs to completion (event page stays alive during active async operations); ensure the message listener that receives PARSE_RESULT is registered at top level so it can restart the event page if needed |
-| Extension appears to work in Firefox (installs, icon shows) but citations never generate | Users report "broken extension" without useful error message | Add a Firefox-specific error path: if `browser.offscreen` is undefined and the background script does not contain the PDF pipeline, log a clear console error and send a user-visible error message to the content script |
+*This section focuses on developer UX — the experience of using the CI pipeline.*
+
+| Pitfall | Developer Impact | Better Approach |
+|---------|-----------------|-----------------|
+| Workflow job named `build` when it also tests and packages | Confusing status display in PR checks — "build failed" when it was actually a lint failure | Name the job specifically: `ci` with steps `Build`, `Test`, `Lint`, `Package` — or use separate jobs per concern |
+| Artifact retention set to 90 days (default) for every push | Artifact storage quota fills up; old push artifacts are not useful | Set `retention-days: 7` for push-triggered runs; keep 90-day retention only for artifacts from tags/releases |
+| No step names in workflow YAML | CI log output shows step index numbers, not meaningful names | Always add `name:` to every `run:` and `uses:` step |
+| CI passes but artifact is the wrong extension version | Developer downloads artifact, submits wrong version to store | Include version from `manifest.json` in artifact name; verify by checking the artifact name in the PR |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **declarativeContent replaced:** Firefox build has no reference to `chrome.declarativeContent`; icon activates correctly only on patent pages in Firefox
-- [ ] **offscreen logic ported:** Firefox background script contains the full PDF fetch + parse + IndexedDB pipeline; `browser.offscreen` is never referenced in Firefox code
-- [ ] **Manifests split:** `dist/chrome/manifest.json` and `dist/firefox/manifest.json` are distinct files; Firefox manifest has `browser_specific_settings.gecko.id` and no `offscreen`/`declarativeContent` permissions
-- [ ] **Content script format:** esbuild produces content script bundle as IIFE (not ESM); no `import`/`export` statements in content script output
-- [ ] **outbase set:** esbuild build config explicitly sets `outbase: 'src'`; output paths match manifest references exactly
-- [ ] **PDF.js workerSrc:** Uses `chrome.runtime.getURL('lib/pdf.worker.mjs')` — not a relative path or hardcoded string; works in Firefox
-- [ ] **Gecko ID set:** Firefox manifest `browser_specific_settings.gecko.id` is a unique, stable identifier
-- [ ] **71-case test corpus:** All 71 tests pass against bundled Chrome output before Firefox porting begins; all 71 tests pass against Firefox output after porting
-- [ ] **IndexedDB graceful degradation:** IndexedDB errors are caught and the extension falls back to session-only caching rather than crashing
-- [ ] **No source maps in release zip:** Release packaging script explicitly omits `*.js.map` files from the zip
+- [ ] **Build-before-test ordering:** Workflow YAML has an explicit `npm run build` step before any `npm run test:*` step — verify by reading the YAML top-to-bottom
+- [ ] **Cache is `~/.npm` not `node_modules/`:** `setup-node` uses `cache: 'npm'`; no separate `actions/cache` step for `node_modules`
+- [ ] **No double-zip:** `upload-artifact` path points to `dist/chrome/` and `dist/firefox/` (directories), not to `.zip` files
+- [ ] **Artifact names are distinct:** Chrome and Firefox artifacts have different `name:` values in the YAML
+- [ ] **Timeout is set:** Job-level `timeout-minutes` is present and set to a reasonable value (10-15 minutes)
+- [ ] **web-ext lint passes locally first:** Run `npm run test:lint` locally against a fresh build before adding it to CI; CI lint must pass with zero errors
+- [ ] **No source maps in packaged dist:** Run `ls dist/chrome/ dist/firefox/` after build to verify no `.js.map` files exist (production build has `sourcemap: false`)
+- [ ] **Node version pinned:** `setup-node` specifies `node-version: '22'` (or current LTS); not `node-version: 'latest'` (unstable) or no version (runner default)
+- [ ] **Workflow triggers match requirements:** `on: push` covers all branches; `on: pull_request` targets `main`; no unintended triggers
 
 ---
 
@@ -366,13 +341,13 @@ Shared Code Extraction phase — establish the test-after-each-move discipline a
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| declarativeContent not replaced — Firefox icon broken | LOW | Implement content-script-driven `action.enable(tabId)` pattern; test takes ~2 hours |
-| offscreen logic not ported — Firefox PDF pipeline dead | HIGH | Full migration of offscreen.js into Firefox background script; 1-2 days of work plus regression testing |
-| Content scripts bundled as ESM — silent injection failure | LOW | Change esbuild format to `iife` for content script entry; rebuild and test; ~30 minutes |
-| outbase misconfigured — manifest path mismatches | LOW | Add `outbase: 'src'` to build config; verify output tree; ~1 hour |
-| 71-case regression after shared code extraction | MEDIUM | Git bisect the extraction commits; identify which module move caused the regression; fix the import path or logic error; 2-4 hours |
-| Firefox gecko ID missing — storage.sync not syncing | LOW | Add ID to Firefox manifest and rebuild; no data migration needed for development builds; for production it must be set before first release |
-| IndexedDB broken for "never remember history" users | MEDIUM | Add try/catch around IndexedDB open; route to in-memory fallback; test with Firefox in permanent private browsing mode; ~4 hours |
+| Tests validated stale dist/ | LOW | Delete dist/ from cache (force cache miss by changing cache key suffix), re-run workflow |
+| Double-zipped artifact submitted to store | LOW | Download artifact, unzip outer wrapper, submit inner zip; fix workflow to upload directory not zip file |
+| Vitest hanged for 6 hours | LOW (time lost, no data loss) | Cancel job manually; add `timeout-minutes`; investigate which test file caused the hang using `vitest run --reporter=verbose` |
+| web-ext lint failing on PDF.js warnings | LOW | Add `--ignore-files 'lib/**'` to lint command or create `.web-ext-config.cjs`; rerun workflow |
+| Node version binary mismatch | MEDIUM | Delete the cached `~/.npm`, run `npm ci` fresh, verify native binary installs correctly; may need to regenerate `package-lock.json` on Linux |
+| `upload-artifact` duplicate name failure | LOW | Rename one artifact; rerun workflow |
+| Workflow double-running on PR push | LOW | Add concurrency group to cancel in-progress runs; or accept the duplication |
 
 ---
 
@@ -380,40 +355,37 @@ Shared Code Extraction phase — establish the test-after-each-move discipline a
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| declarativeContent not supported in Firefox | Firefox Background Script | Install Firefox build on a non-patent page: icon must be disabled. Navigate to patent page: icon must activate |
-| offscreen API unavailable in Firefox | Firefox Background Script | Generate a citation on Firefox: position map must be built and citation must appear |
-| Chrome-specific manifest keys breaking Firefox | Build Pipeline Setup (manifest split) | `web-ext lint` passes with zero warnings; Firefox loads extension without errors |
-| Content scripts bundled as ESM | Build Pipeline Setup | Inspect bundle output: no `import`/`export` at top level of content script file |
-| esbuild path flattening | Build Pipeline Setup | Compare `dist/chrome/` tree against manifest path references; every path must resolve |
-| Module type mismatch for Firefox background | Build Pipeline Setup | Firefox background loads without SyntaxError; message listeners register on install |
-| Shared code duplication confusion | Build Pipeline Setup | Content script bundle is a single IIFE file; no chunk imports |
-| Global scope regression from classic→IIFE bundling | Shared Code Extraction | All 71 golden tests pass against bundled output |
-| Firefox IndexedDB in private mode | Firefox Background Script | Test with Firefox "Never remember history" setting: extension degrades gracefully, no crash |
-| PDF.js worker path fragility | Firefox Background Script | PDF loads and parses correctly on Firefox; no console errors about worker URL |
-| Missing gecko ID | Firefox manifest split | `browser.storage.sync` persists across two Firefox instances (or test with `web-ext` dev install) |
-| Bundled output breaks Vitest tests | Shared Code Extraction | All 71 tests pass after every individual module move, not just at the end |
+| Tests run before build (missing dist/) | CI Workflow Setup | Inspect YAML step order: build step must precede all test steps |
+| npm cache misconfiguration | CI Workflow Setup | Confirm `setup-node` uses `cache: 'npm'`; no `actions/cache` for `node_modules/` |
+| Double-zip artifact | CI Artifact Packaging | Download the artifact from a test run; verify it unzips to extension files (manifest.json at root), not to another zip |
+| web-ext lint false positives on PDF.js | CI Workflow Setup | Run lint step in CI; verify it exits with code 0 with zero errors |
+| Workflow double-triggers | CI Workflow Setup | Open a PR and push a commit; observe how many workflow runs appear in the PR status checks |
+| Node/native binary version mismatch | CI Workflow Setup | First CI run on a fresh runner; verify `npm ci` completes without platform binary warnings |
+| Artifact naming collision | CI Artifact Packaging | Verify Chrome and Firefox artifact names differ in YAML; download both from one run |
+| Vitest hang with no timeout | CI Workflow Setup | Verify `timeout-minutes` is present at the job level in YAML |
 
 ---
 
 ## Sources
 
-- [MDN: Chrome incompatibilities](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities) — declarativeContent unsupported (bug 1435864); content script global scope differences; web_accessible_resources UUID behavior; data cloning differences (HIGH confidence, official docs)
-- [Firefox Extension Workshop: MV3 Migration Guide](https://extensionworkshop.com/documentation/develop/manifest-v3-migration-guide/) — background script format; gecko ID requirement; host_permissions as optional permission (HIGH confidence, official docs)
-- [MDN: Background scripts](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Background_scripts) — event page lifecycle; suspension behavior; state loss; storage.session vs storage.local (HIGH confidence, official docs)
-- [MDN: storage.sync](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync) — gecko ID requirement for sync to function (HIGH confidence, official docs)
-- [MDN: background manifest key](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background) — Firefox uses scripts array; service_worker ignored before Firefox 121 (HIGH confidence, official docs)
-- [esbuild API docs](https://esbuild.github.io/api/) — format options (iife/esm/cjs); outbase; splitting; multiple entry points behavior (HIGH confidence, official docs)
-- [esbuild FAQ](https://esbuild.github.io/faq/) — IIFE format for browser global scope safety (HIGH confidence, official docs)
-- [Firefox Bugzilla 1435864](https://bugzil.la/1435864) — declarativeContent not implemented in Firefox (HIGH confidence, official bug tracker)
-- [Firefox Bugzilla 1406675](https://bugzilla.mozilla.org/show_bug.cgi?id=1406675) — IndexedDB broken when cookies disabled (MEDIUM confidence, bug report)
-- [Firefox Bugzilla 1841806](https://bugzilla.mozilla.org/show_bug.cgi?id=1841806) — IndexedDB not working in private browsing mode for extensions (MEDIUM confidence, bug report)
-- [GitHub: mozilla/webextension-polyfill](https://github.com/mozilla/webextension-polyfill) — chrome vs browser namespace shim (HIGH confidence, official Mozilla project)
-- [w3c/webextensions issue #156](https://github.com/w3c/webextensions/issues/156) — ES modules in content scripts proposal (MEDIUM confidence, standards discussion)
-- [esbuild GitHub issue #1025](https://github.com/evanw/esbuild/issues/1025) — shared dependencies between builds (MEDIUM confidence, maintainer response)
-- [codestudy.net: MV3 background scripts vs service workers in Firefox](https://www.codestudy.net/blog/manifest-v3-background-scripts-service-worker-on-firefox/) — Firefox 121 service_worker + scripts behavior (MEDIUM confidence, community article verified against MDN)
-- Project source audit: `src/background/service-worker.js`, `src/manifest.json`, `src/offscreen/offscreen.js`, `src/shared/constants.js` — identified declarativeContent dependency, offscreen pattern, dual-context constants, inline message type duplication (HIGH confidence, direct code inspection)
+- [GitHub Docs: Building and testing Node.js](https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs) — `npm ci`, `setup-node`, cache configuration (HIGH confidence, official docs)
+- [actions/setup-node: Advanced Usage](https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md) — `cache: 'npm'` option, package-lock.json cache key behavior (HIGH confidence, official)
+- [actions/upload-artifact v4 README](https://github.com/actions/upload-artifact) — unique artifact names, double-zip issue, retention-days, v4 breaking changes from v3 (HIGH confidence, official)
+- [GitHub blog: upload-artifact double-zip issue #39](https://github.com/actions/upload-artifact/issues/39) — confirmed double-zip when uploading pre-built zip file (HIGH confidence, maintainer acknowledged)
+- [GitHub community: pull_request triggers fire twice](https://github.com/orgs/community/discussions/26940) — push + pull_request both trigger on PR branch push (HIGH confidence, community confirmed)
+- [GitHub Docs: Workflow syntax — on.pull_request.branches](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions) — branch filter applies to base branch, not source branch (HIGH confidence, official docs)
+- [Vitest GitHub Discussions #5507](https://github.com/vitest-dev/vitest/discussions/5507) — vitest hangs in GitHub Actions, exceeded maximum execution time (MEDIUM confidence, community reports)
+- [Vitest GitHub issue #3644](https://github.com/vitest-dev/vitest/issues/3644) — vitest failing tests not emitting failure exit in GitHub Actions (MEDIUM confidence, issue tracker)
+- [mozilla/web-ext issue #1376](https://github.com/mozilla/web-ext/issues/1376) — web-ext lint false positives on third-party library files (MEDIUM confidence, official issue tracker)
+- [mozilla/web-ext issue #397](https://github.com/mozilla/web-ext/issues/397) — ignore-files pattern behavior with lint (MEDIUM confidence, official issue tracker)
+- [esbuild GitHub issue #1646](https://github.com/evanw/esbuild/issues/1646) — esbuild-linux-64 not found after cross-platform npm install (MEDIUM confidence, issue tracker)
+- [esbuild GitHub issue #2865](https://github.com/evanw/esbuild/issues/2865) — esbuild installed on wrong platform binary mismatch (MEDIUM confidence, issue tracker)
+- [Unit 42: ArtiPACKED — GitHub Actions artifact token leaks](https://unit42.paloaltonetworks.com/github-repo-artifacts-leak-tokens/) — artifact security risks including git token exposure (HIGH confidence, security research, August 2024)
+- [GitHub Changelog: deprecation of actions/upload-artifact v3](https://github.blog/changelog/) — v3 deprecated November 2024, v4 required (HIGH confidence, official)
+- [GitHub Changelog: Node 20 deprecation on runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/) — Node 20 deprecated on runners as of September 2025; Node 22 or 24 recommended (HIGH confidence, official)
+- Project source audit: `package.json` test scripts, `scripts/build.js`, `vitest.config.chrome.js`, `vitest.config.firefox.js` — identified dist/ dependency ordering requirement, build configuration, and lint command (HIGH confidence, direct code inspection)
 
 ---
-*Pitfalls research for: esbuild build pipeline and Firefox extension port of an existing Chrome MV3 extension*
-*Researched: 2026-03-03*
-*Milestone: v2.0 Firefox Port*
+*Pitfalls research for: GitHub Actions CI/CD pipeline for a cross-browser browser extension (esbuild, Vitest, web-ext)*
+*Researched: 2026-03-04*
+*Milestone: v2.1 CI/CD Pipeline*

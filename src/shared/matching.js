@@ -487,7 +487,10 @@ export function matchAndCite(selectedText, positionMap, contextBefore = '', cont
   // correct HTML-selected text after both go through the same transformation.
   const { text: ocrNormalized, changed: selChanged } = normalizeOcr(normalized);
 
-  const { concat, boundaries, changedRanges } = buildConcat(positionMap);
+  // changedRanges is available for future penalty refinement (e.g., overlap-based
+  // precision when selChanged is true). Currently unused because selChanged alone
+  // is the necessary and sufficient penalty condition.
+  const { concat, boundaries } = buildConcat(positionMap);
 
   // Determine whether the OCR confidence penalty should apply.
   // The penalty fires when the SELECTION contained OCR-confused characters

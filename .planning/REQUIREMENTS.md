@@ -43,17 +43,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MATCH-01 | — | Pending |
-| MATCH-02 | — | Pending |
-| MATCH-03 | — | Pending |
-| VALID-01 | — | Pending |
-| VALID-02 | — | Pending |
+| MATCH-01 | Phase 21 | Pending |
+| MATCH-02 | Phase 20 | Pending |
+| MATCH-03 | Phase 20 | Pending |
+| VALID-01 | Phase 22 | Pending |
+| VALID-02 | Phase 22 | Pending |
 
 **Coverage:**
 - v2.2 requirements: 5 total
-- Mapped to phases: 0
-- Unmapped: 5 ⚠️
+- Mapped to phases: 5
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap creation — all 5 requirements mapped*

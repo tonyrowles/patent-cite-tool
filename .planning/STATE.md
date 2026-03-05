@@ -70,8 +70,14 @@ All v1.0–v2.1 decisions archived in PROJECT.md Key Decisions table.
 
 None.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 2 | Fix CI: commit package-lock.json (currently gitignored but required by npm ci) | 2026-03-05 | a47dbb8 | [2-fix-ci-commit-package-lock-json-currentl](./quick/2-fix-ci-commit-package-lock-json-currentl/) |
+
 ## Session Continuity
 
-Last activity: 2026-03-04 — Roadmap created for v2.2 Matching Robustness
+Last activity: 2026-03-05 - Completed quick task 2: Fix CI: commit package-lock.json (currently gitignored but required by npm ci)
 Status: Roadmap ready — 3 phases defined, 5/5 requirements mapped
 Next: `/gsd:plan-phase 20` — plan OCR normalization and concat refactor

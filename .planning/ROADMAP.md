@@ -142,4 +142,4 @@ Plans:
 | 19. CI Hardening | v2.1 | 1/1 | Complete | 2026-03-05 |
 | 20. OCR Normalization and Concat Refactor | 2/2 | Complete    | 2026-03-05 | — |
 | 21. Gutter-Tolerant Matching | 1/1 | Complete    | 2026-03-05 | — |
-| 22. Validation and Golden Baseline | 1/1 | Complete   | 2026-03-05 | — |
+| 22. Validation and Golden Baseline | 1/1 | Complete    | 2026-03-05 | — |

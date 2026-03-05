@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Matching Robustness
 status: completed
-last_updated: "2026-03-05T17:55:41.598Z"
-last_activity: "2026-03-05 — Completed 21-01: gutterTolerantMatch Tier 5 fallback wired into matchAndCite"
+last_updated: "2026-03-05T18:00:30.085Z"
+last_activity: "2026-03-05 — Completed 22-01: 75-entry golden baseline, synthetic gutter fixture, full CI green (461/461 tests)"
 progress:
   total_phases: 3
   completed_phases: 3

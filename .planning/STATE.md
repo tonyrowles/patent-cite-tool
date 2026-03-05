@@ -1,34 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: CI/CD Pipeline
-status: complete
-last_updated: "2026-03-05"
-last_activity: 2026-03-05 — Milestone v2.1 archived
+milestone: v2.2
+milestone_name: Matching Robustness
+status: active
+last_updated: "2026-03-04"
+last_activity: 2026-03-04 — Milestone v2.2 started
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-05)
+See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Planning next milestone
+**Current focus:** Defining requirements for v2.2 Matching Robustness
 
 ## Current Position
 
-Milestone: v2.1 CI/CD Pipeline — COMPLETE
-Status: Ready for next milestone
-Last activity: 2026-03-05 — Milestone v2.1 archived
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-04 — Milestone v2.2 started
 
 ## Performance Metrics
 
@@ -58,6 +57,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-05 — Milestone v2.1 archived
-Status: Milestone complete
-Next: `/gsd:new-milestone`
+Last activity: 2026-03-04 — Milestone v2.2 started
+Status: Defining requirements
+Next: Define requirements → create roadmap

@@ -74,6 +74,15 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - webextension-polyfill — Firefox supports chrome.* natively; unnecessary dependency
 - Build-time minification — keep source readable for extension store review
 
+## Current Milestone: v2.2 Matching Robustness
+
+**Goal:** Harden the text matching pipeline against stray gutter line numbers and OCR discrepancies so citations succeed on patents with imperfect PDF text layers.
+
+**Target features:**
+- Gutter-number-tolerant matching — strip potential gutter numbers (multiples of 5, 5–65) from concat text during matching, so stray numbers that slip past upstream filters don't break citation lookup
+- OCR-aware normalization — handle common OCR confusions (case errors like s→S, character substitutions like 1↔l↔I/0↔O, merged words, split words) as a matching fallback
+- Validation with OCR-heavy patents (US6324676) and expanded test coverage
+
 ## Context
 
 Shipped v2.1 with 7,700 LOC (JavaScript/HTML/CSS/JSON/YAML) across 33 source files.
@@ -138,4 +147,4 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
 
 ---
-*Last updated: 2026-03-05 after v2.1 milestone*
+*Last updated: 2026-03-04 after v2.2 milestone start*

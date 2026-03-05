@@ -21,9 +21,9 @@ Requirements for CI/CD Pipeline milestone. Each maps to roadmap phases.
 
 ### Hardening
 
-- [ ] **HARD-01**: Concurrency group cancels stale CI runs when new commits push to the same branch
+- [x] **HARD-01**: Concurrency group cancels stale CI runs when new commits push to the same branch
 - [x] **HARD-02**: Job has `timeout-minutes` set to prevent indefinite hangs
-- [ ] **HARD-03**: Workflow uses explicit `permissions: contents: read` for least-privilege security
+- [x] **HARD-03**: Workflow uses explicit `permissions: contents: read` for least-privilege security
 
 ## Future Requirements
 
@@ -65,9 +65,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PKG-01 | Phase 18 | Complete |
 | PKG-02 | Phase 18 | Complete |
 | PKG-03 | Phase 18 | Complete |
-| HARD-01 | Phase 19 | Pending |
+| HARD-01 | Phase 19 | Complete |
 | HARD-02 | Phase 18 | Complete |
-| HARD-03 | Phase 19 | Pending |
+| HARD-03 | Phase 19 | Complete |
 
 **Coverage:**
 - v2.1 requirements: 9 total

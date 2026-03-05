@@ -64,7 +64,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 **Milestone Goal:** Automate build, test, and packaging via GitHub Actions so every push and PR is validated and store-ready ZIPs are produced as downloadable artifacts.
 
 - [x] **Phase 18: Core CI Workflow** - End-to-end GitHub Actions pipeline: triggers, dependency install, build, test, packaging, and artifact upload (completed 2026-03-05)
-- [ ] **Phase 19: CI Hardening** - Security and reliability hardening: concurrency group and least-privilege permissions
+- [x] **Phase 19: CI Hardening** - Security and reliability hardening: concurrency group and least-privilege permissions (completed 2026-03-05)
 
 ## Phase Details
 
@@ -90,7 +90,7 @@ Plans:
   1. Pushing two commits in quick succession to a PR branch cancels the first in-progress run before the second run completes
   2. The workflow YAML declares `permissions: contents: read` and no broader permission grants appear in the job or step blocks
   3. Push commits directly to main are never cancelled by the concurrency group (each main-branch run completes independently)
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 19-01-PLAN.md — Add concurrency group and least-privilege permissions to CI workflow
 
@@ -116,4 +116,4 @@ Plans:
 | 16. Firefox Extension | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 17. Cross-Browser Validation | v2.0 | 2/2 | Complete | 2026-03-05 |
 | 18. Core CI Workflow | v2.1 | 1/1 | Complete | 2026-03-05 |
-| 19. CI Hardening | v2.1 | 0/1 | Not started | - |
+| 19. CI Hardening | 1/1 | Complete   | 2026-03-05 | - |

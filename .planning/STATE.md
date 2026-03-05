@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: CI/CD Pipeline
 status: planning
-last_updated: "2026-03-05T05:45:43.874Z"
+last_updated: "2026-03-05T06:06:44.722Z"
 last_activity: 2026-03-04 — Roadmap created for v2.1
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
   percent: 0
 ---
 
@@ -43,6 +43,7 @@ Progress: [░░░░░░░░░░] 0%
 | v2.0 Firefox Port | 4 | 10 | ~2 days |
 | Phase 18-core-ci-workflow P01 | 2 | 1 tasks | 1 files |
 | Phase 18-core-ci-workflow P01 | 15min | 2 tasks | 1 files |
+| Phase 19-ci-hardening P01 | 1min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -55,6 +56,8 @@ All v1.0–v2.0 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 18-core-ci-workflow]: timeout-minutes: 10 for CI job — generous headroom over build+test time without risking 6-hour default hang
 - [Phase 18-core-ci-workflow]: Build runs once before 4 named test steps (not via npm test) — gives per-suite pass/fail visibility in Actions UI
 - [Phase 18-core-ci-workflow]: Shell zip with cd+zip pattern for store-ready ZIPs; actions/* at v4 for proven stability
+- [Phase 19-ci-hardening]: Concurrency group uses head_ref && ref || run_id: PR runs share a group key (cancelled on new push); main/feature push runs use unique run_id (never cancelled)
+- [Phase 19-ci-hardening]: permissions: contents: read at workflow level — upload-artifact v4 uses ACTIONS_RUNTIME_TOKEN so no additional GITHUB_TOKEN scopes needed
 
 ### Pending Todos
 

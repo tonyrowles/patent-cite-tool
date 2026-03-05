@@ -1,34 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Firefox Port
-status: completed
-last_updated: "2026-03-05"
-last_activity: 2026-03-05 — v2.0 milestone archived
+milestone: v2.1
+milestone_name: CI/CD Pipeline
+status: active
+last_updated: "2026-03-04"
+last_activity: 2026-03-04 — Milestone v2.1 started
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-05)
+See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Planning next milestone
+**Current focus:** v2.1 CI/CD Pipeline
 
 ## Current Position
 
-Phase: All v2.0 phases complete (14-17)
-Status: v2.0 Firefox Port SHIPPED — all 16 requirements satisfied, milestone archived
-Last activity: 2026-03-05 — v2.0 milestone archived
-
-Progress: [██████████] 100% (v2.0 complete)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-04 — Milestone v2.1 started
 
 ## Performance Metrics
 
@@ -53,7 +52,7 @@ None.
 
 ### Blockers/Concerns
 
-None — all v2.0 risks resolved.
+None.
 
 ### Quick Tasks Completed
 
@@ -63,6 +62,6 @@ None — all v2.0 risks resolved.
 
 ## Session Continuity
 
-Last activity: 2026-03-05 — v2.0 milestone archived
-Status: v2.0 SHIPPED — ready for next milestone
-Next: `/gsd:new-milestone` when ready to plan next version
+Last activity: 2026-03-04 — Milestone v2.1 started
+Status: Defining requirements for CI/CD Pipeline
+Next: Define requirements → create roadmap

@@ -44,9 +44,19 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - ✓ IndexedDB graceful degradation for Firefox private browsing — v2.0
 - ✓ Cross-browser validation — 71-case corpus passes both builds + web-ext lint — v2.0
 
+## Current Milestone: v2.1 CI/CD Pipeline
+
+**Goal:** Automate build, test, and packaging via GitHub Actions so every push and PR is validated and store-ready ZIPs are produced as artifacts.
+
+**Target features:**
+- GitHub Actions workflow triggered on push (all branches) and PRs to main
+- Build Chrome and Firefox dists
+- Run Vitest regression suite (71-case corpus)
+- Package store-ready .zip files as downloadable artifacts
+
 ### Active
 
-(No active requirements — next milestone not yet defined)
+- [ ] GitHub Actions CI/CD pipeline for automated build, test, and packaging
 
 ### Future
 
@@ -134,4 +144,4 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
 
 ---
-*Last updated: 2026-03-05 after v2.0 milestone*
+*Last updated: 2026-03-04 after v2.1 milestone start*

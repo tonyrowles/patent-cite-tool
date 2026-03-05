@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Matching Robustness
-status: executing
-last_updated: "2026-03-05T08:18:08.791Z"
-last_activity: "2026-03-05 — Completed 20-01: normalizeOcr and buildConcat extracted"
+status: completed
+last_updated: "2026-03-05T08:21:28.701Z"
+last_activity: "2026-03-05 — Completed 20-02: OCR selection normalization and penalty logic in matchAndCite"
 progress:
   total_phases: 3
   completed_phases: 1

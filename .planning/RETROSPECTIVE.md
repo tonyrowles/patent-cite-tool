@@ -188,6 +188,50 @@
 
 ---
 
+## Milestone: v2.1 — CI/CD Pipeline
+
+**Shipped:** 2026-03-05
+**Phases:** 2 | **Plans:** 2 | **Commits:** 15
+
+### What Was Built
+- GitHub Actions CI workflow triggering on push (all branches) and PRs to main
+- Four individually named test steps (test:src, test:chrome, test:firefox, test:lint) with per-suite pass/fail visibility in Actions UI
+- Store-ready ZIP packaging via cd+zip pattern — manifest.json at archive root, uploaded as downloadable artifacts
+- Concurrency group with head_ref && ref || run_id — stale PR runs cancelled, main-branch runs protected
+- Least-privilege GITHUB_TOKEN scope (contents: read only)
+- 10-minute job timeout to prevent runaway builds
+
+### What Worked
+- Smallest milestone yet (2 phases, 1 file) — focused scope made execution clean and fast
+- Pre-flight validation (build + lint locally) before committing CI workflow avoided any GitHub Actions iteration
+- Phase 18 → Phase 19 sequencing was natural — base workflow first, then hardening additions
+- Both plans executed with zero deviations from plan
+- Auto-advance mode for checkpoints worked well since CI verification was confirmatory (not exploratory)
+
+### What Was Inefficient
+- ROADMAP.md plan checkbox for 19-01 still shows `[ ]` despite being complete — 5th consecutive milestone with this recurring issue
+- Phase 19 progress table row in ROADMAP.md had a formatting error (missing v2.1 milestone column) — carried through to archive
+- STATE.md had stale phase-level performance metrics mixed with milestone-level rows — formatting inconsistency
+
+### Patterns Established
+- cd+zip pattern: `cd dist/X && zip -r ../../name.zip .` — ensures manifest.json at archive root
+- Named test steps (not single `npm test`) for individual pass/fail visibility in CI
+- Concurrency pattern: `${{ github.workflow }}-${{ github.head_ref && github.ref || github.run_id }}` for PR cancellation without main-branch impact
+- Workflow-level `permissions: contents: read` as default for read-only CI workflows
+
+### Key Lessons
+1. **Pre-flight local validation is cheap insurance.** Running the full build+test locally before committing CI workflow saved what could have been multiple push-fix-push iterations on GitHub.
+2. **Focused milestones execute cleanly.** Two phases, one file, clear requirements — both plans completed with zero deviations. Scope discipline pays off.
+3. **ROADMAP.md checkbox sync is a permanent debt.** Five milestones in a row. Either automate it or accept it as cosmetic and stop noting it.
+4. **CI hardening is a natural follow-on, not a separate milestone.** Concurrency + permissions added 7 lines and took 1 minute. Could have been part of Phase 18, but separation made requirements tracking cleaner.
+
+### Cost Observations
+- Model mix: balanced profile (sonnet for execution agents, opus for orchestration)
+- Sessions: 1 (both phases in a single session)
+- Notable: Fastest milestone — ~3 minutes of execution time total. Minimal file changes (1 file, 68 lines).
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -198,6 +242,7 @@
 | v1.1 | ~20 | 3 | Infrastructure + parallel execution — wave-based plans |
 | v1.2 | 69 | 6 | Test infrastructure + audit-driven gap closure |
 | v2.0 | 52 | 4 | Build pipeline + cross-browser architecture |
+| v2.1 | 15 | 2 | CI/CD automation — smallest, fastest milestone |
 
 ### Cumulative Quality
 
@@ -207,6 +252,7 @@
 | v1.1 | 0 | ~95% (manual) | Duplicated matching functions |
 | v1.2 | 95 | 100% (71-case corpus) | Manual screenshot/tile assets pending |
 | v2.0 | 303 | 100% (71-case × 3 targets) | Store submissions pending |
+| v2.1 | 338 | 100% (CI-validated) | Store submissions pending |
 
 ### Top Lessons (Verified Across Milestones)
 

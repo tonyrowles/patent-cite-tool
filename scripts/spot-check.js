@@ -101,13 +101,10 @@ for (let i = 0; i < SPOT_CHECK_IDS.length; i++) {
   }
 
   // Display
-  const textPreview = tc.selectedText.length > 80
-    ? tc.selectedText.slice(0, 80) + '...'
-    : tc.selectedText;
-
   console.log(`\n[${i + 1}/5] ${patentNumber}  (${tc.category})`);
   console.log(`  URL:              ${googleUrl}`);
-  console.log(`  Select this text: "${textPreview}"`);
+  console.log(`  Select this text:`);
+  console.log(`  "${tc.selectedText}"`);
   if (citation !== null) {
     console.log(`  Expected citation: ${citation}`);
   } else {

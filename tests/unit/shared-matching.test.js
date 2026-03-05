@@ -320,18 +320,20 @@ describe('shared/matching.js', () => {
       // "method 25 further" -> "method further"
       // original: m(0)e(1)t(2)h(3)o(4)d(5) (6)2(7)5(8) (9)f(10)u(11)r(12)t(13)h(14)e(15)r(16)
       // stripped: m(0)e(1)t(2)h(3)o(4)d(5) (6)f(7)u(8)r(9)t(10)h(11)e(12)r(13)
-      // strippedToOrig[6] should map to 9 (the space before 'further' in original)
-      // strippedToOrig[7] should map to 10 ('f' in 'further')
+      // After stripping '25' (indices 7,8), preCollapse = "method  further" (double space at orig 6,9)
+      // Collapse keeps the FIRST space (orig pos 6), skips the second (orig pos 9)
+      // So strippedToOrig[6] = 6 (the first surviving space, orig position 6)
+      // strippedToOrig[7] = 10 ('f' in 'further' at original position 10)
       const result = stripGutterNumbers('method 25 further');
       expect(Array.isArray(result.strippedToOrig)).toBe(true);
       // The offset array length should match the stripped string length
       expect(result.strippedToOrig.length).toBe(result.stripped.length);
       // Position 0 of stripped ('m') should map to position 0 of original
       expect(result.strippedToOrig[0]).toBe(0);
-      // Position 6 of stripped (' ') should map to position 9 of original (space after '25')
-      // (original: 'method 25 further', space after 25 is at index 9)
-      // After stripping '25' (indices 7,8) the space before 'further' (index 9) survives
-      expect(result.strippedToOrig[6]).toBe(9);
+      // Position 6 of stripped (' ') maps to original position 6 (first surviving space)
+      expect(result.strippedToOrig[6]).toBe(6);
+      // Position 7 of stripped ('f') maps to original position 10 ('f' in 'further')
+      expect(result.strippedToOrig[7]).toBe(10);
     });
 
     it('Test 8: returns changed=false when no gutter numbers found', () => {
@@ -404,27 +406,40 @@ describe('shared/matching.js', () => {
 
   describe('matchAndCite Tier 5 integration', () => {
     it('Test 14: selection resolves via Tier 5 when gutter number in concat prevented Tiers 1-4, confidence 0.85', () => {
-      // Concat: "an improved 20 method for" -- selection: "an improved method for"
-      // Tiers 1-4 will all fail because the texts differ (20 in concat but not selection)
+      // Concat: "method 20 25 further" -- selection: "method further"
+      // Two gutter numbers (20, 25) inserted in concat cause all Tiers 1-4 to fail:
+      //   Tier 1 exact: "method further" not in "method 20 25 further"
+      //   Tier 2 ws-stripped: "methodfurther" not in "method2025further"
+      //   Tier 3 bookend: selection too short (< 60 chars)
+      //   Tier 4 fuzzy: distance 6 / max(14,20) = 0.7 similarity < 0.80 -> fails
+      // Tier 5 strips both "20" and "25" -> "method further", exact match, returns 0.85
       const positionMap = [
-        { text: 'an improved 20 method for', column: 1, lineNumber: 15, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'method 20 25 further', column: 1, lineNumber: 15, page: 1, section: 'spec', hasWrapHyphen: false },
       ];
-      const result = matchAndCite('an improved method for', positionMap);
+      const result = matchAndCite('method further', positionMap);
       expect(result).not.toBeNull();
       expect(result.confidence).toBe(0.85);
       expect(result.citation).toBe('1:15');
     });
 
     it('Test 15: Tier 5 does not apply OCR penalty stacking -- confidence stays 0.85 even when selChanged=true', () => {
-      // Selection with OCR pattern (rn->m would fire, selChanged=true)
-      // AND gutter number in concat -- Tier 5 should return 0.85 flat, not 0.83
+      // Selection with OCR pattern (rn->m fires, selChanged=true)
+      // AND two gutter numbers in concat that make Tiers 1-4 ALL fail
+      // Tier 5 strips the gutter numbers and resolves, returning flat 0.85 (not 0.83)
+      //
+      // Concat: "rnethod 20 25 further" (normalizeOcr in buildConcat turns rn->m: "method 20 25 further")
+      // Selection: "rnethod further" -> normalizeText -> normalizeOcr -> "method further"
+      // selChanged=true because selection had OCR pattern "rn" at start
+      //
+      // Tier 4 fuzzy: needle="method further" (14), haystack="method 20 25 further" (20)
+      // Two gutter insertions cause similarity < 0.80, so Tier 4 fails.
+      // Tier 5 strips "20" and "25" -> "method further", exact match, returns 0.85
       const positionMap = [
-        { text: 'communication 10 is key', column: 1, lineNumber: 20, page: 1, section: 'spec', hasWrapHyphen: false },
+        { text: 'rnethod 20 25 further', column: 1, lineNumber: 20, page: 1, section: 'spec', hasWrapHyphen: false },
       ];
-      // "cornrnunication is key" has OCR confusion (rn->m), selChanged will be true
-      // But Tier 5 overrides penalty -- must return 0.85, not 0.83
-      const result = matchAndCite('cornrnunication is key', positionMap);
+      const result = matchAndCite('rnethod further', positionMap);
       expect(result).not.toBeNull();
+      // selChanged is true but Tier 5 owns flat 0.85 -- no penalty stacking
       expect(result.confidence).toBe(0.85);
     });
 

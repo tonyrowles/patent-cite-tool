@@ -451,6 +451,180 @@ export function levenshtein(a, b) {
 }
 
 /**
+ * Standalone multiples of 5 in the range 5-65 that may appear as gutter line numbers
+ * in USPTO patent PDF concat text. Space-anchored to avoid stripping patent numbers,
+ * chemical quantities, and sequence identifiers.
+ */
+const GUTTER_VALUES = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65];
+
+/**
+ * Strip stray gutter line numbers from a concat string.
+ *
+ * USPTO patents print gutter line numbers (multiples of 5, range 5-65) every 5 lines.
+ * The upstream spatial filter normally excludes them, but occasionally one slips through
+ * into the concat. This function strips only space-isolated standalone values so that
+ * numbers embedded in measurements ("30% ACN"), identifiers ("US5559167"), and
+ * sequence numbers ("SEQ ID NO: 30") are preserved.
+ *
+ * Uses a character-survive mask to track which original positions survive, then
+ * rebuilds the strippedToOrig offset array after double-space collapse.
+ *
+ * @param {string} concat - The concat string from buildConcat.
+ * @returns {{ stripped: string, strippedToOrig: number[], changed: boolean }}
+ *   stripped:      The concat with gutter numbers removed and double-spaces collapsed.
+ *   strippedToOrig: strippedToOrig[i] = original concat index for stripped[i].
+ *   changed:       true if any characters were removed.
+ */
+export function stripGutterNumbers(concat) {
+  // Mark each position as surviving (1) or stripped (0)
+  const survive = new Uint8Array(concat.length).fill(1);
+
+  for (const n of GUTTER_VALUES) {
+    const numStr = String(n);
+    const len = numStr.length;
+    for (let pos = 0; pos <= concat.length - len; pos++) {
+      if (concat.substring(pos, pos + len) === numStr) {
+        const before = pos === 0 || concat[pos - 1] === ' ';
+        const after = pos + len === concat.length || concat[pos + len] === ' ';
+        if (before && after) {
+          // Strip the gutter number characters (but not the surrounding spaces)
+          for (let k = pos; k < pos + len; k++) survive[k] = 0;
+        }
+      }
+    }
+  }
+
+  // Build initial stripped string and offset map from survive mask
+  const preCollapseToOrig = [];
+  let preCollapse = '';
+  for (let i = 0; i < concat.length; i++) {
+    if (survive[i]) {
+      preCollapseToOrig.push(i);
+      preCollapse += concat[i];
+    }
+  }
+
+  // Collapse double-spaces and trim, then rebuild offset array (approach 2: rebuild after collapse)
+  // Walk preCollapse, skip extra spaces, and build the final stripped string + strippedToOrig
+  const strippedToOrig = [];
+  let stripped = '';
+  let prevWasSpace = false;
+  for (let i = 0; i < preCollapse.length; i++) {
+    const ch = preCollapse[i];
+    if (ch === ' ') {
+      if (!prevWasSpace && stripped.length > 0) {
+        // Keep this space only if we are not at the start and not doubling up
+        strippedToOrig.push(preCollapseToOrig[i]);
+        stripped += ch;
+        prevWasSpace = true;
+      }
+      // Skip extra spaces (prevWasSpace already true, or at start of string)
+    } else {
+      strippedToOrig.push(preCollapseToOrig[i]);
+      stripped += ch;
+      prevWasSpace = false;
+    }
+  }
+  // Trim trailing space if any
+  if (stripped.endsWith(' ')) {
+    stripped = stripped.slice(0, -1);
+    strippedToOrig.pop();
+  }
+
+  const changed = stripped !== concat;
+  return { stripped, strippedToOrig, changed };
+}
+
+/**
+ * Tier 5 gutter-tolerant fallback for matchAndCite.
+ *
+ * When Tiers 1-4 all fail, this function strips stray gutter line numbers from
+ * a copy of the concat, remaps the boundary array to the stripped positions, and
+ * replays the full Tier 1-4 cascade on the stripped concat. Confidence is always
+ * capped at 0.85 (forces yellow UI indicator) regardless of which inner tier succeeds.
+ *
+ * No-op guard: if stripping changed nothing, returns null immediately (Tiers 1-4
+ * already tried this exact text and failed).
+ *
+ * OCR penalty is NOT applied to Tier 5 results — the flat 0.85 cap already signals
+ * uncertainty appropriate for legal filings. applyPenaltyIfNeeded is intentionally
+ * bypassed by matchAndCite for this tier.
+ *
+ * @param {string} selection - OCR-normalized selection text (ocrNormalized from matchAndCite).
+ * @param {string} concat - Original concat from buildConcat (not modified).
+ * @param {Array} boundaries - Original boundary array from buildConcat.
+ * @param {Array} positionMap - positionMap array for entry lookup.
+ * @param {string} contextBefore - Text before selection in DOM.
+ * @param {string} contextAfter - Text after selection in DOM.
+ * @returns {{ citation: string, startEntry: object, endEntry: object, confidence: number } | null}
+ */
+export function gutterTolerantMatch(selection, concat, boundaries, positionMap, contextBefore, contextAfter) {
+  // Step 1: Strip gutter numbers from a copy of concat
+  const { stripped, strippedToOrig, changed } = stripGutterNumbers(concat);
+
+  // No-op guard: if nothing was stripped, Tiers 1-4 already tried this exact text
+  if (!changed) return null;
+
+  // Step 2: Build origToStripped reverse map for boundary remapping
+  // origToStripped[origIdx] = strippedIdx, or -1 if that char was stripped
+  const origToStripped = new Int32Array(concat.length).fill(-1);
+  for (let si = 0; si < strippedToOrig.length; si++) {
+    origToStripped[strippedToOrig[si]] = si;
+  }
+
+  // Step 3: Remap boundaries from original-concat space to stripped-concat space
+  // resolveMatch uses boundaries to find entryIdx via charStart <= pos < charEnd
+  const remappedBoundaries = boundaries.map(b => {
+    // Find first surviving position at or after charStart
+    let newStart = origToStripped[b.charStart];
+    if (newStart === -1) {
+      for (let j = b.charStart; j < concat.length; j++) {
+        if (origToStripped[j] !== -1) { newStart = origToStripped[j]; break; }
+      }
+    }
+    if (newStart === -1) newStart = 0; // fallback for edge case
+
+    // Find last surviving position before charEnd, then +1 (exclusive)
+    let newEnd = -1;
+    for (let j = b.charEnd - 1; j >= b.charStart; j--) {
+      if (origToStripped[j] !== -1) { newEnd = origToStripped[j] + 1; break; }
+    }
+    if (newEnd === -1) newEnd = newStart + 1; // fallback for all-stripped entry
+
+    return { charStart: newStart, charEnd: newEnd, entryIdx: b.entryIdx };
+  });
+
+  // Step 4: Replay Tier 1-4 cascade on stripped concat with remapped boundaries
+
+  // Inner Tier 1: exact match
+  const exactPositions = findAllOccurrences(stripped, selection);
+  if (exactPositions.length > 0) {
+    const bestPos = pickBestByContext(exactPositions, selection.length, stripped, contextBefore, contextAfter);
+    const result = resolveMatch(bestPos, bestPos + selection.length, remappedBoundaries, positionMap, 0.85);
+    if (result) return result;
+  }
+
+  // Inner Tier 2: whitespace-stripped match (uses remapped boundaries internally)
+  const wsResult = whitespaceStrippedMatch(selection, stripped, remappedBoundaries, positionMap, contextBefore, contextAfter);
+  if (wsResult) return { ...wsResult, confidence: 0.85 };
+
+  // Inner Tier 3: bookend match (uses remapped boundaries internally; requires long selection)
+  if (selection.length > 60) {
+    const beResult = bookendMatch(selection, stripped, remappedBoundaries, positionMap);
+    if (beResult) return { ...beResult, confidence: 0.85 };
+  }
+
+  // Inner Tier 4: fuzzy match (resolve with remapped boundaries at 0.85)
+  const fuzzyResult = fuzzySubstringMatch(selection, stripped);
+  if (fuzzyResult && fuzzyResult.similarity >= 0.80) {
+    const result = resolveMatch(fuzzyResult.start, fuzzyResult.end, remappedBoundaries, positionMap, 0.85);
+    if (result) return result;
+  }
+
+  return null;
+}
+
+/**
  * Core matching function.
  * Given selected text and a PositionMap, returns a citation result or null.
  *
@@ -539,6 +713,17 @@ export function matchAndCite(selectedText, positionMap, contextBefore = '', cont
       boundaries, positionMap, fuzzyResult.similarity
     ));
   }
+
+  // Tier 5: gutter-tolerant fallback — strips stray gutter line numbers (multiples of 5,
+  // range 5-65) from a copy of the concat, remaps boundaries, and replays the Tier 1-4
+  // cascade on the stripped concat. Confidence is capped at 0.85 (yellow UI indicator).
+  //
+  // applyPenaltyIfNeeded is NOT applied: Tier 5 owns its flat 0.85 confidence,
+  // overriding OCR penalty stacking per design decision.
+  const gutterResult = gutterTolerantMatch(
+    ocrNormalized, concat, boundaries, positionMap, contextBefore, contextAfter
+  );
+  if (gutterResult) return gutterResult;
 
   return null;
 }

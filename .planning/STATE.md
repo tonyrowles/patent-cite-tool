@@ -2,34 +2,33 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: CI/CD Pipeline
-status: planning
-last_updated: "2026-03-05T06:09:29.268Z"
-last_activity: 2026-03-04 — Roadmap created for v2.1
+status: complete
+last_updated: "2026-03-05"
+last_activity: 2026-03-05 — Milestone v2.1 archived
 progress:
   total_phases: 2
   completed_phases: 2
   total_plans: 2
   completed_plans: 2
-  percent: 0
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-04)
+See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** v2.1 CI/CD Pipeline — Phase 18: Core CI Workflow
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 18 of 19 (Core CI Workflow)
-Plan: — (not started)
-Status: Ready to plan
-Last activity: 2026-03-04 — Roadmap created for v2.1
+Milestone: v2.1 CI/CD Pipeline — COMPLETE
+Status: Ready for next milestone
+Last activity: 2026-03-05 — Milestone v2.1 archived
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -41,23 +40,13 @@ Progress: [░░░░░░░░░░] 0%
 | v1.1 Silent Mode + Infrastructure | 3 | 8 | 1 day |
 | v1.2 Store Polish + Accuracy Hardening | 6 | 12 | 2 days |
 | v2.0 Firefox Port | 4 | 10 | ~2 days |
-| Phase 18-core-ci-workflow P01 | 2 | 1 tasks | 1 files |
-| Phase 18-core-ci-workflow P01 | 15min | 2 tasks | 1 files |
-| Phase 19-ci-hardening P01 | 1min | 2 tasks | 1 files |
+| v2.1 CI/CD Pipeline | 2 | 2 | 2 days |
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.0–v2.0 decisions archived in PROJECT.md Key Decisions table.
-- [Phase 18-core-ci-workflow]: timeout-minutes: 10 for CI job — generous headroom over build+test time without risking 6-hour default hang
-- [Phase 18-core-ci-workflow]: Build runs once before 4 named test steps (not via npm test) — gives per-suite pass/fail visibility in Actions UI
-- [Phase 18-core-ci-workflow]: Shell zip with cd+zip pattern for store-ready ZIPs; actions/* at v4 for proven stability
-- [Phase 18-core-ci-workflow]: timeout-minutes: 10 for CI job — generous headroom over build+test time without risking 6-hour default hang
-- [Phase 18-core-ci-workflow]: Build runs once before 4 named test steps (not via npm test) — gives per-suite pass/fail visibility in Actions UI
-- [Phase 18-core-ci-workflow]: Shell zip with cd+zip pattern for store-ready ZIPs; actions/* at v4 for proven stability
-- [Phase 19-ci-hardening]: Concurrency group uses head_ref && ref || run_id: PR runs share a group key (cancelled on new push); main/feature push runs use unique run_id (never cancelled)
-- [Phase 19-ci-hardening]: permissions: contents: read at workflow level — upload-artifact v4 uses ACTIONS_RUNTIME_TOKEN so no additional GITHUB_TOKEN scopes needed
+All v1.0–v2.1 decisions archived in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
@@ -65,10 +54,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 18: Validate `npm run test:lint` exits 0 locally against a clean `dist/` build before committing the workflow (web-ext lint PDF.js false positive risk — MEDIUM confidence).
+None.
 
 ## Session Continuity
 
-Last activity: 2026-03-04 — Roadmap created
-Status: Phase 18 ready to plan
-Next: `/gsd:plan-phase 18`
+Last activity: 2026-03-05 — Milestone v2.1 archived
+Status: Milestone complete
+Next: `/gsd:new-milestone`

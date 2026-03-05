@@ -44,19 +44,9 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - ✓ IndexedDB graceful degradation for Firefox private browsing — v2.0
 - ✓ Cross-browser validation — 71-case corpus passes both builds + web-ext lint — v2.0
 
-## Current Milestone: v2.1 CI/CD Pipeline
+### Validated
 
-**Goal:** Automate build, test, and packaging via GitHub Actions so every push and PR is validated and store-ready ZIPs are produced as artifacts.
-
-**Target features:**
-- GitHub Actions workflow triggered on push (all branches) and PRs to main
-- Build Chrome and Firefox dists
-- Run Vitest regression suite (71-case corpus)
-- Package store-ready .zip files as downloadable artifacts
-
-### Active
-
-- [ ] GitHub Actions CI/CD pipeline for automated build, test, and packaging
+- ✓ GitHub Actions CI/CD pipeline — build, test (338 tests + lint), and store-ready ZIP packaging on every push/PR — v2.1
 
 ### Future
 
@@ -86,9 +76,9 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 
 ## Context
 
-Shipped v2.0 with 7,600 LOC (JavaScript/HTML/CSS/JSON) across 32 source files.
-Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest, web-ext, sharp.
-Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules in src/shared/ (constants, matching). Firefox uses background script instead of offscreen document.
+Shipped v2.1 with 7,700 LOC (JavaScript/HTML/CSS/JSON/YAML) across 33 source files.
+Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest, web-ext, sharp, GitHub Actions.
+Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules in src/shared/ (constants, matching). Firefox uses background script instead of offscreen document. CI via GitHub Actions: build → 4 test suites → ZIP packaging → artifact upload.
 
 - **Google Patents HTML vs PDF mismatch**: Handled with fuzzy matching (exact → whitespace-stripped → punctuation-agnostic → bookend → Levenshtein). Long selections (>500 chars) may fail when texts genuinely diverge.
 - **Patent PDF structure**: Cover page → preliminary material → figures → two-column specification. Bimodal x-coordinate analysis detects spec pages; dynamic gutter detection finds column boundaries.
@@ -126,6 +116,10 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | IndexedDB detect-once degradation | Single idbAvailable flag on first error; all IDB ops silently skipped | ✓ Good — graceful private browsing support |
 | Per-target vitest alias configs | Redirect src/shared imports to dist/ bundles without modifying test files | ✓ Good — proves bundling correctness |
 | No webextension-polyfill | Firefox natively supports chrome.* namespace | ✓ Good — zero extra dependencies |
+| GitHub Actions CI with 4 named test steps | Per-suite pass/fail visibility in Actions UI (not single npm test) | ✓ Good — individual failure diagnosis |
+| Shell zip with cd+zip for store-ready artifacts | Pre-installed on ubuntu-latest; manifest.json at ZIP root | ✓ Good — no action dependency |
+| Concurrency group: head_ref && ref \|\| run_id | PR runs cancelled on new push; main runs never cancelled (unique run_id) | ✓ Good — correct semantics |
+| Workflow-level permissions: contents: read | upload-artifact v4 uses ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN | ✓ Good — least-privilege |
 | Local-only caching via IndexedDB | Cloud cache adds backend complexity; local sufficient for MVP | ✓ Good for v1 |
 | Citation format: 4:5-20 shorthand | User preference for compact format | ✓ Good — shipped as default |
 | Pre-compute citation on mouseup for silent mode | Copy event must be synchronous; async lookup impossible in copy handler | ✓ Good — fast, no visible delay |
@@ -144,4 +138,4 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
 
 ---
-*Last updated: 2026-03-04 after v2.1 milestone start*
+*Last updated: 2026-03-05 after v2.1 milestone*

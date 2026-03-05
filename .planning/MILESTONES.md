@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.1 CI/CD Pipeline (Shipped: 2026-03-05)
+
+**Phases completed:** 2 phases (18-19), 2 plans, 4 tasks
+**Timeline:** 2 days (2026-03-04 → 2026-03-05)
+**Source LOC:** 68 (YAML)
+**Git range:** b9ac927..9afd509 (1 file, +68 lines)
+
+**Delivered:** GitHub Actions CI/CD pipeline that triggers on every push and PR, builds Chrome and Firefox dists, runs 4 named test suites (338 tests + web-ext lint), packages store-ready ZIPs as downloadable artifacts, and is hardened with concurrency cancellation and least-privilege permissions.
+
+**Key accomplishments:**
+1. GitHub Actions CI workflow — triggers on push (all branches) and PRs to main with Node 22 LTS + npm cache
+2. Four individually named test steps (test:src, test:chrome, test:firefox, test:lint) with per-suite pass/fail visibility
+3. Store-ready ZIP packaging via cd+zip pattern with manifest.json at archive root, uploaded via upload-artifact@v4
+4. Concurrency group with head_ref && ref || run_id — stale PR runs cancelled, main-branch runs protected
+
+**Requirements:** 9/9 v2.1 requirements shipped (CICD-01-03, PKG-01-03, HARD-01-03)
+
+---
+
 ## v2.0 Firefox Port (Shipped: 2026-03-05)
 
 **Phases completed:** 4 phases (14-17), 10 plans

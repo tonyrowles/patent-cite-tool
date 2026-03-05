@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Matching Robustness
-status: active
-last_updated: "2026-03-05"
-last_activity: 2026-03-05 — Completed 20-01 normalizeOcr and buildConcat
+status: executing
+last_updated: "2026-03-05T08:18:08.791Z"
+last_activity: "2026-03-05 — Completed 20-01: normalizeOcr and buildConcat extracted"
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,12 +24,12 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 20 — OCR Normalization and Concat Refactor
-Plan: 01 complete (ready for 02)
-Status: Active — Phase 20 in progress
-Last activity: 2026-03-05 — Completed 20-01: normalizeOcr and buildConcat extracted
+Plan: 02 complete (Phase 20 complete)
+Status: Active — Phase 20 complete, ready for Phase 21
+Last activity: 2026-03-05 — Completed 20-02: OCR selection normalization and penalty logic in matchAndCite
 
 ```
-v2.2 Progress: [█████░░░░░] 50% (1/2 plans in Phase 20)
+v2.2 Progress: [██████████] 100% (2/2 plans in Phase 20)
 ```
 
 ## Performance Metrics
@@ -61,6 +61,7 @@ All v1.0–v2.1 decisions archived in PROJECT.md Key Decisions table.
 - Golden baseline updated only after manual citation verification against printed patent — additions only, no modifications to existing 71 entries
 - [Phase 20-ocr-normalization-and-concat-refactor]: normalizeOcr applied symmetrically to both selectedText and concat so OCR transformation is net-zero for clean text and corrective for OCR-corrupted PDF text
 - [Phase 20-ocr-normalization-and-concat-refactor]: buildConcat returns {concat, boundaries, changedRanges} — changedRanges tracks OCR-affected ranges for future tiers, buildConcat is single source of truth replacing inline loop
+- [Phase 20-ocr-normalization-and-concat-refactor]: OCR penalty condition is selChanged only (not changedRanges overlap) — real patent text contains rn/cl/li in common English so changedRanges is almost always non-empty; selChanged is the correct necessity test
 
 ### Pending Todos
 
@@ -79,6 +80,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-05 - Completed 20-01: normalizeOcr and buildConcat extracted to matching.js; matchAndCite refactored; 153 tests pass
-Status: Phase 20 active — 20-01 complete (MATCH-02, MATCH-03 done)
-Next: 20-02 — gutterTolerantMatch (or next planned phase 20 plan)
+Last activity: 2026-03-05 - Completed 20-02: OCR normalization wired into matchAndCite cascade with selChanged-based penalty; 157 tests pass
+Status: Phase 20 complete — MATCH-02 and MATCH-03 both satisfied; 71/71 baseline cases preserved
+Next: Phase 21 — gutterTolerantMatch using shared buildConcat helper

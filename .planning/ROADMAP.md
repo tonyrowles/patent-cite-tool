@@ -72,7 +72,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
 ### v2.2 Matching Robustness (Phases 20-22)
 
-- [ ] **Phase 20: OCR Normalization and Concat Refactor** - Extract buildConcat, add normalizeOcr as Tier 0b preprocessing
+- [x] **Phase 20: OCR Normalization and Concat Refactor** - Extract buildConcat, add normalizeOcr as Tier 0b preprocessing (completed 2026-03-05)
 - [ ] **Phase 21: Gutter-Tolerant Matching** - Add gutterTolerantMatch as Tier 5 fallback with confidence ceiling
 - [ ] **Phase 22: Validation and Golden Baseline** - Add US6324676 test cases and verify merged/split-word coverage
 
@@ -87,7 +87,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
   2. All 71 existing golden baseline cases pass at the same tier and confidence values as before the change — zero regressions
   3. `buildConcat` is exported from `src/shared/matching.js` and returns `{ concat, boundaries }` — `matchAndCite` calls it rather than inlining the loop
   4. `normalizeOcr` is exported from `src/shared/matching.js` and applied to both the selection and the positionMap entries inside `buildConcat` before any matching tier runs
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 20-01-PLAN.md — TDD: normalizeOcr function, buildConcat extraction, matchAndCite rewire
 - [ ] 20-02-PLAN.md — Wire OCR normalization into matchAndCite cascade with confidence penalty
@@ -136,6 +136,6 @@ Plans:
 | 17. Cross-Browser Validation | v2.0 | 2/2 | Complete | 2026-03-05 |
 | 18. Core CI Workflow | v2.1 | 1/1 | Complete | 2026-03-05 |
 | 19. CI Hardening | v2.1 | 1/1 | Complete | 2026-03-05 |
-| 20. OCR Normalization and Concat Refactor | 1/2 | In Progress|  | — |
+| 20. OCR Normalization and Concat Refactor | 2/2 | Complete   | 2026-03-05 | — |
 | 21. Gutter-Tolerant Matching | v2.2 | 0/? | Not started | — |
 | 22. Validation and Golden Baseline | v2.2 | 0/? | Not started | — |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Firefox Port
 status: completed
-last_updated: "2026-03-04T23:57:04.117Z"
+last_updated: "2026-03-05T00:33:19.909Z"
 last_activity: "2026-03-04 — Phase 16-03 complete (Firefox human UAT: icon activation, citation generation, IndexedDB degradation all verified)"
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 10
+  completed_plans: 9
   percent: 100
 ---
 
@@ -24,12 +24,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: 16 of 17 (Firefox Extension)
-Plan: 03 complete — Firefox human verification (all FOX requirements confirmed in real browser)
-Status: Phase 16 COMPLETE — all 3 plans done, ready for Phase 17
-Last activity: 2026-03-04 — Phase 16-03 complete (Firefox human UAT: icon activation, citation generation, IndexedDB degradation all verified)
+Phase: 17 of 17 (Cross-Browser Validation)
+Plan: 01 complete — Cross-browser test infrastructure (71/71 corpus, web-ext lint 0 errors)
+Status: Phase 17 Plan 01 COMPLETE — VALID-01 and VALID-02 satisfied; npm test is single-command validator
+Last activity: 2026-03-05 — Phase 17-01 complete (cross-browser vitest configs + web-ext lint wired into npm test)
 
-Progress: [██████████] 100% (v2.0 Phase 16 complete — all FOX requirements satisfied)
+Progress: [█████████░] 90% (Phase 17 Plan 01 complete — cross-browser validation infrastructure permanent)
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Progress: [██████████] 100% (v2.0 Phase 16 complete — all 
 | Phase 16-firefox-extension P01 | 4 | 2 tasks | 3 files |
 | Phase 16-firefox-extension P02 | 2min | 2 tasks | 1 files |
 | Phase 16-firefox-extension P03 | 5min | 2 tasks | 0 files |
+| Phase 17-cross-browser-validation P01 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,10 @@ All v1.0–v1.2 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 16-firefox-extension]: Object entry point syntax (not outbase) for Firefox ESM bundle prevents dist/firefox/firefox/background.js path double-nesting
 - [Phase 16-firefox-extension]: external: ['../lib/pdf.mjs'] in Firefox ESM config — relative to dist/firefox/background/ output location, resolves to dist/firefox/lib/pdf.mjs at runtime
 - [Phase 16-firefox-extension]: Firefox extension human UAT passed — user confirmed all FOX requirements (FOX-01 through FOX-05) satisfied in real Firefox browser: load without errors, icon activation, column:line citations matching Chrome output, wasm-unsafe-eval CSP for PDF.js, IndexedDB degradation to in-memory Map
+- [Phase 17-cross-browser-validation]: Per-target test-export ESM bundles (chrome/firefox) prove each dist/ build's bundling did not corrupt matching logic
+- [Phase 17-cross-browser-validation]: vitest resolve.alias regex pattern intercepts src/shared/matching.js imports and redirects to dist/ bundle without modifying test files
+- [Phase 17-cross-browser-validation]: web-ext lint uses --ignore-files 'lib/**' with no --warnings-as-errors; VALID-02 requires 0 errors only; 11 warnings are intentional extension patterns
+- [Phase 17-cross-browser-validation]: npm test is now full validation pipeline: build + test:src + test:chrome + test:firefox + test:lint
 
 ### Pending Todos
 
@@ -94,6 +99,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-04 — Phase 16 Plan 03 complete (Firefox human verification: all FOX requirements confirmed in real browser)
-Status: Phase 16 COMPLETE — Firefox MV3 extension fully built and verified
-Next: Phase 17 (release / store submission packaging)
+Last activity: 2026-03-05 — Phase 17 Plan 01 complete (cross-browser vitest configs + web-ext lint pipeline)
+Status: Phase 17 Plan 01 COMPLETE — VALID-01, VALID-02 satisfied; npm test is permanent single-command validator
+Next: Phase 17 Plan 02 (if exists) or project complete

@@ -31,8 +31,8 @@ Requirements for Firefox port milestone. Each maps to roadmap phases.
 
 ### Validation
 
-- [ ] **VALID-01**: 71-case test corpus passes against both Chrome and Firefox builds
-- [ ] **VALID-02**: `web-ext lint` passes on Firefox build
+- [x] **VALID-01**: 71-case test corpus passes against both Chrome and Firefox builds
+- [x] **VALID-02**: `web-ext lint` passes on Firefox build
 - [ ] **VALID-03**: Both extensions load and produce citations on Google Patents
 
 ## Future Requirements
@@ -80,8 +80,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOX-03 | Phase 16 | Complete |
 | FOX-04 | Phase 16 | Complete |
 | FOX-05 | Phase 16 | Complete |
-| VALID-01 | Phase 17 | Pending |
-| VALID-02 | Phase 17 | Pending |
+| VALID-01 | Phase 17 | Complete |
+| VALID-02 | Phase 17 | Complete |
 | VALID-03 | Phase 17 | Pending |
 
 **Coverage:**

@@ -136,4 +136,4 @@ Plans:
 | 14. Shared Code Extraction | v2.0 | 2/2 | Complete | 2026-03-04 |
 | 15. esbuild Build Pipeline | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 16. Firefox Extension | v2.0 | 3/3 | Complete | 2026-03-04 |
-| 17. Cross-Browser Validation | v2.0 | 0/2 | Not started | - |
+| 17. Cross-Browser Validation | 1/2 | In Progress|  | - |

@@ -113,5 +113,5 @@ Plans:
 | 15. esbuild Build Pipeline | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 16. Firefox Extension | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 17. Cross-Browser Validation | v2.0 | 2/2 | Complete | 2026-03-05 |
-| 18. Core CI Workflow | 1/1 | Complete   | 2026-03-05 | - |
+| 18. Core CI Workflow | 1/1 | Complete    | 2026-03-05 | - |
 | 19. CI Hardening | v2.1 | 0/TBD | Not started | - |

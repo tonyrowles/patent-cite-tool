@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (Chrome + Firefox)
+        run: npm run build
+
+      - name: Test — src (Vitest unit)
+        run: npm run test:src
+
+      - name: Test — chrome-dist (Vitest chrome)
+        run: npm run test:chrome
+
+      - name: Test — firefox-dist (Vitest firefox)
+        run: npm run test:firefox
+
+      - name: Test — lint (web-ext lint)
+        run: npm run test:lint
+
+      - name: Package Chrome extension
+        if: success()
+        run: cd dist/chrome && zip -r ../../patent-cite-chrome.zip .
+
+      - name: Package Firefox extension
+        if: success()
+        run: cd dist/firefox && zip -r ../../patent-cite-firefox.zip .
+
+      - name: Upload Chrome artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patent-cite-chrome
+          path: patent-cite-chrome.zip
+          retention-days: 30
+
+      - name: Upload Firefox artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patent-cite-firefox
+          path: patent-cite-firefox.zip
+          retention-days: 30

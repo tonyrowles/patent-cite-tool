@@ -3,14 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Matching Robustness
 status: active
-last_updated: "2026-03-04"
-last_activity: 2026-03-04 — Roadmap created for v2.2 Matching Robustness
+last_updated: "2026-03-05"
+last_activity: 2026-03-05 — Completed 20-01 normalizeOcr and buildConcat
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -25,12 +24,12 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 20 — OCR Normalization and Concat Refactor
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-04 — Roadmap created for v2.2 Matching Robustness
+Plan: 01 complete (ready for 02)
+Status: Active — Phase 20 in progress
+Last activity: 2026-03-05 — Completed 20-01: normalizeOcr and buildConcat extracted
 
 ```
-v2.2 Progress: [----------] 0% (0/3 phases)
+v2.2 Progress: [█████░░░░░] 50% (1/2 plans in Phase 20)
 ```
 
 ## Performance Metrics
@@ -60,6 +59,8 @@ All v1.0–v2.1 decisions archived in PROJECT.md Key Decisions table.
 - Confidence capped at 0.85 for Tier 5 gutter-tolerant matches — forces yellow UI, appropriate uncertainty for legal filings
 - buildConcat extracted as shared helper before gutterTolerantMatch implemented — avoids duplicating wrap-hyphen detection logic
 - Golden baseline updated only after manual citation verification against printed patent — additions only, no modifications to existing 71 entries
+- [Phase 20-ocr-normalization-and-concat-refactor]: normalizeOcr applied symmetrically to both selectedText and concat so OCR transformation is net-zero for clean text and corrective for OCR-corrupted PDF text
+- [Phase 20-ocr-normalization-and-concat-refactor]: buildConcat returns {concat, boundaries, changedRanges} — changedRanges tracks OCR-affected ranges for future tiers, buildConcat is single source of truth replacing inline loop
 
 ### Pending Todos
 
@@ -78,6 +79,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-03-05 - Completed quick task 2: Fix CI: commit package-lock.json (currently gitignored but required by npm ci)
-Status: Roadmap ready — 3 phases defined, 5/5 requirements mapped
-Next: `/gsd:plan-phase 20` — plan OCR normalization and concat refactor
+Last activity: 2026-03-05 - Completed 20-01: normalizeOcr and buildConcat extracted to matching.js; matchAndCite refactored; 153 tests pass
+Status: Phase 20 active — 20-01 complete (MATCH-02, MATCH-03 done)
+Next: 20-02 — gutterTolerantMatch (or next planned phase 20 plan)

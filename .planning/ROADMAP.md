@@ -99,9 +99,9 @@ Plans:
   5. Running `npm run build` produces both dist/chrome/ and dist/firefox/ in a single invocation
 **Plans**: 3 plans
 Plans:
-- [ ] 16-01-PLAN.md — Create Firefox source files (background.js orchestrator + pdf-pipeline.js) and update manifest
-- [ ] 16-02-PLAN.md — Wire Firefox source files into esbuild build pipeline, verify complete dist/firefox/ output
-- [ ] 16-03-PLAN.md — Human verification of Firefox extension in browser
+- [x] 16-01-PLAN.md — Create Firefox source files (background.js orchestrator + pdf-pipeline.js) and update manifest
+- [x] 16-02-PLAN.md — Wire Firefox source files into esbuild build pipeline, verify complete dist/firefox/ output
+- [x] 16-03-PLAN.md — Human verification of Firefox extension in browser
 
 ### Phase 17: Cross-Browser Validation
 **Goal**: Both Chrome and Firefox builds are confirmed regression-free against the full test corpus and verified against real patents
@@ -111,7 +111,10 @@ Plans:
   1. The 71-case Vitest corpus passes against both dist/chrome/ and dist/firefox/ builds (zero failures)
   2. `web-ext lint` passes on the dist/firefox/ build with zero errors or warnings
   3. Both extensions produce correct citations on at least 5 real Google Patents pages loaded live in their respective browsers
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 17-01-PLAN.md — Create dist/ test infrastructure (vitest configs, test-export bundles, npm scripts, web-ext lint)
+- [ ] 17-02-PLAN.md — Spot-check comparison script and human cross-browser verification
 
 ## Progress
 
@@ -132,5 +135,5 @@ Plans:
 | 13. Offscreen Wrap-Hyphen Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 14. Shared Code Extraction | v2.0 | 2/2 | Complete | 2026-03-04 |
 | 15. esbuild Build Pipeline | v2.0 | 3/3 | Complete | 2026-03-04 |
-| 16. Firefox Extension | 3/3 | Complete    | 2026-03-04 | - |
-| 17. Cross-Browser Validation | v2.0 | 0/? | Not started | - |
+| 16. Firefox Extension | v2.0 | 3/3 | Complete | 2026-03-04 |
+| 17. Cross-Browser Validation | v2.0 | 0/2 | Not started | - |

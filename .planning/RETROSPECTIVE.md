@@ -232,6 +232,50 @@
 
 ---
 
+## Milestone: v2.2 — Matching Robustness
+
+**Shipped:** 2026-03-05
+**Phases:** 3 | **Plans:** 4 | **Commits:** 25
+
+### What Was Built
+- OCR normalization pipeline — `normalizeOcr` with 5 prose-safe substitution pairs (rn→m, cl→d, cI→d, vv→w, li→h) applied as Tier 0b preprocessing
+- Concat refactor — `buildConcat` extracted as shared helper returning `{concat, boundaries, changedRanges}`, replacing inline loop in matchAndCite
+- Gutter-tolerant matching — Tier 5 last-resort fallback using space-anchored survive-mask strip for stray USPTO gutter line numbers (multiples of 5, range 5-65)
+- 75-entry golden baseline — 4 new validated test cases (US6324676 OCR divergence, split-word, synthetic gutter fixture)
+- Fixed matching-exports.js missing exports from phases 20/21
+
+### What Worked
+- TDD approach (RED → GREEN → REFACTOR) for all plans — every implementation was regression-validated before proceeding
+- Symmetric normalizeOcr design (apply to both selection and concat) was discovered during implementation — prevented 10 baseline regressions
+- Survive-mask approach for gutter stripping matched existing whitespaceStrippedMatch pattern — consistent codebase patterns
+- Synthetic fixture (gutter number injected into real patent data) provided isolated Tier 5 testing without relying on finding perfect real-world examples
+- All plans executed with zero scope creep — auto-fixed bugs were all in test expectations or pre-existing gaps
+
+### What Was Inefficient
+- matching-exports.js was missing normalizeOcr/buildConcat/stripGutterNumbers since phases 20/21 — not caught until phase 22 CI run (30 test failures)
+- Plan 20-01 specified normalizeOcr on concat only — symmetric application to both sides was discovered during implementation (10/71 baseline failures forced the correction)
+- Plan 20-02 "conservative" penalty approach (changedRanges overlap) was incorrect — changedRanges almost always non-empty for real English text
+
+### Patterns Established
+- Tier 0b preprocessing — normalizeOcr applied before all cascade tiers, not as a separate tier
+- Survive-mask + offset array rebuild pattern for character-level stripping (reusable for future transformations)
+- Synthetic fixture pattern — minimal JSON subset with controlled artifact injection for isolated algorithm testing
+- selChanged as the correct penalty gating flag for symmetric normalization features
+- Dynamic spot-check count — SPOT_CHECK_IDS.length replaces hardcoded references
+
+### Key Lessons
+1. **Export maintenance is a cross-phase concern.** matching-exports.js fell out of sync across two phases — consider adding an automated export check or CI step.
+2. **Plan-specified normalization strategies need baseline validation.** Both 20-01 and 20-02 had logically correct but practically incorrect normalization/penalty strategies that broke baseline tests. Always test against the full corpus immediately.
+3. **Synthetic fixtures enable targeted tier testing.** Real-world examples of Tier 5 gutter contamination are rare; synthetic injection proved the algorithm without hunting for perfect specimens.
+4. **TDD catches implementation bugs early.** All auto-fixes were discovered during GREEN phase, not after deployment. The failing-test-first discipline keeps the feedback loop tight.
+
+### Cost Observations
+- Model mix: balanced profile (sonnet for execution agents, opus for orchestration)
+- Sessions: 2 (phases 20-21 + phase 22)
+- Notable: Fastest execution times yet — Phase 21 completed in 4 minutes, Phase 22 in 4 minutes. Phase 20 took ~45 minutes due to two plans with symmetric normalization discovery.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -243,6 +287,7 @@
 | v1.2 | 69 | 6 | Test infrastructure + audit-driven gap closure |
 | v2.0 | 52 | 4 | Build pipeline + cross-browser architecture |
 | v2.1 | 15 | 2 | CI/CD automation — smallest, fastest milestone |
+| v2.2 | 25 | 3 | OCR normalization + gutter matching — accuracy hardening |
 
 ### Cumulative Quality
 
@@ -253,6 +298,7 @@
 | v1.2 | 95 | 100% (71-case corpus) | Manual screenshot/tile assets pending |
 | v2.0 | 303 | 100% (71-case × 3 targets) | Store submissions pending |
 | v2.1 | 338 | 100% (CI-validated) | Store submissions pending |
+| v2.2 | 461 | 100% (75-case baseline) | s→S OCR gap documented, not implemented |
 
 ### Top Lessons (Verified Across Milestones)
 

@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.2 Matching Robustness (Shipped: 2026-03-05)
+
+**Phases completed:** 3 phases (20-22), 4 plans, 7 tasks
+**Timeline:** 2 days (2026-03-03 → 2026-03-05)
+**Commits:** 25
+**Git range:** c8958a8..08f5f00 (26 files, +3,893 / -88 lines)
+
+**Delivered:** OCR-aware normalization and gutter-tolerant matching hardening the citation pipeline against imperfect PDF text layers, validated with 75-entry golden baseline (4 new test cases including US6324676 OCR-heavy patent).
+
+**Key accomplishments:**
+1. OCR normalization pipeline — `normalizeOcr` with 5 prose-safe substitution pairs applied symmetrically to selection and concat as Tier 0b preprocessing
+2. Concat refactor — `buildConcat` extracted as shared helper returning `{concat, boundaries, changedRanges}`, single source of truth for concat construction
+3. Gutter-tolerant matching — Tier 5 last-resort fallback using space-anchored survive-mask strip for stray USPTO gutter line numbers, flat 0.85 confidence cap
+4. 75-entry golden baseline — 4 new validated test cases (US6324676 OCR divergence, split-word, synthetic gutter), zero regressions on existing 71 entries
+
+**Requirements:** 5/5 v2.2 requirements shipped (MATCH-01-03, VALID-01-02)
+
+---
+
 ## v2.1 CI/CD Pipeline (Shipped: 2026-03-05)
 
 **Phases completed:** 2 phases (18-19), 2 plans, 4 tasks

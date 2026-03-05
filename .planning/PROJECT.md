@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A cross-browser extension (Chrome + Firefox) for patent professionals that generates precise column:line citations (for granted patents) or paragraph citations (for published applications) by highlighting text on Google Patents. Built with an esbuild pipeline from shared source code, supports silent clipboard mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker, shared server-side cache via Cloudflare KV, and 100% accuracy on a 71-case cross-browser test corpus.
+A cross-browser extension (Chrome + Firefox) for patent professionals that generates precise column:line citations (for granted patents) or paragraph citations (for published applications) by highlighting text on Google Patents. Built with an esbuild pipeline from shared source code, supports silent clipboard mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker, shared server-side cache via Cloudflare KV, OCR-aware normalization (Tier 0b) and gutter-tolerant matching (Tier 5), and 100% accuracy on a 75-case cross-browser golden baseline.
 
 ## Core Value
 
@@ -48,6 +48,14 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 
 - ✓ GitHub Actions CI/CD pipeline — build, test (338 tests + lint), and store-ready ZIP packaging on every push/PR — v2.1
 
+### Validated
+
+- ✓ OCR-aware normalization — `normalizeOcr` with 5 prose-safe pairs applied as Tier 0b preprocessing to both selection and concat — v2.2
+- ✓ Concat refactor — `buildConcat` extracted as shared helper, single source of truth for concat construction — v2.2
+- ✓ Gutter-tolerant matching — Tier 5 last-resort fallback strips stray gutter line numbers with 0.85 confidence cap — v2.2
+- ✓ 75-entry golden baseline with OCR-heavy patent (US6324676) and synthetic gutter test coverage — v2.2
+- ✓ Merged/split-word handling verified via whitespace-stripped matching — v2.2
+
 ### Future
 
 - Chrome Web Store screenshot (1280x800) and promotional tile (440x280)
@@ -74,18 +82,13 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - webextension-polyfill — Firefox supports chrome.* natively; unnecessary dependency
 - Build-time minification — keep source readable for extension store review
 
-## Current Milestone: v2.2 Matching Robustness
+## Latest Milestone: v2.2 Matching Robustness (Shipped 2026-03-05)
 
-**Goal:** Harden the text matching pipeline against stray gutter line numbers and OCR discrepancies so citations succeed on patents with imperfect PDF text layers.
-
-**Target features:**
-- Gutter-number-tolerant matching — strip potential gutter numbers (multiples of 5, 5–65) from concat text during matching, so stray numbers that slip past upstream filters don't break citation lookup
-- OCR-aware normalization — handle common OCR confusions (case errors like s→S, character substitutions like 1↔l↔I/0↔O, merged words, split words) as a matching fallback
-- Validation with OCR-heavy patents (US6324676) and expanded test coverage
+Hardened the text matching pipeline against stray gutter line numbers and OCR discrepancies. Added OCR-aware normalization (Tier 0b) and gutter-tolerant matching (Tier 5). Golden baseline expanded from 71 to 75 cases with zero regressions.
 
 ## Context
 
-Shipped v2.1 with 7,700 LOC (JavaScript/HTML/CSS/JSON/YAML) across 33 source files.
+Shipped v2.2 with ~8,000 LOC (JavaScript/HTML/CSS/JSON/YAML) across 35 source files.
 Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest, web-ext, sharp, GitHub Actions.
 Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules in src/shared/ (constants, matching). Firefox uses background script instead of offscreen document. CI via GitHub Actions: build → 4 test suites → ZIP packaging → artifact upload.
 
@@ -96,8 +99,8 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 - **Silent mode**: Pre-computes citation on mouseup, reads synchronously in copy event handler. Toast feedback for success/failure.
 - **USPTO fallback**: Three trigger points (no DOM link, Google fetch failure, no text layer) all route to Cloudflare Worker proxy.
 - **Server cache**: Check-before-fetch with 3s timeout, fire-and-forget upload after parse, existence-check write protection.
-- **Accuracy**: 100% on 71-case test corpus (8 categories: pre-2000, modern, chemical, claims, cross-column, repetitive, short, long). Gutter contamination and wrap-hyphen normalization fixes applied.
-- **Testing**: Vitest with golden baseline snapshot testing, off-by-one tier classification, per-category accuracy reports.
+- **Accuracy**: 100% on 75-case test corpus (10 categories: pre-2000, modern, chemical, claims, cross-column, repetitive, short, long, ocr, gutter). Gutter contamination, wrap-hyphen normalization, OCR normalization, and gutter-tolerant matching applied.
+- **Testing**: Vitest with golden baseline snapshot testing, off-by-one tier classification, per-category accuracy reports. 461 tests across 4 suites.
 - **Distribution**: Store-ready with privacy policy, listing copy, extension ZIP. Pending screenshot/tile assets and Chrome Web Store submission.
 
 ## Constraints
@@ -129,6 +132,12 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | Shell zip with cd+zip for store-ready artifacts | Pre-installed on ubuntu-latest; manifest.json at ZIP root | ✓ Good — no action dependency |
 | Concurrency group: head_ref && ref \|\| run_id | PR runs cancelled on new push; main runs never cancelled (unique run_id) | ✓ Good — correct semantics |
 | Workflow-level permissions: contents: read | upload-artifact v4 uses ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN | ✓ Good — least-privilege |
+| normalizeOcr as Tier 0b preprocessing | Apply 5 prose-safe OCR pairs symmetrically to both sides; all tiers benefit without modification | ✓ Good — zero regressions, symmetric design |
+| OCR penalty on selChanged only | changedRanges almost always non-empty for real English text; selChanged is the correct necessity test | ✓ Good — baseline preserved at 1.0 confidence |
+| buildConcat as shared helper | Single source of truth for concat construction; reused by gutterTolerantMatch | ✓ Good — eliminated duplication |
+| gutterTolerantMatch as Tier 5 last-resort | Minimizes false positives; only fires when Tiers 1-4 all fail | ✓ Good — no interference with clean patents |
+| Space-anchored gutter strip via survive-mask | Char-by-char boundary check; avoids stripping from patent numbers and chemical quantities | ✓ Good — precise, zero false strips |
+| Flat 0.85 confidence for Tier 5 | Forces yellow UI indicator; appropriate uncertainty signal for legal filings | ✓ Good — clear caution signal |
 | Local-only caching via IndexedDB | Cloud cache adds backend complexity; local sufficient for MVP | ✓ Good for v1 |
 | Citation format: 4:5-20 shorthand | User preference for compact format | ✓ Good — shipped as default |
 | Pre-compute citation on mouseup for silent mode | Copy event must be synchronous; async lookup impossible in copy handler | ✓ Good — fast, no visible delay |
@@ -147,4 +156,4 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
 
 ---
-*Last updated: 2026-03-04 after v2.2 milestone start*
+*Last updated: 2026-03-05 after v2.2 milestone*

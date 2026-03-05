@@ -1,186 +1,185 @@
 # Project Research Summary
 
-**Project:** Patent Citation Tool v2.1 — GitHub Actions CI/CD Pipeline
-**Domain:** GitHub Actions CI/CD for a cross-browser browser extension (Chrome + Firefox MV3)
+**Project:** Patent Citation Tool v2.2 — Matching Robustness
+**Domain:** OCR-aware text normalization and gutter-number-tolerant matching for a browser extension
 **Researched:** 2026-03-04
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The v2.1 milestone is a narrow, well-defined addition: wrap an already-working build and test infrastructure in a GitHub Actions CI/CD pipeline that validates every push, runs the existing 71-case Vitest corpus, and produces store-ready zip artifacts for Chrome and Firefox. The extension already has a complete esbuild pipeline (`npm run build`), four npm test scripts, and a web-ext lint step. CI does not redesign any of this — it calls those exact commands in the correct order on an `ubuntu-latest` runner. All four research areas converge on the same recommendation: a single, linear workflow job with no matrix, no multi-job splits, and no external publish automation.
+This milestone is a targeted algorithmic extension to an already-working patent citation browser extension. The v2.1 pipeline correctly handles modern USPTO patents through a four-tier cascade (exact → whitespace-stripped → bookend → Levenshtein fuzzy), but fails on two specific failure modes: stray gutter line numbers that slip past the upstream spatial filter and land in the matching concat, and OCR character confusions (1/l/I, 0/O, rn/m) in pre-2000 scanned patents whose text layers were OCR'd. The v2.2 scope is precisely bounded: add `normalizeOcr` as a Tier 0b preprocessing step and `gutterTolerantMatch` as a new Tier 5 fallback, both in `src/shared/matching.js`, with no new npm dependencies, no new files, and no changes to the extension's API surface.
 
-The recommended approach is a single `.github/workflows/ci.yml` file with one job containing sequential steps: checkout, setup-node (Node 22, `cache: 'npm'`), `npm ci`, `npm run build`, four separate test steps, two zip packaging steps, and `upload-artifact`. Build-before-test ordering is the primary dependency constraint. The pipeline completes in under 60 seconds and produces two store-ready zip artifacts. The `dist/` directories flow between steps via the shared runner filesystem — no inter-job artifact transfer is needed.
+The recommended implementation approach follows from the architecture of the existing cascade: OCR normalization is applied before the cascade (Tier 0b) so all downstream tiers benefit automatically from character-level cleanup, while gutter stripping is a last-resort Tier 5 fallback that only activates when all other tiers fail. The primary test vehicle is patent US6324676, which has a known degraded text layer. Both features are pure JavaScript functions in a single file, tested via the existing Vitest corpus and the 71-case golden baseline.
 
-The two most consequential risks are (1) running test steps before the build step executes, producing either a loud `Cannot find module` failure or a silent stale-dist pass that validates the wrong code, and (2) double-zipping the artifact by uploading a pre-made `.zip` file to `upload-artifact`, which wraps it in another zip and breaks store submission. Both are trivially avoided with the patterns documented in research. A job-level `timeout-minutes: 10` guards against the secondary risk of a Vitest worker hang that would otherwise consume 6 hours of runner time.
+The dominant risk is false positives, not missed new cases. Gutter number stripping can destroy legitimate patent text ("at least 5 blocks", chemical measurement values), and aggressive OCR character substitution can collapse distinct tokens. Both risks are mitigated by strict anchoring (gutter strip applies only to space-isolated standalone integers; OCR substitution avoids globally overloaded characters 1/l/I and 0/O), confidence ceilings that force yellow UI for these matches (capped at 0.85), and the hard constraint that the existing 71-case corpus must pass at identical tier and confidence values after every change.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The CI stack is minimal by design. Three primary GitHub Actions are pinned to their current major versions: `actions/checkout@v6`, `actions/setup-node@v6`, and `actions/upload-artifact@v7`. Node.js 22 LTS is the correct version choice — Node 20 reaches EOL in April 2026 and Node 24 becomes the runner default in June 2026, making Node 22 the stable window for this milestone. The only required npm change is pinning `web-ext` as a devDependency (currently invoked via `npx`, which risks silent version drift in CI). No new npm packages are needed for the workflow itself — GitHub Actions are not npm packages.
+No new npm packages are needed. The npm ecosystem was surveyed for OCR post-correction libraries and Unicode confusable character libraries; none address the specific problem. Existing OCR engine packages (Tesseract.js, scribe.js) run OCR on images and are irrelevant — the patents already have a text layer. Unicode confusables packages (107KB) address homoglyph spoofing across thousands of codepoints, not the ~6 well-known optical confusion pairs in scanned patent text. The correct approach is a handcrafted normalization function of 5–10 regex replacements.
 
 **Core technologies:**
-- `actions/checkout@v6`: Fetch repo code — latest stable, runs on Actions Runner 2.329.0+ (all GitHub-hosted runners qualify)
-- `actions/setup-node@v6` (`cache: 'npm'`): Install Node 22 and cache `~/.npm` keyed on `package-lock.json` hash — built-in caching; explicit `cache: 'npm'` required because `packageManager` field is absent from `package.json`
-- `actions/upload-artifact@v7`: Upload store-ready zips — `compression-level: 0` required to prevent double-zipping pre-made zip files; v3 was deprecated November 2024
-- `ubuntu-latest` (Ubuntu 24.04): CI runner — has `zip`, Node.js, and git pre-installed; no custom runner needed
-- `zip` (shell built-in): Package `dist/chrome/` and `dist/firefox/` — avoids an external action dependency for a one-line operation
-- `web-ext@9.4.0` (pinned devDependency): Firefox lint — must be pinned to prevent CI version drift from `npx` resolution
-- Node.js 22 LTS: Runtime for all build/test scripts — correct stability window between Node 20 EOL (April 2026) and Node 24 runner default (June 2026)
+- `src/shared/matching.js` (in-repo): Implementation home for both new features — pure functions, no browser APIs, bundled automatically for Chrome and Firefox by the existing esbuild pipeline
+- Vitest ^3.0.0 (existing): Unit tests for new pure functions run under 1 second; 71-case golden baseline catches regressions on every change
+
+**What not to add:**
+- `confusables` npm 1.1.1: 107KB, unmaintained, wrong problem domain (Unicode homoglyph spoofing, not OCR confusion)
+- Any OCR engine library (Tesseract.js, scribe.js): wrong abstraction; project constraint excludes client-side OCR
+- Weighted Levenshtein with confusion matrix: overkill for 6 known substitutions; pre-normalization + exact match is faster and more predictable
 
 ### Expected Features
 
-The feature set for v2.1 is well-defined with a clear P1/P2/P3 breakdown. All P1 features have LOW implementation cost and no external dependencies. Nothing in v2.1 requires store API credentials or secret management.
+The v2.2 milestone adds two categories of features, both required to achieve the goal of handling OCR-heavy patents like US6324676.
 
-**Must have (table stakes — P1):**
-- Push triggers on all branches + PR triggers targeting `main` — every commit validated
-- `checkout`, `setup-node` with LTS version + npm cache, `npm ci` — standard CI foundation
-- `npm run build` as an explicit step before any test step — enforces the build-before-test ordering that the test suite requires
-- Individual test steps (`test:src`, `test:chrome`, `test:firefox`, `test:lint`) run with distinct `name:` labels, not via combined `npm test` — produces per-suite pass/fail in the Actions UI without log inspection
-- Chrome zip artifact upload with `compression-level: 0` — store-ready, no double-zip
-- Firefox zip artifact upload with `compression-level: 0` — same
-- Job-level `timeout-minutes: 10` — prevents a Vitest hang from consuming 6 hours of runner time
+**Must have (table stakes):**
+- Gutter-number-tolerant matching — fixes citation failures where upstream spatial filter misses stray line numbers that land in the matching concat
+- OCR character substitution normalization — fixes citation failures on pre-2000 patents with systematic character confusion in scanned text layers
+- Test cases for US6324676 — required regression anchor; minimum 3 cases covering confirmed OCR error patterns in that patent
+- Verify merged/split-word coverage — confirm whitespace-stripped match already handles "FPGAuse"/"FPGA use" patterns before adding a dedicated step
 
-**Should have (differentiators — P2, add after baseline works):**
-- Concurrency group (`cancel-in-progress: true`) — cancels stale PR runs on rapid-push fixups; uses `head_ref || run_id` to cancel PR runs but not main-branch runs
-- SHA or ref in artifact names — traceability between artifact download and originating commit
-- Conditional artifact upload (main-only) — reduces PR artifact noise
-- Explicit `permissions: contents: read` — security hygiene, least privilege
+**Should have (differentiators):**
+- Confidence-weighted OCR fallback (0.85) — surfaces OCR-matched citations as yellow, giving users appropriate uncertainty feedback; costs nothing once normalization feature exists
+- `stripGutterNumbers` exported as a testable utility — testing hygiene, no user-facing impact
 
-**Defer (v3.0+):**
-- Automated Chrome Web Store publish — requires OAuth token management and non-deterministic review queue
-- Automated AMO (Firefox) publish — requires AMO API key secrets; `web-ext sign` race conditions during review
-- Release workflow with version tagging — when changelog tracking becomes important
+**Defer (v2.2.x / v3.0+):**
+- Additional OCR-heavy test fixtures beyond US6324676 — add after initial validation is complete
+- Automatic OCR-heavy patent detection — high implementation cost (statistical analysis), low urgency
+- Levenshtein fuzzy match on strings over 100 characters — O(n²) cost; bookend strategy already handles long selections
+
+**Anti-features (explicitly excluded):**
+- Full OCR post-processing via language model — corrupts technical terms; incompatible with browser extension constraints
+- Client-side OCR via Tesseract.js — explicitly out of scope per PROJECT.md; adds ~10MB to the extension
+- Global case-insensitive normalization for OCR — loses disambiguation between I/l/1 in patent identifiers
+- Fuzzy gutter number matching (near-multiples of 5) — USPTO mandates exact every-5-line numbering per 37 CFR § 1.52; fuzzy stripping would destroy "61" in claims text
 
 ### Architecture Approach
 
-The workflow architecture is deliberately simple: one file (`.github/workflows/ci.yml`), one job (`ci`), sequential steps sharing the runner filesystem. No matrix is needed because both browser targets come from one `npm run build` command. No multi-job split is needed because `dist/` flows between steps via the shared filesystem — uploading and downloading it between jobs would add 30-60 seconds of overhead to a pipeline that completes in under 60 seconds. No Docker containers are needed because Node.js LTS on `ubuntu-latest` is sufficient and 2-3x faster. The only new files to create are the `.github/workflows/ci.yml` file and its parent directories. No existing project files require modification.
+All changes are confined to `src/shared/matching.js`. Three coordinated additions implement both features: (1) a `normalizeOcr` function applying prose-safe OCR corrections (rn→m, cl→d, additional quote/hyphen variants) as Tier 0b preprocessing to both the user selection and the concat; (2) a `buildConcat` function factored out from the existing inline loop in `matchAndCite`, which calls `normalizeOcr` internally so all subsequent tiers operate on OCR-normalized text without per-tier changes; (3) a `gutterTolerantMatch` function as Tier 5 that strips space-isolated multiples of 5 (5–65) from the concat, rebuilds character boundaries, then retries exact and whitespace-stripped matching with confidence capped at 0.85.
 
 **Major components:**
-1. Trigger block (`on:`) — `push: branches: ['**']` + `pull_request: branches: [main]`; dual triggers cause double-run on PR pushes but are acceptable at this scale; mitigated by P2 concurrency group
-2. Dependency installation (`checkout` + `setup-node` + `npm ci`) — foundation; `cache: 'npm'` reduces `npm ci` from ~30s to ~3s on cache hits
-3. Build step (`npm run build`) — must precede all test steps; produces `dist/chrome/` and `dist/firefox/` including `matching-exports.js` bundles required by Chrome/Firefox Vitest configs
-4. Test steps — four separate `run:` steps with distinct `name:` labels; fail fast; immediate per-suite visibility in Actions UI
-5. Packaging steps (`zip` shell commands) — only execute after all tests pass; produces store-ready zips at repo root with `manifest.json` at root of zip (not inside a subdirectory)
-6. Artifact upload (`upload-artifact@v7` with `compression-level: 0`) — retains both zips; both zips can be uploaded as a single named artifact (`extension-zips`) to keep the Actions summary clean
+1. `normalizeOcr(text)` — new exported function; applies prose-safe OCR confusion corrections; called on selection and on each positionMap entry via `buildConcat`; does NOT touch alphanumeric identifiers (1/l/I and 0/O excluded from global substitution due to identifier collision risk)
+2. `buildConcat(positionMap)` — refactored extract from `matchAndCite`'s inline loop; returns `{ concat, boundaries }`; applies `normalizeOcr` internally; required by `gutterTolerantMatch` to avoid duplicating wrap-hyphen detection logic
+3. `gutterTolerantMatch(normalized, concat, boundaries, positionMap, contextBefore, contextAfter)` — new Tier 5 fallback; strips `/ (5|10|15|20|25|30|35|40|45|50|55|60|65) /g` (space-anchored) from concat; rebuilds boundaries for stripped concat; retries exact + whitespace-stripped; caps confidence at 0.85
+
+**Tier ordering after v2.2:**
+
+| Tier | Strategy | Confidence | UI Color |
+|------|----------|------------|----------|
+| 0b | OCR normalization (preprocessing) | Inherits from matching tier | — |
+| 1 | Exact | 1.00 | Green |
+| 2 | Whitespace-stripped | 0.96–0.99 | Green |
+| 3 | Bookend | 0.92 | Green |
+| 4 | Fuzzy Levenshtein | 0.80+ | Yellow/Green |
+| 5 | Gutter-tolerant (NEW) | 0.85 | Yellow |
+
+**Files modified:** `src/shared/matching.js`, `tests/unit/text-matcher.test.js`, `tests/test-cases.js`, `tests/golden/baseline.json` (regenerated after manual citation verification). No other files change.
 
 ### Critical Pitfalls
 
-Research identified 8 pitfalls. The top 5 by severity and likelihood are:
+1. **Gutter strip destroying legitimate patent text** — Never apply the strip without whitespace isolation on both sides. Numbers like "at least 5 blocks" or "60/056,785" (provisional application numbers) would be corrupted by a naive global regex. Use space-anchored pattern: `/ (5|10|...|65) /g`. Stricter guard: only strip when `entry.text.trim()` equals exactly the number (true signature of a standalone missed gutter marker). Run the full 71-case corpus — especially chemical patents US9688736 and US10472384 — before and after every change; all must pass at the same tier.
 
-1. **Tests running before build (missing or stale `dist/`)** — `vitest.config.chrome.js` and `vitest.config.firefox.js` resolve imports from `dist/chrome/matching-exports.js` and `dist/firefox/matching-exports.js`. If the build step is absent or placed after test steps, Vitest fails with `Cannot find module` — or worse, passes against a stale cached `dist/` from a previous run. Prevention: explicit `npm run build` step in the workflow before any `npm run test:*` step; never cache `dist/`.
+2. **OCR normalization creating false positive matches** — In a precision-critical legal context (column:line citations in patent filings), a false positive is worse than a failed match. Apply normalization only as Tier 0b preprocessing; cap confidence at 0.85 for any match that required OCR correction; add a minimum-length guard (no OCR path for selections under 20 characters); restrict global substitutions to prose-safe pairs (rn→m, cl→d) — never add 1/l/I or 0/O as global substitutions.
 
-2. **Double-zipping the artifact** — `upload-artifact` always wraps uploaded content in a zip. Uploading a pre-made `.zip` file produces `.zip.zip`. Store submission portals expect `manifest.json` at the zip root — a double-zip fails validation. Prevention: use `cd dist/chrome && zip -r ../../patent-cite-chrome.zip .` (zips contents, not the directory itself) and set `compression-level: 0` on the upload step.
+3. **Inserting new steps at the wrong position in the cascade** — The cascade is position-dependent; a new strategy inserted before bookend intercepts selections that would report confidence 0.92, downgrading them to 0.85. OCR normalization must be Tier 0b and gutter-tolerant matching must be Tier 5. After every change, verify the `afterAll` accuracy metrics: exact match count must not decrease; no tier downgrades for existing passing cases.
 
-3. **npm cache misconfiguration** — Caching `node_modules/` directly is counterproductive: `npm ci` deletes it immediately. Native binaries (`esbuild`, `sharp`) are platform-specific; a `node_modules/` cache from macOS breaks on Linux runners silently. Prevention: `setup-node` with `cache: 'npm'` caches `~/.npm` with the correct lockfile-keyed cache key automatically.
+4. **Premature golden baseline update** — Never regenerate `tests/golden/baseline.json` immediately after algorithm changes. For new US6324676 test cases, determine expected column:line values by reading the printed patent in Google Patents PDF viewer before running the algorithm. Only update the baseline after manual verification; `git diff baseline.json` should show only additions, never modifications to the existing 71 entries.
 
-4. **Vitest hang with no job timeout** — Vitest worker initialization can hang rather than fail, especially with large fixture files. Without `timeout-minutes`, the 6-hour GitHub Actions default applies. Prevention: `timeout-minutes: 10` at the job level — the test suite runs in under 30 seconds locally; any CI run exceeding 5 minutes is a hang.
+5. **Modifying `normalizeText` with OCR substitutions** — `normalizeText` is applied to both the needle and the haystack (positionMap entries). Adding alphanumeric substitutions corrupts the `boundaries` array used by `resolveMatch` for position mapping and breaks `extractPrintedColumnNumbers`. OCR substitutions must live in a separate `normalizeOcr` function, never inside `normalizeText`.
 
-5. **`web-ext lint` failing on PDF.js library files** — The `--ignore-files 'lib/**'` flag should suppress PDF.js linting, but edge cases exist when manifest-referenced files are also in the ignore list, causing `DANGEROUS_EVAL` or `MANIFEST_CONTENT_SCRIPT_FILE_NOT_FOUND` warnings that exit non-zero. Prevention: verify `npm run test:lint` exits with code 0 locally against a fresh build before committing the workflow; if warnings persist, add `.web-ext-config.cjs` with `ignoreFiles: ['lib/**', 'matching-exports.js']`.
+---
 
 ## Implications for Roadmap
 
-This milestone fits in two phases. Research reveals no hidden complexity that would expand scope beyond what the four research files describe.
+The research points to a clean 3-phase implementation ordered strictly by dependency and regression risk.
 
-### Phase 1: Core CI Workflow
+### Phase 1: Foundation — normalizeOcr + buildConcat Refactor
 
-**Rationale:** All P1 features form a single dependency chain — checkout must precede install, install must precede build, build must precede tests, tests must precede packaging. There is no partial value to deliver from this set: a CI pipeline either runs end-to-end or it does not. Everything in P1 belongs in one phase.
+**Rationale:** OCR normalization is the lowest-risk change (pure preprocessing, cheap, idempotent) and is a prerequisite for validating that the concat-building refactor is safe. The `buildConcat` extraction is required before `gutterTolerantMatch` can be implemented without code duplication. Establishing this foundation with zero regressions is the critical gate before Phase 2 adds Tier 5 complexity.
+**Delivers:** `normalizeOcr` and `buildConcat` exported from `matching.js`; `matchAndCite` refactored to call `buildConcat` and apply `normalizeOcr` at Tier 0b; all 71 existing test cases pass at identical tier and confidence values
+**Addresses:** Table-stakes feature: OCR character substitution normalization (prose-safe subset); merged/split-word coverage verification
+**Avoids:** Anti-pattern of modifying `normalizeText` (Pitfall 5); anti-pattern of running two separate full pipelines (Architecture Anti-Pattern 3); confidence inflation from cascade position errors (Pitfall 3)
 
-**Delivers:** A passing `.github/workflows/ci.yml` that validates every push to every branch and every PR to `main`, and produces Chrome + Firefox zip artifacts downloadable from the Actions run summary.
+### Phase 2: Gutter-Tolerant Matching — Tier 5 Implementation
 
-**Addresses:** All P1 features — triggers, checkout/setup-node/npm-ci foundation, build step, four separate named test steps, zip packaging, artifact upload with correct settings.
+**Rationale:** Depends on the stable `buildConcat` from Phase 1. `gutterTolerantMatch` needs a stripped variant of the same concat that `matchAndCite` uses; without `buildConcat`, the only option is duplicating the complex wrap-hyphen detection loop. Isolated unit tests for the function before adding corpus-level cases validates the space-anchor pattern before it can interact with the 71-case baseline.
+**Delivers:** `gutterTolerantMatch` as Tier 5 with confidence ceiling 0.85; space-anchored strip pattern; all 71 existing cases unaffected (Tier 5 only fires when Tiers 1–4 fail)
+**Addresses:** Table-stakes feature: gutter-number-tolerant matching
+**Avoids:** Gutter strip destroying legitimate patent text (Pitfall 1); conflicts with upstream position-map filtering (Pitfall 5); confidence inflation on gutter-tolerant matches (Architecture Anti-Pattern 4)
 
-**Avoids:**
-- Pitfall 1 (build-before-test) — enforced by explicit step sequence in YAML
-- Pitfall 2 (double-zip) — avoided by `compression-level: 0` and correct zip command pattern
-- Pitfall 3 (npm cache misconfiguration) — avoided by `setup-node` with `cache: 'npm'`, no manual `actions/cache` step
-- Pitfall 4 (Vitest hang) — avoided by `timeout-minutes: 10` at job level
-- Pitfall 5 (web-ext lint PDF.js false positives) — validate locally before merging
-- Pitfall 6 (Node binary mismatch) — avoided by explicit `node-version: '22'`
+### Phase 3: Validation — US6324676 Test Cases + Golden Baseline Update
 
-**Stack elements used:** `actions/checkout@v6`, `actions/setup-node@v6`, Node.js 22, `ubuntu-latest`, `zip`, `actions/upload-artifact@v7`, `web-ext@9.4.0` (pinned devDependency)
-
-### Phase 2: CI Hardening
-
-**Rationale:** P2 features are one-liner YAML additions that require the baseline workflow to be observable in practice before they provide value. Concurrency groups are most useful once rapid-push stacking is observed; SHA artifact names are useful once artifact traceability matters; conditional upload is useful once PR artifact noise is noticed. None of these block the P1 pipeline from functioning.
-
-**Delivers:** Concurrency group (cancels stale in-progress PR runs), SHA-suffixed artifact names (traceability), conditional artifact upload gated on `refs/heads/main` (reduces PR noise), explicit `permissions: contents: read` (security hygiene).
-
-**Uses:** No new stack elements — all are YAML configuration changes to the existing workflow file.
-
-**Avoids:** Pitfall 5 (double-trigger run accumulation on PR branches) via concurrency group.
-
-### Phase 3: Automated Store Submission (Deferred to v3.0+)
-
-**Rationale:** Requires Chrome Web Store OAuth credentials, AMO API keys, a separate release job gated on tags, and handling non-deterministic review queue states. Research consensus is unambiguous: produce the zip artifact in v2.1, submit manually, automate in v3.0 only after the manual workflow is validated and store listings are active.
-
-**Delivers:** Automated publish to Chrome Web Store and/or AMO triggered on tagged releases.
-
-**Stack elements needed (when prioritized):** `chrome-webstore-upload-action` or equivalent; `web-ext sign` with AMO JWT secrets; GitHub repository secrets for API credentials; separate `release` job with `needs: ci` and `if: startsWith(github.ref, 'refs/tags/')`.
+**Rationale:** End-to-end validation with the problem patent comes last, after the implementation is confirmed correct on isolated unit tests. The golden baseline is updated only after manual citation verification against the printed patent. Cross-browser build verification (`npm run build` + grep of dist files) confirms the new exports are available in both Chrome and Firefox bundles.
+**Delivers:** 3–5 new test cases for US6324676 passing via Tiers 0b or 5; updated `tests/golden/baseline.json` (additions only, no modifications to existing 71 entries); full CI green on Chrome and Firefox builds
+**Addresses:** Table-stakes feature: test coverage for US6324676; confidence-weighted OCR fallback verified in the UI (yellow for 0.85 matches)
+**Avoids:** Premature golden baseline update (Pitfall 4); new fixture citations without manual verification (PITFALLS integration gotcha)
 
 ### Phase Ordering Rationale
 
-- Phase 1 is a prerequisite for Phase 2: the P2 features (concurrency group, artifact naming, permissions) are refinements to a running workflow. There is no workflow to refine until Phase 1 exists.
-- Phase 2 features are purely additive YAML changes with no new dependencies and can ship as a follow-up PR immediately after Phase 1 validates.
-- Phase 3 is blocked on external prerequisites (live store listings, OAuth credentials, AMO API access) that are not available for v2.1 and are explicitly out of scope per milestone definition.
-- The single-job architecture eliminates the build-to-test artifact transfer problem that would otherwise require a multi-phase approach or inter-job dependencies.
-- Running each npm test script as a separate named step (rather than `npm test`) is a cross-cutting architectural decision that affects Phase 1 implementation: it provides immediate per-suite failure visibility in the Actions UI at zero additional cost.
+- **Phase 1 before Phase 2:** `gutterTolerantMatch` needs `buildConcat` as a stable shared helper; the refactor must be proven regression-free before Phase 2 builds on top of it
+- **Phases 1 and 2 before Phase 3:** Corpus test cases for US6324676 are added only after isolated unit tests confirm the algorithm is correct; this prevents the golden baseline from encoding in-progress behavior
+- **OCR normalization as Tier 0b, not a cascade tier:** Preprocessing once is architecturally cleaner and cheaper than a second full cascade pass; all four existing matching tiers benefit without modification; confidence is inherited naturally from whichever tier resolves the match
+- **Gutter stripping as Tier 5, not preprocessing:** Unlike OCR normalization (symmetric, low false-positive risk), gutter stripping is asymmetric (concat only) and has non-trivial false-positive risk on legitimate numbers in patent text; last-resort placement minimizes incorrect matches
 
 ### Research Flags
 
-Phases with standard, well-documented patterns — skip `/gsd:research-phase`:
-- **Phase 1 (Core CI Workflow):** All action versions, Node version, npm caching, zip packaging, and artifact upload patterns are verified against official GitHub releases and changelogs. STACK.md and ARCHITECTURE.md contain ready-to-use YAML snippets. No domain-specific unknowns remain.
-- **Phase 2 (CI Hardening):** Concurrency groups, conditional steps, and permissions blocks are standard YAML patterns documented in GitHub Actions official docs.
+Phases with standard patterns (skip `/gsd:research-phase`):
+- **Phase 1 (normalizeOcr + buildConcat):** Pure refactor of existing code plus a small new function; all integration points and implementation sketches are fully documented in ARCHITECTURE.md; no external dependencies or unknowns
+- **Phase 2 (gutterTolerantMatch):** Boundary rebuild pattern mirrors existing `whitespaceStrippedMatch` position-mapping approach; anti-patterns explicitly documented; no ambiguity in approach
+- **Phase 3 (validation):** Standard golden-baseline workflow; test-case structure already established by the 71-case corpus
 
-Phases that need research before planning if ever prioritized:
-- **Phase 3 (Automated Store Submission):** Chrome Web Store API and AMO API are subject to change; OAuth token refresh handling is a known pain point. Research the current CWS API v2 and AMO `web-ext sign` documentation before planning this phase.
+Phases that may need targeted investigation during execution (not blocking but watch for):
+- **Phase 2 (gutter strip anchor at concat boundaries):** The space-isolation pattern `/ (N) /g` handles numbers flanked by spaces, but numbers at the very start or end of the concat string are flanked by string boundaries. Verify the anchor handles concat edge cases correctly with a targeted unit test before integrating.
+- **Phase 3 (US6324676 OCR pair scope):** Whether the prose-safe subset of `normalizeOcr` (rn→m, cl→d) is sufficient to fix US6324676, or whether bounded 1/l/I substitutions are also needed, will only be known after inspecting the actual patent's failure modes. If Phase 3 reveals gaps, the `normalizeOcr` scope may need a targeted expansion with word-boundary guards.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All action versions verified against GitHub releases on 2026-03-04. Node version guidance verified against GitHub changelog. `setup-node` caching behavior verified against official advanced-usage docs. |
-| Features | HIGH | Feature set is derived directly from the project's existing `package.json` scripts — no guesswork. P1/P2/P3 prioritization is based on dependency ordering and implementation cost, both LOW for P1. |
-| Architecture | HIGH | Single-job pattern verified against GitHub Actions official docs. Anti-patterns (matrix, multi-job split, `npm test` in CI, double-zip) are documented in official action repos and GitHub blog. |
-| Pitfalls | HIGH (most) / MEDIUM (some) | Critical pitfalls (build ordering, cache, double-zip, artifact names) are HIGH confidence from official docs and maintainer-acknowledged issues. web-ext lint PDF.js behavior and Vitest hang edge cases are MEDIUM confidence from issue tracker reports. |
+| Stack | HIGH | Verified by direct npm registry survey on 2026-03-04; no viable external library exists; conclusion from first principles confirmed by project constraints in PROJECT.md |
+| Features | HIGH (existing codebase) / MEDIUM (OCR pairs) | Existing codebase is ground truth for what is already handled; OCR character pair list corroborated by multiple independent sources; specific pairs needed for US6324676 require Phase 3 validation to confirm scope is sufficient |
+| Architecture | HIGH | Based on direct analysis of live codebase source files; all integration points, build-order dependencies, and anti-patterns identified from reading actual source code; no external unknowns |
+| Pitfalls | HIGH | Derived from direct codebase analysis with specific test case references (US9688736, US10472384, US5959167) that would reveal regressions; chemical and numbered-reference categories are the concrete regression sentinels |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **`web-ext lint` PDF.js behavior in CI vs. local:** MEDIUM confidence gap. The `--ignore-files 'lib/**'` interaction with manifest-referenced files has documented edge cases. Validate by running `npm run test:lint` locally against a clean `dist/` build before merging the CI workflow. If the lint step exits non-zero, add `.web-ext-config.cjs` with `ignoreFiles: ['lib/**', 'matching-exports.js']`.
+- **OCR character pair scope for US6324676:** The initial `normalizeOcr` implements only prose-safe pairs (rn→m, cl→d). Whether this is sufficient to resolve US6324676 failures or whether bounded 1/l/I substitutions (with word-boundary guards) are also needed will be confirmed in Phase 3. If Phase 3 validation reveals patterns the initial scope misses, scope expansion is low risk because the patterns are well-understood from OCR literature.
 
-- **`concurrency` group PR vs. main behavior:** The `${{ github.head_ref || github.run_id }}` pattern is the recommended approach for differentiating PR runs (cancel) from main branch runs (do not cancel). Verified via community pattern matching official docs behavior, but worth observing on the first few real CI runs to confirm the expected cancellation behavior.
+- **Gutter strip anchor at string boundaries:** The space-isolation guard strips numbers flanked by spaces. Numbers at the very start or end of the assembled concat have string boundaries on one side. This is a Phase 2 unit-test task; address with a targeted test case for a positionMap whose first or last entry is a bare gutter number.
 
-- **`sharp` native binary during `npm ci`:** `sharp` is a native binary used only in `generate-icons.mjs` (not in the CI pipeline). If `npm ci` produces platform binary warnings for `sharp` on the Linux runner, consider `npm ci --ignore-scripts` with care, or restructuring `sharp` as an optional/separate devDependency. Not blocking for Phase 1 but worth monitoring on the first CI run.
+- **Merged-word coverage (FPGAuse / FPGA use):** FEATURES.md recommends a targeted test case before v2.2 ships to confirm existing `whitespaceStrippedMatch` already handles this. This is a Phase 1 verification task; if the test passes without new code, close the item. Only implement a dedicated step if the test fails.
+
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [GitHub releases: actions/checkout](https://github.com/actions/checkout/releases) — v6 confirmed as latest, verified 2026-03-04
-- [GitHub releases: actions/setup-node](https://github.com/actions/setup-node/releases) — v6.3.0 confirmed; `cache: 'npm'` caches `~/.npm`, not `node_modules/`
-- [setup-node advanced usage docs](https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md) — automatic caching requires `packageManager` field; explicit `cache: 'npm'` required for this project
-- [GitHub releases: actions/upload-artifact](https://github.com/actions/upload-artifact/releases) — v7.0.0 confirmed as latest
-- [GitHub changelog: upload-artifact v7 non-zipped artifacts](https://github.blog/changelog/2026-02-26-github-actions-now-supports-uploading-and-downloading-non-zipped-artifacts/) — `compression-level: 0` behavior confirmed
-- [GitHub changelog: Node 20 deprecation on Actions runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/) — Node 24 becomes runner default June 2, 2026; Node 20 EOL April 2026
-- [GitHub changelog: ubuntu-latest = Ubuntu 24.04](https://github.blog/changelog/2024-09-25-actions-new-images-and-ubuntu-latest-changes/) — `ubuntu-latest` points to Ubuntu 24.04 since January 2025
-- [GitHub Docs: Building and testing Node.js](https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs) — `npm ci`, `setup-node`, cache configuration
-- [actions/upload-artifact v4+ README](https://github.com/actions/upload-artifact) — unique artifact names, double-zip issue, retention-days, v4/v7 vs. v3 breaking changes
-- [GitHub blog: upload-artifact double-zip issue #39](https://github.com/actions/upload-artifact/issues/39) — maintainer-acknowledged double-zip when uploading pre-built zip file
-- [Unit 42: ArtiPACKED](https://unit42.paloaltonetworks.com/github-repo-artifacts-leak-tokens/) — artifact security risks, git token exposure (August 2024)
-- [GitHub releases: mozilla/web-ext](https://github.com/mozilla/web-ext/releases) — v9.4.0 confirmed as latest as of 2026-03-04
-- Project source (`package.json`, `scripts/build.js`, Vitest configs) — ground truth for CI command ordering and `dist/` dependency structure
+- `src/shared/matching.js` (in-repo) — ground truth for current cascade, existing `normalizeText` contract, integration points for new functions
+- `src/offscreen/position-map-builder.js` (in-repo) — upstream gutter filtering logic, `filterGutterLineNumbers` criteria and x-coordinate tolerance
+- `tests/unit/text-matcher.test.js` (in-repo) — golden baseline workflow, confidence calibration structure, `afterAll` accuracy summary
+- `tests/test-cases.js` (in-repo) — 71-case corpus; chemical (US9688736, US10472384) and numbered-reference (US5959167) cases identified as regression sentinels
+- `tests/fixtures/US6324676.json` (in-repo) — confirmed as the primary OCR validation patent
+- `.planning/PROJECT.md` (in-repo) — v2.2 milestone goals, out-of-scope constraints, target patent US6324676
+- [USPTO 37 CFR § 1.52](https://www.law.cornell.edu/cfr/text/37/1.52) — confirms exact every-5-line gutter number mandate; no fuzzy stripping of near-multiples warranted
 
 ### Secondary (MEDIUM confidence)
-- [GitHub community: pull_request triggers fire twice](https://github.com/orgs/community/discussions/26940) — push + pull_request both trigger on PR branch push
-- [GitHub Actions concurrency community discussion](https://generalreasoning.com/blog/2025/02/05/github-actions-concurrency.html) — `head_ref || run_id` pattern for PR vs. push differentiation
-- [Vitest GitHub Discussions #5507](https://github.com/vitest-dev/vitest/discussions/5507) — Vitest hangs in GitHub Actions, exceeded maximum execution time
-- [mozilla/web-ext issue #1376](https://github.com/mozilla/web-ext/issues/1376) — web-ext lint false positives on third-party library files
-- [mozilla/web-ext issue #397](https://github.com/mozilla/web-ext/issues/397) — `ignore-files` pattern behavior with lint
-- [esbuild GitHub issue #1646](https://github.com/evanw/esbuild/issues/1646) — esbuild-linux-64 not found after cross-platform npm install
-- [DEV Community: Simplify Browser Extension Deployment with GitHub Actions](https://dev.to/jellyfith/simplify-browser-extension-deployment-with-github-actions-37ob) — real-world extension CI workflow patterns
-- [DEV Community: Releasing WebExtension using GitHub Actions](https://dev.to/cardinalby/releasing-webextension-using-github-actions-i9j) — packaging patterns for store submission
+- [Community History Archives: 100 Common OCR Letter Misinterpretations](https://communityhistoryarchives.com/100-common-ocr-letter-misinterpretations/) — OCR character confusion pairs (1/l/I, 0/O, S/5, rn/m confirmed; community source, not patent-specific)
+- [arXiv 1604.06225: OCR Error Correction Using Character Correction](https://arxiv.org/pdf/1604.06225) — character-level normalization before string match is standard OCR post-correction technique
+- [arXiv 2106.12030: A Simple and Practical Approach to Improve Misspellings in OCR Text](https://arxiv.org/pdf/2106.12030) — OCR error taxonomy; word split/merge categories
+- [ACM: Survey of Post-OCR Processing Approaches](https://dl.acm.org/doi/fullHtml/10.1145/3453476) — comprehensive post-OCR correction literature
+- [imagetext.site: Troubleshooting Common OCR Errors](https://imagetext.site/articles/troubleshooting-ocr-errors.html) — O/0, I/l/1, S/5 confirmed as primary confusion pairs in technical/legal documents
+- [Google Digitized Patent Grants OCR text](https://www.google.com/googlebooks/uspto-patents-grants-ocr.html) — confirms OCR provenance for pre-1980 USPTO patents
+
+### Tertiary (LOW confidence)
+- npm registry: `confusables@1.1.1`, `unicode-confusables@0.1.1` — surveyed and excluded; unmaintained, wrong problem scope (Unicode homoglyph spoofing, not OCR character confusion)
 
 ---
+
 *Research completed: 2026-03-04*
 *Ready for roadmap: yes*

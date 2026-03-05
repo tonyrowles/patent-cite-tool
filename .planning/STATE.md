@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Matching Robustness
 status: completed
-last_updated: "2026-03-05T17:12:43.851Z"
-last_activity: "2026-03-05 — Completed 21-01: gutterTolerantMatch Tier 5 fallback with stripGutterNumbers and boundary remapping"
+last_updated: "2026-03-05T17:16:11.255Z"
+last_activity: "2026-03-05 — Completed 21-01: gutterTolerantMatch Tier 5 fallback wired into matchAndCite"
 progress:
   total_phases: 3
   completed_phases: 2

@@ -87,7 +87,10 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
   2. All 71 existing golden baseline cases pass at the same tier and confidence values as before the change — zero regressions
   3. `buildConcat` is exported from `src/shared/matching.js` and returns `{ concat, boundaries }` — `matchAndCite` calls it rather than inlining the loop
   4. `normalizeOcr` is exported from `src/shared/matching.js` and applied to both the selection and the positionMap entries inside `buildConcat` before any matching tier runs
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 20-01-PLAN.md — TDD: normalizeOcr function, buildConcat extraction, matchAndCite rewire
+- [ ] 20-02-PLAN.md — Wire OCR normalization into matchAndCite cascade with confidence penalty
 
 ### Phase 21: Gutter-Tolerant Matching
 **Goal**: Citations succeed on patents where stray gutter line numbers (multiples of 5, range 5-65) slipped past the upstream spatial filter and landed in the concat text
@@ -133,6 +136,6 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 | 17. Cross-Browser Validation | v2.0 | 2/2 | Complete | 2026-03-05 |
 | 18. Core CI Workflow | v2.1 | 1/1 | Complete | 2026-03-05 |
 | 19. CI Hardening | v2.1 | 1/1 | Complete | 2026-03-05 |
-| 20. OCR Normalization and Concat Refactor | v2.2 | 0/? | Not started | — |
+| 20. OCR Normalization and Concat Refactor | v2.2 | 0/2 | Not started | — |
 | 21. Gutter-Tolerant Matching | v2.2 | 0/? | Not started | — |
 | 22. Validation and Golden Baseline | v2.2 | 0/? | Not started | — |

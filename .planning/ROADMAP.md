@@ -6,6 +6,7 @@
 - ✅ **v1.1 Silent Mode + Infrastructure** — Phases 5-7 (shipped 2026-03-03)
 - ✅ **v1.2 Store Polish + Accuracy Hardening** — Phases 8-13 (shipped 2026-03-03)
 - ✅ **v2.0 Firefox Port** — Phases 14-17 (shipped 2026-03-05)
+- 🚧 **v2.1 CI/CD Pipeline** — Phases 18-19 (in progress)
 
 ## Phases
 
@@ -58,6 +59,37 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 
 </details>
 
+### 🚧 v2.1 CI/CD Pipeline (In Progress)
+
+**Milestone Goal:** Automate build, test, and packaging via GitHub Actions so every push and PR is validated and store-ready ZIPs are produced as downloadable artifacts.
+
+- [ ] **Phase 18: Core CI Workflow** - End-to-end GitHub Actions pipeline: triggers, dependency install, build, test, packaging, and artifact upload
+- [ ] **Phase 19: CI Hardening** - Security and reliability hardening: concurrency group and least-privilege permissions
+
+## Phase Details
+
+### Phase 18: Core CI Workflow
+**Goal**: Every push and PR triggers a GitHub Actions run that installs dependencies, builds both browser targets, runs the full 71-case test suite, and uploads store-ready Chrome and Firefox ZIPs as downloadable artifacts
+**Depends on**: Phase 17 (v2.0 complete — esbuild pipeline and npm test scripts exist)
+**Requirements**: CICD-01, CICD-02, CICD-03, PKG-01, PKG-02, PKG-03, HARD-02
+**Success Criteria** (what must be TRUE):
+  1. Pushing a commit to any branch triggers a GitHub Actions run visible in the Actions tab
+  2. Opening or updating a PR targeting main triggers a GitHub Actions run with pass/fail status check
+  3. The Actions run shows four individually named test steps (test:src, test:chrome, test:firefox, test:lint) with per-suite pass/fail visibility — no log inspection required
+  4. A passing run produces two downloadable artifacts (patent-cite-chrome.zip and patent-cite-firefox.zip) with manifest.json at the zip root
+  5. A test failure causes the run to fail and no artifacts are produced
+**Plans**: TBD
+
+### Phase 19: CI Hardening
+**Goal**: The CI workflow resists misuse and resource waste — stale in-progress runs are cancelled on new pushes to the same branch, and the workflow requests only the minimum repository permissions required
+**Depends on**: Phase 18
+**Requirements**: HARD-01, HARD-03
+**Success Criteria** (what must be TRUE):
+  1. Pushing two commits in quick succession to a PR branch cancels the first in-progress run before the second run completes
+  2. The workflow YAML declares `permissions: contents: read` and no broader permission grants appear in the job or step blocks
+  3. Push commits directly to main are never cancelled by the concurrency group (each main-branch run completes independently)
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -79,3 +111,5 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 | 15. esbuild Build Pipeline | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 16. Firefox Extension | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 17. Cross-Browser Validation | v2.0 | 2/2 | Complete | 2026-03-05 |
+| 18. Core CI Workflow | v2.1 | 0/TBD | Not started | - |
+| 19. CI Hardening | v2.1 | 0/TBD | Not started | - |

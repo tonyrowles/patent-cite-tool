@@ -59,21 +59,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CICD-01 | — | Pending |
-| CICD-02 | — | Pending |
-| CICD-03 | — | Pending |
-| PKG-01 | — | Pending |
-| PKG-02 | — | Pending |
-| PKG-03 | — | Pending |
-| HARD-01 | — | Pending |
-| HARD-02 | — | Pending |
-| HARD-03 | — | Pending |
+| CICD-01 | Phase 18 | Pending |
+| CICD-02 | Phase 18 | Pending |
+| CICD-03 | Phase 18 | Pending |
+| PKG-01 | Phase 18 | Pending |
+| PKG-02 | Phase 18 | Pending |
+| PKG-03 | Phase 18 | Pending |
+| HARD-01 | Phase 19 | Pending |
+| HARD-02 | Phase 18 | Pending |
+| HARD-03 | Phase 19 | Pending |
 
 **Coverage:**
 - v2.1 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9 ⚠️
+- Mapped to phases: 9
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap creation*

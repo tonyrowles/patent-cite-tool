@@ -9,20 +9,20 @@ Requirements for CI/CD Pipeline milestone. Each maps to roadmap phases.
 
 ### CI Workflow
 
-- [ ] **CICD-01**: GitHub Actions workflow triggers on push to any branch and on PRs to main
-- [ ] **CICD-02**: Workflow checks out code, sets up Node 22 LTS with npm cache, and runs `npm ci`
-- [ ] **CICD-03**: Workflow runs `npm test` (build + Vitest 71-case corpus + web-ext lint) and fails the run on any test failure
+- [x] **CICD-01**: GitHub Actions workflow triggers on push to any branch and on PRs to main
+- [x] **CICD-02**: Workflow checks out code, sets up Node 22 LTS with npm cache, and runs `npm ci`
+- [x] **CICD-03**: Workflow runs `npm test` (build + Vitest 71-case corpus + web-ext lint) and fails the run on any test failure
 
 ### Packaging
 
-- [ ] **PKG-01**: Workflow zips `dist/chrome/` into a store-ready artifact with manifest.json at zip root
-- [ ] **PKG-02**: Workflow zips `dist/firefox/` into a store-ready artifact with manifest.json at zip root
-- [ ] **PKG-03**: Both zip artifacts are downloadable from the GitHub Actions run page
+- [x] **PKG-01**: Workflow zips `dist/chrome/` into a store-ready artifact with manifest.json at zip root
+- [x] **PKG-02**: Workflow zips `dist/firefox/` into a store-ready artifact with manifest.json at zip root
+- [x] **PKG-03**: Both zip artifacts are downloadable from the GitHub Actions run page
 
 ### Hardening
 
 - [ ] **HARD-01**: Concurrency group cancels stale CI runs when new commits push to the same branch
-- [ ] **HARD-02**: Job has `timeout-minutes` set to prevent indefinite hangs
+- [x] **HARD-02**: Job has `timeout-minutes` set to prevent indefinite hangs
 - [ ] **HARD-03**: Workflow uses explicit `permissions: contents: read` for least-privilege security
 
 ## Future Requirements
@@ -59,14 +59,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CICD-01 | Phase 18 | Pending |
-| CICD-02 | Phase 18 | Pending |
-| CICD-03 | Phase 18 | Pending |
-| PKG-01 | Phase 18 | Pending |
-| PKG-02 | Phase 18 | Pending |
-| PKG-03 | Phase 18 | Pending |
+| CICD-01 | Phase 18 | Complete |
+| CICD-02 | Phase 18 | Complete |
+| CICD-03 | Phase 18 | Complete |
+| PKG-01 | Phase 18 | Complete |
+| PKG-02 | Phase 18 | Complete |
+| PKG-03 | Phase 18 | Complete |
 | HARD-01 | Phase 19 | Pending |
-| HARD-02 | Phase 18 | Pending |
+| HARD-02 | Phase 18 | Complete |
 | HARD-03 | Phase 19 | Pending |
 
 **Coverage:**

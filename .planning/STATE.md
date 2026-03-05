@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: CI/CD Pipeline
-status: active
-last_updated: "2026-03-04"
-last_activity: 2026-03-04 — Roadmap created (2 phases, 9 requirements mapped)
+status: planning
+last_updated: "2026-03-05T05:39:11.613Z"
+last_activity: 2026-03-04 — Roadmap created for v2.1
 progress:
   total_phases: 2
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
   percent: 0
 ---
 
@@ -41,12 +41,16 @@ Progress: [░░░░░░░░░░] 0%
 | v1.1 Silent Mode + Infrastructure | 3 | 8 | 1 day |
 | v1.2 Store Polish + Accuracy Hardening | 6 | 12 | 2 days |
 | v2.0 Firefox Port | 4 | 10 | ~2 days |
+| Phase 18-core-ci-workflow P01 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
 ### Decisions
 
 All v1.0–v2.0 decisions archived in PROJECT.md Key Decisions table.
+- [Phase 18-core-ci-workflow]: timeout-minutes: 10 for CI job — generous headroom over build+test time without risking 6-hour default hang
+- [Phase 18-core-ci-workflow]: Build runs once before 4 named test steps (not via npm test) — gives per-suite pass/fail visibility in Actions UI
+- [Phase 18-core-ci-workflow]: Shell zip with cd+zip pattern for store-ready ZIPs; actions/* at v4 for proven stability
 
 ### Pending Todos
 

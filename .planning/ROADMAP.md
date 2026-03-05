@@ -63,7 +63,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 
 **Milestone Goal:** Automate build, test, and packaging via GitHub Actions so every push and PR is validated and store-ready ZIPs are produced as downloadable artifacts.
 
-- [ ] **Phase 18: Core CI Workflow** - End-to-end GitHub Actions pipeline: triggers, dependency install, build, test, packaging, and artifact upload
+- [x] **Phase 18: Core CI Workflow** - End-to-end GitHub Actions pipeline: triggers, dependency install, build, test, packaging, and artifact upload (completed 2026-03-05)
 - [ ] **Phase 19: CI Hardening** - Security and reliability hardening: concurrency group and least-privilege permissions
 
 ## Phase Details
@@ -78,7 +78,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   3. The Actions run shows four individually named test steps (test:src, test:chrome, test:firefox, test:lint) with per-suite pass/fail visibility — no log inspection required
   4. A passing run produces two downloadable artifacts (patent-cite-chrome.zip and patent-cite-firefox.zip) with manifest.json at the zip root
   5. A test failure causes the run to fail and no artifacts are produced
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 18-01-PLAN.md — CI workflow creation with pre-flight validation and GitHub verification
 
@@ -113,5 +113,5 @@ Plans:
 | 15. esbuild Build Pipeline | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 16. Firefox Extension | v2.0 | 3/3 | Complete | 2026-03-04 |
 | 17. Cross-Browser Validation | v2.0 | 2/2 | Complete | 2026-03-05 |
-| 18. Core CI Workflow | v2.1 | 0/1 | Not started | - |
+| 18. Core CI Workflow | 1/1 | Complete   | 2026-03-05 | - |
 | 19. CI Hardening | v2.1 | 0/TBD | Not started | - |

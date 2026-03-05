@@ -186,6 +186,41 @@ async function buildFirefox({ sourcemaps = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Test-export bundles (ESM bundles of matching logic for each dist/ target)
+// Used by vitest.config.chrome.js and vitest.config.firefox.js via resolve.alias
+// ---------------------------------------------------------------------------
+
+async function buildTestExports({ chrome = true, firefox = true } = {}) {
+  const builds = [];
+
+  if (chrome) {
+    builds.push(
+      esbuild.build({
+        entryPoints: ['src/matching-exports.js'],
+        bundle: true,
+        format: 'esm',
+        platform: 'browser',
+        outfile: 'dist/chrome/matching-exports.js',
+      }),
+    );
+  }
+
+  if (firefox) {
+    builds.push(
+      esbuild.build({
+        entryPoints: ['src/matching-exports.js'],
+        bundle: true,
+        format: 'esm',
+        platform: 'browser',
+        outfile: 'dist/firefox/matching-exports.js',
+      }),
+    );
+  }
+
+  await Promise.all(builds);
+}
+
+// ---------------------------------------------------------------------------
 // Watch mode (Chrome only)
 // ---------------------------------------------------------------------------
 
@@ -227,12 +262,15 @@ async function main() {
     await watchChrome();
   } else if (chromeOnly) {
     await buildChrome();
+    await buildTestExports({ chrome: true, firefox: false });
   } else if (firefoxOnly) {
     await buildFirefox();
+    await buildTestExports({ chrome: false, firefox: true });
   } else {
     // Default: build both targets
     await buildChrome();
     await buildFirefox();
+    await buildTestExports({ chrome: true, firefox: true });
   }
 }
 

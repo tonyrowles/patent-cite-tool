@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build (Chrome + Firefox)
+        run: npm run build
+
+      - name: Test — src (Vitest unit)
+        run: npm run test:src
+
+      - name: Test — chrome-dist (Vitest chrome)
+        run: npm run test:chrome
+
+      - name: Test — firefox-dist (Vitest firefox)
+        run: npm run test:firefox
+
+      - name: Test — lint (web-ext lint)
+        run: npm run test:lint
+
+      - name: Package Chrome extension
+        run: cd dist/chrome && zip -r ../../patent-cite-chrome.zip .
+
+      - name: Package Firefox extension
+        run: cd dist/firefox && zip -r ../../patent-cite-firefox.zip .
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            patent-cite-chrome.zip \
+            patent-cite-firefox.zip \
+            --generate-notes

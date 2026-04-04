@@ -122,34 +122,50 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
   const confidenceClass = confidence >= 0.95 ? 'high' : confidence >= 0.80 ? 'medium' : 'low';
   const confidenceLabel = confidence >= 0.95 ? '' : confidence >= 0.80 ? 'Approximate match' : 'Low confidence';
 
-  // Build popup content
-  let html = `<div class="cite-row">`;
-  html += `<span class="cite-text">${escapeHtml(citation)}</span>`;
-  html += `<button class="cite-copy-btn" title="Copy citation">Copy</button>`;
+  // Build popup content via DOM
+  const row = document.createElement('div');
+  row.className = 'cite-row';
+
+  const citeText = document.createElement('span');
+  citeText.className = 'cite-text';
+  citeText.textContent = citation;
+  row.appendChild(citeText);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'cite-copy-btn';
+  copyBtn.title = 'Copy citation';
+  copyBtn.textContent = 'Copy';
+  row.appendChild(copyBtn);
 
   // Confidence dot (always visible if not perfect)
   if (confidence < 0.95) {
-    html += `<span class="cite-confidence cite-conf-${confidenceClass}" title="${confidenceLabel}"></span>`;
+    const dot = document.createElement('span');
+    dot.className = `cite-confidence cite-conf-${confidenceClass}`;
+    dot.title = confidenceLabel;
+    row.appendChild(dot);
   }
 
-  html += `</div>`;
+  popup.appendChild(row);
 
   // Advanced mode: show matched text and confidence detail
   if (displayMode === 'advanced') {
     if (matchedText) {
       const preview = matchedText.length > 80 ? matchedText.substring(0, 80) + '...' : matchedText;
-      html += `<div class="cite-preview">${escapeHtml(preview)}</div>`;
+      const previewEl = document.createElement('div');
+      previewEl.className = 'cite-preview';
+      previewEl.textContent = preview;
+      popup.appendChild(previewEl);
     }
     if (confidence < 1.0) {
       const pct = Math.round(confidence * 100);
-      html += `<div class="cite-conf-detail cite-conf-${confidenceClass}">Match confidence: ${pct}%</div>`;
+      const confDetail = document.createElement('div');
+      confDetail.className = `cite-conf-detail cite-conf-${confidenceClass}`;
+      confDetail.textContent = `Match confidence: ${pct}%`;
+      popup.appendChild(confDetail);
     }
   }
 
-  popup.innerHTML = html;
-
   // Copy button handler
-  const copyBtn = popup.querySelector('.cite-copy-btn');
   copyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     navigator.clipboard.writeText(citation).then(() => {
@@ -229,7 +245,10 @@ export function showErrorPopup(errorMessage, rect) {
   const popup = document.createElement('div');
   popup.className = 'cite-popup cite-error';
   popup.style.pointerEvents = 'auto';
-  popup.innerHTML = `<div class="cite-error-msg">${escapeHtml(errorMessage)}</div>`;
+  const msg = document.createElement('div');
+  msg.className = 'cite-error-msg';
+  msg.textContent = errorMessage;
+  popup.appendChild(msg);
 
   let top = rect.bottom + 8;
   let left = rect.left;
@@ -296,7 +315,7 @@ export function showSuccessToast(citation, rect) {
 
   const pill = document.createElement('div');
   pill.className = 'cite-toast-success';
-  pill.innerHTML = escapeHtml(citation);
+  pill.textContent = citation;
 
   // Position below selection, clamped to viewport
   let top = rect.bottom + 6;
@@ -339,7 +358,7 @@ export function showFailureToast(reason, rect) {
 
   const pill = document.createElement('div');
   pill.className = 'cite-toast-failure';
-  pill.innerHTML = escapeHtml(reason);
+  pill.textContent = reason;
 
   // Position below selection, clamped to viewport (account for ~220px width)
   let top = rect.bottom + 6;
@@ -543,14 +562,3 @@ function getFailureToastCSS() {
 // Utility
 // ---------------------------------------------------------------------------
 
-/**
- * Escape HTML to prevent XSS in innerHTML.
- *
- * @param {string} text - Raw text to escape.
- * @returns {string} HTML-safe text.
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}

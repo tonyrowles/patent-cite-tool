@@ -8,6 +8,7 @@ import {
   assignLineNumbers,
   clusterIntoLines,
   buildLineEntry,
+  extractPrintedColumnNumbers,
 } from '../../src/offscreen/position-map-builder.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -204,5 +205,64 @@ describe('cross-column line number consistency: US10592688', () => {
     // Both should be line 53
     expect(col1At180[0].lineNumber).toBe(53);
     expect(col2At180[0].lineNumber).toBe(53);
+  });
+});
+
+// ============================================================================
+// extractPrintedColumnNumbers unit tests
+// ============================================================================
+
+describe('extractPrintedColumnNumbers', () => {
+  const pageHeight = 792; // US letter
+  const pageWidth = 612;
+
+  function makeHeaderItem(text, x, y) {
+    return { text, x, y: y !== undefined ? y : pageHeight - 50, width: 10, height: 10 };
+  }
+
+  it('returns column pair for normal spec page', () => {
+    const items = [
+      makeHeaderItem('1', 50, 750),
+      makeHeaderItem('2', 500, 750),
+    ];
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toEqual({ left: 1, right: 2 });
+  });
+
+  it('returns null for patent-number substring like 203', () => {
+    const items = [
+      makeHeaderItem('203', 50, 750),
+      makeHeaderItem('204', 500, 750),
+    ];
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+  });
+
+  it('returns null when single large number in header (US10203551 scenario)', () => {
+    const items = [
+      makeHeaderItem('203', 50, 750),
+    ];
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+  });
+
+  it('accepts high but legitimate columns (99, 100)', () => {
+    const items = [
+      makeHeaderItem('99', 50, 750),
+      makeHeaderItem('100', 500, 750),
+    ];
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toEqual({ left: 99, right: 100 });
+  });
+
+  it('returns null when columns are not consecutive', () => {
+    const items = [
+      makeHeaderItem('5', 50, 750),
+      makeHeaderItem('8', 500, 750),
+    ];
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+  });
+
+  it('returns null when no numbers in header', () => {
+    const items = [
+      makeHeaderItem('Abstract', 50, 750),
+    ];
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
   });
 });

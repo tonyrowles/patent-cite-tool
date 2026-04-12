@@ -141,7 +141,7 @@ export function extractPrintedColumnNumbers(items, pageHeight, pageWidth) {
   const headerThreshold = pageHeight - 90;
   const midX = pageWidth / 2;
 
-  // Find header items that are standalone numbers (1-999)
+  // Find header items that are standalone numbers (1-200)
   const headerNumbers = [];
   for (const item of items) {
     if (item.y >= headerThreshold) {
@@ -180,8 +180,8 @@ export function extractPrintedColumnNumbers(items, pageHeight, pageWidth) {
   // Sanity check: right should be left + 1 (consecutive columns)
   if (right !== left + 1) return null;
 
-  // Sanity check: column numbers should be reasonable (1-999)
-  if (left < 1 || right > 999) return null;
+  // Sanity check: column numbers should be reasonable (1-200)
+  if (left < 1 || right > 200) return null;
 
   return { left, right };
 }

@@ -23,7 +23,7 @@ const WORKER_URL = 'https://pct.tonyrowles.com';
 const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
 
 // Cache version — bump to invalidate all cached entries
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 
 // ---------------------------------------------------------------------------
 // IndexedDB degradation state (FOX-05)

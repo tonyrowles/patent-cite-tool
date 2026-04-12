@@ -9,6 +9,7 @@ import {
   clusterIntoLines,
   buildLineEntry,
   extractPrintedColumnNumbers,
+  isLikelySpecPage,
   buildPositionMap,
 } from '../../src/offscreen/position-map-builder.js';
 
@@ -340,5 +341,121 @@ describe('buildPositionMap sequential column validation', () => {
     const cols = [...new Set(result.map(e => e.column))];
     expect(cols).not.toContain(203);
     expect(cols).not.toContain(204);
+  });
+});
+
+// ============================================================================
+// isLikelySpecPage unit tests
+// ============================================================================
+
+describe('isLikelySpecPage', () => {
+  const pageHeight = 792;
+
+  function makeItems(headerTexts, bodyCount) {
+    const items = [];
+    // Header items (in header zone: y >= pageHeight - 90 = 702)
+    for (const text of headerTexts) {
+      items.push({ text, x: 200, y: 730, width: 50, height: 10 });
+    }
+    // Body items (between footer and header thresholds)
+    for (let i = 0; i < bodyCount; i++) {
+      items.push({ text: `text ${i}`, x: 80 + (i % 10) * 20, y: 100 + (i % 30) * 18, width: 50, height: 10 });
+    }
+    return items;
+  }
+
+  it('returns true for a spec page with only patent number in header', () => {
+    expect(isLikelySpecPage(makeItems(['US 10,203,551 B2'], 200), pageHeight)).toBe(true);
+  });
+
+  it('returns false for cover page with "United States Patent"', () => {
+    expect(isLikelySpecPage(makeItems(['(12)', 'United States Patent', 'US 10,203,551 B2'], 200), pageHeight)).toBe(false);
+  });
+
+  it('returns false for figure page with "Sheet X of Y"', () => {
+    expect(isLikelySpecPage(makeItems(['U.S. Patent', 'Sheet 2 of 5', 'US 10,203,551 B2'], 200), pageHeight)).toBe(false);
+  });
+
+  it('returns false for abstract continuation with "Page N"', () => {
+    expect(isLikelySpecPage(makeItems(['US 10,203,551 B2', 'Page 2'], 200), pageHeight)).toBe(false);
+  });
+
+  it('returns false for sparse page (garbled figure OCR)', () => {
+    expect(isLikelySpecPage(makeItems(['some text'], 30), pageHeight)).toBe(false);
+  });
+});
+
+// ============================================================================
+// buildPositionMap fallback column inference tests
+// ============================================================================
+
+describe('buildPositionMap fallback column inference', () => {
+  const pageWidth = 612;
+  const pageHeight = 792;
+
+  /**
+   * Build a spec-like page WITHOUT column numbers in the header.
+   * Only the patent number appears in the header zone.
+   */
+  function makeSpecPageNoColNums(pageNum) {
+    const items = [];
+    // Header: only patent number (no standalone digits)
+    items.push({ text: 'US 10,203,551 B2', x: 256, y: pageHeight - 50, width: 90, height: 10 });
+    // Body text — 100+ items split across both halves
+    for (let i = 0; i < 50; i++) {
+      items.push({ text: `left text ${i}`, x: 60 + (i % 5) * 10, y: 100 + i * 10, width: 80, height: 10 });
+    }
+    for (let i = 0; i < 50; i++) {
+      items.push({ text: `right text ${i}`, x: 350 + (i % 5) * 10, y: 100 + i * 10, width: 80, height: 10 });
+    }
+    return { pageNum, items, pageWidth, pageHeight };
+  }
+
+  /** Build a cover page that should be skipped. */
+  function makeCoverPage(pageNum) {
+    const items = [];
+    items.push({ text: '(12)', x: 78, y: pageHeight - 50, width: 17, height: 10 });
+    items.push({ text: 'United States Patent', x: 98, y: pageHeight - 50, width: 162, height: 10 });
+    for (let i = 0; i < 50; i++) {
+      items.push({ text: `left ${i}`, x: 60 + (i % 5) * 10, y: 100 + i * 10, width: 80, height: 10 });
+    }
+    for (let i = 0; i < 50; i++) {
+      items.push({ text: `right ${i}`, x: 350 + (i % 5) * 10, y: 100 + i * 10, width: 80, height: 10 });
+    }
+    return { pageNum, items, pageWidth, pageHeight };
+  }
+
+  it('infers sequential columns when no printed column numbers exist', () => {
+    const result = buildPositionMap([
+      makeCoverPage(1),
+      makeSpecPageNoColNums(2),
+      makeSpecPageNoColNums(3),
+    ]);
+    const cols = [...new Set(result.map(e => e.column))].sort((a, b) => a - b);
+    expect(cols).toEqual([1, 2, 3, 4]);
+  });
+
+  it('skips cover and figure pages in fallback mode', () => {
+    const figurePage = {
+      pageNum: 2, items: [], pageWidth, pageHeight,
+    };
+    // Add "Sheet 1 of 3" header + enough body items
+    figurePage.items.push({ text: 'Sheet 1 of 3', x: 300, y: pageHeight - 50, width: 60, height: 10 });
+    for (let i = 0; i < 50; i++) {
+      figurePage.items.push({ text: `l ${i}`, x: 60 + (i % 5) * 10, y: 100 + i * 10, width: 80, height: 10 });
+    }
+    for (let i = 0; i < 50; i++) {
+      figurePage.items.push({ text: `r ${i}`, x: 350 + (i % 5) * 10, y: 100 + i * 10, width: 80, height: 10 });
+    }
+
+    const result = buildPositionMap([
+      makeCoverPage(1),
+      figurePage,
+      makeSpecPageNoColNums(3),
+      makeSpecPageNoColNums(4),
+    ]);
+    // Only spec pages should produce entries, starting at columns 1,2
+    const cols = [...new Set(result.map(e => e.column))].sort((a, b) => a - b);
+    expect(cols).toEqual([1, 2, 3, 4]);
   });
 });

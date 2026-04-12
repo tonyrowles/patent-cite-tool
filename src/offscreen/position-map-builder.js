@@ -653,70 +653,115 @@ export function assignLineNumbers(lines, entries, pageNum, column) {
  * @param {Array} pageResults - Per-page text items from extractTextFromPdf.
  * @returns {Array} PositionMap entries.
  */
+/**
+ * Check whether a two-column page is likely a specification page (not a cover,
+ * figure, or abstract page).  Used as a fallback when the PDF has no printed
+ * column numbers in the header — e.g. US10203551 where PDF.js only extracts
+ * the patent-number text.
+ *
+ * @param {Array}  items      - All text items on the page.
+ * @param {number} pageHeight - Page height in points.
+ * @returns {boolean}
+ */
+export function isLikelySpecPage(items, pageHeight) {
+  const headerThreshold = pageHeight - 90;
+  const headerText = items
+    .filter(it => it.y >= headerThreshold)
+    .map(it => it.text)
+    .join(' ');
+
+  // Cover page
+  if (headerText.includes('United States Patent')) return false;
+  // Figure / drawing pages
+  if (/Sheet\s+\d+\s+of\s+\d+/i.test(headerText)) return false;
+  // Abstract continuation pages (rare, but seen in some patents)
+  if (/\bPage\s+\d+\b/i.test(headerText)) return false;
+
+  // Spec pages have dense body text; figure pages with two-column OCR
+  // artifacts typically have far fewer items.
+  const bodyItems = items.filter(it => it.y > 40 && it.y < headerThreshold);
+  if (bodyItems.length < 80) return false;
+
+  return true;
+}
+
+/**
+ * Process one page's two columns and append entries.
+ *
+ * @param {object} pageResult - { pageNum, items, pageWidth, pageHeight }
+ * @param {{ left: number, right: number }} colNums - Column numbers for this page.
+ * @param {Array} entries - Accumulator for position map entries.
+ */
+function processPageColumns(pageResult, colNums, entries) {
+  const { pageNum, items, pageWidth, pageHeight } = pageResult;
+
+  const boundary = findColumnBoundary(items, pageWidth);
+  const filtered = filterHeadersFooters(items, pageHeight);
+  if (filtered.length === 0) return;
+
+  const grid = extractGutterLineGrid(filtered, boundary, pageWidth);
+
+  const leftItems = filterGutterLineNumbers(
+    stripCrossBoundaryText(
+      filtered.filter(item => item.x < boundary),
+      boundary
+    ),
+    boundary, pageWidth
+  );
+  const rightItems = filterGutterLineNumbers(
+    filtered.filter(item => item.x >= boundary), boundary, pageWidth
+  );
+
+  const leftLines = clusterIntoLines(leftItems);
+  if (grid) {
+    assignLineNumbersByGrid(leftLines, entries, pageNum, colNums.left, grid);
+  } else {
+    assignLineNumbers(leftLines, entries, pageNum, colNums.left);
+  }
+
+  const rightLines = clusterIntoLines(rightItems);
+  if (grid) {
+    assignLineNumbersByGrid(rightLines, entries, pageNum, colNums.right, grid);
+  } else {
+    assignLineNumbers(rightLines, entries, pageNum, colNums.right);
+  }
+}
+
 export function buildPositionMap(pageResults) {
   const entries = [];
-  let expectedLeftCol = 1; // tracks sequential column progression; spec always starts at col 1
-  for (const pageResult of pageResults) {
-    const { pageNum, items, pageWidth, pageHeight } = pageResult;
 
-    // Skip non-two-column pages
+  // --- Primary pass: use printed column numbers with sequential validation ---
+  let expectedLeftCol = 1; // spec always starts at col 1
+  for (const pageResult of pageResults) {
+    const { items, pageWidth, pageHeight } = pageResult;
     if (!isTwoColumnPage(items, pageWidth)) continue;
 
-    // Extract printed column numbers from page headers.
-    // Only specification pages have printed column numbers — this
-    // automatically skips cover pages, figure pages, and other non-spec
-    // two-column pages (like sequence listings without column headers).
     const colNums = extractPrintedColumnNumbers(items, pageHeight, pageWidth);
     if (!colNums) continue;
 
-    // Sequential validation: column numbers must proceed in order across pages
-    // (1,2 → 3,4 → 5,6 ...). Reject pages that break the sequence — catches
-    // patent-number substrings like "203" from US10203551 that slip past the
-    // per-page checks.
+    // Sequential validation: columns must proceed in order (1,2 → 3,4 → 5,6).
+    // Rejects patent-number fragments like "203" from US10203551.
     if (colNums.left !== expectedLeftCol) continue;
     expectedLeftCol = colNums.right + 1;
 
-    // Find column boundary for this page
-    const boundary = findColumnBoundary(items, pageWidth);
+    processPageColumns(pageResult, colNums, entries);
+  }
 
-    // Filter headers/footers
-    const filtered = filterHeadersFooters(items, pageHeight);
-    if (filtered.length === 0) continue;
+  // --- Fallback pass: infer column numbers from page order ---
+  // Some PDFs (e.g. US10203551) have column numbers rendered as graphics
+  // rather than text, so extractPrintedColumnNumbers finds nothing valid.
+  // Fall back to inferring columns for pages that look like spec pages.
+  if (entries.length === 0) {
+    let inferredLeft = 1;
+    for (const pageResult of pageResults) {
+      const { items, pageWidth, pageHeight } = pageResult;
+      if (!isTwoColumnPage(items, pageWidth)) continue;
+      if (!isLikelySpecPage(items, pageHeight)) continue;
 
-    // Extract gutter line-marker grid BEFORE filtering gutter markers out.
-    // The grid provides absolute y-to-line-number mapping, ensuring both
-    // columns get consistent line numbers for the same y-coordinate.
-    const grid = extractGutterLineGrid(filtered, boundary, pageWidth);
+      const colNums = { left: inferredLeft, right: inferredLeft + 1 };
+      inferredLeft += 2;
 
-    // Split into left and right column items.
-    // For left-column items, first strip any cross-boundary contamination
-    // (PDF text items that physically span from left column into the right
-    // column, containing embedded gutter line numbers and right-column text).
-    const leftItems = filterGutterLineNumbers(
-      stripCrossBoundaryText(
-        filtered.filter(item => item.x < boundary),
-        boundary
-      ),
-      boundary, pageWidth
-    );
-    const rightItems = filterGutterLineNumbers(
-      filtered.filter(item => item.x >= boundary), boundary, pageWidth
-    );
-
-    // Process left column (use printed column number)
-    const leftLines = clusterIntoLines(leftItems);
-    if (grid) {
-      assignLineNumbersByGrid(leftLines, entries, pageNum, colNums.left, grid);
-    } else {
-      assignLineNumbers(leftLines, entries, pageNum, colNums.left);
-    }
-
-    // Process right column (use printed column number)
-    const rightLines = clusterIntoLines(rightItems);
-    if (grid) {
-      assignLineNumbersByGrid(rightLines, entries, pageNum, colNums.right, grid);
-    } else {
-      assignLineNumbers(rightLines, entries, pageNum, colNums.right);
+      processPageColumns(pageResult, colNums, entries);
     }
   }
 

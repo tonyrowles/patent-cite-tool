@@ -9,6 +9,7 @@ import {
   clusterIntoLines,
   buildLineEntry,
   extractPrintedColumnNumbers,
+  buildPositionMap,
 } from '../../src/offscreen/position-map-builder.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -228,22 +229,33 @@ describe('extractPrintedColumnNumbers', () => {
     expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toEqual({ left: 1, right: 2 });
   });
 
-  it('returns null for patent-number substring like 203', () => {
+  it('returns null when left column is even (e.g., 4,5)', () => {
+    const items = [
+      makeHeaderItem('4', 50, 750),
+      makeHeaderItem('5', 500, 750),
+    ];
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+  });
+
+  it('accepts odd-even pairs like 203,204 at per-page level (sequential check is in buildPositionMap)', () => {
     const items = [
       makeHeaderItem('203', 50, 750),
       makeHeaderItem('204', 500, 750),
     ];
-    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+    // extractPrintedColumnNumbers only checks structure (odd left, consecutive).
+    // The sequential cross-page check in buildPositionMap catches impossible jumps.
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toEqual({ left: 203, right: 204 });
   });
 
-  it('returns null when single large number in header (US10203551 scenario)', () => {
+  it('returns null when single number inferred as left gives even left', () => {
+    // Single "204" on right side → inferred left = 203 (odd) → accepted at per-page level
     const items = [
-      makeHeaderItem('203', 50, 750),
+      makeHeaderItem('204', 500, 750),
     ];
-    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toEqual({ left: 203, right: 204 });
   });
 
-  it('accepts high but legitimate columns (99, 100)', () => {
+  it('accepts high but legitimate odd-even columns (99, 100)', () => {
     const items = [
       makeHeaderItem('99', 50, 750),
       makeHeaderItem('100', 500, 750),
@@ -264,5 +276,69 @@ describe('extractPrintedColumnNumbers', () => {
       makeHeaderItem('Abstract', 50, 750),
     ];
     expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+  });
+});
+
+// ============================================================================
+// buildPositionMap sequential column validation tests
+// ============================================================================
+
+describe('buildPositionMap sequential column validation', () => {
+  const pageWidth = 612;
+  const pageHeight = 792;
+
+  /**
+   * Build a minimal two-column page result that passes isTwoColumnPage,
+   * extractPrintedColumnNumbers, and produces at least one entry.
+   */
+  function makeSpecPage(pageNum, leftCol, rightCol) {
+    const items = [];
+    // Header column numbers
+    items.push({ text: String(leftCol), x: 50, y: pageHeight - 50, width: 10, height: 10 });
+    items.push({ text: String(rightCol), x: 500, y: pageHeight - 50, width: 10, height: 10 });
+    // Body text — need 30+ items split across both halves to pass isTwoColumnPage
+    for (let i = 0; i < 20; i++) {
+      items.push({ text: `left text ${i}`, x: 60 + (i % 5) * 10, y: 100 + i * 20, width: 80, height: 10 });
+    }
+    for (let i = 0; i < 20; i++) {
+      items.push({ text: `right text ${i}`, x: 350 + (i % 5) * 10, y: 100 + i * 20, width: 80, height: 10 });
+    }
+    return { pageNum, items, pageWidth, pageHeight };
+  }
+
+  it('accepts pages with sequential column numbers (1,2 → 3,4)', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 1, 2),
+      makeSpecPage(2, 3, 4),
+    ]);
+    // Both pages should produce entries
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).toContain(1);
+    expect(cols).toContain(2);
+    expect(cols).toContain(3);
+    expect(cols).toContain(4);
+  });
+
+  it('rejects pages that break the sequential pattern (1,2 → 203,204)', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 1, 2),
+      makeSpecPage(2, 203, 204), // impossible jump — patent number contamination
+    ]);
+    // Only page 1 columns should appear
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).toContain(1);
+    expect(cols).toContain(2);
+    expect(cols).not.toContain(203);
+    expect(cols).not.toContain(204);
+  });
+
+  it('rejects page with spurious column 203 even as first spec page', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 203, 204), // first page should start at 1,2
+    ]);
+    // No entries should be produced since 203 ≠ expected first column (1)
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).not.toContain(203);
+    expect(cols).not.toContain(204);
   });
 });

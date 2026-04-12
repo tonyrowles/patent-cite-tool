@@ -141,7 +141,7 @@ export function extractPrintedColumnNumbers(items, pageHeight, pageWidth) {
   const headerThreshold = pageHeight - 90;
   const midX = pageWidth / 2;
 
-  // Find header items that are standalone numbers (1-200)
+  // Find header items that are standalone numbers
   const headerNumbers = [];
   for (const item of items) {
     if (item.y >= headerThreshold) {
@@ -180,8 +180,9 @@ export function extractPrintedColumnNumbers(items, pageHeight, pageWidth) {
   // Sanity check: right should be left + 1 (consecutive columns)
   if (right !== left + 1) return null;
 
-  // Sanity check: column numbers should be reasonable (1-200)
-  if (left < 1 || right > 200) return null;
+  // Sanity check: left column must be odd (patent spec pages always have
+  // odd-even pairs: 1,2 then 3,4 then 5,6 etc.)
+  if (left < 1 || left % 2 !== 1) return null;
 
   return { left, right };
 }
@@ -654,6 +655,7 @@ export function assignLineNumbers(lines, entries, pageNum, column) {
  */
 export function buildPositionMap(pageResults) {
   const entries = [];
+  let expectedLeftCol = 1; // tracks sequential column progression; spec always starts at col 1
   for (const pageResult of pageResults) {
     const { pageNum, items, pageWidth, pageHeight } = pageResult;
 
@@ -666,6 +668,13 @@ export function buildPositionMap(pageResults) {
     // two-column pages (like sequence listings without column headers).
     const colNums = extractPrintedColumnNumbers(items, pageHeight, pageWidth);
     if (!colNums) continue;
+
+    // Sequential validation: column numbers must proceed in order across pages
+    // (1,2 → 3,4 → 5,6 ...). Reject pages that break the sequence — catches
+    // patent-number substrings like "203" from US10203551 that slip past the
+    // per-page checks.
+    if (colNums.left !== expectedLeftCol) continue;
+    expectedLeftCol = colNums.right + 1;
 
     // Find column boundary for this page
     const boundary = findColumnBoundary(items, pageWidth);

@@ -4,9 +4,9 @@ milestone: v2.3
 milestone_name: Post-v2.2 Hardening
 status: active
 last_updated: "2026-05-12T00:00:00.000Z"
-last_activity: "2026-05-12 — Milestone v2.3 Post-v2.2 Hardening started"
+last_activity: "2026-05-12 — Roadmap created for v2.3; Phase 23 is current focus"
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,14 +19,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** v2.3 Post-v2.2 Hardening — defining requirements
+**Current focus:** v2.3 Post-v2.2 Hardening — Phase 23: Column Inference for Headerless PDFs (defining plans)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 23 — Column Inference for Headerless PDFs
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-12 — Milestone v2.3 Post-v2.2 Hardening started
+Status: Defining plans
+Last activity: 2026-05-12 — Roadmap created for v2.3; Phase 23 is current focus
+
+```
+Progress: 0/3 phases complete
+[░░░░░░░░░░░░░░░░░░░░] 0%
+Phase 23 [ ] → Phase 24 [ ] → Phase 25 [ ]
+```
 
 ## Performance Metrics
 
@@ -40,6 +46,7 @@ Last activity: 2026-05-12 — Milestone v2.3 Post-v2.2 Hardening started
 | v2.0 Firefox Port | 4 | 10 | ~2 days |
 | v2.1 CI/CD Pipeline | 2 | 2 | 2 days |
 | v2.2 Matching Robustness | 3 | 4 | 2 days |
+| v2.3 Post-v2.2 Hardening | 3 | TBD | TBD |
 
 ## Accumulated Context
 
@@ -64,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-05-12 — Milestone v2.3 Post-v2.2 Hardening started
-Status: Defining requirements
-Next: roadmapper will derive phases from v2.3 requirements
+Last activity: 2026-05-12 — Roadmap created for v2.3; Phase 23 is current focus
+Status: Defining plans
+Next: `/gsd-plan-phase 23` — Column Inference for Headerless PDFs

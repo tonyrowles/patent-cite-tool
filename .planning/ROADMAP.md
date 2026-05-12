@@ -8,6 +8,7 @@
 - ✅ **v2.0 Firefox Port** — Phases 14-17 (shipped 2026-03-05)
 - ✅ **v2.1 CI/CD Pipeline** — Phases 18-19 (shipped 2026-03-05)
 - ✅ **v2.2 Matching Robustness** — Phases 20-22 (shipped 2026-03-05)
+- 🚧 **v2.3 Post-v2.2 Hardening** — Phases 23-25 (active)
 
 ## Phases
 
@@ -81,6 +82,47 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
 </details>
 
+### v2.3 Post-v2.2 Hardening (Phases 23-25) — ACTIVE
+
+- [ ] **Phase 23: Column Inference for Headerless PDFs** — ACCY-04, ACCY-05
+- [ ] **Phase 24: Firefox AMO Validation Cleanup** — FOX-06
+- [ ] **Phase 25: Automatic Release Workflow** — CICD-04
+
+## Phase Details
+
+### Phase 23: Column Inference for Headerless PDFs
+**Goal**: The citation tool produces correct column numbers for granted patents whose PDFs omit printed column headers, with cache invalidation ensuring all users re-parse with the new logic.
+**Depends on**: Phase 22 (Golden Baseline — regression protection for any accuracy change)
+**Requirements**: ACCY-04, ACCY-05
+**Success Criteria** (what must be TRUE):
+  1. Running the test suite against US10203551 (the trigger case) returns correct column numbers — no more impossible values like column 203.
+  2. Column number results fall within a structurally validated upper bound (≤200) derived from the patent's actual page/column layout, not an arbitrary cap.
+  3. When a patent PDF has no printed column headers, the tool infers column numbers from structural cues (page geometry, line density) rather than failing or returning garbage values.
+  4. The CACHE_VERSION constant is bumped (v2 → v3) so a user who previously cached a stale position map re-parses automatically on next use — the old map is not served.
+  5. All 75 existing golden baseline cases continue to pass after the inference change (zero regressions).
+**Plans**: TBD
+
+### Phase 24: Firefox AMO Validation Cleanup
+**Goal**: The Firefox dist passes `web-ext lint` with zero AMO-blocking errors or warnings, making the extension submission-ready for the Firefox Add-ons store.
+**Depends on**: Phase 17 (Firefox Extension — the dist being linted)
+**Requirements**: FOX-06
+**Success Criteria** (what must be TRUE):
+  1. Running `web-ext lint` against the Firefox dist exits with a zero return code and prints no errors.
+  2. Running `web-ext lint` against the Firefox dist prints no AMO-blocking warnings (those that would cause automatic rejection during review).
+  3. The CI test step `test:lint` passes in GitHub Actions, confirming lint clean status is enforced on every push.
+**Plans**: TBD
+
+### Phase 25: Automatic Release Workflow
+**Goal**: Pushing a `v*` semver tag to the repository automatically triggers a GitHub Actions workflow that builds both browser dists and attaches them to a published GitHub Release — no manual upload step required.
+**Depends on**: Phase 18 (Core CI Workflow — release workflow builds on the same infrastructure)
+**Requirements**: CICD-04
+**Success Criteria** (what must be TRUE):
+  1. Pushing a `v*` tag (e.g., `v2.3.0`) to `main` triggers a new GitHub Actions workflow run — the workflow is not a manual step.
+  2. The workflow builds Chrome and Firefox dists and attaches the resulting ZIPs as downloadable assets on the corresponding GitHub Release.
+  3. A GitHub Release entry appears automatically (draft or published) for the pushed tag, with release notes derived from the tag or workflow.
+  4. The release workflow is independent of the CI push workflow — a tag push does not interfere with normal branch CI runs.
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -107,3 +149,6 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 | 20. OCR Normalization and Concat Refactor | v2.2 | 2/2 | Complete | 2026-03-05 |
 | 21. Gutter-Tolerant Matching | v2.2 | 1/1 | Complete | 2026-03-05 |
 | 22. Validation and Golden Baseline | v2.2 | 1/1 | Complete | 2026-03-05 |
+| 23. Column Inference for Headerless PDFs | v2.3 | 0/? | Not started | - |
+| 24. Firefox AMO Validation Cleanup | v2.3 | 0/? | Not started | - |
+| 25. Automatic Release Workflow | v2.3 | 0/? | Not started | - |

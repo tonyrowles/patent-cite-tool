@@ -37,8 +37,8 @@
 
 ## Traceability
 
-To be filled by roadmapper — each REQ-ID maps to exactly one phase.
-
 | Phase | Requirements |
 |-------|--------------|
-| TBD   | TBD          |
+| Phase 23 — Column Inference for Headerless PDFs | ACCY-04, ACCY-05 |
+| Phase 24 — Firefox AMO Validation Cleanup | FOX-06 |
+| Phase 25 — Automatic Release Workflow | CICD-04 |

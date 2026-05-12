@@ -8,6 +8,15 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
+## Current Milestone: v2.3 Post-v2.2 Hardening
+
+**Goal:** Retroactively capture the column-inference accuracy fix, Firefox store-validation cleanup, and CI release-automation work that landed on `main` after the v2.2 archive — close the books and tag a release.
+
+**Target features:**
+- Column-number inference for granted patents whose PDFs lack printed column headers (structural validation, range tightening, cache invalidation)
+- Firefox store-validation cleanup so the extension is AMO-submission-ready
+- Automatic GitHub Release workflow triggered by `v*` version-tag push
+
 ## Requirements
 
 ### Validated
@@ -55,6 +64,13 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - ✓ Gutter-tolerant matching — Tier 5 last-resort fallback strips stray gutter line numbers with 0.85 confidence cap — v2.2
 - ✓ 75-entry golden baseline with OCR-heavy patent (US6324676) and synthetic gutter test coverage — v2.2
 - ✓ Merged/split-word handling verified via whitespace-stripped matching — v2.2
+
+### Active (v2.3)
+
+- [ ] **ACCY-04**: Citation tool produces correct column numbers for granted patents whose PDFs lack printed column headers
+- [ ] **ACCY-05**: Position map cache invalidates when column-extraction logic changes (CACHE_VERSION bump)
+- [ ] **FOX-06**: Firefox extension passes web-ext lint with zero AMO-blocking validation errors/warnings
+- [ ] **CICD-04**: Pushing a `v*` tag triggers an automatic GitHub Release with built artifacts attached
 
 ### Future
 
@@ -155,5 +171,22 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | options_ui with open_in_tab: true | Standard Chrome extension pattern; full-page settings experience | ✓ Good — clean UX |
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-05 after v2.2 milestone*
+*Last updated: 2026-05-12 — milestone v2.3 Post-v2.2 Hardening started*

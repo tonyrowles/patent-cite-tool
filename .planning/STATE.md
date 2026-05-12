@@ -1,31 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.2
-milestone_name: Matching Robustness
-status: archived
-last_updated: "2026-03-05T18:30:00.000Z"
-last_activity: "2026-03-05 — Archived v2.2 Matching Robustness milestone"
+milestone: v2.3
+milestone_name: Post-v2.2 Hardening
+status: active
+last_updated: "2026-05-12T00:00:00.000Z"
+last_activity: "2026-05-12 — Milestone v2.3 Post-v2.2 Hardening started"
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 4
-  completed_plans: 4
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-05)
+See: .planning/PROJECT.md (updated 2026-05-12)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Planning next milestone
+**Current focus:** v2.3 Post-v2.2 Hardening — defining requirements
 
 ## Current Position
 
-Milestone: v2.2 Matching Robustness — SHIPPED 2026-03-05
-Status: Archived — all 5 requirements satisfied, 75/75 baseline cases, 461/461 tests pass
-Next: `/gsd:new-milestone` for next version
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-12 — Milestone v2.3 Post-v2.2 Hardening started
 
 ## Performance Metrics
 
@@ -63,6 +64,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-04-12 - Completed quick task 260412-fde: Fix spurious results reporting impossible page numbers like 203 for patent US10203551
-Status: Milestone archived — ready for next milestone
-Next: `/gsd:new-milestone` to start next version cycle
+Last activity: 2026-05-12 — Milestone v2.3 Post-v2.2 Hardening started
+Status: Defining requirements
+Next: roadmapper will derive phases from v2.3 requirements

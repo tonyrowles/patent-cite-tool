@@ -67,13 +67,13 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 
 ### Active (v2.3)
 
-- [ ] **FOX-06**: Firefox extension passes web-ext lint with zero AMO-blocking validation errors/warnings
 - [ ] **CICD-04**: Pushing a `v*` tag triggers an automatic GitHub Release with built artifacts attached
 
 ### Validated (v2.3)
 
 - ✓ **ACCY-04**: Citation tool produces correct column numbers for granted patents whose PDFs lack printed column headers — Validated in Phase 23: Column Inference for Headerless PDFs
 - ✓ **ACCY-05**: Position map cache invalidates when column-extraction logic changes (CACHE_VERSION bump) — Validated in Phase 23: Column Inference for Headerless PDFs
+- ✓ **FOX-06**: Firefox extension passes `web-ext lint` with zero AMO-blocking validation errors/warnings — Validated in Phase 24: Firefox AMO Validation Cleanup
 
 ### Future
 
@@ -192,4 +192,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-12 — Phase 23 (Column Inference for Headerless PDFs) complete; ACCY-04, ACCY-05 validated*
+*Last updated: 2026-05-12 — Phase 24 (Firefox AMO Validation Cleanup) complete; FOX-06 validated*

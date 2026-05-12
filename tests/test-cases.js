@@ -572,6 +572,20 @@ export const TEST_CASES = [
     selectedText: 'receptor exclusively expressed on plasma cells and plasmablasts. BCMA is a receptor for two ligands in the',
     category: 'gutter',
   },
+
+  // =========================================================================
+  // Headerless PDF trigger case — US10203551 (Phase 23, ACCY-04)
+  // The bug: PDF.js extracted "203" from patent number "10203551" as a
+  // standalone header item, yielding impossible column 203. The fix
+  // (structural validators + two-pass fallback inference) now produces
+  // correct sequential columns. This entry is the integration-level proof.
+  // =========================================================================
+  {
+    id: 'US10203551-spec-short',
+    patentFile: './tests/fixtures/US10203551.json',
+    selectedText: 'At present, backlightmodules of liquid crystal display devices are mainly divided into a direct-down type and an edge- in type. An edge -in type of backlightmodule generally',
+    category: 'modern-short',
+  },
 ];
 
 // =========================================================================

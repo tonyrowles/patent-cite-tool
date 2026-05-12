@@ -86,7 +86,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
 - [x] **Phase 23: Column Inference for Headerless PDFs** — ACCY-04, ACCY-05 (completed 2026-05-12)
 - [x] **Phase 24: Firefox AMO Validation Cleanup** — FOX-06 (completed 2026-05-12)
-- [ ] **Phase 25: Automatic Release Workflow** — CICD-04
+- [x] **Phase 25: Automatic Release Workflow** — CICD-04 (completed 2026-05-12)
 
 ## Phase Details
 
@@ -127,7 +127,7 @@ Plans:
   4. The release workflow is independent of the CI push workflow — a tag push does not interfere with normal branch CI runs.
 **Plans**: 1 plan
 Plans:
-- [ ] 25-01-PLAN.md — Verify release.yml invariants & ci.yml trigger-independence, add static-grep guard test
+- [x] 25-01-PLAN.md — Verify release.yml invariants & ci.yml trigger-independence, add static-grep guard test
 
 ## Progress
 
@@ -157,4 +157,4 @@ Plans:
 | 22. Validation and Golden Baseline | v2.2 | 1/1 | Complete | 2026-03-05 |
 | 23. Column Inference for Headerless PDFs | v2.3 | 3/3 | Complete    | 2026-05-12 |
 | 24. Firefox AMO Validation Cleanup | v2.3 | 1/1 | Complete    | 2026-05-12 |
-| 25. Automatic Release Workflow | v2.3 | 0/1 | Defining plans | - |
+| 25. Automatic Release Workflow | v2.3 | 1/1 | Complete    | 2026-05-12 |

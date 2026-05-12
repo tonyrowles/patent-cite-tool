@@ -85,7 +85,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 ### v2.3 Post-v2.2 Hardening (Phases 23-25) — ACTIVE
 
 - [x] **Phase 23: Column Inference for Headerless PDFs** — ACCY-04, ACCY-05 (completed 2026-05-12)
-- [ ] **Phase 24: Firefox AMO Validation Cleanup** — FOX-06
+- [x] **Phase 24: Firefox AMO Validation Cleanup** — FOX-06 (completed 2026-05-12)
 - [ ] **Phase 25: Automatic Release Workflow** — CICD-04
 
 ## Phase Details
@@ -154,5 +154,5 @@ Plans:
 | 21. Gutter-Tolerant Matching | v2.2 | 1/1 | Complete | 2026-03-05 |
 | 22. Validation and Golden Baseline | v2.2 | 1/1 | Complete | 2026-03-05 |
 | 23. Column Inference for Headerless PDFs | v2.3 | 3/3 | Complete    | 2026-05-12 |
-| 24. Firefox AMO Validation Cleanup | v2.3 | 0/? | Not started | - |
+| 24. Firefox AMO Validation Cleanup | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 25. Automatic Release Workflow | v2.3 | 0/? | Not started | - |

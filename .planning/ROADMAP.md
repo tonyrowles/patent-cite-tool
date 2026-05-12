@@ -100,7 +100,11 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
   3. When a patent PDF has no printed column headers, the tool infers column numbers from structural cues (page geometry, line density) rather than failing or returning garbage values.
   4. The CACHE_VERSION constant is bumped (v2 → v3) so a user who previously cached a stale position map re-parses automatically on next use — the old map is not served.
   5. All 75 existing golden baseline cases continue to pass after the inference change (zero regressions).
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 23-01-PLAN.md — Verify structural validators & add guard tests for column-inference invariants
+- [ ] 23-02-PLAN.md — Verify CACHE_VERSION='v3' invariant, add static-grep guard test, bump Firefox manifest to 2.3.0
+- [ ] 23-03-PLAN.md — US10203551 integration fixture, regenerated golden baseline (75→76), full regression run
 
 ### Phase 24: Firefox AMO Validation Cleanup
 **Goal**: The Firefox dist passes `web-ext lint` with zero AMO-blocking errors or warnings, making the extension submission-ready for the Firefox Add-ons store.

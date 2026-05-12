@@ -84,7 +84,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
 ### v2.3 Post-v2.2 Hardening (Phases 23-25) — ACTIVE
 
-- [ ] **Phase 23: Column Inference for Headerless PDFs** — ACCY-04, ACCY-05
+- [x] **Phase 23: Column Inference for Headerless PDFs** — ACCY-04, ACCY-05 (completed 2026-05-12)
 - [ ] **Phase 24: Firefox AMO Validation Cleanup** — FOX-06
 - [ ] **Phase 25: Automatic Release Workflow** — CICD-04
 
@@ -102,9 +102,9 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
   5. All 75 existing golden baseline cases continue to pass after the inference change (zero regressions).
 **Plans**: 3 plans
 Plans:
-- [ ] 23-01-PLAN.md — Verify structural validators & add guard tests for column-inference invariants
-- [ ] 23-02-PLAN.md — Verify CACHE_VERSION='v3' invariant, add static-grep guard test, bump Firefox manifest to 2.3.0
-- [ ] 23-03-PLAN.md — US10203551 integration fixture, regenerated golden baseline (75→76), full regression run
+- [x] 23-01-PLAN.md — Verify structural validators & add guard tests for column-inference invariants
+- [x] 23-02-PLAN.md — Verify CACHE_VERSION='v3' invariant, add static-grep guard test, bump Firefox manifest to 2.3.0
+- [x] 23-03-PLAN.md — US10203551 integration fixture, regenerated golden baseline (75→76), full regression run
 
 ### Phase 24: Firefox AMO Validation Cleanup
 **Goal**: The Firefox dist passes `web-ext lint` with zero AMO-blocking errors or warnings, making the extension submission-ready for the Firefox Add-ons store.
@@ -153,6 +153,6 @@ Plans:
 | 20. OCR Normalization and Concat Refactor | v2.2 | 2/2 | Complete | 2026-03-05 |
 | 21. Gutter-Tolerant Matching | v2.2 | 1/1 | Complete | 2026-03-05 |
 | 22. Validation and Golden Baseline | v2.2 | 1/1 | Complete | 2026-03-05 |
-| 23. Column Inference for Headerless PDFs | v2.3 | 0/? | Not started | - |
+| 23. Column Inference for Headerless PDFs | v2.3 | 3/3 | Complete    | 2026-05-12 |
 | 24. Firefox AMO Validation Cleanup | v2.3 | 0/? | Not started | - |
 | 25. Automatic Release Workflow | v2.3 | 0/? | Not started | - |

@@ -125,7 +125,9 @@ Plans:
   2. The workflow builds Chrome and Firefox dists and attaches the resulting ZIPs as downloadable assets on the corresponding GitHub Release.
   3. A GitHub Release entry appears automatically (draft or published) for the pushed tag, with release notes derived from the tag or workflow.
   4. The release workflow is independent of the CI push workflow — a tag push does not interfere with normal branch CI runs.
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 25-01-PLAN.md — Verify release.yml invariants & ci.yml trigger-independence, add static-grep guard test
 
 ## Progress
 
@@ -155,4 +157,4 @@ Plans:
 | 22. Validation and Golden Baseline | v2.2 | 1/1 | Complete | 2026-03-05 |
 | 23. Column Inference for Headerless PDFs | v2.3 | 3/3 | Complete    | 2026-05-12 |
 | 24. Firefox AMO Validation Cleanup | v2.3 | 1/1 | Complete    | 2026-05-12 |
-| 25. Automatic Release Workflow | v2.3 | 0/? | Not started | - |
+| 25. Automatic Release Workflow | v2.3 | 0/1 | Defining plans | - |

@@ -32,7 +32,7 @@ if (!process.argv.includes('--confirm')) {
 
 // Dynamic imports (ESM)
 const { TEST_CASES } = await import('../tests/test-cases.js');
-const { matchAndCite } = await import('../src/content/text-matcher.js');
+const { matchAndCite } = await import('../src/shared/matching.js');
 
 const baseline = {};
 let count = 0;

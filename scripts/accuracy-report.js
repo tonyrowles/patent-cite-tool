@@ -26,7 +26,7 @@ const ROOT = resolve(__dirname, '..');
 // ---------------------------------------------------------------------------
 
 const { TEST_CASES, CATEGORIES } = await import('../tests/test-cases.js');
-const { matchAndCite } = await import('../src/content/text-matcher.js');
+const { matchAndCite } = await import('../src/shared/matching.js');
 const { classifyResult } = await import('../tests/helpers/classify-result.js');
 
 const COMPARE_MODE = process.argv.includes('--compare');

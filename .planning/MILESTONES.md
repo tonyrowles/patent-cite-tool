@@ -1,5 +1,19 @@
 # Milestones
 
+## v2.3 Post-v2.2 Hardening (Shipped: 2026-05-12)
+
+**Phases completed:** 3 phases, 5 plans, 8 tasks
+
+**Key accomplishments:**
+
+- Verified that src/offscreen/position-map-builder.js retains the four structural-validator invariants (odd-left, consecutive-pair, cross-page sequential, two-pass fallback) and pinned them with four named guard tests (G1-G4); test count 30 → 34 with no source modifications.
+- Pinned `CACHE_VERSION='v3'` invariant at both client sites with a 4-assertion static-grep guard test, and aligned the Firefox manifest version to 2.3.0 (matching Chrome).
+- Generated a 556-entry real-PDF integration fixture for the headerless trigger case US10203551, added it to TEST_CASES, regenerated the golden baseline (75 -> 76), and confirmed npm test exits 0 end-to-end.
+- Static-grep guard test (tests/unit/web-ext-lint.test.js, 5 assertions) ratifies the on-main AMO lint enforcement chain — `npm run test:lint` against freshly-built `dist/firefox/` exits 0 with errors 0 / warnings 0 / notices 0; no source files modified.
+- Static-grep guard test (8 assertions) pinning the tag-triggered release.yml + ci.yml trigger-independence contract, plus documented evidence that v2.3.0 was published end-to-end by `github-actions[bot]`.
+
+---
+
 ## v2.2 Matching Robustness (Shipped: 2026-03-05)
 
 **Phases completed:** 3 phases (20-22), 4 plans, 7 tasks
@@ -10,6 +24,7 @@
 **Delivered:** OCR-aware normalization and gutter-tolerant matching hardening the citation pipeline against imperfect PDF text layers, validated with 75-entry golden baseline (4 new test cases including US6324676 OCR-heavy patent).
 
 **Key accomplishments:**
+
 1. OCR normalization pipeline — `normalizeOcr` with 5 prose-safe substitution pairs applied symmetrically to selection and concat as Tier 0b preprocessing
 2. Concat refactor — `buildConcat` extracted as shared helper returning `{concat, boundaries, changedRanges}`, single source of truth for concat construction
 3. Gutter-tolerant matching — Tier 5 last-resort fallback using space-anchored survive-mask strip for stray USPTO gutter line numbers, flat 0.85 confidence cap
@@ -29,6 +44,7 @@
 **Delivered:** GitHub Actions CI/CD pipeline that triggers on every push and PR, builds Chrome and Firefox dists, runs 4 named test suites (338 tests + web-ext lint), packages store-ready ZIPs as downloadable artifacts, and is hardened with concurrency cancellation and least-privilege permissions.
 
 **Key accomplishments:**
+
 1. GitHub Actions CI workflow — triggers on push (all branches) and PRs to main with Node 22 LTS + npm cache
 2. Four individually named test steps (test:src, test:chrome, test:firefox, test:lint) with per-suite pass/fail visibility
 3. Store-ready ZIP packaging via cd+zip pattern with manifest.json at archive root, uploaded via upload-artifact@v4
@@ -48,6 +64,7 @@
 **Delivered:** Cross-browser extension with esbuild build pipeline, shared code architecture, and a fully functional Firefox port — both browsers validated against 71-case test corpus and real Google Patents pages.
 
 **Key accomplishments:**
+
 1. Shared code extraction — constants + matching consolidated into src/shared/, zero duplication between Chrome/Firefox
 2. esbuild build pipeline — single `npm run build` produces dist/chrome/ and dist/firefox/ from src/
 3. Firefox MV3 extension — background script absorbs offscreen document logic with IndexedDB graceful degradation
@@ -69,6 +86,7 @@
 **Delivered:** Store-ready extension with Vitest test harness, 100% accuracy on 71-case corpus, three-state toolbar icons, dedicated options page, privacy policy, and Chrome Web Store listing assets.
 
 **Key accomplishments:**
+
 1. Vitest test infrastructure with 71-case patent fixture corpus and frozen golden baseline
 2. Accuracy improved from 97.7% to 100.0% via gutter contamination and wrap-hyphen fixes
 3. Three-state toolbar icon system (gray/partial/full) with sharp-based generation pipeline
@@ -79,6 +97,7 @@
 **Requirements:** 19/21 v1.2 requirements shipped (TEST-01-06, ACCY-01-03, ICON-01-03, OPTS-01-04, STOR-01, STOR-04-05)
 
 ### Known Gaps
+
 - **STOR-02**: 1280x800 screenshot — requires manual capture in Chrome browser (user action)
 - **STOR-03**: 440x280 promotional tile — requires manual design (user action)
 - **ACCY-01**: Live spot-check of 10-15 real patents skipped at user request (fixture-based audit complete with 71 cases)
@@ -95,6 +114,7 @@
 **Delivered:** Silent clipboard citation mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker proxy, and shared Cloudflare KV cache so parsed patents benefit all users.
 
 **Key accomplishments:**
+
 1. Silent mode — Ctrl+C on highlighted text appends column:line citation to clipboard with toast feedback
 2. Cloudflare Worker with bearer auth, CORS, and 3-step USPTO ODP orchestration for eGrant PDF fetch
 3. Three-point fallback chain: no DOM link → Google fetch failure → no text layer, all routing to USPTO
@@ -115,6 +135,7 @@
 **Delivered:** Chrome extension that generates precise column:line and paragraph citations from highlighted text on Google Patents — no manual PDF counting needed.
 
 **Key accomplishments:**
+
 1. MV3 Chrome extension with patent page detection and PDF fetch via offscreen document
 2. PDF.js text extraction with two-column specification detection and PositionMap builder
 3. Document-wide column/line numbering matching attorney citation convention
@@ -125,4 +146,3 @@
 **Requirements:** 16/16 v1 requirements shipped (MATCH-02 confidence indicator was built but checkbox not updated in REQUIREMENTS.md)
 
 ---
-

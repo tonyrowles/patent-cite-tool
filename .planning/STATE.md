@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Post-v2.2 Hardening
 status: executing
-last_updated: "2026-05-12T18:52:05.201Z"
+last_updated: "2026-05-12T18:56:04.431Z"
 last_activity: 2026-05-12
 progress:
   total_phases: 3

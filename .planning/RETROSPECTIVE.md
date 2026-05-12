@@ -276,6 +276,46 @@
 
 ---
 
+## Milestone: v2.3 — Post-v2.2 Hardening
+
+**Shipped:** 2026-05-12
+**Phases:** 3 | **Plans:** 5 | **Tasks:** 8
+
+### What Was Built
+- Column-inference verification + integration fixture for headerless PDFs (US10203551-class): structural validators ratified with G1-G4 guard tests, 76-entry golden baseline (75→76), CACHE_VERSION='v3' bump pinned by a 4-assertion grep test, Firefox manifest aligned to 2.3.0.
+- Firefox AMO lint enforcement chain retro-documented: `tests/unit/web-ext-lint.test.js` (5 assertions) pins `package.json scripts.test:lint`, the npm test chain, the CI step name (em-dash U+2014), and the absence of `continue-on-error: true` muting.
+- Release workflow retro-documented: `tests/unit/release-workflow.test.js` (8 assertions) pins `release.yml` (tag trigger, permissions, both ZIPs, `gh release create --generate-notes`) and the trigger-independence between `release.yml` and `ci.yml`. Real Release `v2.3.0` exists on GitHub as end-to-end proof.
+
+### What Worked
+- **Retro-document pattern**: writing CONTEXT.md → verify-only PLAN.md → static-grep guard test → SUMMARY converged in minutes per phase, with zero source modifications. Suitable template for future "capture what already shipped" milestones.
+- **Static-grep guards over runtime checks**: pinning literal strings (script names, CI step names, file paths) in unit tests fails fast in `npm test` before the actual CI/AMO/release gate would catch it. Cheaper signal closer to the developer.
+- **End-to-end evidence baked into SUMMARY**: citing the live `v2.3.0` Release with author `github-actions[bot]` proved the release workflow had actually run — not just hypothetically valid.
+- **Phase 24 → Phase 25 cross-phase wire** (release.yml invokes `npm run test:lint`) was caught and pinned by the integration checker, not introduced as new code.
+
+### What Was Inefficient
+- The plan-checker prompt had to be primed with "RESEARCH.md is intentionally absent for retro phases" to avoid blocking on Dimension 8 / Nyquist. A `retro: true` frontmatter flag (or a phase tag) could short-circuit Nyquist checks automatically.
+- `gsd-tools phase complete` did not auto-tick requirement checkboxes in REQUIREMENTS.md — had to manually mark `[x]` before `milestone complete` to avoid the "incomplete requirements" prompt. Worth tightening for next milestone.
+- The `complete-milestone` skill expected a `<details>` collapse of v2.3 details in ROADMAP.md but the milestone-complete CLI didn't perform that step — orchestrator had to do it manually.
+
+### Patterns Established
+- **Retro-document phase template** — CONTEXT.md captures "as-shipped" decisions; PLAN.md has 2 tasks (verify task + guard test task); SUMMARY documents end-to-end evidence; SUMMARY's `requirements-completed` field is the canonical source of truth for `milestone complete`.
+- **Static-grep guard test naming** — `tests/unit/{feature}-{contract}.test.js` (web-ext-lint, release-workflow, cache-version). Follows existing `cache-version.test.js` analog.
+- **Defensive `continue-on-error: true` absence check** — added to both Phase 24 (L5) and Phase 25 (R6) guards. Mute-step regression is a real silent-failure mode worth pinning.
+- **Em-dash U+2014 in CI step names** is pinned as an exact byte sequence (no regex), so a cosmetic rename to a hyphen would fail the test and be visible in the diff.
+
+### Key Lessons
+1. **Retro milestones are legitimate work.** Capturing already-shipped code into the GSD planning artifacts is not busywork — it produces guard tests that protect the invariants from future regressions. The cost (~10 minutes per phase with this template) is far less than discovering a silent regression months later via AMO rejection.
+2. **The integration checker is the right place to verify cross-phase wiring on retro milestones.** Individual phase verifiers can only see one phase; the integration checker confirms FOX-06 → CICD-04 wire on `release.yml:45`.
+3. **`gh release view <tag>` is the cleanest end-to-end proof** for CI/CD phases. Static file checks tell you the workflow is structurally valid; the live release tells you it actually ran.
+4. **Don't trust `requirements_updated: false`** from `phase complete` — manually verify REQUIREMENTS.md checkboxes match the validated state before running `milestone complete`.
+
+### Cost Observations
+- Model mix: balanced (sonnet executors, opus planner)
+- Sessions: 1 single autonomous run from `/gsd-autonomous` after declining to abandon v2.3
+- Notable: Both phases completed inside one session with `--auto --no-transition` chain; total executor time ~5 minutes across Phase 24 + Phase 25 (each ~2 min). The retro-document template makes phases fast.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -288,6 +328,7 @@
 | v2.0 | 52 | 4 | Build pipeline + cross-browser architecture |
 | v2.1 | 15 | 2 | CI/CD automation — smallest, fastest milestone |
 | v2.2 | 25 | 3 | OCR normalization + gutter matching — accuracy hardening |
+| v2.3 | ~15 | 3 | Retro-documentation of already-shipped work — guard tests added |
 
 ### Cumulative Quality
 
@@ -299,6 +340,7 @@
 | v2.0 | 303 | 100% (71-case × 3 targets) | Store submissions pending |
 | v2.1 | 338 | 100% (CI-validated) | Store submissions pending |
 | v2.2 | 461 | 100% (75-case baseline) | s→S OCR gap documented, not implemented |
+| v2.3 | 216 src (+13 guards) | 100% (76-case baseline) | All v2.3 work was retroactive capture; no new behavior |
 
 ### Top Lessons (Verified Across Milestones)
 

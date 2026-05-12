@@ -459,3 +459,62 @@ describe('buildPositionMap fallback column inference', () => {
     expect(cols).toEqual([1, 2, 3, 4]);
   });
 });
+
+// ============================================================================
+// Phase 23 structural-validator guards
+// ============================================================================
+// These tests explicitly name the four invariants that prevent spurious
+// column numbers (e.g. "203" from patent number US10203551) from polluting
+// the position map. Future regressions to extractPrintedColumnNumbers or
+// the cross-page sequential validator in buildPositionMap will surface here
+// with a clear test name.
+// ----------------------------------------------------------------------------
+
+describe('Phase 23 structural-validator guards', () => {
+  const pageWidth = 612;
+  const pageHeight = 792;
+  const headerY = pageHeight - 50; // inside header zone (y >= pageHeight - 90)
+
+  function makeHeaderItems(leftVal, rightVal) {
+    const items = [];
+    if (leftVal !== null) items.push({ text: String(leftVal), x: 100, y: headerY, width: 10, height: 10 });
+    if (rightVal !== null) items.push({ text: String(rightVal), x: 450, y: headerY, width: 10, height: 10 });
+    // padding body items so isTwoColumnPage / extractPrintedColumnNumbers don't bail early
+    for (let i = 0; i < 30; i++) {
+      items.push({ text: `l${i}`, x: 60 + (i % 5) * 10, y: 100 + i * 15, width: 60, height: 10 });
+      items.push({ text: `r${i}`, x: 350 + (i % 5) * 10, y: 100 + i * 15, width: 60, height: 10 });
+    }
+    return items;
+  }
+
+  it('G1: rejects even left column (4,5) — odd-left invariant', () => {
+    const items = makeHeaderItems(4, 5);
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+  });
+
+  it('G2: rejects non-consecutive pair (1,3) — right === left+1 invariant', () => {
+    const items = makeHeaderItems(1, 3);
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toBeNull();
+  });
+
+  it('G3: accepts valid odd-left pair (5,6) — positive sanity', () => {
+    const items = makeHeaderItems(5, 6);
+    expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toEqual({ left: 5, right: 6 });
+  });
+
+  it('G4: buildPositionMap rejects first page claiming columns (203,204) — sequential cross-page invariant', () => {
+    // Build a single spec page whose header advertises columns 203,204.
+    // The intra-page validators (odd-left, consecutive) accept 203,204
+    // because 203 is odd and 204 = 203 + 1. The CROSS-PAGE sequential
+    // validator (expectedLeftCol = 1 on first page) must reject it.
+    const items = makeHeaderItems(203, 204);
+    const pageResult = { pageNum: 1, items, pageWidth, pageHeight };
+    const result = buildPositionMap([pageResult]);
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).not.toContain(203);
+    expect(cols).not.toContain(204);
+    // Fallback pass may or may not produce entries here depending on
+    // isLikelySpecPage acceptance; assertion is specifically that the
+    // bad column numbers do not appear, which is the invariant under test.
+  });
+});

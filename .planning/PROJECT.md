@@ -8,14 +8,17 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v2.3 Post-v2.2 Hardening
+## Current Milestone: v3.0 Autonomous E2E Testing Agent
 
-**Goal:** Retroactively capture the column-inference accuracy fix, Firefox store-validation cleanup, and CI release-automation work that landed on `main` after the v2.2 archive — close the books and tag a release.
+**Goal:** Build a Playwright-driven testing agent that exercises the extension against real Google Patents pages, observes the citations the plugin produces, and verifies them by independently re-parsing the source PDF — catching cross-browser bugs, Google UI drift, and accuracy regressions that unit tests cannot.
 
 **Target features:**
-- Column-number inference for granted patents whose PDFs lack printed column headers (structural validation, range tightening, cache invalidation)
-- Firefox store-validation cleanup so the extension is AMO-submission-ready
-- Automatic GitHub Release workflow triggered by `v*` version-tag push
+- Playwright + Chromium harness that loads the extension and drives Google Patents pages (highlight → observe citation)
+- Deterministic regression mode covering the 76 golden patents (runs locally + GitHub Actions nightly cron)
+- LLM exploratory mode driven by Claude Code (subscription, local-dev only) — picks fresh patents and unusual selections
+- Independent PDF re-parse verifier (separate pdf.js/pdftotext code path) that searches for the selected text near the cited column:line
+- Nightly cron failure routing — auto-files (or comments on) a GitHub issue with screenshot, DOM snapshot, and PDF page snippet
+- Zero new functionality in the extension itself — this milestone is testing infrastructure only
 
 ## Requirements
 
@@ -71,6 +74,15 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - ✓ **ACCY-05**: Position map cache invalidates when column-extraction logic changes (CACHE_VERSION bump) — Validated in Phase 23: Column Inference for Headerless PDFs
 - ✓ **FOX-06**: Firefox extension passes `web-ext lint` with zero AMO-blocking validation errors/warnings — Validated in Phase 24: Firefox AMO Validation Cleanup
 - ✓ **CICD-04**: Pushing a `v*` tag triggers an automatic GitHub Release with built artifacts attached — Validated in Phase 25: Automatic Release Workflow
+
+### Active (v3.0)
+
+- Playwright + Chromium E2E harness that loads the unpacked extension and drives Google Patents pages
+- Deterministic regression mode against the 76 golden patents (local + nightly cron)
+- Independent PDF re-parse verifier (separate code path from the extension pipeline)
+- LLM exploratory mode invoked via Claude Code (subscription-only, local-dev only)
+- Nightly GitHub Actions cron with auto-issue filing on failure
+- Failure diagnostics capture: page screenshot, DOM snapshot, PDF page snippet for the cited column:line
 
 ### Future
 
@@ -189,4 +201,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-12 — Phase 25 (Automatic Release Workflow) complete; CICD-04 validated. All v2.3 phases shipped.*
+*Last updated: 2026-05-13 — v3.0 milestone started (Autonomous E2E Testing Agent)*

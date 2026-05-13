@@ -15,10 +15,10 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 **Target features:**
 - Playwright + Chromium harness that loads the extension and drives Google Patents pages (highlight → observe citation)
 - Deterministic regression mode covering the 76 golden patents (runs locally + GitHub Actions nightly cron)
-- LLM exploratory mode driven by Claude Code (subscription, local-dev only) — picks fresh patents and unusual selections
 - Independent PDF re-parse verifier (separate pdf.js/pdftotext code path) that searches for the selected text near the cited column:line
 - Nightly cron failure routing — auto-files (or comments on) a GitHub issue with screenshot, DOM snapshot, and PDF page snippet
 - Zero new functionality in the extension itself — this milestone is testing infrastructure only
+- **Deferred to v3.1:** LLM exploratory mode (subscription-driven headless agents violate Anthropic ToS; will revisit via interactive Claude Code + Playwright MCP server)
 
 ## Requirements
 
@@ -80,9 +80,13 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - Playwright + Chromium E2E harness that loads the unpacked extension and drives Google Patents pages
 - Deterministic regression mode against the 76 golden patents (local + nightly cron)
 - Independent PDF re-parse verifier (separate code path from the extension pipeline)
-- LLM exploratory mode invoked via Claude Code (subscription-only, local-dev only)
 - Nightly GitHub Actions cron with auto-issue filing on failure
 - Failure diagnostics capture: page screenshot, DOM snapshot, PDF page snippet for the cited column:line
+- USPTO/Worker fallback fault-injection test (catches silent regressions in the Cloudflare Worker path)
+
+### Deferred to v3.1
+
+- LLM exploratory mode — Anthropic ToS forbids subscription-driven headless agents; revisit via interactive Claude Code + `@playwright/mcp` server
 
 ### Future
 

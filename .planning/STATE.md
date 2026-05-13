@@ -53,7 +53,7 @@ All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
 ### v3.0 Pre-locked Decisions (from milestone kickoff)
 
 - **Test harness:** Playwright + Chromium (Chrome only for v3.0; Firefox E2E deferred to v3.1+)
-- **Modes:** Hybrid — deterministic core (76 golden patents) + LLM exploratory (Claude Code, subscription-only, local-dev only)
+- **Modes:** Deterministic core (76 golden patents) only in v3.0. **LLM exploratory mode DEFERRED to v3.1** — original "Claude Code subscription headless" plan violates Anthropic ToS per documented bans; correct path is interactive Claude Code + `@playwright/mcp`, which is fundamentally different ergonomics and warrants its own milestone.
 - **Verification source:** Independent PDF re-parse (separate code path from extension pipeline) — search for selected text near cited column:line
 - **Runtime split:** Local dev (npm script + Claude Code subscription) AND GitHub Actions nightly cron (deterministic mode only — no LLM in cron)
 - **Reporting:** GitHub Actions logs + auto-issue on failure

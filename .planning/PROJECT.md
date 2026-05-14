@@ -17,8 +17,9 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - Deterministic regression mode covering the 76 golden patents (runs locally + GitHub Actions nightly cron)
 - Independent PDF re-parse verifier (separate pdf.js/pdftotext code path) that searches for the selected text near the cited column:line
 - Nightly cron failure routing — auto-files (or comments on) a GitHub issue with screenshot, DOM snapshot, and PDF page snippet
-- Zero new functionality in the extension itself — this milestone is testing infrastructure only
-- **Deferred to v3.1:** LLM exploratory mode (subscription-driven headless agents violate Anthropic ToS; will revisit via interactive Claude Code + Playwright MCP server)
+- USPTO/Worker fallback fault-injection test (catches silent regressions in the Cloudflare Worker path)
+- LLM exploratory mode driven by headless `claude -p` against the Max 5 subscription credit pool — picks fresh patents and unusual selections; local-dev only; soft monthly $100 cap with warning at $80
+- Only non-functional changes to the extension: `data-testid` attributes on UI hooks + one Cloudflare Worker header for test-mode skip-KV-writes
 
 ## Requirements
 
@@ -83,10 +84,7 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - Nightly GitHub Actions cron with auto-issue filing on failure
 - Failure diagnostics capture: page screenshot, DOM snapshot, PDF page snippet for the cited column:line
 - USPTO/Worker fallback fault-injection test (catches silent regressions in the Cloudflare Worker path)
-
-### Deferred to v3.1
-
-- LLM exploratory mode — Anthropic ToS forbids subscription-driven headless agents; revisit via interactive Claude Code + `@playwright/mcp` server
+- LLM exploratory mode using headless `claude -p` (Max 5 credit pool, local-dev only, soft monthly $100 cap with warning at $80)
 
 ### Future
 

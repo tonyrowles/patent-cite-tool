@@ -53,7 +53,7 @@ All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
 ### v3.0 Pre-locked Decisions (from milestone kickoff)
 
 - **Test harness:** Playwright + Chromium (Chrome only for v3.0; Firefox E2E deferred to v3.1+)
-- **Modes:** Deterministic core (76 golden patents) only in v3.0. **LLM exploratory mode DEFERRED to v3.1** — original "Claude Code subscription headless" plan violates Anthropic ToS per documented bans; correct path is interactive Claude Code + `@playwright/mcp`, which is fundamentally different ergonomics and warrants its own milestone.
+- **Modes:** Hybrid — deterministic core (76 golden patents) + LLM exploratory (headless `claude -p` against Max 5 subscription credit; local-dev only; soft monthly $100 cap with warning at $80). Anthropic's May-2026 announcement that Max 5 subscribers get $100/mo headless-API credit unblocked the originally-planned approach; the v3.0 design proceeds with appropriate budget guardrails.
 - **Verification source:** Independent PDF re-parse (separate code path from extension pipeline) — search for selected text near cited column:line
 - **Runtime split:** Local dev (npm script + Claude Code subscription) AND GitHub Actions nightly cron (deterministic mode only — no LLM in cron)
 - **Reporting:** GitHub Actions logs + auto-issue on failure

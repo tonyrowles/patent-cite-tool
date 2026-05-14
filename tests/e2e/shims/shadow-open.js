@@ -11,7 +11,13 @@
 // Production extension is unchanged; this override only runs in test contexts.
 (function () {
   const originalAttachShadow = Element.prototype.attachShadow;
+  // NOTE: this override is global — every closed shadow root in the page,
+  // including Google Patents' own Polymer components, will be opened. We
+  // accept that to read the extension's closed root. If a host-page
+  // component starts behaving differently under test, suspect this shim
+  // first. The `options || {}` guard also defends against attachShadow()
+  // invoked with no argument (spec disallows it, but cheap to handle).
   Element.prototype.attachShadow = function (options) {
-    return originalAttachShadow.call(this, { ...options, mode: 'open' });
+    return originalAttachShadow.call(this, { ...(options || {}), mode: 'open' });
   };
 })();

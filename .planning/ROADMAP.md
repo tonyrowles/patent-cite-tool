@@ -96,7 +96,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 ### 🚧 v3.0 Autonomous E2E Testing Agent (Phases 26-31) — ACTIVE
 
-- [ ] **Phase 26: Playwright Harness Scaffolding** — Build the Playwright + Chromium foundation: load unpacked Chrome extension, shadow-pierce, clipboard shim, service-worker readiness, and `data-testid` UI hooks
+- [x] **Phase 26: Playwright Harness Scaffolding** — Build the Playwright + Chromium foundation: load unpacked Chrome extension, shadow-pierce, clipboard shim, service-worker readiness, and `data-testid` UI hooks (completed 2026-05-14)
 - [ ] **Phase 27: Selection Emulation + 76-Case Deterministic Suite** — Programmatic selection that triggers the extension; replay all 76 golden patents end-to-end; capture screenshot + DOM artifacts on failure
 - [ ] **Phase 28: Independent PDF Verifier** — Second code path that re-parses each PDF and confirms the cited text lives near the cited column:line; structured JSON report + failure taxonomy; PDF page snippet artifacts
 - [ ] **Phase 29: CI Nightly Cron + Auto-Issue Filing** — GitHub Actions nightly cron (rotating 30-patent sample, full 76 on Sundays); fingerprint-based idempotent auto-issue filing on failure
@@ -202,7 +202,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 23. Column Inference for Headerless PDFs | v2.3 | 3/3 | Complete    | 2026-05-12 |
 | 24. Firefox AMO Validation Cleanup | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 25. Automatic Release Workflow | v2.3 | 1/1 | Complete    | 2026-05-12 |
-| 26. Playwright Harness Scaffolding | v3.0 | 0/0 | Not started | - |
+| 26. Playwright Harness Scaffolding | v3.0 | 3/3 | Complete    | 2026-05-14 |
 | 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 0/0 | Not started | - |
 | 28. Independent PDF Verifier | v3.0 | 0/0 | Not started | - |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 0/0 | Not started | - |

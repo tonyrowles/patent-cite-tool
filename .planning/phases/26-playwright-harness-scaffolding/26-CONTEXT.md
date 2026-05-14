@@ -40,7 +40,8 @@ Out of scope (deferred to Phase 27+):
 ### Playwright Config & Browser Launch
 - **Browser channel: `channel: 'chromium'`** — Playwright-bundled Chromium (NOT system Chrome). Required for headless extension support without `xvfb-run` (per research Pitfalls 1, 13).
 - **Persistent context: `chromium.launchPersistentContext(userDataDir, {...})`** — required for unpacked extension loading. `userDataDir` is a fresh `os.tmpdir()/pct-e2e-{uuid}` per test, cleaned up in `afterEach`.
-- **Args:** `--disable-extensions-except=${absPath}/dist/chrome`, `--load-extension=${absPath}/dist/chrome`, `--enable-features=ServiceWorker`. Headless mode via `headless: 'chromium'` (NOT legacy headless — required for extensions).
+- **Args:** `--disable-extensions-except=${absPath}/dist/chrome`, `--load-extension=${absPath}/dist/chrome`. The previously-considered `--enable-features=ServiceWorker` flag was demoted to Claude's Discretion — research found it redundant under `channel: 'chromium'` (Chrome enables SW by default in the persistent context).
+- **Headless mode:** omit the `headless` key — under `channel: 'chromium'`, Playwright defaults to the new headless mode required for extensions. The previously-locked `headless: 'chromium'` literal was demoted to Claude's Discretion after research found no documented support for that literal value in Playwright 1.60.0.
 - **Service-worker readiness:** Wait for the extension's SW via `context.serviceWorkers()` + `context.waitForEvent('serviceworker')` with 10s timeout. Probe `chrome.runtime.id` from the page to confirm registration before triggering selection (per HARN-02; mitigates research Pitfall 1 SW race).
 
 ### Shadow DOM Piercing (HARN-03)
@@ -95,6 +96,8 @@ tests/e2e/
 - Service-worker readiness probe wording.
 - Smoke spec assertion text.
 - `package.json` formatting (alphabetize script ordering).
+- *(Demoted from locked Decisions — see Playwright Config & Browser Launch above)* `--enable-features=ServiceWorker` launch arg: research (Open Q #1, RESOLVED) found it redundant under `channel: 'chromium'` because Chrome enables service workers by default in the persistent context Playwright uses to load extensions. The flag may be added back if a specific failure mode emerges; it is no longer required by CONTEXT.
+- *(Demoted from locked Decisions — see Playwright Config & Browser Launch above)* `headless: 'chromium'` literal value: research (Open Q #1, RESOLVED) found no documented support for that literal in Playwright 1.60.0. Under `channel: 'chromium'`, omitting the `headless` key yields the new headless mode required for extension support. Setting `headless: 'old'` is the only documented opt-in to the legacy mode and is not desired here.
 
 </decisions>
 

@@ -16,6 +16,10 @@ export async function gotoPatent(page, patentId, { timeout = 30_000 } = {}) {
     throw new Error(`gotoPatent: invalid patentId "${patentId}"`);
   }
   const url = `https://patents.google.com/patent/${patentId}/en`;
+  // Track a single deadline so page.goto + waitForSelector share the budget
+  // (otherwise total wall-clock could reach 2× timeout and exceed the per-test
+  // budget configured in playwright.config.js).
+  const deadline = Date.now() + timeout;
   const response = await page.goto(url, {
     waitUntil: 'domcontentloaded',
     timeout,
@@ -26,9 +30,10 @@ export async function gotoPatent(page, patentId, { timeout = 30_000 } = {}) {
   }
   // Wait for any of Google Patents' top-level containers to attach.
   // <patent-result> is a Polymer component; <main> / <article> are fallbacks.
+  const remaining = Math.max(0, deadline - Date.now());
   await page.waitForSelector('main, article, patent-result', {
     state: 'attached',
-    timeout,
+    timeout: remaining,
   });
   return response;
 }

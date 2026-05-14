@@ -34,6 +34,7 @@ function getCitationHost() {
 
   citationHost = document.createElement('div');
   citationHost.id = 'patent-cite-host';
+  citationHost.setAttribute('data-testid', 'pct-citation-host');
   citationHost.style.cssText = 'all: initial; position: fixed; z-index: 2147483647; pointer-events: none;';
   citationShadow = citationHost.attachShadow({ mode: 'closed' });
   document.body.appendChild(citationHost);
@@ -116,6 +117,7 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
 
   const popup = document.createElement('div');
   popup.className = 'cite-popup';
+  popup.setAttribute('data-testid', 'pct-citation-pill');
   popup.style.pointerEvents = 'auto';
 
   // Confidence indicator

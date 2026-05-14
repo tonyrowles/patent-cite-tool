@@ -571,32 +571,37 @@ Note: Playwright auto-discovers spec files under `testDir` (`./specs`), so the c
 | A4 | Service worker `chrome.runtime.id` is bound by the time `waitForEvent('serviceworker')` resolves | Service Worker Readiness | Per PITFALLS.md Pitfall 1, this can fail in CI. The probe `sw.evaluate(() => chrome.runtime.id)` adds robustness. For Phase 26 local-dev smoke, this is sufficient. CI may need to bump timeouts in Phase 29. |
 | A5 | The `__lastCopiedText__` shim's `queueMicrotask`-deferred read correctly captures the extension's `setData` payload | Clipboard Observer | The extension uses `event.preventDefault()` + `setData` in a bubble-phase listener; the shim's capture-phase listener runs first but defers via microtask. This pattern is robust per spec, but Phase 26 does not exercise it (no selection in smoke). Phase 27 will validate empirically against US11427642 silent-mode flow. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact `headless: 'chromium'` literal vs default headless under `channel: 'chromium'`**
    - What we know: Playwright 1.49+ supports headless extensions under `channel: 'chromium'`; the docs do not explicitly enumerate `headless: 'chromium'` as a literal value.
    - What's unclear: Whether `headless: 'chromium'`, `headless: true`, or just omitting the key is the canonical 1.60.0 form.
    - Recommendation: Implement with `headless: 'chromium'` per CONTEXT.md; if Playwright emits a warning or error, fall back to omitting the key. Either path satisfies CONTEXT.md's intent (true headless, no xvfb).
+   - **RESOLVED:** Implement with `headless: 'chromium'` per CONTEXT.md; if Playwright emits a warning or error, fall back to omitting the key. Either path satisfies CONTEXT.md's intent (true headless, no xvfb).
 
 2. **Should `.planning/testing-contract.md` be created in Phase 26 (per PITFALLS.md Pitfall 14 recommendation)?**
    - What we know: PITFALLS.md and SUMMARY.md recommend a written test-contract doc.
    - What's unclear: Whether the planner wants it in Phase 26 or deferred to Phase 31's `tests/e2e/README.md` (`DOC-01`).
    - Recommendation: Defer to Phase 31. Phase 26 has clear scope already, and the contract surface stabilizes only after Phase 27. The smoke spec acts as a de-facto contract for Phase 26.
+   - **RESOLVED:** Defer to Phase 31. Phase 26 has clear scope already, and the contract surface stabilizes only after Phase 27. The smoke spec acts as a de-facto contract for Phase 26.
 
 3. **Does the Cloudflare Worker cache interfere with Phase 26's smoke?**
    - What we know: The smoke spec only loads US11427642's page and asserts the extension content script registered. It does NOT trigger selection, which is what would invoke the Worker via `MSG.LOOKUP_POSITION`. The Worker is not in Phase 26's signal path.
    - What's unclear: Nothing — the Worker is not exercised in smoke.
    - Recommendation: Ignore for Phase 26. Phase 30 owns `X-PCT-Test-Mode`.
+   - **RESOLVED:** Ignore for Phase 26. Phase 30 owns `X-PCT-Test-Mode`.
 
 4. **Should Phase 26 add a Playwright `globalSetup` that runs `npm run build:chrome`, or rely on the npm-script chain?**
    - What we know: ARCHITECTURE.md (the milestone-level research) recommends `globalSetup`; CONTEXT.md prefers the npm-script chain (`build → e2e:smoke`).
    - What's unclear: Whether downstream phases (Phase 27 with `test.each` over 76 cases) will want `globalSetup` for parallelism.
    - Recommendation: Phase 26 uses the npm-script chain (matches CONTEXT.md). Phase 27 can introduce `globalSetup` if needed.
+   - **RESOLVED:** Phase 26 uses the npm-script chain (matches CONTEXT.md). Phase 27 can introduce `globalSetup` if needed.
 
 5. **Should the smoke spec assert that `data-testid="pct-citation-host"` exists in the page DOM after navigation?**
    - What we know: The host element is only created by the extension when a selection event fires (`getCitationHost()` is lazy at `src/content/citation-ui.js:35`). No selection in smoke → no host element on the page.
    - What's unclear: Whether the smoke spec should manually trigger the host creation (by calling `getCitationHost` via page.evaluate against the extension's content script — which is not exported globally, so cannot be invoked).
    - Recommendation: Smoke spec should NOT assert host existence. The smoke spec proves the *infrastructure* (extension loaded, SW ready, shadow override functional via probe shadow root); Phase 27 proves the *end-to-end* (selection → host appears → testids accessible).
+   - **RESOLVED:** Smoke spec should NOT assert host existence. The smoke spec proves the *infrastructure* (extension loaded, SW ready, shadow override functional via probe shadow root); Phase 27 proves the *end-to-end* (selection → host appears → testids accessible).
 
 ## Environment Availability
 

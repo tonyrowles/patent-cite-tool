@@ -3,3 +3,8 @@ worker/node_modules/
 worker/.dev.vars
 node_modules/
 dist/
+
+# Playwright e2e artifacts
+tests/e2e/artifacts/
+playwright-report/
+test-results/

@@ -126,7 +126,12 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   2. Programmatic `selectText({containerSelector, charStart, charEnd})` calls reliably trigger the extension's existing `mouseup` listener (via Range API + dispatched `mouseup` with debounce-respecting wait), and `getCitation()` returns a structured `{citation, confidence, mode}` from either Shadow DOM or clipboard
   3. Each test case starts with cleared cookies, IndexedDB, and `chrome.storage` — running the suite in shuffled order produces identical results to sequential order, proving inter-case isolation
   4. Any failed assertion writes a full-page screenshot to `tests/e2e/artifacts/{run-id}/{case-id}-screenshot.png` and a DOM snapshot (including Shadow DOM contents) to `tests/e2e/artifacts/{run-id}/{case-id}-dom.html`, so a developer can triage the failure from artifacts alone without local repro
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 27-01-PLAN.md — selectText helper (TreeWalker + Range API + dispatched mouseup) + normalizer unit tests
+- [ ] 27-02-PLAN.md — settings helper (setTriggerMode via SW) + getCitation observation + artifacts wiring
+- [ ] 27-03-PLAN.md — 76-case regression spec with pre-flight DOM-drift smoke and per-test diagnostics
+- [ ] 27-04-PLAN.md — @smoke tagging + silent-mode end-to-end spec + npm scripts (e2e:smoke, e2e:regression, e2e:silent)
+- [ ] 27-05-PLAN.md — Run all three suites and verify DIAG-01/DIAG-02 artifact wiring
 **UI hint**: yes
 
 ### Phase 28: Independent PDF Verifier
@@ -203,7 +208,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 24. Firefox AMO Validation Cleanup | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 25. Automatic Release Workflow | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 26. Playwright Harness Scaffolding | v3.0 | 3/3 | Complete    | 2026-05-14 |
-| 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 0/0 | Not started | - |
+| 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 0/5 | Not started | - |
 | 28. Independent PDF Verifier | v3.0 | 0/0 | Not started | - |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 0/0 | Not started | - |
 | 30. Worker Fault-Injection | v3.0 | 0/0 | Not started | - |

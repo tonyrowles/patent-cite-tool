@@ -11,3 +11,6 @@ test-results/
 
 # Cached Google Patents HTML for selectedText regeneration
 tests/e2e/.html-cache/
+
+# Cached Google Patents PDFs for the independent verifier (Phase 28)
+tests/e2e/.pdf-cache/

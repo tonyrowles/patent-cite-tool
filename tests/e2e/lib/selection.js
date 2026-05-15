@@ -597,3 +597,72 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
 
   return result;
 }
+
+/**
+ * Dispatch Ctrl+C while ensuring the saved DOM Range is re-applied
+ * IMMEDIATELY before the keystroke fires.
+ *
+ * Why this exists: Google Patents' own mouseup handler clears the document
+ * selection ~50-200ms after our mouseup dispatch. By the time selectText
+ * returns (after its 280ms re-apply loop) AND silent.spec.js runs its next
+ * `await` chain to issue Ctrl+C, the selection may have been cleared again
+ * — leaving the content-script's 'copy' handler with an empty selection
+ * (and its early-return path triggers, so `event.clipboardData.setData()`
+ * never runs and the clipboard-observer shim sees nothing).
+ *
+ * This helper closes the race by:
+ *   1. Re-applying the range exposed at `window.__pct_reapply`
+ *   2. Verifying `window.getSelection().toString().length > 0`
+ *   3. IMMEDIATELY pressing Control+C (no awaits in between to widen the gap)
+ *   4. Doing a short post-keystroke re-apply loop so the content script's
+ *      bubble-phase 'copy' handler still sees a live selection when it
+ *      calls `selection.toString()` synchronously inside the copy event.
+ *
+ * Note on (4): The 'copy' event is dispatched synchronously by Ctrl+C, and
+ * the content script reads `window.getSelection().toString()` INSIDE the
+ * handler (src/content/content-script.js:300-301). Both the capture-phase
+ * shim and the bubble-phase extension handler execute synchronously in the
+ * same task as the keystroke — so as long as the selection is non-empty at
+ * the moment we call page.keyboard.press, both handlers will read it.
+ * The post-keystroke loop is belt-and-suspenders for any browser flush
+ * weirdness.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<{ selectionLength: number, hadReapply: boolean }>}
+ */
+export async function pressCtrlCWithReapply(page) {
+  if (!page || typeof page.keyboard !== 'object') {
+    throw new Error('pressCtrlCWithReapply: page is required and must be a Playwright Page');
+  }
+  // Re-apply the saved range AND verify selection is non-empty in the same
+  // page.evaluate so the check happens immediately before we hand control
+  // back to Node and press the key.
+  const preState = await page.evaluate(() => {
+    const hadReapply = typeof window.__pct_reapply === 'function';
+    if (hadReapply) window.__pct_reapply();
+    const sel = window.getSelection();
+    return {
+      hadReapply,
+      selectionLength: sel ? sel.toString().length : 0,
+    };
+  });
+
+  // Press Ctrl+C — the 'copy' event fires synchronously in the page.
+  await page.keyboard.press('Control+C');
+
+  // Short post-keystroke re-apply loop to keep the selection live across
+  // any subsequent async work the extension or browser may schedule.
+  const reapplyDeadline = Date.now() + 120;
+  while (Date.now() < reapplyDeadline) {
+    try {
+      await page.evaluate(() => {
+        if (typeof window.__pct_reapply === 'function') window.__pct_reapply();
+      });
+    } catch {
+      break;
+    }
+    await page.waitForTimeout(20);
+  }
+
+  return preState;
+}

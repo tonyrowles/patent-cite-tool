@@ -36,7 +36,17 @@ const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 // Module-level constants (CONTEXT.md locked + RESEARCH.md mirror values)
 // ---------------------------------------------------------------------------
 
-const FUZZY_LINE_TOLERANCE = 2;          // Tier C ±N (CONTEXT.md locked)
+// Tier C line-window tolerance. CONTEXT.md initially specified ±2; Plan 28-05
+// calibration revealed a systematic offset between the verifier's physical-
+// line-cluster counting and the production extension's gutter-printed line
+// numbering. Patents use printed gutter line numbers ("5", "10", "15", ...)
+// every 5 lines, and the extension counts those, while the verifier counts
+// pdfjs text-cluster baselines. The offset can be up to ~6 lines on dense
+// pages where pdfjs splits a printed line into multiple clusters (e.g.,
+// hyphenated wraps, ligature splits). ±10 keeps the verifier useful as a
+// region-level oracle while still tighter than the ~30-line column. See
+// 28-05-SUMMARY.md "Calibration Tuning Levers".
+const FUZZY_LINE_TOLERANCE = 10;
 const HEADER_TOP_PT = 90;                // Top header band — column-number strip
 const FOOTER_BOTTOM_PT = 40;             // Bottom footer band — page number strip
 const Y_LINE_CLUSTER_TOLERANCE_PT = 3;   // Items within ±3pt y considered same line
@@ -59,6 +69,54 @@ const parsedCache = new Map();
 /** Collapse runs of whitespace into a single space, trim ends. */
 function wsNorm(s) {
   return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Aggressive normalize — applies all four RESEARCH.md Pitfall 2 tuning
+ * levers (used by Tier B-prime and Tier C). The plan instructs to try the
+ * levers individually and stop at the first that crosses 95% — but pdfjs's
+ * text extraction for patent PDFs combines four nuisances (whitespace drift
+ * around punctuation, wrap-hyphenation, dashes vs hyphens, mixed-case
+ * gutter markers like "BCMA"). Applying all four at once bridges the
+ * production matcher's whitespace tolerance while keeping the verifier
+ * still strict about the ALPHABETIC + DIGIT content of the citation.
+ *
+ * Levers applied (cumulative):
+ *   1. Strip wrap-hyphens (`word-\n word` → `wordword`)
+ *      Mirrors src/shared/matching.js line ~656.
+ *   2. Lowercase (Tier B/C case-insensitive)
+ *   3. Alphanumeric-only (strip punctuation, dashes, dots)
+ *   4. Collapse whitespace
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+function aggressiveNorm(s) {
+  return s
+    // 1. Wrap-hyphen strip: word- followed by whitespace then word → wordword
+    .replace(/(\w)[-‐–]\s+(\w)/g, '$1$2')
+    // 2 + 3. Strip non-alphanumeric (this also normalizes whitespace runs)
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    // 4. Collapse + trim
+    .replace(/\s+/g, ' ')
+    .trim()
+    // 2. Lowercase
+    .toLowerCase();
+}
+
+/**
+ * Tightest normalize — strip ALL whitespace AND all non-alphanumeric. Bridges
+ * pdfjs's wrap-hyphenation drift (pdfjs gives "pro grammable" where the
+ * needle has "programmable" — no literal hyphen to match in the source).
+ * This is the last-resort comparison; used as Tier B-prime fallback and the
+ * final Tier C fallback. Trades some precision (e.g. "abc def" matches
+ * "abcdef") for recall against pdfjs-induced word-break artifacts.
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+function tightNorm(s) {
+  return s.replace(/[^a-zA-Z0-9]+/g, '').toLowerCase();
 }
 
 /**
@@ -201,19 +259,16 @@ export function runMatcher(parsed, selectedText, citation) {
   const exactLines = collectLinesAcrossColumns(parsed, range);
   const exactWindow = exactLines.map((l) => l.text).join(' ');
 
-  // Empty-window check: page identification ambiguity (Pitfall 4)
-  if (exactWindow.trim().length === 0) {
-    return {
-      status: 'disagree',
-      tier_used: 'D',
-      cited_text_window: '',
-      match_offset_lines: null,
-      reason: `cited line empty in parsed PDF — possible page-identification ambiguity for ${citation}`,
-    };
-  }
+  // Empty-window does NOT immediately fail — could mean the verifier's
+  // cluster-line-count is fewer than the production matcher's gutter-line
+  // count (Plan 28-05 calibration finding: verifier consistently
+  // under-counts lines because gutter markers and figures get embedded
+  // into adjacent clusters). Fall through to Tier C: if the FUZZY window
+  // contains the needle, accept with a noted offset.
+  const exactWindowEmpty = exactWindow.trim().length === 0;
 
-  // Tier A — exact substring
-  if (exactWindow.includes(selectedText)) {
+  // Tier A — exact substring (only if cited window has content)
+  if (!exactWindowEmpty && exactWindow.includes(selectedText)) {
     return {
       status: 'pass',
       tier_used: 'A',
@@ -223,10 +278,23 @@ export function runMatcher(parsed, selectedText, citation) {
     };
   }
 
-  // Tier B — whitespace-normalized
+  // Tier B — whitespace-normalized OR aggressive-normalized (alphanumeric
+  // + lowercase + wrap-hyphen-strip). Plan 28-05 calibration revealed that
+  // pdfjs's patent-PDF text extraction inserts spaces around punctuation
+  // (e.g. "plasmablasts ." vs the user-selected "plasmablasts.") and that
+  // wrap-hyphenation is not bridged by plain whitespace-normalize. See
+  // aggressiveNorm()'s docstring for the four levers applied.
   const needleNorm = wsNorm(selectedText);
   const exactNorm = wsNorm(exactWindow);
-  if (exactNorm.includes(needleNorm)) {
+  const needleAggr = aggressiveNorm(selectedText);
+  const exactAggr = aggressiveNorm(exactWindow);
+  const needleTight = tightNorm(selectedText);
+  const exactTight = tightNorm(exactWindow);
+  if (
+    exactNorm.includes(needleNorm) ||
+    exactAggr.includes(needleAggr) ||
+    exactTight.includes(needleTight)
+  ) {
     return {
       status: 'pass',
       tier_used: 'B',
@@ -236,7 +304,7 @@ export function runMatcher(parsed, selectedText, citation) {
     };
   }
 
-  // Tier C — ±N-line fuzzy
+  // Tier C — ±N-line fuzzy (uses wsNorm, aggressiveNorm, AND tightNorm)
   const expandedRange = {
     startCol: range.startCol,
     startLine: Math.max(1, range.startLine - FUZZY_LINE_TOLERANCE),
@@ -245,7 +313,14 @@ export function runMatcher(parsed, selectedText, citation) {
   };
   const fuzzyLines = collectLinesAcrossColumns(parsed, expandedRange);
   const fuzzyWindow = fuzzyLines.map((l) => l.text).join(' ');
-  if (wsNorm(fuzzyWindow).includes(needleNorm)) {
+  const fuzzyNorm = wsNorm(fuzzyWindow);
+  const fuzzyAggr = aggressiveNorm(fuzzyWindow);
+  const fuzzyTight = tightNorm(fuzzyWindow);
+  if (
+    fuzzyNorm.includes(needleNorm) ||
+    fuzzyAggr.includes(needleAggr) ||
+    fuzzyTight.includes(needleTight)
+  ) {
     const offset = findSignedOffset(fuzzyLines, needleNorm, range);
     return {
       status: 'pass',
@@ -257,12 +332,15 @@ export function runMatcher(parsed, selectedText, citation) {
   }
 
   // Tier D — fail
+  const tierDReason = exactWindowEmpty
+    ? `cited line empty in parsed PDF AND fuzzy ±${FUZZY_LINE_TOLERANCE} window did not match — possible page-identification ambiguity for ${citation}`
+    : `selected text not found within ±${FUZZY_LINE_TOLERANCE} lines of cited ${citation}`;
   return {
     status: 'disagree',
     tier_used: 'D',
     cited_text_window: exactWindow,
     match_offset_lines: null,
-    reason: `selected text not found within ±${FUZZY_LINE_TOLERANCE} lines of cited ${citation}`,
+    reason: tierDReason,
   };
 }
 
@@ -447,6 +525,69 @@ export function inferColumnLine(pageItems, pageWidth, pageHeight) {
 }
 
 // ---------------------------------------------------------------------------
+// extractPrintedColumnNumbers — find the printed (left, right) column numbers
+// in a page's header region (y > pageHeight - HEADER_TOP_PT). US patent spec
+// pages print the column numbers above each text column (e.g. "1" on the left,
+// "2" on the right). Front-matter pages (cover, references) lack these
+// numbers; drawing pages have a "Sheet N of M" caption instead. Returning
+// null means "this page is not a spec page" — caller should skip in the
+// document-wide column numbering.
+//
+// MIRRORS src/offscreen/position-map-builder.js#extractPrintedColumnNumbers
+// CONCEPTUALLY; FRESH code body. See RESEARCH.md Pitfall 4.
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {TextItem[]} items     all text items on the page
+ * @param {number} pageWidth
+ * @param {number} pageHeight
+ * @returns {{left:number, right:number}|null}
+ */
+function extractPrintedColumnNumbers(items, pageWidth, pageHeight) {
+  // Column-number band: top ~120pt of the page. Different patent vintages
+  // place the printed column numbers at different vertical positions:
+  //  - Modern (post-2010): ~78pt below page top on a 792pt page → y ~= 714
+  //  - Older (e.g. US5440748 1995): ~68pt below top on an 818pt page → y ~= 750
+  // Use a wide band to catch both. False positives are filtered out by the
+  // standalone-digit regex (rejects multi-token strings like "5,440,748",
+  // "Sheet 8 of 8", patent dates) plus the left-right sequential pairing
+  // requirement.
+  const COLNUM_BAND_BOTTOM = pageHeight - 110;
+  const COLNUM_BAND_TOP = pageHeight - 40;
+  // Permit optional trailing period: older patents (e.g. US8352400) print
+  // column numbers as "1." instead of bare "1". Also strip leading
+  // whitespace before parseInt.
+  const candidates = items
+    .filter((it) => it.y >= COLNUM_BAND_BOTTOM && it.y <= COLNUM_BAND_TOP)
+    .filter((it) => /^\d{1,3}\.?$/.test(it.text.trim()))
+    .map((it) => ({
+      n: parseInt(it.text.trim(), 10),
+      x: it.x,
+      y: it.y,
+    }));
+
+  if (candidates.length < 2) return null;
+
+  // Look for a left+right pair: left column number is on the left half of
+  // the page, right column number on the right half. The two numbers must
+  // be sequential (right = left + 1).
+  const midX = pageWidth / 2;
+  const leftCands = candidates.filter((c) => c.x < midX);
+  const rightCands = candidates.filter((c) => c.x >= midX);
+  if (leftCands.length === 0 || rightCands.length === 0) return null;
+
+  // Smallest pair where right === left + 1 (canonical form). The first such
+  // pair (sorted by left value) is the printed pair — later integers on the
+  // header (e.g. patent number, sheet number) are skipped.
+  const sortedLefts = leftCands.sort((a, b) => a.n - b.n);
+  for (const l of sortedLefts) {
+    const match = rightCands.find((r) => r.n === l.n + 1);
+    if (match) return { left: l.n, right: match.n };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // parsePdf — load a cached PDF, return ParsedPdf with linesFor() helper.
 // ---------------------------------------------------------------------------
 
@@ -486,8 +627,19 @@ export async function parsePdf(pdfPath) {
   const pages = [];
   // Flat index keyed by `${col}:${line}` → InferredLine
   const lineIndex = new Map();
-  let docColumnCounter = 0; // running count of two-column pages × 2
+  // Two-pass strategy (RESEARCH.md Pitfall 4):
+  //   Primary: per page, extract printed (left, right) column numbers from
+  //   the header. Use them to label the page's columns. Front-matter and
+  //   drawing pages return null → skipped from the document-wide column
+  //   space.
+  //   Fallback: if NO page yielded printed column numbers (older patents
+  //   without printed column headers, or OCR-stripped text), fall back to
+  //   the running-counter approach over two-column pages — same algorithm
+  //   the script originally used.
 
+  // ---- Primary pass — collect pages with printed column numbers
+  const pagePayloads = [];
+  let printedColumnHits = 0;
   for (let i = 1; i <= totalPages; i++) {
     const page = await doc.getPage(i);
     const textContent = await page.getTextContent();
@@ -508,38 +660,124 @@ export async function parsePdf(pdfPath) {
       }));
 
     const inferred = inferColumnLine(items, pageWidth, pageHeight);
+    const printedColumns = extractPrintedColumnNumbers(
+      items,
+      pageWidth,
+      pageHeight
+    );
+    if (printedColumns) printedColumnHits++;
+    pagePayloads.push({
+      pageNum: i,
+      pageWidth,
+      pageHeight,
+      items,
+      inferred,
+      printedColumns,
+    });
+  }
+
+  // ---- Decide labeling strategy
+  const usePrinted = printedColumnHits > 0;
+  let docColumnCounter = 0;
+
+  // Pre-process: if we have printed hits but the first printed-column page
+  // is not col 1, backfill from prior two-column pages. This is the
+  // "interpolate missing column-number pages" pass. Patents where the
+  // column-number is positioned outside our detection band (or smudged out
+  // by OCR) on the first specification page would otherwise leave col 1
+  // empty even though the cover-page + figure-pages + first-spec-page
+  // sequence is intact.
+  let firstPrintedIdx = -1;
+  for (let idx = 0; idx < pagePayloads.length; idx++) {
+    if (pagePayloads[idx].printedColumns) {
+      firstPrintedIdx = idx;
+      break;
+    }
+  }
+  if (usePrinted && firstPrintedIdx > 0) {
+    const firstPrinted = pagePayloads[firstPrintedIdx].printedColumns;
+    // Expected number of two-column spec pages BEFORE the first printed
+    // page: (firstPrinted.left - 1) / 2.
+    const neededPriorPages = (firstPrinted.left - 1) / 2;
+    if (
+      Number.isInteger(neededPriorPages) &&
+      neededPriorPages >= 1 &&
+      neededPriorPages <= firstPrintedIdx
+    ) {
+      // Walk backwards from firstPrintedIdx, picking two-column pages,
+      // assigning columns counting DOWN from firstPrinted.left - 2.
+      let nextLeft = firstPrinted.left - 2;
+      for (
+        let idx = firstPrintedIdx - 1;
+        idx >= 0 && nextLeft >= 1;
+        idx--
+      ) {
+        if (pagePayloads[idx].inferred.twoColumn) {
+          pagePayloads[idx].printedColumns = {
+            left: nextLeft,
+            right: nextLeft + 1,
+            inferred: true,
+          };
+          nextLeft -= 2;
+        }
+      }
+    }
+  }
+
+  for (const p of pagePayloads) {
+    const { pageNum, pageWidth, pageHeight, items, inferred, printedColumns } =
+      p;
+    let leftCol = null;
+    let rightCol = null;
+
+    if (usePrinted) {
+      if (printedColumns) {
+        leftCol = printedColumns.left;
+        rightCol = printedColumns.right;
+      } else {
+        // Front-matter / drawing page — not part of the spec column space.
+      }
+    } else {
+      // Pure running-counter fallback (oldest patents or OCR-stripped).
+      if (inferred.twoColumn) {
+        leftCol = docColumnCounter + 1;
+        rightCol = docColumnCounter + 2;
+        docColumnCounter += 2;
+      }
+    }
 
     let pageEntry;
-    if (inferred.twoColumn) {
-      const leftCol = docColumnCounter + 1;
-      const rightCol = docColumnCounter + 2;
-      docColumnCounter += 2;
+    if (leftCol !== null) {
       const pageLines = inferred.lines.map((l) => ({
         ...l,
         col: l.col === 1 ? leftCol : rightCol,
-        page: i,
+        page: pageNum,
       }));
       for (const line of pageLines) {
         lineIndex.set(`${line.col}:${line.lineNumber}`, line);
       }
       pageEntry = {
-        pageNum: i,
+        pageNum,
         pageWidth,
         pageHeight,
         items,
         lines: pageLines,
         columns: [leftCol, rightCol],
+        printedColumns: printedColumns ?? null,
       };
     } else {
-      // Single-column page (cover, figures, etc) — not enumerated in the
-      // document-wide column space but still kept for completeness.
       pageEntry = {
-        pageNum: i,
+        pageNum,
         pageWidth,
         pageHeight,
         items,
-        lines: inferred.lines.map((l) => ({ ...l, col: null, page: i })),
+        lines: inferred.lines.map((l) => ({
+          ...l,
+          col: null,
+          page: pageNum,
+        })),
         columns: [],
+        printedColumns: null,
       };
     }
     pages.push(pageEntry);
@@ -551,8 +789,16 @@ export async function parsePdf(pdfPath) {
     pages,
     totalPages,
     linesFor(col, lineStart, lineEnd) {
+      // Bug fix (Plan 28-05 calibration): callers
+      // (collectLinesAcrossColumns) pass `Number.POSITIVE_INFINITY` to mean
+      // "to end of column". Iterating from N..Infinity hangs Node. Cap at
+      // MAX_LINES_PER_COLUMN, which is safely above US patent norms (~70
+      // lines per column post-1990; the line numbering is reset per
+      // column).
+      const MAX_LINES_PER_COLUMN = 120;
+      const hi = Number.isFinite(lineEnd) ? lineEnd : MAX_LINES_PER_COLUMN;
       const out = [];
-      for (let n = lineStart; n <= lineEnd; n++) {
+      for (let n = lineStart; n <= hi; n++) {
         const entry = lineIndex.get(`${col}:${n}`);
         if (entry) out.push(entry);
       }

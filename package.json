@@ -17,6 +17,7 @@
     "test:firefox": "vitest run --config vitest.config.firefox.js",
     "test:lint": "npx web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'",
     "test:watch": "vitest",
+    "verify:calibrate": "node scripts/verify-calibrate.mjs",
     "update-golden": "node scripts/update-golden.js --confirm",
     "accuracy-report": "node scripts/accuracy-report.js",
     "generate-icons": "node scripts/generate-icons.mjs"

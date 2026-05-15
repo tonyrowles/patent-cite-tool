@@ -8,3 +8,6 @@ dist/
 tests/e2e/artifacts/
 playwright-report/
 test-results/
+
+# Cached Google Patents HTML for selectedText regeneration
+tests/e2e/.html-cache/

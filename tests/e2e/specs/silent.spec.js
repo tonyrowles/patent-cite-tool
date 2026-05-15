@@ -47,7 +47,7 @@ const SILENT_CASES = [
     id: 'US11427642-silent-cross-col',
     baselineId: 'US11427642-cross-col',
     selectedText:
-      'the CH2 and CH3 domains of classical antibodies. These UniAbs lack the first domain of the constant region (CHI ) which is present in the genome, but is spliced out during',
+      'CH3), which are highly homologous to the CH2 and CH3 domains of classical antibodies. These UniAbs lack the first domain of the constant region (CH1) which is present in the genome, but is spliced out during mRNA processing. The absence of the',
   },
 ];
 

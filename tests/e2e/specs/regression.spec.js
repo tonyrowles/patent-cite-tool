@@ -35,13 +35,43 @@ import { getCitation } from '../lib/observation.js';
 import { setTriggerMode } from '../lib/settings.js';
 import { captureScreenshot, captureDomSnapshot } from '../lib/artifacts.js';
 import { resolveRunId } from '../lib/run-id.js';
+import { verifyCitation } from '../lib/pdf-verifier.js';
+import { renderPdfSnippet } from '../lib/pdf-snippet.js';
+import { appendCase, reportPathFor } from '../lib/report.js';
+import {
+  VERIFIER_DISAGREE,
+  WRONG_CITATION,
+  NO_CITATION_PRODUCED,
+  GOOGLE_DOM_DRIFT,
+} from '../lib/error-codes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../../dist/chrome');
 const RUN_ID = resolveRunId();
+const REPORT_PATH = reportPathFor(RUN_ID);
 
 // 2-second throttle between cases — RESEARCH.md Pitfall D.
 const THROTTLE_MS = 2_000;
+
+/**
+ * Lightweight citation parser for spec-side use — extracts the starting
+ * (column, line) for the verifier-disagreement PDF snippet renderer.
+ * Mirrors pdf-verifier.js#parseCitation but kept local to avoid pulling in
+ * the verifier's full surface at module load time. Handles all citation
+ * forms emitted by the extension (single line, same-column range,
+ * cross-column range).
+ *
+ * @param {string} citation  e.g. '1:26-27' or '63:1-4' or '79:81-80:3'
+ * @returns {{startCol:number, startLine:number}}
+ */
+function parseCitationLight(citation) {
+  if (!citation || typeof citation !== 'string') {
+    return { startCol: 1, startLine: 1 };
+  }
+  const m = citation.match(/^(\d+):(\d+)/);
+  if (!m) return { startCol: 1, startLine: 1 };
+  return { startCol: parseInt(m[1], 10), startLine: parseInt(m[2], 10) };
+}
 
 // SMOKE_IDS are tagged with @smoke in the test title — Plan 04 also adds
 // @smoke to one spec to give npm run e2e:smoke a 5-case Phase-27 subset.
@@ -184,13 +214,41 @@ test.describe('Phase 27 regression — 76 cases, auto-trigger', () => {
         );
       });
       if (isCaptcha) {
-        try { await captureScreenshot(page, RUN_ID, 'PRE-FLIGHT-CAPTCHA'); } catch {}
-        try { await captureDomSnapshot(page, RUN_ID, 'PRE-FLIGHT-CAPTCHA'); } catch {}
+        let captchaShot = null;
+        let captchaDom = null;
+        try { captchaShot = await captureScreenshot(page, RUN_ID, 'PRE-FLIGHT-CAPTCHA'); } catch {}
+        try { captchaDom = await captureDomSnapshot(page, RUN_ID, 'PRE-FLIGHT-CAPTCHA'); } catch {}
+        // RPT-02: stamp the pre-flight failure into report.json so a CI-side
+        // analyzer can distinguish "Google blocked us with CAPTCHA" from
+        // "extension regression". CAPTCHA falls under GOOGLE_DOM_DRIFT in
+        // the 8-string taxonomy (the page wasn't usable).
+        try {
+          appendCase(REPORT_PATH, {
+            id: 'PRE-FLIGHT-CAPTCHA',
+            status: 'failed',
+            errorClass: GOOGLE_DOM_DRIFT,
+            citation: null,
+            verifier_verdict: null,
+            artifacts: { screenshot: captchaShot, dom: captchaDom, pdf_snippet: null },
+          });
+        } catch {}
         throw new Error('CAPTCHA_DETECTED: Google Patents pre-flight got a CAPTCHA — aborting suite');
       }
       if (!probe.ok) {
-        try { await captureScreenshot(page, RUN_ID, 'PRE-FLIGHT-DOM-DRIFT'); } catch {}
-        try { await captureDomSnapshot(page, RUN_ID, 'PRE-FLIGHT-DOM-DRIFT'); } catch {}
+        let driftShot = null;
+        let driftDom = null;
+        try { driftShot = await captureScreenshot(page, RUN_ID, 'PRE-FLIGHT-DOM-DRIFT'); } catch {}
+        try { driftDom = await captureDomSnapshot(page, RUN_ID, 'PRE-FLIGHT-DOM-DRIFT'); } catch {}
+        try {
+          appendCase(REPORT_PATH, {
+            id: 'PRE-FLIGHT-DOM-DRIFT',
+            status: 'failed',
+            errorClass: GOOGLE_DOM_DRIFT,
+            citation: null,
+            verifier_verdict: null,
+            artifacts: { screenshot: driftShot, dom: driftDom, pdf_snippet: null },
+          });
+        } catch {}
         throw new Error(`DOM_DRIFT: Google Patents pre-flight failed — ${probe.reason}`);
       }
     } finally {
@@ -216,6 +274,22 @@ test.describe('Phase 27 regression — 76 cases, auto-trigger', () => {
       // case as test.skip so it shows in the test report as "skipped"
       // (not absent and not failed), preserving the audit trail.
       test.skip(title, () => {});
+      // RPT-01: emit a skipped-case entry into report.json so summary.total
+      // === 76 (Plan 28-05 contract). appendCase happens at module load
+      // time (test enumeration); the report writer is idempotent on replay.
+      try {
+        appendCase(REPORT_PATH, {
+          id: tc.id,
+          status: 'skipped',
+          errorClass: null,
+          citation: null,
+          verifier_verdict: null,
+          artifacts: { screenshot: null, dom: null, pdf_snippet: null },
+        });
+      } catch {
+        // appendCase failure here is non-fatal — the report will still
+        // include the live cases that pass through appendCase later.
+      }
       continue;
     }
     if (TIMEOUT_PILL_DEFERRED_IDS.has(tc.id)) {
@@ -226,11 +300,28 @@ test.describe('Phase 27 regression — 76 cases, auto-trigger', () => {
       // TIMEOUT_PILL_DEFERRED_IDS block above and 27-09-SUMMARY.md for the
       // per-case rationale and Phase 28 handoff.
       test.skip(`${title} [DEFERRED-TO-PHASE-28]`, () => {});
+      try {
+        appendCase(REPORT_PATH, {
+          id: tc.id,
+          status: 'skipped',
+          errorClass: null,
+          citation: null,
+          verifier_verdict: null,
+          artifacts: { screenshot: null, dom: null, pdf_snippet: null },
+        });
+      } catch {}
       continue;
     }
     test(title, async () => {
       const { context, page, cleanup } = await loadExtension({ extensionPath: EXTENSION_PATH });
       const patentId = patentIdFromCaseId(tc.id);
+      const t0 = Date.now();
+      let observed = null;
+      let verifierVerdict = null;
+      let caseStatus = 'failed';
+      let errorClass = null;
+      const artifacts = { screenshot: null, dom: null, pdf_snippet: null };
+
       try {
         // 1. Override trigger mode to 'auto' BEFORE navigation
         //    (RESEARCH.md Pitfall B — content script reads sync at init).
@@ -240,18 +331,116 @@ test.describe('Phase 27 regression — 76 cases, auto-trigger', () => {
         // 3. Selection
         await selectText({ page, uniqueSubstring: tc.selectedText });
         // 4. Read pill
-        const observed = await getCitation(page, { mode: 'auto' });
-        // 5. Assert citation
+        observed = await getCitation(page, { mode: 'auto' });
+
+        // 5. Run the independent verifier (VFY-01) — oracle that re-parses
+        //    the PDF and reports whether the cited region contains the
+        //    user's selectedText. Runs on every live case, even those that
+        //    will pass the baseline assertion, because VERIFIER_DISAGREE on
+        //    a baseline-passing case is a Phase 28 diagnostic finding.
+        try {
+          verifierVerdict = await verifyCitation({
+            patentId,
+            selectedText: tc.selectedText,
+            observedCitation: observed.citation,
+          });
+        } catch (verifyErr) {
+          // Verifier infrastructure failure (PDF fetch fail, parse fail,
+          // etc.) is NOT a test failure — record but don't block.
+          verifierVerdict = {
+            status: 'disagree',
+            tier_used: 'D',
+            reason: `VERIFIER_INFRA_FAIL: ${verifyErr.message}`,
+            cited_text_window: '',
+            match_offset_lines: null,
+          };
+        }
+
+        // 6. Baseline assertions (Phase 27 contract — unchanged).
         expect(observed.citation).toBe(expected.citation);
-        // 6. Assert color-mapped confidence
-        expect(observed.confidence).toBe(colorFromNumericConfidence(expected.confidence));
+        expect(observed.confidence).toBe(
+          colorFromNumericConfidence(expected.confidence)
+        );
+
+        // Reached here → baseline assertion passed.
+        caseStatus = 'passed';
+
+        // 7. Verifier soft-check (DIAG-03 + RPT-02): if the verifier
+        //    disagrees on a baseline-passing case, classify the case as
+        //    errorClass=VERIFIER_DISAGREE (passed but with an oracle
+        //    objection) and render a pdf-snippet.png for human review.
+        if (verifierVerdict.status === 'disagree') {
+          errorClass = VERIFIER_DISAGREE;
+          try {
+            const { startLine } = parseCitationLight(observed.citation);
+            // Page identification is best-effort in v3.0 (RESEARCH.md
+            // Pitfall 4 deferred to v3.1). Pass page=1 as a documented
+            // heuristic — the snippet will still show *some* region of
+            // the patent, which is enough for the human reviewer to
+            // decide whether the verifier or the extension is wrong.
+            const snippetPath = await renderPdfSnippet({
+              patentId,
+              page: 1,
+              line: startLine,
+              runId: RUN_ID,
+              caseId: tc.id,
+            });
+            artifacts.pdf_snippet = snippetPath;
+          } catch (snipErr) {
+            // Don't fail the test on snippet-render error; log only.
+            // eslint-disable-next-line no-console
+            console.warn(
+              `renderPdfSnippet failed for ${tc.id}: ${snipErr.message}`
+            );
+          }
+        }
       } catch (e) {
-        // Diagnostics on failure (DIAG-01, DIAG-02). Best-effort — never let
-        // an artifact failure mask the underlying assertion failure.
-        try { await captureScreenshot(page, RUN_ID, tc.id); } catch {}
-        try { await captureDomSnapshot(page, RUN_ID, tc.id); } catch {}
+        // Test failed (baseline mismatch or upstream error).
+        caseStatus = 'failed';
+        // Classify into the RPT-02 taxonomy based on what we have:
+        if (
+          observed &&
+          observed.citation &&
+          observed.citation !== expected.citation
+        ) {
+          errorClass = WRONG_CITATION;
+        } else if (!observed || !observed.citation) {
+          errorClass = NO_CITATION_PRODUCED;
+        } else {
+          errorClass = WRONG_CITATION;
+        }
+        // Phase 27 diagnostics (DIAG-01, DIAG-02) — unchanged
+        try {
+          artifacts.screenshot = await captureScreenshot(
+            page,
+            RUN_ID,
+            tc.id
+          );
+        } catch {}
+        try {
+          artifacts.dom = await captureDomSnapshot(page, RUN_ID, tc.id);
+        } catch {}
         throw e;
       } finally {
+        // ALWAYS append a CaseEntry to report.json (passed OR failed) so
+        // RPT-01's "76 entries per run" contract holds. The skipped-case
+        // entries are written at test-enumeration time (above).
+        try {
+          appendCase(REPORT_PATH, {
+            id: tc.id,
+            status: caseStatus,
+            errorClass,
+            citation: observed ? observed.citation : null,
+            verifier_verdict: verifierVerdict,
+            artifacts,
+            duration_ms: Date.now() - t0,
+          });
+        } catch (reportErr) {
+          // eslint-disable-next-line no-console
+          console.error(
+            `appendCase failed for ${tc.id}: ${reportErr.message}`
+          );
+        }
         await cleanup();
         // Throttle to reduce CAPTCHA risk on Google Patents
         // (RESEARCH.md Pitfall D). Total added: ~2.5 min across 76 cases.
@@ -259,4 +448,19 @@ test.describe('Phase 27 regression — 76 cases, auto-trigger', () => {
       }
     });
   }
+
+  // Finalize report.json: appendCase already updates `ended` on every call,
+  // but this hook ensures the final timestamp lands AFTER all per-case
+  // writes (no-op idempotent overwrite if the file was written by the last
+  // appendCase already).
+  test.afterAll(async () => {
+    const fs = await import('node:fs');
+    try {
+      const report = JSON.parse(fs.readFileSync(REPORT_PATH, 'utf8'));
+      report.ended = new Date().toISOString();
+      fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2));
+    } catch {
+      // No report present (no cases ran) — nothing to finalize.
+    }
+  });
 });

@@ -107,24 +107,74 @@ async function readAutoCitation(page, { timeout }) {
 }
 
 async function readSilentCitation(page, { timeout = 3_000 } = {}) {
-  // Poll the clipboard shim for up to `timeout` ms.
+  // Try the clipboard-observer shim first; if it captures only the selection
+  // text (no citation suffix), fall back to navigator.clipboard.readText()
+  // which reads the SYSTEM clipboard (populated by the extension's
+  // event.clipboardData.setData() + event.preventDefault() in
+  // src/content/content-script.js:297-348).
+  //
+  // Why the fallback exists: Chrome content scripts run in an ISOLATED
+  // world. The 'copy' event's `event.clipboardData` is wrapped per-world,
+  // so setData called from the extension's isolated world does NOT populate
+  // the main-world DataTransfer the capture-phase shim reads. The system
+  // clipboard IS populated though, because the browser uses the isolated
+  // world's clipboardData when preventDefault was called there.
+  //
+  // CITATION_RE matches "N:N", "N:N-N", "N:N-N:N", or "[N]" at end of string,
+  // optionally preceded by a patent prefix like "'427642B2 Pat., ".
+  const CITATION_RE = /(\d+:\d+(?:-\d+(?::\d+)?)?|\[\d+\])\s*$/;
   const deadline = Date.now() + timeout;
+
+  const readShim = () =>
+    page.evaluate(() => window.__lastCopiedText__ || '');
+  const readSystemClipboard = () =>
+    page
+      .evaluate(async () => {
+        try {
+          return await navigator.clipboard.readText();
+        } catch (e) {
+          return '__CLIPBOARD_ERROR__:' + (e && e.message ? e.message : String(e));
+        }
+      })
+      .catch(() => '');
+
+  const readConfidence = () =>
+    page.evaluate(() => {
+      const host = document.getElementById('patent-cite-host');
+      if (!host || !host.shadowRoot) return 'red';
+      const success = host.shadowRoot.querySelector('.cite-toast-success');
+      const failure = host.shadowRoot.querySelector('.cite-toast-failure');
+      return success ? 'green' : failure ? 'red' : 'yellow';
+    });
+
   while (Date.now() < deadline) {
-    const raw = await page.evaluate(() => window.__lastCopiedText__ || '');
-    if (raw) {
-      // Silent-mode payload format: "{originalSelectedText} {citation}".
-      // Citation token is "N:N", "N:N-N", "N:N-N:N", or "[N]" at end of string.
-      const m = raw.match(/(\d+:\d+(?:-\d+(?::\d+)?)?|\[\d+\])\s*$/);
-      const citation = m ? m[1] : '';
-      // Silent mode has no in-DOM confidence dot; infer from toast presence.
-      const confidence = await page.evaluate(() => {
-        const host = document.getElementById('patent-cite-host');
-        if (!host || !host.shadowRoot) return 'red';
-        const success = host.shadowRoot.querySelector('.cite-toast-success');
-        const failure = host.shadowRoot.querySelector('.cite-toast-failure');
-        return success ? 'green' : failure ? 'red' : 'yellow';
-      });
-      return { citation, confidence, mode: 'silent' };
+    const shimText = await readShim();
+    let citation = '';
+    let raw = shimText;
+    if (shimText) {
+      const m = shimText.match(CITATION_RE);
+      if (m) citation = m[1];
+    }
+    if (!citation) {
+      // Shim didn't see a citation suffix — fall back to system clipboard.
+      const sysText = await readSystemClipboard();
+      if (sysText && !sysText.startsWith('__CLIPBOARD_ERROR__')) {
+        const m2 = sysText.match(CITATION_RE);
+        if (m2) {
+          citation = m2[1];
+          raw = sysText;
+        }
+      }
+    }
+    if (citation) {
+      const confidence = await readConfidence();
+      return { citation, confidence, mode: 'silent', raw };
+    }
+    if (raw && Date.now() + 100 < deadline) {
+      // We have SOME clipboard data but no citation token yet — keep
+      // polling in case the extension hasn't written its append yet.
+      await page.waitForTimeout(100);
+      continue;
     }
     await page.waitForTimeout(100);
   }

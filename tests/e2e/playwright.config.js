@@ -11,7 +11,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './specs',
-  timeout: 60_000,             // per-test; Google Patents first-load can be slow
+  timeout: 90_000,             // per-test; Google Patents first-load + PDF parse can be slow
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,                  // persistent context for extension -> serial

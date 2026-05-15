@@ -58,7 +58,7 @@ export async function readClipboardShim(page) {
  * @param {{ mode?: 'auto'|'silent', timeout?: number }} [opts]
  * @returns {Promise<{ citation: string, confidence: 'green'|'yellow'|'red', mode: 'auto'|'silent' }>}
  */
-export async function getCitation(page, { mode = 'auto', timeout = 8_000 } = {}) {
+export async function getCitation(page, { mode = 'auto', timeout = 30_000 } = {}) {
   if (mode === 'silent') {
     return await readSilentCitation(page, { timeout });
   }
@@ -71,7 +71,22 @@ export async function getCitation(page, { mode = 'auto', timeout = 8_000 } = {})
 async function readAutoCitation(page, { timeout }) {
   await page.waitForSelector(PILL_SELECTOR, { state: 'attached', timeout });
   const result = await page.evaluate((sel) => {
-    const pill = document.querySelector(sel);
+    // `document.querySelector` does NOT pierce shadow boundaries. The
+    // citation pill lives inside the extension's host shadow root
+    // (opened for tests via the post-build patch in
+    // tests/e2e/lib/extension-loader.js). Look in that shadow root
+    // directly.
+    function findPill() {
+      const direct = document.querySelector(sel);
+      if (direct) return direct;
+      const host = document.getElementById('patent-cite-host');
+      if (host && host.shadowRoot) {
+        const inShadow = host.shadowRoot.querySelector(sel);
+        if (inShadow) return inShadow;
+      }
+      return null;
+    }
+    const pill = findPill();
     if (!pill) return { citation: '', confidence: 'red' };
     const textEl = pill.querySelector('.cite-text');
     const text = textEl ? (textEl.textContent || '').trim() : '';

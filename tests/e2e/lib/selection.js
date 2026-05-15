@@ -115,6 +115,33 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
     throw new Error('selectText: uniqueSubstring is required and must be a string');
   }
 
+  // Wait for the extension content script's mouseup listener to be in place
+  // AND for Google Patents to finish populating the claims section. MV3
+  // injects content scripts at document_idle (after `load` event), and
+  // claims hydration runs alongside but completes after the
+  // description-paragraph wait used by gotoPatent. Without this settle,
+  // selectText can find the needle only in <body> (via the fallback path),
+  // which mis-locates the selection.
+  await page
+    .waitForLoadState('load', { timeout: 5000 })
+    .catch(() => {});
+  // Wait for claims content to populate. Google Patents lazy-renders some
+  // sections; we explicitly check for claim text density to ensure
+  // selectText's container scan can pick the right section.
+  await page
+    .waitForFunction(
+      () => {
+        const claims = document.querySelector('section[itemprop="claims"]');
+        if (!claims) return false;
+        const text = (claims.textContent || '').trim();
+        return text.length > 200;
+      },
+      null,
+      { timeout: 8000 },
+    )
+    .catch(() => {});
+  await page.waitForTimeout(500);
+
   const result = await page.evaluate(
     async ({ needle, requireExact }) => {
       // Duplicated from module scope so page.evaluate sees it; keep both in sync.
@@ -131,9 +158,18 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
           '$1$2',
         );
 
+      // Google Patents Polymer-hydrates older patents and REPLACES the
+      // initial `section[itemprop="..."]` elements with custom-element
+      // wrappers. The post-hydration structure uses `<section
+      // id="description">` and `<section id="claims">` (without
+      // itemprop). We probe both forms — Polymer ID first since most
+      // patents will be hydrated by the time selectText runs.
       const CONTAINERS = [
+        'section#description',
+        'section#claims',
         'section[itemprop="description"]',
         'section[itemprop="claims"]',
+        'patent-result',
         'main',
         'body',
       ];
@@ -197,39 +233,124 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
       //   2. \s*-\s* → '-'
       //   3. \s+([,;:]) → '$1'
       //   4. trim()
-      // For correct offset mapping we walk character-by-character and emit a
-      // "norm character" only when one would survive the regex chain. The
-      // chain is non-local (rule 2 looks at neighbors around a hyphen), so
-      // we use a small lookahead/lookbehind state.
       //
-      // Simpler approach: walk the raw text per-node and apply the same
-      // collapse-whitespace-run rule used by `normalize`'s first step
-      // (\s+ → ' '), which is sufficient for offset bookkeeping in the
-      // overwhelming majority of cases. The basic-normalize regex chain
-      // turns "TALL - 2" into "TALL-2", which IS a meaningful offset shift,
-      // but the round-trip verification at the end catches the rare
-      // disagreement and reports it via SELECTION_FAILED.
+      // The walker concatenates `container.textContent` virtually, so we
+      // walk a flat character stream maintaining a small lookahead state.
+      // For each raw char in the current text node we ask: "would
+      // `normalize()` emit a corresponding char at this position?". If
+      // yes, we increment `normCursor`. If no (whitespace inside a run,
+      // or whitespace adjacent to a hyphen / preceding `,;:`), we don't.
+      //
+      // Without these rules, locate() falls into the "ROUNDTRIP_MISMATCH"
+      // path documented in 27-DATA-REGEN-SUMMARY for any needle that lies
+      // after an upstream `\s*-\s*` or `\s+[,;:]` pattern in the body.
+      //
+      // The implementation walks raw text but treats hyphen / punctuation
+      // groups as "atomic" — a hyphen with surrounding whitespace produces
+      // a single `-` char in normalize-space; a whitespace run immediately
+      // before `,;:` produces no char (the punct char itself follows).
       let node;
+      // Build a single flat character stream from all text nodes so we
+      // can apply the multi-char lookahead rules without re-implementing
+      // them across segment boundaries.
+      const rawTexts = [];
+      const nodeList = [];
       while ((node = walker.nextNode())) {
-        const raw = node.nodeValue || '';
-        const segStart = normCursor;
-        for (let i = 0; i < raw.length; i++) {
-          const c = raw[i];
-          if (/\s/.test(c)) {
-            if (!inWhitespaceRun && normCursor > 0) {
-              normCursor++;
-            }
-            inWhitespaceRun = true;
-          } else {
-            inWhitespaceRun = false;
-            normCursor++;
-          }
+        rawTexts.push(node.nodeValue || '');
+        nodeList.push(node);
+      }
+      // Concatenated raw text + per-position node-index map.
+      let flat = '';
+      const flatNodeIdx = [];   // flat[i] originated from nodeList[flatNodeIdx[i]]
+      const flatNodeOffset = []; // ...at offset flatNodeOffset[i] within that node
+      for (let n = 0; n < rawTexts.length; n++) {
+        const r = rawTexts[n];
+        for (let j = 0; j < r.length; j++) {
+          flat += r[j];
+          flatNodeIdx.push(n);
+          flatNodeOffset.push(j);
         }
+      }
+      // Walk flat applying the three normalize rules to produce a parallel
+      // normCursor map. normFromFlat[i] = the normCursor that flat-char i
+      // PRODUCES (the value just before processing this char), or -1 if
+      // it doesn't produce a norm char (whitespace inside a run / stripped
+      // by hyphen / pre-punct rule).
+      const normFromFlat = new Array(flat.length).fill(-1);
+      // For each segment record normStart/normEnd in norm space.
+      const segStartNorm = new Array(nodeList.length).fill(0);
+      const segEndNorm = new Array(nodeList.length).fill(0);
+      let curSegIdx = -1;
+      for (let i = 0; i < flat.length; i++) {
+        // Track segment boundaries
+        if (flatNodeIdx[i] !== curSegIdx) {
+          if (curSegIdx >= 0) segEndNorm[curSegIdx] = normCursor;
+          curSegIdx = flatNodeIdx[i];
+          segStartNorm[curSegIdx] = normCursor;
+        }
+        const c = flat[i];
+        if (/\s/.test(c)) {
+          // Look ahead: does this whitespace run lead into `-` or `,;:`?
+          let k = i;
+          while (k < flat.length && /\s/.test(flat[k])) k++;
+          const followChar = k < flat.length ? flat[k] : '';
+          if (followChar === '-' || /[,;:]/.test(followChar)) {
+            // This whitespace run is entirely stripped (rule 2 strips
+            // both sides of hyphen; rule 3 strips before punct).
+            // No norm char emitted for any of these whitespace positions;
+            // leave normFromFlat[..] = -1 for them.
+            i = k - 1; // advance to last whitespace; outer loop ++i will jump to followChar
+            inWhitespaceRun = false;
+            continue;
+          }
+          // Otherwise this whitespace run produces a single ' ' on the
+          // FIRST whitespace char of the run (if we're past start);
+          // subsequent ws chars in the run produce nothing (leave -1).
+          if (!inWhitespaceRun && normCursor > 0) {
+            normFromFlat[i] = normCursor;
+            normCursor++;
+            inWhitespaceRun = true;
+          }
+          // else: continued whitespace — normFromFlat[i] stays -1.
+        } else if (c === '-') {
+          // Rule 2: hyphen always emits '-' regardless of surrounding
+          // whitespace. Surrounding whitespace is handled by the
+          // whitespace branch (above) which now strips the lead-in.
+          // Look BACK: if previous char was whitespace that was stripped,
+          // we still emit '-' here.
+          normFromFlat[i] = normCursor;
+          normCursor++;
+          inWhitespaceRun = false;
+          // Look ahead: if the next char is whitespace, the whitespace
+          // branch will look forward to see if THAT trailing whitespace
+          // is followed by a non-special; if so it emits a space (which
+          // would NOT be the intended behavior of rule 2). Rule 2 says
+          // strip whitespace on BOTH sides of the hyphen. Mark the next
+          // whitespace run as "skip" by leaving inWhitespaceRun=true
+          // semantically — actually simpler: peek ahead and consume any
+          // trailing whitespace right here.
+          let k = i + 1;
+          while (k < flat.length && /\s/.test(flat[k])) {
+            normFromFlat[k] = -1;
+            k++;
+          }
+          i = k - 1;
+        } else {
+          inWhitespaceRun = false;
+          normFromFlat[i] = normCursor;
+          normCursor++;
+        }
+      }
+      if (curSegIdx >= 0) segEndNorm[curSegIdx] = normCursor;
+
+      // Build segments array compatible with the old shape (preserving
+      // `node`, `rawText`, `normStart`, `normEnd`).
+      for (let n = 0; n < nodeList.length; n++) {
         segments.push({
-          node,
-          rawText: raw,
-          normStart: segStart,
-          normEnd: normCursor,
+          node: nodeList[n],
+          rawText: rawTexts[n],
+          normStart: segStartNorm[n],
+          normEnd: segEndNorm[n],
         });
       }
 
@@ -327,27 +448,34 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
 
       // ------------------------------------------------------------
       // Step 4 — locate {startNode, startOffset} and {endNode, endOffset}
+      //
+      // We use the flat-character / normFromFlat map built during the
+      // walker pass. For a given normIdx, find the first flat-char i
+      // where normFromFlat[i] === normIdx (i.e. the flat char that emits
+      // normIdx). That flat char maps to (nodeList[flatNodeIdx[i]],
+      // flatNodeOffset[i]).
+      //
+      // Edge case: end positions can point one past the final norm char.
+      // We detect that case (normIdx === normCursor) and return the last
+      // node + (rawText.length).
       // ------------------------------------------------------------
       function locate(normIdx) {
-        for (const seg of segments) {
-          if (normIdx >= seg.normStart && normIdx <= seg.normEnd) {
-            // Re-walk raw to find the within-node offset.
-            let nc = seg.normStart;
-            let ws = seg.normStart > 0 && /\s/.test(seg.rawText[0] || '');
-            for (let i = 0; i < seg.rawText.length; i++) {
-              if (nc === normIdx) return { node: seg.node, offset: i };
-              const c = seg.rawText[i];
-              if (/\s/.test(c)) {
-                if (!ws && nc > 0) nc++;
-                ws = true;
-              } else {
-                ws = false;
-                nc++;
-              }
-            }
-            if (nc === normIdx) {
-              return { node: seg.node, offset: seg.rawText.length };
-            }
+        if (normIdx === normCursor) {
+          // End-of-document — return the last node + (rawText.length)
+          if (nodeList.length === 0) return null;
+          const lastN = nodeList.length - 1;
+          return {
+            node: nodeList[lastN],
+            offset: rawTexts[lastN].length,
+          };
+        }
+        // Linear scan; flat is small (< few hundred KB) so this is fine.
+        for (let i = 0; i < flat.length; i++) {
+          if (normFromFlat[i] === normIdx) {
+            return {
+              node: nodeList[flatNodeIdx[i]],
+              offset: flatNodeOffset[i],
+            };
           }
         }
         return null;
@@ -408,6 +536,12 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
       // listener (line 173) receives it. The host-guard at line 182
       // lets document-targeted events through (target is document, not
       // patent-cite-host).
+      //
+      // Google Patents' own mouseup handler asynchronously moves the
+      // selection to its <search-app> bar, which would defeat the
+      // content-script's 200ms debounced read. We re-apply the range in a
+      // tight loop for ~260ms (past the debounce + a small margin) to
+      // keep the selection intact at the moment the extension reads it.
       // ------------------------------------------------------------
       const rect = range.getBoundingClientRect();
       document.dispatchEvent(
@@ -418,7 +552,12 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
           clientY: rect.bottom || 100,
         }),
       );
-
+      // Expose the range to be re-applied by an outer Node-side loop
+      // (faster and bounded — avoids being starved by busy-main-thread).
+      window.__pct_reapply = () => {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      };
       return {
         ok: true,
         containerSelector,
@@ -439,10 +578,22 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
     throw err;
   }
 
-  // Wait past the content-script's 200ms mouseup debounce + a small margin.
-  // The extension reads window.getSelection() at debounce-fire time, so the
-  // Range must remain applied until at least 250ms after dispatch.
-  await page.waitForTimeout(250);
+  // Node-side re-apply loop. Google Patents' own mouseup handler clears
+  // the user-selection asynchronously; the content script's 200ms
+  // debounce reads selection at t=200ms after mouseup. Re-applying every
+  // ~30ms keeps the range live across that window. Bound at 280ms total.
+  const reapplyDeadline = Date.now() + 280;
+  while (Date.now() < reapplyDeadline) {
+    try {
+      await page.evaluate(() => {
+        if (typeof window.__pct_reapply === 'function') window.__pct_reapply();
+      });
+    } catch {
+      // page may be closing; bail silently
+      break;
+    }
+    await page.waitForTimeout(25);
+  }
 
   return result;
 }

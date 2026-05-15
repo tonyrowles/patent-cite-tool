@@ -24,7 +24,7 @@ const EXTENSION_PATH = path.resolve(__dirname, '../../../dist/chrome');
 const SEED_PATENT = 'US11427642';
 
 test.describe('Phase 26 smoke', () => {
-  test('loads extension, navigates seed patent, SW ready, shadow shim functional', async () => {
+  test('loads extension, navigates seed patent, SW ready, shadow shim functional @smoke', async () => {
     const { page, extensionId, cleanup } = await loadExtension({
       extensionPath: EXTENSION_PATH,
     });

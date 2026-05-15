@@ -86,8 +86,10 @@ These represent the breadth of selection types without including the riskiest pa
 - `e2e:silent` → new: `npm run build:chrome && playwright test --config tests/e2e/playwright.config.js specs/silent.spec.js`
 
 ### Trigger Mode
-- The extension defaults to "auto" trigger mode. Tests do NOT need to set trigger mode explicitly — they exercise the default user path.
-- Silent mode tests set the trigger mode via `chrome.storage.local` write before navigation, then dispatch Ctrl+C after selection. Sync mode tests just rely on the default mouseup trigger.
+- **The extension's default trigger mode is `'floating-button'`** (verified at `src/content/content-script.js:147`), NOT `auto`. The 76-case sync suite must explicitly set `triggerMode: 'auto'` before each navigation.
+- **Trigger mode is stored in `chrome.storage.sync`** (verified at `src/options/options.js:45-75`), NOT `chrome.storage.local`. A new helper `tests/e2e/lib/settings.js` exports `setTriggerMode(context, mode)` that writes via the extension's service-worker context: `await context.serviceWorkers()[0].evaluate(m => chrome.storage.sync.set({triggerMode: m}), mode)`.
+- 76-case sync spec: `await setTriggerMode(context, 'auto')` before navigation; auto mouseup dispatch triggers the pill.
+- Silent-mode spec: `await setTriggerMode(context, 'silent')` before navigation; Ctrl+C after selection populates the clipboard shim.
 
 ### Claude's Discretion
 - Exact wording of failure classifications (`SELECTION_FAILED`, `WRONG_CITATION`, `NO_CITATION_PRODUCED`) — match Phase 28's taxonomy when that lands.

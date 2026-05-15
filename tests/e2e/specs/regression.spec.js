@@ -60,14 +60,35 @@ const SMOKE_IDS = new Set([
   'US10592688-spec-short',
 ]);
 
+// Synthetic-fixture cases — case-ids that do NOT correspond to a real
+// Google Patents page (no live navigation possible). These are deferred
+// to a future dedicated synthetic-fixture spec; for now they are skipped
+// here so the regression spec can iterate cleanly over the live cases
+// without aborting on patentIdFromCaseId. Currently this matches the
+// single 'synthetic-gutter-1' entry in tests/test-cases.js (category
+// 'gutter'); add new synthetic categories here as they are introduced.
+const SYNTHETIC_CATEGORIES = new Set(['gutter']);
+
 /**
  * 'US11427642-spec-short-1' → 'US11427642'
+ *
+ * Production patent IDs only. Synthetic cases (e.g. 'synthetic-gutter-1')
+ * are filtered upstream via SYNTHETIC_CATEGORIES before reaching this
+ * function; if a non-patent case-id slips through, the error message
+ * points at the fix mechanism so the failure is self-diagnosing.
+ *
  * @param {string} caseId
  * @returns {string}
  */
 function patentIdFromCaseId(caseId) {
   const m = caseId.match(/^([A-Z]{2}\d+[A-Z]?\d*)-/);
-  if (!m) throw new Error(`patentIdFromCaseId: unable to parse ${caseId}`);
+  if (!m) {
+    throw new Error(
+      `patentIdFromCaseId: unable to parse ${caseId} — non-patent case-ids ` +
+      `(e.g. synthetic-*) must be skipped via SYNTHETIC_CATEGORIES before ` +
+      `reaching the navigation path`
+    );
+  }
   return m[1];
 }
 
@@ -144,6 +165,16 @@ test.describe('Phase 27 regression — 76 cases, auto-trigger', () => {
       throw new Error(`regression.spec: baseline.json missing entry for ${tc.id}`);
     }
     const title = SMOKE_IDS.has(tc.id) ? `${tc.id} @smoke` : tc.id;
+    if (SYNTHETIC_CATEGORIES.has(tc.category)) {
+      // Synthetic-fixture case: no live Google Patents page exists for
+      // this case-id, so the live-page replay performed by this spec is
+      // not meaningful. Coverage of synthetic fixtures is deferred to a
+      // future dedicated synthetic-fixture spec; here we register the
+      // case as test.skip so it shows in the test report as "skipped"
+      // (not absent and not failed), preserving the audit trail.
+      test.skip(title, () => {});
+      continue;
+    }
     test(title, async () => {
       const { context, page, cleanup } = await loadExtension({ extensionPath: EXTENSION_PATH });
       const patentId = patentIdFromCaseId(tc.id);

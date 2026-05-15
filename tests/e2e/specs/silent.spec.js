@@ -18,13 +18,6 @@
 // SEL-02 (silent reader path), HARN-04 (clipboard observation in headless),
 // DIAG-01/DIAG-02 wired to per-test catch blocks.
 //
-// NOTE: `resolveRunId` is inlined here because Plan 27-03 (which ships the
-// shared `tests/e2e/lib/run-id.js` module) runs in parallel with Plan 27-04;
-// cross-plan helper imports are deferred to the orchestrator's post-merge
-// reconciliation pass. The inlined logic mirrors the contract documented in
-// 27-RESEARCH.md "Run-id Strategy":
-//   process.env.PLAYWRIGHT_RUN_ID || ISO timestamp with FS-safe characters.
-
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
@@ -35,21 +28,11 @@ import { selectText } from '../lib/selection.js';
 import { getCitation } from '../lib/observation.js';
 import { setTriggerMode } from '../lib/settings.js';
 import { captureScreenshot, captureDomSnapshot } from '../lib/artifacts.js';
+import { resolveRunId } from '../lib/run-id.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../../dist/chrome');
 const SEED_PATENT = 'US11427642';
-
-/**
- * Resolve a filesystem-safe run identifier. Mirrors the contract of
- * tests/e2e/lib/run-id.js (Plan 27-03). Inlined here to avoid a
- * cross-Wave-2-plan import dependency.
- */
-function resolveRunId() {
-  const env = process.env.PLAYWRIGHT_RUN_ID;
-  if (env && env.trim()) return env.trim();
-  return new Date().toISOString().replace(/[:.]/g, '-');
-}
 
 const RUN_ID = resolveRunId();
 

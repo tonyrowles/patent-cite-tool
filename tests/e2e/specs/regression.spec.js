@@ -127,7 +127,13 @@ const SYNTHETIC_CATEGORIES = new Set(['gutter']);
 // Skipped pending Phase 28 adjudication.
 const TIMEOUT_PILL_DEFERRED_IDS = new Set([
   // From 27-05-SUMMARY.md (original 7 TIMEOUT_PILL cases):
-  'US11427642-claims-1',           // claim preamble "The invention claimed is:" PDF↔HTML drift
+  // NOTE: 'US11427642-claims-1' was REMOVED in Plan 28-05-04 — Phase 28's
+  // independent verifier confirmed the cited text IS at the baseline-recorded
+  // location 63:1-4 (Tier B pass), so the case is now re-enabled in the live
+  // suite. The extension is expected to FAIL it (pill timeout) with
+  // errorClass=NO_CITATION_PRODUCED; report.json's verifier_verdict for that
+  // case will pinpoint the cited text for the human reviewer. See
+  // 28-05-SUMMARY.md "Phase 27 Adjudication".
   'US11427642-repetitive',         // long claim selection — same B2 patent as -claims-1
   'US4723129-claims',              // claim preamble "We claim:" PDF↔HTML drift
   'US5371234-chemical-cross-col',  // chemical disclaimer paragraph, cross-col reference

@@ -34,13 +34,14 @@ import { verifyCitation } from '../tests/e2e/lib/pdf-verifier.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ARTIFACTS_ROOT = path.resolve(__dirname, '../tests/e2e/artifacts');
 
-// Duplicated from tests/e2e/specs/regression.spec.js L98-L113. The spec file
-// is a Playwright spec — we cannot import it cleanly from a plain node
-// script without dragging in @playwright/test. Single source of truth lives
-// in the spec; this duplication is documented in 28-05-SUMMARY.md.
-// KEEP IN SYNC.
+// Duplicated from tests/e2e/specs/regression.spec.js TIMEOUT_PILL_DEFERRED_IDS.
+// The spec file is a Playwright spec — we cannot import it cleanly from a
+// plain node script without dragging in @playwright/test. Single source of
+// truth lives in the spec; this duplication is documented in 28-05-SUMMARY.md.
+// KEEP IN SYNC. Plan 28-05-04 removed US11427642-claims-1 from the spec —
+// removed here too so the calibration set (66 cases) matches the live spec
+// set (65 → 66 live + 10 → 9 deferred).
 const TIMEOUT_PILL_DEFERRED_IDS = new Set([
-  'US11427642-claims-1',
   'US11427642-repetitive',
   'US4723129-claims',
   'US5371234-chemical-cross-col',

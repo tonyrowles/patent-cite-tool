@@ -868,37 +868,43 @@ function colorOf(numericConfidence) {
 | A6 | `test.describe.configure({mode:'serial'})` should NOT be used (despite CONTEXT.md `<specifics>` recommending it) because it short-circuits after first failure | Architecture Pattern 2 + Open Question O2 | Without `serial`, if Playwright's defaults change (e.g., `fullyParallel: true` becomes default), tests could race in parallel and trample chrome.storage. Mitigation: `playwright.config.js` already sets `workers: 1` and `fullyParallel: false` (Phase 26); both protect against the race. The locked CONTEXT.md `<specifics>` value is a recommendation, not a decision — Phase 27 can deviate with justification (this research is the justification). |
 | A7 | The 5 chosen `@smoke` test case IDs all exist in baseline.json | Tagged Specs | If any ID is missing, the smoke run fails loudly. Mitigation: planner verifies by `node -e "const cases = require('./tests/test-cases.js'); const ids = ['US11427642-spec-short-1','US11427642-spec-long','US11427642-cross-col','US8352400-claims','US10592688-spec-short']; ids.forEach(i => console.log(i, cases.TEST_CASES.find(c => c.id === i) ? 'OK' : 'MISSING'))"`. (All 5 verified present in test-cases.js by inspection during this research.) |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **O1 (CONTEXT.md correction handling) — Trigger mode default + storage scope errors**
    - What we know: Default is `'floating-button'` not `'auto'`; storage is `sync` not `local`. CONTEXT.md got both wrong.
    - What's unclear: Whether the planner should (a) document the correction in `27-PLAN.md` and proceed with the corrected values, or (b) require user re-confirmation of CONTEXT.md's locked intent ("the 76-case suite runs in auto-trigger mode") via a brief amendment commit.
    - Recommendation: **(a) Document and proceed.** The corrected behavior matches the stated intent ("auto mode for the 76-case suite"); only the implementation path (`chrome.storage.sync.set({triggerMode:'auto'})` before navigation, not "rely on default") changes. The planner can call out the correction in `27-PLAN.md` "Decisions" section.
+   - **RESOLVED:** Document and proceed. Plans 02-03 explicitly call `setTriggerMode(context, 'auto')` via `chrome.storage.sync.set` before each `gotoPatent`. The CONTEXT.md correction is noted in the per-plan Decisions sections without requiring an amendment commit.
 
 2. **O2 (Serial mode) — Use `test.describe.configure({mode:'serial'})` or rely on `workers:1`?**
    - What we know: `serial` mode skips subsequent tests after the first failure. `workers:1` ensures one-at-a-time without skip-on-fail semantics. Phase 26's `playwright.config.js` sets `workers: 1` and `fullyParallel: false`.
    - What's unclear: CONTEXT.md `<specifics>` calls for `serial` "to ensure cases run one at a time (matches `workers: 1` in playwright.config.js — belt and suspenders)". But this drops 75 cases on the floor if case #1 fails — defeats the regression-suite purpose.
    - Recommendation: **Drop `serial`.** Keep `workers:1` + `fullyParallel:false`. This is an explicit deviation from CONTEXT.md's `<specifics>` — call it out in the plan. The intent ("run one at a time") is preserved; the side-effect ("skip on first fail") is undesirable for Phase 27.
+   - **RESOLVED:** Drop `serial`. Plan 03's `regression.spec.js` does NOT call `test.describe.configure({mode:'serial'})`; it relies on the Phase 26 `workers:1` + `fullyParallel:false` lock. All 76 cases run on every invocation regardless of intermediate failures — exactly what a regression suite needs.
 
 3. **O3 (Failure-hook location) — `try/catch` in each test vs `test.afterEach` hook**
    - What we know: Both work. Catch-block has `page` in scope; afterEach needs a fixture to pass `page` through `testInfo` indirection.
    - What's unclear: Personal preference.
    - Recommendation: **Catch block** for simplicity. Documented in Failure Hook section. The planner can revisit if a fixture-based form becomes natural for Phase 28's verifier integration.
+   - **RESOLVED:** Catch block. Plan 03's `regression.spec.js` wraps assertions in `try/catch/finally` with `captureScreenshot` + `captureDomSnapshot` in the catch and `cleanup()` in the finally. Phase 28 may revisit if a verifier-fixture pattern proves cleaner.
 
 4. **O4 (Silent-spec patent choice) — One spec for US11427642 silent, or two for diversity?**
    - What we know: CONTEXT.md says "Two dedicated specs (one auto-trigger, one silent) over a single representative patent (US11427642)". The auto-trigger spec is already covered by the regression suite (US11427642 has 6 cases there).
    - What's unclear: Whether the auto-trigger silent-mode spec is meant to be a parallel/redundant proof, or just the silent-mode counterpart.
    - Recommendation: **One silent.spec.js, one case.** `US11427642-spec-short-1` with `triggerMode:'silent'`, dispatches Ctrl+C, asserts clipboard shim matches `baseline.json["US11427642-spec-short-1"].citation`. The auto-mode case is already in the regression suite — no need to duplicate. Re-read CONTEXT.md `<decisions>`: it says "Two dedicated specs" but the rationale ("prove HARN-04 closes the loop") is about silent mode only. **Interpretation: 2 specs over US11427642 = (auto-mode silent-mode-toggled-off) + (silent-mode-toggled-on)**, both demonstrating the harness handles the chrome.storage.sync trigger-mode toggle. Recommend interpreting as ONE silent-spec file with two `test()` cases inside it.
+   - **RESOLVED:** One `silent.spec.js` file with two `test()` cases inside it (both on US11427642 — `spec-short-1` and `cross-col`). Plan 04 ships this; the auto-mode coverage on US11427642 is already in the 76-case regression suite (no duplication).
 
 5. **O5 (Smoke spec rename) — `tests/e2e/specs/smoke.spec.js` → `infra-smoke.spec.js`?**
    - What we know: CONTEXT.md offers two paths: rename to `infra-smoke.spec.js` OR keep the name and tag the test with `@smoke` so `--grep @smoke` picks it up alongside the 5 regression `@smoke` cases.
    - What's unclear: Either works.
    - Recommendation: **Tag, don't rename.** Add `@smoke` to the Phase 26 smoke spec's test title. The existing spec already proves infrastructure; tagging is one-line, renaming touches Git history and CI references. `npm run e2e:smoke` becomes `--grep @smoke` and picks up 1 (Phase 26 infra) + 5 (Phase 27 cases) = 6 tests, total ~30s.
+   - **RESOLVED:** Tag, don't rename. Plan 04 adds `@smoke` to the existing Phase 26 `tests/e2e/specs/smoke.spec.js` test title; `npm run e2e:smoke` uses `--grep @smoke` to pick up that one infra test plus the 5 tagged regression cases. No git-history disruption.
 
 6. **O6 (Out-of-corpus baseline entries) — How to fail if `baseline.json` has entries without `test-cases.js` counterparts?**
    - What we know: CONTEXT.md says "a baseline.json entry without a test-cases.js entry is invalid data, not a soft skip."
    - What's unclear: Implementation — fail at spec-load time (throw at the top of the file) or fail at runtime?
    - Recommendation: **Fail at spec-load** with a non-test assertion. The regression spec's top-level code (BEFORE `test.describe` opens) iterates baseline keys and asserts each has a `test-cases.js` entry; if not, throw immediately. Playwright reports this as a load-time error, not a test failure — clear signal of "data is wrong" vs "code is wrong".
+   - **RESOLVED:** Fail at spec-load. Plan 03's `regression.spec.js` does the inverse check inline (each `tc.id` must have a `baseline[tc.id]` entry, else throw at module load before `test.describe` opens). Per CONTEXT.md `<decisions>` "Claude's Discretion", this asymmetry is acceptable — the failure mode CONTEXT cares about (missing baseline for a test-case) is covered; the reverse (extra baseline entries) is a soft-warning candidate for Phase 28.
 
 ## Environment Availability
 

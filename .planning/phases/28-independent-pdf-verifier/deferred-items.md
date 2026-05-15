@@ -26,4 +26,16 @@ These are golden-baseline divergences. They surfaced after Phase 27's `baseline.
 
 ## Other items
 
-(none yet)
+### Stale `eslint-disable no-await-in-loop` directives in tests/e2e/lib/settings.js
+
+**Status (Plan 28-04):** 2 ESLint warnings (not errors) for unused `eslint-disable` directives at `tests/e2e/lib/settings.js:85` and `:104`.
+
+These pre-exist the ESLint install in Plan 28-04 — someone wrote `// eslint-disable-next-line no-await-in-loop` lines anticipating future enforcement, but the rule was never actually enabled, so the disable directives are unused. With ESLint 10's flat config + the `reportUnusedDisableDirectives` default (`warn`), they surface as warnings.
+
+**Why deferred:**
+- Phase 28 scope is the VFY-02 independence boundary ONLY (28-PLAN frontmatter, Plan 28-04 docstring). Stylistic enforcement is explicitly out of scope.
+- Warnings do not fail `npm run lint` (exit 0).
+- The plan instructed "DO NOT add stylistic rules (no-unused-vars, semi, etc.) — Phase 28 only enforces the independence boundary". Removing the stale disable comments would be a stylistic clean-up — touches files outside the verifier independence claim.
+
+**Recommended action:**
+- Trivial v3.1 cleanup: delete the two `// eslint-disable-next-line no-await-in-loop` lines in `settings.js` (or actually enable `no-await-in-loop` if the project wants that rule enforced).

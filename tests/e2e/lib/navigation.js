@@ -35,5 +35,13 @@ export async function gotoPatent(page, patentId, { timeout = 30_000 } = {}) {
     state: 'attached',
     timeout: remaining,
   });
+  // Wait for Polymer to hydrate body content. Description paragraphs / claim
+  // divs populate AFTER patent-result attaches; without this wait, selectText
+  // fires against a hollow DOM and mis-reports DOM_DRIFT.
+  const remaining2 = Math.max(1000, deadline - Date.now());
+  await page.waitForSelector('div.description-paragraph, div.claim-text', {
+    state: 'attached',
+    timeout: remaining2,
+  });
   return response;
 }

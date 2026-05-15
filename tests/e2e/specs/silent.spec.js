@@ -24,9 +24,9 @@ import { test, expect } from '@playwright/test';
 import baseline from '../../golden/baseline.json' with { type: 'json' };
 import { loadExtension } from '../lib/extension-loader.js';
 import { gotoPatent } from '../lib/navigation.js';
-import { selectText } from '../lib/selection.js';
+import { selectText, pressCtrlCWithReapply } from '../lib/selection.js';
 import { getCitation } from '../lib/observation.js';
-import { setTriggerMode } from '../lib/settings.js';
+import { setTriggerMode, waitForPatentParsed } from '../lib/settings.js';
 import { captureScreenshot, captureDomSnapshot } from '../lib/artifacts.js';
 import { resolveRunId } from '../lib/run-id.js';
 
@@ -64,13 +64,41 @@ test.describe('Phase 27 silent-mode end-to-end (US11427642)', () => {
       try {
         await setTriggerMode(context, 'silent');
         await gotoPatent(page, SEED_PATENT);
+        // For grant patents (US11427642 is B2), silent mode's preSilentCitation
+        // requires `currentPatent.status === 'parsed'` in chrome.storage.local
+        // before it will route through the PositionMap lookup path. Without
+        // this wait, preSilentCitation early-exits with `{ type: 'plain' }`
+        // and the copy handler lets default copy proceed — clipboard payload
+        // is just the selected text (no citation suffix).
+        await waitForPatentParsed(context, { timeoutMs: 45_000 });
         await selectText({ page, uniqueSubstring: tc.selectedText });
+        // For grant patents, silent mode's preSilentCitation sends LOOKUP_POSITION
+        // to the service worker on mouseup. The CITATION_RESULT comes back async
+        // (offscreen document round-trip). selectText only waits 280ms for the
+        // content-script debounce — but the offscreen round-trip can take 500ms+
+        // beyond that. Wait additional time so lastCitationResult transitions
+        // from `{ type: 'pending' }` to `{ type: 'success', citation, ... }`
+        // before we fire Ctrl+C.
+        await page.waitForTimeout(1500);
         // Trigger the silent-mode copy event. The content script's bubble-phase
         // copy listener (src/content/content-script.js:297-342) writes the
         // citation into the clipboard; the Phase 26 clipboard-observer shim's
         // capture-phase listener reads it into window.__lastCopiedText__.
-        await page.keyboard.press('Control+C');
-        const observed = await getCitation(page, { mode: 'silent' });
+        //
+        // pressCtrlCWithReapply re-applies the saved range IMMEDIATELY before
+        // the keystroke so Google Patents' async-mouseup selection clear
+        // cannot empty the selection between selectText's 280ms re-apply
+        // loop and the actual Ctrl+C dispatch.
+        const preState = await pressCtrlCWithReapply(page);
+        if (preState.selectionLength === 0) {
+          throw new Error(
+            `silent.spec: selection empty at Ctrl+C dispatch (hadReapply=${preState.hadReapply}) — re-apply path broken`,
+          );
+        }
+        // Give the bubble-phase extension handler + capture-phase shim
+        // microtask time to land before reading __lastCopiedText__.
+        await page.waitForTimeout(200);
+        const observed = await getCitation(page, { mode: 'silent', timeout: 5_000 });
         // Assert citation only — silent-mode confidence inference is
         // best-effort (toast-based, may not be reliable). Plan 02 SUMMARY
         // documented this constraint.

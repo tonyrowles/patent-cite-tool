@@ -56,56 +56,56 @@
     "confidence": 0.99
   },
   "US6738932-spec-short": {
-    "citation": "1:36",
-    "confidence": 1
+    "citation": "1:37",
+    "confidence": 0.98
   },
   "US6738932-spec-long": {
-    "citation": "1:32-36",
-    "confidence": 0.96
+    "citation": "1:33-37",
+    "confidence": 0.98
   },
   "US6738932-claims": {
     "citation": "10:25-29",
     "confidence": 0.96
   },
   "US6738932-cross-col": {
-    "citation": "1:66-2:1",
+    "citation": "1:67-2:1",
     "confidence": 0.98
   },
   "US5440748-spec-short": {
-    "citation": "1:24-25",
+    "citation": "1:26-27",
     "confidence": 0.98
   },
   "US5440748-spec-long": {
-    "citation": "1:23-32",
-    "confidence": 0.97
+    "citation": "1:25-34",
+    "confidence": 0.98
   },
   "US5440748-claims": {
     "citation": "8:6-11",
     "confidence": 0.97
   },
   "US5440748-cross-col": {
-    "citation": "1:65-66",
-    "confidence": 1
+    "citation": "1:67-68",
+    "confidence": 0.98
   },
   "US5440748-repetitive": {
     "citation": "8:6-9",
     "confidence": 0.97
   },
   "US4723129-spec-short": {
-    "citation": "1:14-16",
+    "citation": "1:16-18",
     "confidence": 0.98
   },
   "US4723129-spec-long": {
-    "citation": "1:65-66",
-    "confidence": 0.97
+    "citation": "1:67-68",
+    "confidence": 0.98
   },
   "US4723129-claims": {
     "citation": "34:24-26",
     "confidence": 0.97
   },
   "US4723129-cross-col": {
-    "citation": "1:65-66",
-    "confidence": 0.97
+    "citation": "1:67-68",
+    "confidence": 0.98
   },
   "US5959167-spec-short": {
     "citation": "7:9-11",
@@ -132,8 +132,8 @@
     "confidence": 0.98
   },
   "US7346586-cross-col": {
-    "citation": "1:64-2:2",
-    "confidence": 0.99
+    "citation": "1:66-2:2",
+    "confidence": 0.98
   },
   "US9876543-cross-col": {
     "citation": "9:66-10:2",
@@ -176,20 +176,20 @@
     "confidence": 0.98
   },
   "US4317036-spec-short": {
-    "citation": "1:2-3",
-    "confidence": 0.99
+    "citation": "1:1",
+    "confidence": 0.98
   },
   "US4317036-spec-long": {
-    "citation": "1:2-10",
-    "confidence": 0.94
+    "citation": "1:1-4",
+    "confidence": 0.9
   },
   "US4317036-claims": {
-    "citation": "12:25-31",
-    "confidence": 0.97
+    "citation": "12:27-33",
+    "confidence": 0.98
   },
   "US5371234-spec-short": {
-    "citation": "1:6-8",
-    "confidence": 0.97
+    "citation": "1:7-9",
+    "confidence": 0.98
   },
   "US5371234-spec-long": {
     "citation": "1:14-21",
@@ -220,20 +220,20 @@
     "confidence": 0.94
   },
   "US7509250-spec-long": {
-    "citation": "1:62-66",
-    "confidence": 0.97
+    "citation": "1:63-67",
+    "confidence": 0.98
   },
   "US7509250-claims": {
     "citation": "19:55-59",
     "confidence": 0.98
   },
   "US7509250-cross-col": {
-    "citation": "1:62-2:2",
-    "confidence": 0.97
+    "citation": "1:63-2:2",
+    "confidence": 0.98
   },
   "US8352400-spec-short": {
-    "citation": "1:60-64",
-    "confidence": 0.99
+    "citation": "1:62-66",
+    "confidence": 0.98
   },
   "US8352400-spec-long": {
     "citation": "2:1-7",
@@ -244,24 +244,24 @@
     "confidence": 0.97
   },
   "US8352400-cross-col": {
-    "citation": "1:60-2:3",
-    "confidence": 0.94
+    "citation": "1:62-2:3",
+    "confidence": 0.9
   },
   "US6324676-spec-short": {
-    "citation": "1:37-44",
-    "confidence": 0.94
+    "citation": "1:36-43",
+    "confidence": 0.9
   },
   "US6324676-spec-long": {
-    "citation": "1:59-66",
-    "confidence": 0.96
+    "citation": "1:58-65",
+    "confidence": 0.98
   },
   "US6324676-claims": {
-    "citation": "8:36-44",
-    "confidence": 0.96
+    "citation": "8:36-45",
+    "confidence": 0.98
   },
   "US6324676-cross-col": {
-    "citation": "1:67-2:2",
-    "confidence": 0.96
+    "citation": "1:66-2:2",
+    "confidence": 0.98
   },
   "US10234567-spec-short": {
     "citation": "9:1-4",

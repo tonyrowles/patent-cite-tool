@@ -97,7 +97,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 ### 🚧 v3.0 Autonomous E2E Testing Agent (Phases 26-31) — ACTIVE
 
 - [x] **Phase 26: Playwright Harness Scaffolding** — Build the Playwright + Chromium foundation: load unpacked Chrome extension, shadow-pierce, clipboard shim, service-worker readiness, and `data-testid` UI hooks (completed 2026-05-14)
-- [ ] **Phase 27: Selection Emulation + 76-Case Deterministic Suite** — Programmatic selection that triggers the extension; replay all 76 golden patents end-to-end; capture screenshot + DOM artifacts on failure
+- [x] **Phase 27: Selection Emulation + 76-Case Deterministic Suite** — Programmatic selection that triggers the extension; replay all 76 golden patents end-to-end; capture screenshot + DOM artifacts on failure (completed 2026-05-15)
 - [ ] **Phase 28: Independent PDF Verifier** — Second code path that re-parses each PDF and confirms the cited text lives near the cited column:line; structured JSON report + failure taxonomy; PDF page snippet artifacts
 - [ ] **Phase 29: CI Nightly Cron + Auto-Issue Filing** — GitHub Actions nightly cron (rotating 30-patent sample, full 76 on Sundays); fingerprint-based idempotent auto-issue filing on failure
 - [ ] **Phase 30: Worker Fault-Injection** — Cloudflare Worker `X-PCT-Test-Mode` header skips KV writes; fault-injection E2E forces Google PDF failure and verifies USPTO fallback produces an accurate citation
@@ -126,12 +126,16 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   2. Programmatic `selectText({containerSelector, charStart, charEnd})` calls reliably trigger the extension's existing `mouseup` listener (via Range API + dispatched `mouseup` with debounce-respecting wait), and `getCitation()` returns a structured `{citation, confidence, mode}` from either Shadow DOM or clipboard
   3. Each test case starts with cleared cookies, IndexedDB, and `chrome.storage` — running the suite in shuffled order produces identical results to sequential order, proving inter-case isolation
   4. Any failed assertion writes a full-page screenshot to `tests/e2e/artifacts/{run-id}/{case-id}-screenshot.png` and a DOM snapshot (including Shadow DOM contents) to `tests/e2e/artifacts/{run-id}/{case-id}-dom.html`, so a developer can triage the failure from artifacts alone without local repro
-**Plans**: 5 plans
-- [ ] 27-01-PLAN.md — selectText helper (TreeWalker + Range API + dispatched mouseup) + normalizer unit tests
-- [ ] 27-02-PLAN.md — settings helper (setTriggerMode via SW) + getCitation observation + artifacts wiring
-- [ ] 27-03-PLAN.md — 76-case regression spec with pre-flight DOM-drift smoke and per-test diagnostics
-- [ ] 27-04-PLAN.md — @smoke tagging + silent-mode end-to-end spec + npm scripts (e2e:smoke, e2e:regression, e2e:silent)
-- [ ] 27-05-PLAN.md — Run all three suites and verify DIAG-01/DIAG-02 artifact wiring
+**Plans**: 9 plans (5 + 4 gap-closure)
+- [x] 27-01-PLAN.md — selectText helper (TreeWalker + Range API + dispatched mouseup) + normalizer unit tests
+- [x] 27-02-PLAN.md — settings helper (setTriggerMode via SW) + getCitation observation + artifacts wiring
+- [x] 27-03-PLAN.md — 76-case regression spec with pre-flight DOM-drift smoke and per-test diagnostics
+- [x] 27-04-PLAN.md — @smoke tagging + silent-mode end-to-end spec + npm scripts (e2e:smoke, e2e:regression, e2e:silent)
+- [x] 27-05-PLAN.md — Run all three suites and verify DIAG-01/DIAG-02 artifact wiring
+- [ ] 27-06-PLAN.md — Gap closure: recalibrate baseline.json for 22 WRONG_CITATION cases (Bucket A)
+- [ ] 27-07-PLAN.md — Gap closure: regenerate HTML-form selectedText for 3 SELECTION/DOM_DRIFT cases (Buckets C+D)
+- [ ] 27-08-PLAN.md — Gap closure: skip synthetic-fixture cases in regression spec (Bucket E)
+- [ ] 27-09-PLAN.md — Gap closure: triage 7 TIMEOUT_PILL cases; data-fix or defer to Phase 28 (Bucket B)
 **UI hint**: yes
 
 ### Phase 28: Independent PDF Verifier
@@ -208,7 +212,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 24. Firefox AMO Validation Cleanup | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 25. Automatic Release Workflow | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 26. Playwright Harness Scaffolding | v3.0 | 3/3 | Complete    | 2026-05-14 |
-| 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 0/5 | Not started | - |
+| 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 6/5 | Complete   | 2026-05-15 |
 | 28. Independent PDF Verifier | v3.0 | 0/0 | Not started | - |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 0/0 | Not started | - |
 | 30. Worker Fault-Injection | v3.0 | 0/0 | Not started | - |

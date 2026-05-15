@@ -54,3 +54,57 @@ export async function setTriggerMode(context, mode) {
     });
   }, mode);
 }
+
+/**
+ * Wait until the extension's `chrome.storage.local.currentPatent.status` is
+ * 'parsed' (PositionMap is ready). This is required before silent-mode tests
+ * fire Ctrl+C on grant patents: silent's preSilentCitation early-exits with
+ * `{ type: 'plain' }` when the PDF isn't parsed yet, which means the copy
+ * handler lets default copy through (no setData → empty observed citation).
+ *
+ * Polls the service worker (which has access to chrome.storage.local) every
+ * 250ms until `status === 'parsed'` or until `timeoutMs` elapses.
+ *
+ * @param {import('@playwright/test').BrowserContext} context
+ * @param {{ timeoutMs?: number }} [opts]
+ * @returns {Promise<{ status: string, source?: string, lineCount?: number }>}
+ *   Resolves with the parsed-patent snapshot on success.
+ * @throws {Error} on timeout — error message contains the last observed status.
+ */
+export async function waitForPatentParsed(context, { timeoutMs = 30_000 } = {}) {
+  if (!context || typeof context.serviceWorkers !== 'function') {
+    throw new Error('waitForPatentParsed: invalid context');
+  }
+  const [sw] = context.serviceWorkers();
+  if (!sw) {
+    throw new Error('waitForPatentParsed: no service worker attached');
+  }
+  const deadline = Date.now() + timeoutMs;
+  let last = { status: 'unknown' };
+  while (Date.now() < deadline) {
+    // eslint-disable-next-line no-await-in-loop
+    const snap = await sw.evaluate(async () => {
+      const data = await chrome.storage.local.get('currentPatent');
+      const p = data.currentPatent || null;
+      return p
+        ? {
+            status: p.status,
+            source: p.source,
+            patentId: p.patentId,
+            lineCount: p.lineCount,
+            columnCount: p.columnCount,
+          }
+        : { status: 'no-currentPatent' };
+    });
+    last = snap;
+    if (snap.status === 'parsed') return snap;
+    if (snap.status === 'error' || snap.status === 'unavailable' || snap.status === 'no-text-layer') {
+      throw new Error(`waitForPatentParsed: terminal status "${snap.status}" — cannot proceed`);
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(
+    `waitForPatentParsed: timed out after ${timeoutMs}ms — last status="${last.status}"`,
+  );
+}

@@ -41,6 +41,7 @@ Out of scope (deferred):
 ### Verifier Independence (VFY-02)
 - Verifier code lives in `tests/e2e/lib/pdf-verifier.js`. It MUST NOT import from `src/` (no `src/shared/matching.js`, no constants, no helpers).
 - ESLint `no-restricted-imports` rule blocks any `import .../src/...` from `tests/e2e/lib/pdf-verifier.js`. `npm run lint` fails on violation.
+- **ESLint is NOT currently installed** in this project (research correction): the plan must `npm install -D eslint` + create a new flat `eslint.config.js` from scratch + add a `lint` npm script. There is no `web-ext lint` to extend (that runs against `dist/firefox/` only).
 - The verifier reimplements its own column:line extraction from pdfjs textContent. Two reasonable paths:
   - **Recommended:** pdfjs `page.getTextContent()` → group items by Y-coordinate → identify column boundaries via x-bimodal analysis → assign each item to (column, line). Then locate the selected text and check it falls within ±N lines of the cited line.
   - Alternative: use pdfjs `getOperatorList()` for raw drawing operations. More complex; recommended path is sufficient.
@@ -102,7 +103,8 @@ Out of scope (deferred):
 
 ### PDF Snippet Rendering (DIAG-03)
 - Module: `tests/e2e/lib/pdf-snippet.js`
-- Dependencies (new dev deps): `canvas` (node-canvas) for pdfjs rendering target, `sharp` (already installed) for crop + PNG write.
+- Dependencies (new dev deps): **`@napi-rs/canvas`** (NOT `canvas`/node-canvas — research correction) — prebuilt N-API binaries for linux-x64, auto-detected by pdfjs-dist 5.5.207's `canvasFactory`, no cairo/pango apt-get needed. `sharp` (already installed) for crop + PNG write.
+- **PDF parsing import path:** `pdfjs-dist/legacy/build/pdf.mjs` in Node (the default entry throws `DOMMatrix is not defined`).
 - Triggered only on `VERIFIER_DISAGREE`. The harness:
   1. Fetches the PDF for the patent
   2. Renders the page containing the cited column:line at ~150 DPI

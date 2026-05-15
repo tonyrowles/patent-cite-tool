@@ -26,6 +26,7 @@ import fs from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { ensureCachedPdf } from './pdf-fetch.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,7 +40,7 @@ const FUZZY_LINE_TOLERANCE = 2;          // Tier C ±N (CONTEXT.md locked)
 const HEADER_TOP_PT = 90;                // Top header band — column-number strip
 const FOOTER_BOTTOM_PT = 40;             // Bottom footer band — page number strip
 const Y_LINE_CLUSTER_TOLERANCE_PT = 3;   // Items within ±3pt y considered same line
-const PDFJS_LEGACY = 'pdfjs-dist/legacy/build/pdf.mjs'; // Pitfall 1 — Node entry
+// pdfjs-dist/legacy/build/pdf.mjs is the Node-friendly entry (Pitfall 1).
 
 const CMAP_URL =
   path.resolve(PROJECT_ROOT, 'node_modules/pdfjs-dist/cmaps/') + '/';
@@ -470,11 +471,6 @@ export async function parsePdf(pdfPath) {
   if (!fs.existsSync(pdfPath)) {
     throw new Error(`parsePdf: file not found ${pdfPath}`);
   }
-  // Lazy/dynamic import so Vitest unit suites that hand-roll synthetic
-  // ParsedPdf objects don't pay the pdfjs cost.
-  const pdfjs = await import(PDFJS_LEGACY);
-  const { getDocument } = pdfjs;
-
   const data = new Uint8Array(fs.readFileSync(pdfPath));
   const loadingTask = getDocument({
     data,

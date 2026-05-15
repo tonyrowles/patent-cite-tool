@@ -1,10 +1,23 @@
 // tests/e2e/lib/artifacts.js
 //
 // captureScreenshot(page, runId, caseId) — writes a full-page PNG to
-//   tests/e2e/artifacts/<runId>/<caseId>-screenshot.png.
+//   tests/e2e/artifacts/<runId>/<caseId>-screenshot.png. Satisfies DIAG-01.
+//
 // captureDomSnapshot(page, runId, caseId) — writes the full document
-//   HTML (including Shadow DOM contents, thanks to the shadow-open shim)
-//   to tests/e2e/artifacts/<runId>/<caseId>-dom.html.
+//   HTML (including Shadow DOM contents, thanks to the Phase 26
+//   shadow-open shim that flipped mode:'closed' to mode:'open') to
+//   tests/e2e/artifacts/<runId>/<caseId>-dom.html. Satisfies DIAG-02.
+//
+// PHASE 27 CONTRACT: regression.spec.js (Plan 03) and silent.spec.js
+// (Plan 04) call these from per-test catch blocks on assertion failure.
+// runId is resolved once per test invocation (via process.env.PLAYWRIGHT_RUN_ID
+// or an ISO timestamp). caseId is the test-case id (e.g.,
+// 'US11427642-spec-short-1').
+//
+// DO NOT call getInnerHTML({includeShadowRoots:true}) — that's a CDP API,
+// not a Playwright Locator method (per 27-RESEARCH.md "DOM Snapshot Note").
+// page.content() already serializes open shadow roots when the Phase 26
+// shadow-open shim is installed via context.addInitScript.
 //
 // Phase 26's smoke spec does not call these on the happy path. Phase 27
 // wires them to test failures (DIAG-01, DIAG-02).

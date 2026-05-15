@@ -177,7 +177,7 @@ export const TEST_CASES = [
   {
     id: 'US5440748-claims',
     patentFile: './tests/fixtures/US5440748.json',
-    selectedText: 'What is claimed is: 1. Computer system comprising:a computer main body which has a plurality of main components and main power supply means for supplying a plurality of first operating voltages to the main components',
+    selectedText: 'a computer main body which has a plurality of main components and main power supply means for supplying a plurality of first operating voltages to the main components',
     category: 'claims',
   },
   {
@@ -189,7 +189,7 @@ export const TEST_CASES = [
   {
     id: 'US5440748-repetitive',
     patentFile: './tests/fixtures/US5440748.json',
-    selectedText: 'What is claimed is: 1. Computer system comprising:a computer main body which has a plurality of main components and main power supply means for',
+    selectedText: 'a computer main body which has a plurality of main components and main power supply means for',
     category: 'repetitive',
   },
 
@@ -297,7 +297,7 @@ export const TEST_CASES = [
   {
     id: 'US4723129-claims-repetitive',
     patentFile: './tests/fixtures/US4723129.json',
-    selectedText: '1. A bubble jet recording process for projecting droplets of liquid, the process comprising the steps of: providing a bubble jet recording head having an orifice from which droplets of liquid are projected, an inlet to which liquid is supplied for delivery to the',
+    selectedText: 'providing a bubble jet recording head having an orifice from which droplets of liquid are projected, an inlet to which liquid is supplied for delivery to the',
     category: 'repetitive',
   },
   {

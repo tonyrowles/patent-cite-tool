@@ -67,7 +67,21 @@ export function normalize(s) {
  * @returns {string}
  */
 export function normalizeDeep(s) {
-  return normalize(s).replace(/([a-zA-Z]) ([a-zA-Z]{4,}-)/g, '$1$2');
+  // The lookbehind `(?<=[a-zA-Z])` requires the captured first letter to
+  // itself be preceded by a letter — so the first token is a FRAGMENT of a
+  // longer word, not a complete standalone word ("a", "an"). The trailing
+  // `-[a-z]` requires the second token's hyphen to be followed by a lowercase
+  // letter — so the hyphen joins another word fragment, not a digit suffix
+  // ("TALL-2", "TRDL-1").
+  //
+  // Together these two constraints fire on the PDF line-wrap artifact
+  // ("prolif eration-inducing" → "proliferation-inducing") without
+  // collapsing ordinary intra-sentence spaces ("a proliferation-inducing"
+  // stays unchanged; "and TRDL-1" stays unchanged).
+  return normalize(s).replace(
+    /(?<=[a-zA-Z])([a-zA-Z]) ([a-zA-Z]{4,}-[a-z])/g,
+    '$1$2',
+  );
 }
 
 /**
@@ -112,7 +126,10 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
           .trim();
       // Duplicated from module scope so page.evaluate sees it; keep both in sync.
       const normalizeDeep = (s) =>
-        normalize(s).replace(/([a-zA-Z]) ([a-zA-Z]{4,}-)/g, '$1$2');
+        normalize(s).replace(
+          /(?<=[a-zA-Z])([a-zA-Z]) ([a-zA-Z]{4,}-[a-z])/g,
+          '$1$2',
+        );
 
       const CONTAINERS = [
         'section[itemprop="description"]',
@@ -250,7 +267,12 @@ export async function selectText({ page, uniqueSubstring, requireExact = true } 
         // strippedSpacePositions = basic-indices where deep-normalize
         // removed the character.
         const strippedSpacePositions = new Set();
-        const re = /([a-zA-Z]) ([a-zA-Z]{4,}-)/g;
+        // Keep this regex IDENTICAL to the one used inside normalizeDeep so
+        // the dropped-character positions match the actual deep-normalize
+        // output. Differs only in capture-group structure: we need m.index
+        // to point at group-1's first letter so we know which space (at
+        // m.index + 1) got dropped.
+        const re = /(?<=[a-zA-Z])([a-zA-Z]) ([a-zA-Z]{4,}-[a-z])/g;
         let m;
         while ((m = re.exec(haystackBasic)) !== null) {
           // m.index is the position of group 1's first char in basic.

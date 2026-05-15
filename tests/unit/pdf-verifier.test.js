@@ -152,6 +152,69 @@ describe('runMatcher — 4-tier matcher', () => {
 // ---------------------------------------------------------------------------
 
 describe('inferColumnLine', () => {
+  it('Test 9 — Tier C ABOVE cited (negative offset)', () => {
+    const parsed = makeParsed([
+      { col: 1, lineNumber: 25, text: 'the needle phrase lives here' },
+      { col: 1, lineNumber: 26, text: 'cited line unrelated content' },
+      { col: 1, lineNumber: 27, text: 'still nothing' },
+    ]);
+    const v = runMatcher(parsed, 'needle phrase', '1:26');
+    expect(v.status).toBe('pass');
+    expect(v.tier_used).toBe('C');
+    expect(v.match_offset_lines).toBe(-1);
+  });
+
+  it('Test 10 — Tier C BELOW cited (positive offset)', () => {
+    const parsed = makeParsed([
+      { col: 1, lineNumber: 26, text: 'cited line text' },
+      { col: 1, lineNumber: 27, text: 'next line' },
+      { col: 1, lineNumber: 28, text: 'needle phrase here' },
+    ]);
+    const v = runMatcher(parsed, 'needle phrase', '1:26');
+    expect(v.status).toBe('pass');
+    expect(v.tier_used).toBe('C');
+    expect(v.match_offset_lines).toBe(2);
+  });
+
+  it('Test 11 — Cross-column citation 79:81-80:3 spans column boundary', () => {
+    const parsed = makeParsed([
+      { col: 79, lineNumber: 81, text: 'in a distributed system comprising a plurality of' },
+      { col: 79, lineNumber: 82, text: 'processing nodes wherein each node' },
+      { col: 80, lineNumber: 1, text: 'maintains a local state cache and' },
+      { col: 80, lineNumber: 2, text: 'communicates via a message bus' },
+      { col: 80, lineNumber: 3, text: 'with eventual consistency guarantees' },
+    ]);
+    const v = runMatcher(
+      parsed,
+      'each node maintains a local state cache',
+      '79:81-80:3'
+    );
+    expect(v.status).toBe('pass');
+    expect(['A', 'B']).toContain(v.tier_used);
+  });
+
+  it('Test 12 — Empty cited window yields Tier D with self-diagnosing reason', () => {
+    // Citation refers to a column/line range that has no entries in the
+    // parsed PDF — could indicate page-identification ambiguity.
+    const parsed = makeParsed([
+      { col: 1, lineNumber: 1, text: 'some content in col 1' },
+    ]);
+    const v = runMatcher(parsed, 'any selection', '99:1-2');
+    expect(v.status).toBe('disagree');
+    expect(v.tier_used).toBe('D');
+    expect(v.reason).toMatch(/empty|ambigu/i);
+  });
+
+  it('Test 13 — Tier B with double space + trailing newline', () => {
+    const parsed = makeParsed([
+      { col: 1, lineNumber: 5, text: 'hello  world\n' },
+    ]);
+    const v = runMatcher(parsed, 'hello world', '1:5');
+    expect(v.status).toBe('pass');
+    expect(v.tier_used).toBe('B');
+    expect(v.match_offset_lines).toBe(0);
+  });
+
   it('Test 7 — bimodal x distribution yields two column buckets', () => {
     // Synthesize a two-column page: 25 items per side (>= production
     // density threshold for two-column detection)

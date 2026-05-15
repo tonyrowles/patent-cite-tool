@@ -98,7 +98,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 - [x] **Phase 26: Playwright Harness Scaffolding** — Build the Playwright + Chromium foundation: load unpacked Chrome extension, shadow-pierce, clipboard shim, service-worker readiness, and `data-testid` UI hooks (completed 2026-05-14)
 - [x] **Phase 27: Selection Emulation + 76-Case Deterministic Suite** — Programmatic selection that triggers the extension; replay all 76 golden patents end-to-end; capture screenshot + DOM artifacts on failure (completed 2026-05-15)
-- [ ] **Phase 28: Independent PDF Verifier** — Second code path that re-parses each PDF and confirms the cited text lives near the cited column:line; structured JSON report + failure taxonomy; PDF page snippet artifacts
+- [x] **Phase 28: Independent PDF Verifier** — Second code path that re-parses each PDF and confirms the cited text lives near the cited column:line; structured JSON report + failure taxonomy; PDF page snippet artifacts (completed 2026-05-15)
 - [ ] **Phase 29: CI Nightly Cron + Auto-Issue Filing** — GitHub Actions nightly cron (rotating 30-patent sample, full 76 on Sundays); fingerprint-based idempotent auto-issue filing on failure
 - [ ] **Phase 30: Worker Fault-Injection** — Cloudflare Worker `X-PCT-Test-Mode` header skips KV writes; fault-injection E2E forces Google PDF failure and verifies USPTO fallback produces an accurate citation
 - [ ] **Phase 31: LLM Exploratory Mode + Docs** — `npm run e2e:explore` drives Claude Code headless against fresh patent selections with local spend ledger ($80 warn / $100 hard-stop, CI-blocked); structured exploration report + `tests/e2e/README.md`
@@ -148,11 +148,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   3. Every test run produces `tests/e2e/artifacts/{run-id}/report.json` listing every case with `{status, errorClass, links to artifacts}`, where `errorClass` is one of the fixed taxonomy values (`EXTENSION_NOT_LOADED`, `NO_CITATION_PRODUCED`, `WRONG_CITATION`, `UI_BROKEN`, `VERIFIER_DISAGREE`, `GOOGLE_DOM_DRIFT`, `USPTO_API_DRIFT`, `FLAKE`)
   4. On a verifier disagreement, the harness renders the PDF page region corresponding to the cited column:line via pdfjs+canvas+sharp and writes the cropped PNG to `tests/e2e/artifacts/{run-id}/{case-id}-pdf-snippet.png` — so a human reviewing the issue can see what the verifier expected vs what the extension cited
 **Plans**: 5 plans (3 waves)
-- [ ] 28-01-PLAN.md (Wave 1) — Verifier core: @napi-rs/canvas install, pdf-verifier.js (parsePdf, inferColumnLine, runMatcher), pdf-fetch.js, Vitest unit tests (VFY-01, VFY-03)
-- [ ] 28-02-PLAN.md (Wave 1) — Report writer + 8-string taxonomy: report.js (appendCase, writeReport, reportPathFor), error-codes.js extended to all 8 RPT-02 strings (RPT-01, RPT-02)
-- [ ] 28-03-PLAN.md (Wave 2, depends on 28-01) — PDF snippet renderer: pdf-snippet.js (renderPdfSnippet) using pdfjs legacy + auto-detected @napi-rs/canvas + sharp crop (DIAG-03)
-- [ ] 28-04-PLAN.md (Wave 2, depends on 28-01) — ESLint install + eslint.config.js with no-restricted-imports rule scoped to pdf-verifier.js, `npm run lint` chained into `npm test` (VFY-02)
-- [ ] 28-05-PLAN.md (Wave 3, depends on 28-01..04) — Calibration script (≥95% Tier A/B/C gate), regression.spec.js verifier wiring, Phase 27 TIMEOUT_PILL_DEFERRED adjudication (VFY-01, VFY-03, DIAG-03, RPT-01, RPT-02)
+- [x] 28-01-PLAN.md (Wave 1) — Verifier core: @napi-rs/canvas install, pdf-verifier.js (parsePdf, inferColumnLine, runMatcher), pdf-fetch.js, Vitest unit tests (VFY-01, VFY-03)
+- [x] 28-02-PLAN.md (Wave 1) — Report writer + 8-string taxonomy: report.js (appendCase, writeReport, reportPathFor), error-codes.js extended to all 8 RPT-02 strings (RPT-01, RPT-02)
+- [x] 28-03-PLAN.md (Wave 2, depends on 28-01) — PDF snippet renderer: pdf-snippet.js (renderPdfSnippet) using pdfjs legacy + auto-detected @napi-rs/canvas + sharp crop (DIAG-03)
+- [x] 28-04-PLAN.md (Wave 2, depends on 28-01) — ESLint install + eslint.config.js with no-restricted-imports rule scoped to pdf-verifier.js, `npm run lint` chained into `npm test` (VFY-02)
+- [x] 28-05-PLAN.md (Wave 3, depends on 28-01..04) — Calibration script (≥95% Tier A/B/C gate), regression.spec.js verifier wiring, Phase 27 TIMEOUT_PILL_DEFERRED adjudication (VFY-01, VFY-03, DIAG-03, RPT-01, RPT-02)
 
 ### Phase 29: CI Nightly Cron + Auto-Issue Filing
 **Goal**: An operationalized E2E pipeline — GitHub Actions runs the deterministic + verifier suite nightly, detects upstream drift before spamming issues, and idempotently files (or comments on) a single GitHub issue per distinct failure root cause
@@ -218,7 +218,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 25. Automatic Release Workflow | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 26. Playwright Harness Scaffolding | v3.0 | 3/3 | Complete    | 2026-05-14 |
 | 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 10/9 | Complete    | 2026-05-15 |
-| 28. Independent PDF Verifier | v3.0 | 0/5 | Not started | - |
+| 28. Independent PDF Verifier | v3.0 | 5/5 | Complete    | 2026-05-15 |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 0/0 | Not started | - |
 | 30. Worker Fault-Injection | v3.0 | 0/0 | Not started | - |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 0/0 | Not started | - |

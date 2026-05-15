@@ -132,10 +132,10 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] 27-03-PLAN.md — 76-case regression spec with pre-flight DOM-drift smoke and per-test diagnostics
 - [x] 27-04-PLAN.md — @smoke tagging + silent-mode end-to-end spec + npm scripts (e2e:smoke, e2e:regression, e2e:silent)
 - [x] 27-05-PLAN.md — Run all three suites and verify DIAG-01/DIAG-02 artifact wiring
-- [ ] 27-06-PLAN.md — Gap closure: recalibrate baseline.json for 22 WRONG_CITATION cases (Bucket A)
-- [ ] 27-07-PLAN.md — Gap closure: regenerate HTML-form selectedText for 3 SELECTION/DOM_DRIFT cases (Buckets C+D)
-- [ ] 27-08-PLAN.md — Gap closure: skip synthetic-fixture cases in regression spec (Bucket E)
-- [ ] 27-09-PLAN.md — Gap closure: triage 7 TIMEOUT_PILL cases; data-fix or defer to Phase 28 (Bucket B)
+- [x] 27-06-PLAN.md — Gap closure: recalibrate baseline.json for 22 WRONG_CITATION cases (Bucket A)
+- [x] 27-07-PLAN.md — Gap closure: regenerate HTML-form selectedText for 3 SELECTION/DOM_DRIFT cases (Buckets C+D)
+- [x] 27-08-PLAN.md — Gap closure: skip synthetic-fixture cases in regression spec (Bucket E)
+- [x] 27-09-PLAN.md — Gap closure: triage 7 TIMEOUT_PILL cases; data-fix or defer to Phase 28 (Bucket B)
 **UI hint**: yes
 
 ### Phase 28: Independent PDF Verifier
@@ -212,7 +212,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 24. Firefox AMO Validation Cleanup | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 25. Automatic Release Workflow | v2.3 | 1/1 | Complete    | 2026-05-12 |
 | 26. Playwright Harness Scaffolding | v3.0 | 3/3 | Complete    | 2026-05-14 |
-| 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 6/5 | Complete   | 2026-05-15 |
+| 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 10/9 | Complete    | 2026-05-15 |
 | 28. Independent PDF Verifier | v3.0 | 0/0 | Not started | - |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 0/0 | Not started | - |
 | 30. Worker Fault-Injection | v3.0 | 0/0 | Not started | - |

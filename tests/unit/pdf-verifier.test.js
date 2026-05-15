@@ -153,29 +153,30 @@ describe('runMatcher — 4-tier matcher', () => {
 
 describe('inferColumnLine', () => {
   it('Test 7 — bimodal x distribution yields two column buckets', () => {
-    // Synthesize a two-column page: 10 items on left x≈72, 10 on right x≈350
+    // Synthesize a two-column page: 25 items per side (>= production
+    // density threshold for two-column detection)
     const pageWidth = 612;
     const pageHeight = 792;
     const pageItems = [];
     // Left column — y descending so order matches reading order top→bottom
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 25; i++) {
       pageItems.push({
-        text: `left word ${i}`,
+        text: `left${i}`,
         x: 72,
         y: 700 - i * 14,
-        width: 50,
+        width: 30,
         height: 10,
         fontName: 'Times',
         hasEOL: false,
       });
     }
     // Right column
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 25; i++) {
       pageItems.push({
-        text: `right word ${i}`,
+        text: `right${i}`,
         x: 350,
         y: 700 - i * 14,
-        width: 50,
+        width: 30,
         height: 10,
         fontName: 'Times',
         hasEOL: false,
@@ -183,6 +184,7 @@ describe('inferColumnLine', () => {
     }
     const result = inferColumnLine(pageItems, pageWidth, pageHeight);
     expect(result).toBeDefined();
+    expect(result.twoColumn).toBe(true);
     expect(Array.isArray(result.lines)).toBe(true);
     // Should have entries on both column buckets (cols 1 and 2 in
     // per-page numbering)

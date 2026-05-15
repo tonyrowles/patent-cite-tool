@@ -95,11 +95,14 @@ test.describe('Phase 27 regression — 76 cases, auto-trigger', () => {
     try {
       await gotoPatent(page, 'US11427642');
       const probe = await page.evaluate(() => {
-        const desc = document.querySelector('section[itemprop="description"]');
-        if (!desc) return { ok: false, reason: 'description section missing' };
-        const text = desc.textContent || '';
-        const hasKnownPhrase = text.includes('plasma cells and plasmablasts');
-        const hasParagraphs = !!desc.querySelector('div.description-paragraph');
+        // Google Patents hydrates with Polymer custom elements (<patent-text>,
+        // <patent-result>). Post-hydration the semantic itemprop="description"
+        // wrapper is replaced; description-paragraph divs persist inside
+        // <patent-text>. Probe by content + paragraph divs, not by container.
+        const hasKnownPhrase = document.body.textContent.includes(
+          'plasma cells and plasmablasts'
+        );
+        const hasParagraphs = !!document.querySelector('div.description-paragraph');
         return {
           ok: hasKnownPhrase && hasParagraphs,
           reason: !hasKnownPhrase

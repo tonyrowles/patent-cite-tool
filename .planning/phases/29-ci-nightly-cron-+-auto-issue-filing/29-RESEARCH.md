@@ -732,22 +732,19 @@ Add `retries: 1` for CI (FLAKE reduction), confirm `reporter: 'list'` works in n
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Rotation modulus: 76 or live-count?**
-   - What we know: CONTEXT.md says `mod 76` (total corpus); live runnable cases = 67
-   - What's unclear: Should rotation index over all 76 positions (skipping deferred/synthetic at selection time) or over only the 67 live positions?
-   - Recommendation: Rotate over `liveCases.length` (67) to guarantee exactly 30 live cases per Mon-Sat run. Using 76 with filtering could yield <30 cases on some weeks.
+1. **Rotation modulus: 76 or live-count?** — **RESOLVED: use `liveCases.length` (66)**
+   - What we know: CONTEXT.md says `mod 76` (total corpus); live runnable cases = 66 (76 minus 9 TIMEOUT_PILL_DEFERRED minus 1 synthetic "gutter" category)
+   - Resolution: Rotate over `liveCases.length` (66) to guarantee exactly 30 live cases per Mon-Sat run. Using 76 with post-filtering could yield <30 cases on some weeks when the rotation lands heavily on deferred/synthetic IDs. The CONTEXT.md "mod 76" wording predates the live-count count — plan 29-01 implements the corrected modulus and references this resolution explicitly.
 
-2. **Pre-flight smoke: full 1-case Playwright run or reuse `e2e:smoke`?**
+2. **Pre-flight smoke: full 1-case Playwright run or reuse `e2e:smoke`?** — **RESOLVED: inline `--grep`**
    - What we know: `e2e:smoke` runs `--grep @smoke` (6 cases); CONTEXT.md specifies 1-case probe on seed patent
-   - What's unclear: Whether to create a new `e2e:cron-smoke` script or use `--grep "US11427642-spec-short-1 @smoke"` inline
-   - Recommendation: Inline `--grep` in the workflow step; no new npm script needed
+   - Resolution: Use inline `--grep "US11427642-spec-short-1"` in the workflow step. No new npm script needed; reduces workflow surface area.
 
-3. **`topOfStackHash` source in `report.json`**
+3. **`topOfStackHash` source in `report.json`** — **RESOLVED: hash `verifier_verdict.reason` (200-char truncation)**
    - What we know: `report.json` case entries have `{id, status, errorClass, citation, verifier_verdict, artifacts, duration_ms}` — no `stack` field
-   - What's unclear: Whether Phase 29 should add a `stack` field to the report schema (requires modifying regression.spec.js) or derive `topOfStackHash` from existing fields
-   - Recommendation: Use `verifier_verdict.reason` (hashed) as proxy; this is within Claude's Discretion
+   - Resolution: Compute `topOfStackHash = sha256(verifier_verdict.reason.substring(0, 200)).substring(0, 12)` when stack is absent. When `verifier_verdict.reason` is missing too, fingerprint uses empty string. This is within Claude's Discretion per CONTEXT.md ("Reporter script's exact stack-hash algorithm") and avoids the larger change of modifying the Phase 28 report schema.
 
 ---
 

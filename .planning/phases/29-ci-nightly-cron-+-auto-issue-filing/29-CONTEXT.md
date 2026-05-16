@@ -47,10 +47,11 @@ Out of scope (deferred):
 - Use `npm ci` for deterministic installs
 
 ### Rotating sample selection
-- Sunday: full 76 cases
-- Mon-Sat: 30-case rotating subset based on `(weekOfYear + dayOfWeek) mod 76`
-- Selection happens at runtime in a helper `scripts/select-cron-cases.mjs` that emits a comma-separated case-id list consumed by `npx playwright test --grep` (regex of OR'd ids)
-- CRON-02 requires the rotation be deterministic across runs of the same day
+- Sunday: full live suite (66 cases — 76 total minus 9 TIMEOUT_PILL_DEFERRED minus 1 synthetic "gutter" category)
+- Mon-Sat: 30-case rotating subset based on `(weekOfYear + dayOfWeek) mod liveCases.length` (i.e., mod 66)
+- Selection happens at runtime in a helper `scripts/select-cron-cases.mjs` that emits a pipe-separated case-id list consumed by `npx playwright test --grep` (regex OR-chain)
+- CRON-02 requires the rotation be deterministic across runs of the same day (use UTC date methods: `getUTCDay()`, `getUTCFullYear()`)
+- **Modulus override:** Original "mod 76" was updated to `mod liveCases.length` per RESEARCH.md Open Question #1 (RESOLVED) — guarantees exactly 30 live runnable cases per weekday and avoids weeks that would otherwise yield <30 due to deferred-ID clustering
 
 ### Pre-flight smoke
 - Before the regression suite, run a 1-case smoke probe on `US11427642-spec-short-1`

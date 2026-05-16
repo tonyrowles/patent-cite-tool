@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Autonomous E2E Testing Agent
 status: executing
-last_updated: "2026-05-16T03:22:09.611Z"
-last_activity: 2026-05-16 -- Phase 29 execution started
+last_updated: "2026-05-16T03:41:46.001Z"
+last_activity: 2026-05-16
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 21
-  completed_plans: 18
-  percent: 86
+  completed_plans: 21
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-13)
 ## Current Position
 
 Phase: 29 (CI Nightly Cron + Auto-Issue Filing) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 29
+Plan: 2 of 4
+Status: Ready to execute
 Progress: [░░░░░░░░░░] 0/6 phases (0%)
-Last activity: 2026-05-16 -- Phase 29 execution started
+Last activity: 2026-05-16
 Next: `/gsd-plan-phase 26`
 
 ## Performance Metrics
@@ -45,12 +45,18 @@ Next: `/gsd-plan-phase 26`
 | v2.2 Matching Robustness | 3 | 4 | 2 days |
 | v2.3 Post-v2.2 Hardening | 3 | 5 | 1 day |
 | v3.0 Autonomous E2E Testing Agent | 6 (planned) | TBD | TBD |
+| Phase 29 P03 | 155 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Decisions
 
 All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
+
+- [Phase 29]: Static concurrency group 'e2e-nightly' (not dynamic) prevents schedule+dispatch race (RESEARCH.md Risk 1)
+- [Phase 29]: gh label create color uses '0075ca' without # prefix (gh CLI requirement)
+- [Phase 29]: npx playwright --version verification step mitigates broken-cache scenario (Pitfall 2)
+- [Phase 29]: Playwright retries: process.env.CI ? 1 : 0 — reduces CI flake noise, fails fast locally
 
 ### v3.0 Pre-locked Decisions (from milestone kickoff)
 

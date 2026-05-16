@@ -44,9 +44,9 @@
 
 ### CI Cron (CRON)
 
-- [ ] **CRON-01**: A new GitHub Actions workflow (`.github/workflows/e2e-nightly.yml`) runs the deterministic E2E suite on a `cron: '0 6 * * *'` schedule (06:00 UTC daily) with `workflow_dispatch` for manual runs.
+- [x] **CRON-01**: A new GitHub Actions workflow (`.github/workflows/e2e-nightly.yml`) runs the deterministic E2E suite on a `cron: '0 6 * * *'` schedule (06:00 UTC daily) with `workflow_dispatch` for manual runs.
 - [ ] **CRON-02**: Nightly cron runs a rotating 30-patent sample from the 76-case corpus; the Sunday run runs the full 76.
-- [ ] **CRON-03**: The cron workflow installs Playwright + Chromium in CI without `xvfb-run` (using `channel: 'chromium'` for headless extension support) and uploads artifacts on failure.
+- [x] **CRON-03**: The cron workflow installs Playwright + Chromium in CI without `xvfb-run` (using `channel: 'chromium'` for headless extension support) and uploads artifacts on failure.
 - [ ] **CRON-04**: On cron failure, a reporter script (`scripts/e2e-report-issue.mjs`) opens or comments on a GitHub issue with the failing patent IDs, error classifications, and links to artifact downloads.
 - [ ] **CRON-05**: The auto-issue filer uses fingerprint-based deduplication (`{caseId, errorClass, top-of-stack-hash}`) so consecutive nightly failures with the same root cause do not spam the issue tracker.
 

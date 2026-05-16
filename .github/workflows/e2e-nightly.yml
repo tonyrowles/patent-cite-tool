@@ -1,0 +1,160 @@
+# .github/workflows/e2e-nightly.yml
+#
+# Phase 29 (CRON-01, CRON-03) — Nightly E2E cron + auto-issue filing.
+#
+# Schedule: 06:00 UTC daily. Manual trigger via workflow_dispatch.
+# Sunday runs the full live suite (66 cases); Mon-Sat run a deterministic
+# 30-case rotating sample (see scripts/select-cron-cases.mjs).
+# Smoke pre-flight on the seed patent gates the suite — on DOM drift, a
+# single meta-issue is filed and the regression is skipped (no 76-issue storm).
+# Per-case failures (non-FLAKE) are filed via scripts/e2e-report-issue.mjs
+# with fingerprint-based dedup.
+#
+# The workflow ALWAYS exits success after issue filing — the filed issue is
+# the failure signal, not a red X on the workflow run page.
+
+name: E2E Nightly
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_full_suite:
+        description: 'Run all 66 live cases (override day-of-week rotation)'
+        type: boolean
+        default: false
+
+# Static concurrency group prevents schedule + workflow_dispatch from racing
+# (per 29-RESEARCH.md Risk 1 — overrides CONTEXT.md dynamic expression).
+# cancel-in-progress: false so a running cron is never killed by a new trigger.
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  e2e-nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_RUN_ID: ${{ github.run_id }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+        # No --with-deps: CONTEXT.md decision; ubuntu-latest has Chromium system
+        # deps preinstalled. See 29-RESEARCH.md Pitfall 3.
+
+      - name: Verify Playwright binary
+        run: npx playwright --version
+        # Pitfall 2 mitigation: ensures the cached binary is functional before
+        # running any tests. A broken cache causes a clean failure here, not a
+        # silent bad-cache scenario (29-RESEARCH.md Pitfall 2).
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Run Phase 29 unit tests (sanity gate)
+        run: npx vitest run tests/unit/select-cron-cases.test.js tests/unit/e2e-report-issue.test.js
+
+      - name: Ensure e2e-nightly label exists
+        run: |
+          gh label create "e2e-nightly" \
+            --color "0075ca" \
+            --description "Auto-filed by nightly E2E cron" \
+            --force 2>/dev/null || true
+        # --force updates if exists; || true makes the step safe if gh rejects --force.
+        # Color uses 6-char hex WITHOUT # prefix (gh CLI requirement).
+        # See 29-RESEARCH.md Risk 6.
+
+      - name: Pre-flight smoke (1 case)
+        id: smoke
+        continue-on-error: true
+        run: |
+          npx playwright test \
+            --config tests/e2e/playwright.config.js \
+            --grep "US11427642-spec-short-1" \
+            specs/regression.spec.js
+        # 1-case probe on the seed patent. If this fails (DOM_DRIFT / CAPTCHA),
+        # we file ONE meta-issue and skip the full suite (no 76-issue storm).
+        # Pattern 4 in 29-RESEARCH.md.
+
+      - name: File meta-issue on smoke failure
+        if: steps.smoke.outcome == 'failure'
+        run: node scripts/e2e-report-issue.mjs --meta-drift
+
+      - name: Select test cases for today
+        id: cases
+        if: steps.smoke.outcome == 'success'
+        run: |
+          if [ "${{ inputs.force_full_suite }}" = "true" ]; then
+            CASES=$(node scripts/select-cron-cases.mjs --full)
+          else
+            CASES=$(node scripts/select-cron-cases.mjs)
+          fi
+          # Pipe-OR'd ID list is passed as --grep regex; Playwright treats | as regex OR.
+          echo "cases=$CASES" >> "$GITHUB_OUTPUT"
+          echo "Selected $(echo "$CASES" | tr '|' '\n' | wc -l) cases for this run"
+        # inputs.force_full_suite is null for cron-triggered runs (not 'false') —
+        # the string comparison '= "true"' is safe: null != "true", so cron runs
+        # the default rotation. See 29-RESEARCH.md Pitfall 1.
+
+      - name: Run E2E regression
+        id: regression
+        if: steps.smoke.outcome == 'success'
+        continue-on-error: true
+        run: |
+          npx playwright test \
+            --config tests/e2e/playwright.config.js \
+            --grep "${{ steps.cases.outputs.cases }}" \
+            specs/regression.spec.js
+        # continue-on-error: true so the workflow proceeds to file issues then
+        # exits success. The filed issue IS the signal; a red-X workflow run is
+        # not. See 29-CONTEXT.md Specific Ideas.
+
+      - name: File issues for failures
+        if: steps.smoke.outcome == 'success' && steps.regression.outcome == 'failure'
+        run: node scripts/e2e-report-issue.mjs
+        # Only runs when regression produced failures. Reads
+        # tests/e2e/artifacts/${PLAYWRIGHT_RUN_ID}/report.json and files
+        # per-case issues with fingerprint-based dedup (CRON-04, CRON-05).
+
+      - name: Upload E2E artifacts
+        if: always() && (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure')
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-nightly-${{ github.run_id }}
+          path: tests/e2e/artifacts/
+          retention-days: 14
+          if-no-files-found: warn
+        # if-no-files-found: warn prevents the step from failing when the smoke
+        # probe fails before any artifacts are written. See 29-RESEARCH.md Risk 5.

@@ -1,0 +1,63 @@
+{
+  "run_id": "test-run-29-02",
+  "started": "2026-05-15T06:00:00.000Z",
+  "ended": "2026-05-15T06:08:00.000Z",
+  "summary": {
+    "total": 5,
+    "passed": 1,
+    "skipped": 1,
+    "failed": 3,
+    "by_error_class": {
+      "EXTENSION_NOT_LOADED": 0,
+      "NO_CITATION_PRODUCED": 0,
+      "WRONG_CITATION": 1,
+      "UI_BROKEN": 0,
+      "VERIFIER_DISAGREE": 1,
+      "GOOGLE_DOM_DRIFT": 0,
+      "USPTO_API_DRIFT": 0,
+      "FLAKE": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "US11427642-spec-short-1",
+      "status": "passed",
+      "errorClass": null,
+      "citation": "1:26-27",
+      "verifier_verdict": { "status": "pass", "tier_used": "A", "cited_text_window": "embodiment", "match_offset_lines": 0, "reason": "exact" },
+      "artifacts": { "screenshot": null, "dom": null, "pdf_snippet": null }
+    },
+    {
+      "id": "US4723129-claims-1",
+      "status": "failed",
+      "errorClass": "WRONG_CITATION",
+      "citation": "5:10-11",
+      "verifier_verdict": { "status": "disagree", "tier_used": "D", "cited_text_window": "", "match_offset_lines": null, "reason": "text not found at cited location" },
+      "artifacts": { "screenshot": "US4723129-claims-1-screenshot.png", "dom": "US4723129-claims-1-dom.html", "pdf_snippet": "US4723129-claims-1-pdf-snippet.png" }
+    },
+    {
+      "id": "US11427642-claims-1",
+      "status": "failed",
+      "errorClass": "VERIFIER_DISAGREE",
+      "citation": "63:1-4",
+      "verifier_verdict": { "status": "disagree", "tier_used": "D", "cited_text_window": "heavy chain antibody", "match_offset_lines": null, "reason": "verifier confirms text exists but at different column:line" },
+      "artifacts": { "screenshot": "US11427642-claims-1-screenshot.png", "dom": "US11427642-claims-1-dom.html", "pdf_snippet": "US11427642-claims-1-pdf-snippet.png" }
+    },
+    {
+      "id": "US10592688-spec-short",
+      "status": "failed",
+      "errorClass": "FLAKE",
+      "citation": null,
+      "verifier_verdict": null,
+      "artifacts": { "screenshot": null, "dom": null, "pdf_snippet": null }
+    },
+    {
+      "id": "US5371234-chemical-cross-col",
+      "status": "skipped",
+      "errorClass": null,
+      "citation": null,
+      "verifier_verdict": null,
+      "artifacts": { "screenshot": null, "dom": null, "pdf_snippet": null }
+    }
+  ]
+}

@@ -163,7 +163,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   2. Two consecutive nightly runs that fail with the same `{caseId, errorClass, top-of-stack-hash}` fingerprint produce ONE issue with two comments — not two separate issues — confirming fingerprint-based deduplication works
   3. The nightly cron runs a rotating 30-patent sample Mon–Sat and the full 76 on Sunday, completing within the workflow's 30-minute timeout on `ubuntu-latest` with Playwright Chromium installed via `channel: 'chromium'` (no `xvfb-run` required)
   4. When a pre-flight smoke probe detects Google Patents DOM drift, the cron emits ONE meta-issue ("Google Patents drift suspected") and skips the 76-patent suite — preventing a 76-issue storm on a platform-side change
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 29-01-PLAN.md — scripts/select-cron-cases.mjs (rotation algorithm + 8 Vitest unit tests for determinism, Sunday/weekday branching, modulus wrap-around) — CRON-02
+- [ ] 29-02-PLAN.md — scripts/e2e-report-issue.mjs (fingerprint dedup issue filer + fixtures + 15+ Vitest tests for fingerprint, dedup, FLAKE filter, body template, sanitization) — CRON-04, CRON-05
+- [ ] 29-03-PLAN.md — .github/workflows/e2e-nightly.yml (cron + workflow_dispatch + Playwright cache + smoke gate + artifact upload) + playwright.config.js CI retries — CRON-01, CRON-03
+- [ ] 29-04-PLAN.md — Label setup + workflow_dispatch smoke run + human verification checkpoint — CRON-01, CRON-03, CRON-04, CRON-05
 
 ### Phase 30: Worker Fault-Injection
 **Goal**: Coverage for the USPTO/Cloudflare Worker fallback path — both the test-mode contract (CI does not pollute the production KV cache) and the production fallback path (when Google PDF fetch fails, the extension still produces an accurate citation via USPTO)
@@ -219,6 +223,6 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 26. Playwright Harness Scaffolding | v3.0 | 3/3 | Complete    | 2026-05-14 |
 | 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 10/9 | Complete    | 2026-05-15 |
 | 28. Independent PDF Verifier | v3.0 | 5/5 | Complete    | 2026-05-15 |
-| 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 0/0 | Not started | - |
+| 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 0/4 | Planned | - |
 | 30. Worker Fault-Injection | v3.0 | 0/0 | Not started | - |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 0/0 | Not started | - |

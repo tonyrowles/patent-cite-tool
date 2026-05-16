@@ -1,0 +1,26 @@
+[
+  {
+    "number": 101,
+    "title": "[e2e-nightly] US4723129-claims-1: WRONG_CITATION",
+    "labels": [{"name": "e2e-nightly"}],
+    "state": "open",
+    "updated_at": "RECENT_PLACEHOLDER",
+    "body": "Existing issue body...\n\n<!-- fingerprint: FP_WRONG_CITATION_US4723129 -->\n"
+  },
+  {
+    "number": 102,
+    "title": "[e2e-nightly] US11427642-claims-1: VERIFIER_DISAGREE",
+    "labels": [{"name": "e2e-nightly"}],
+    "state": "open",
+    "updated_at": "STALE_PLACEHOLDER",
+    "body": "Existing stale issue body...\n\n<!-- fingerprint: FP_VERIFIER_DISAGREE_US11427642 -->\n"
+  },
+  {
+    "number": 103,
+    "title": "[e2e-nightly] some old unrelated issue",
+    "labels": [{"name": "e2e-nightly"}],
+    "state": "open",
+    "updated_at": "RECENT_PLACEHOLDER",
+    "body": "An unrelated issue with no fingerprint comment.\n"
+  }
+]

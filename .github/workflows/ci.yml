@@ -56,6 +56,12 @@ jobs:
       - name: Test — lint (web-ext lint)
         run: npm run test:lint
 
+      - name: Install worker dependencies
+        run: cd worker && npm ci
+
+      - name: Test — worker (Vitest)
+        run: cd worker && npm test
+
       - name: Package Chrome extension
         if: success()
         run: cd dist/chrome && zip -r ../../patent-cite-chrome.zip .

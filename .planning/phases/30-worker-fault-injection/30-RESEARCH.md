@@ -673,22 +673,22 @@ await page.route(`${WORKER_URL}/**`, async route => {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does `page.route()` reach the extension's offscreen document?**
+1. **Does `page.route()` reach the extension's offscreen document?** — **RESOLVED: dual-canary mitigation in 30-02**
    - What we know: Playwright CDP routing intercepts page browsing context requests. Extension offscreen documents run in isolated contexts. Playwright docs say `page.route` does not intercept service worker requests.
    - What's unclear: Whether the offscreen document is treated as a page context (where CDP routing applies) or as an extension isolated context (where it doesn't).
-   - Recommendation: The 30-02 plan MUST include a canary assertion — before the test completes, assert that `routeHandler.callCount > 0` to confirm the route actually intercepted at least one request. If it never fires, escalate to open an issue or use an alternative abort strategy.
+   - Resolution: Plan 30-02 includes TWO canary assertions — `abortCount > 0` for the googleapis abort handler AND `workerRoute.getCallCount() > 0` for the Worker header-injection handler. Either canary firing zero fails the test loudly pointing at this risk. If the canaries fail in execution, the recommended escalation is to (a) try Playwright `context.route` (broader scope) or (b) inject the test-mode flag via a content-script bridge from the page into the offscreen document. Out of scope for now — accept the dual-canary approach.
 
-2. **Should worker/package.json `npm install` be part of the CI workflow?**
+2. **Should worker/package.json `npm install` be part of the CI workflow?** — **RESOLVED: add `cd worker && npm ci` step in 30-01 Task 3**
    - What we know: The root `ci.yml` runs `npm ci` in the root directory only. `worker/` has its own `package.json` and `package-lock.json`.
    - What's unclear: Does ci.yml need a separate step `cd worker && npm ci` before `npm run test:worker`?
-   - Recommendation: Yes — add a `cd worker && npm ci` step in ci.yml before the Worker test step. Otherwise CI uses the checked-in `worker/node_modules` (if committed) or fails with missing module. The worker/ `node_modules` should NOT be committed to git.
+   - Resolution: YES. Plan 30-01 includes a Task that adds two steps to `.github/workflows/ci.yml`: (a) `Install worker dependencies: cd worker && npm ci`, (b) `Test — worker (Vitest)`. Both inserted after the existing `Test — lint` step. `worker/node_modules` stays out of git (worker/.gitignore covers this).
 
-3. **Will X-PCT-Test-Mode need to be added to the CORS Allow-Headers?**
+3. **Will X-PCT-Test-Mode need to be added to the CORS Allow-Headers?** — **RESOLVED: included in 30-01 Task 1**
    - What we know: The extension's offscreen document sends cross-origin requests to `pct.tonyrowles.com`. The Worker's CORS handler currently allows `'Authorization, Content-Type'`.
    - What's unclear: Does the Chrome extension's offscreen document trigger a CORS preflight before the POST /cache call?
-   - Recommendation: Add `X-PCT-Test-Mode` to `'Access-Control-Allow-Headers'` in the Worker's preflight response as a defensive measure. Zero risk, adds clarity.
+   - Resolution: Add `X-PCT-Test-Mode` to `'Access-Control-Allow-Headers'` in the Worker's preflight response as a defensive measure. Zero risk, adds clarity. Implemented as part of Plan 30-01 Task 1's `worker/src/index.js` change.
 
 ---
 

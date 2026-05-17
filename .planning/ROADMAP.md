@@ -177,7 +177,10 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   1. A request to the Cloudflare Worker with `X-PCT-Test-Mode: true` returns the same response body as a normal request but does NOT write to the shared KV cache — confirmed by an integration test that calls the Worker with the header set and asserts no KV write occurred
   2. A fault-injection E2E spec uses `page.route('https://patentimages.storage.googleapis.com/**', route => route.abort())` to force the Google PDF path to fail, then asserts the extension's citation matches the golden baseline AND the verifier independently confirms the cited text — proving the USPTO/Worker fallback path is wired correctly end-to-end
   3. The fault-injection spec runs as part of the nightly cron and counts in the `report.json` summary, so a future Worker regression (auth break, USPTO API change, KV quota exhaustion) surfaces as a tracked failure rather than a silent production outage
-**Plans**: TBD
+**Plans**: 3 plans (3 waves)
+- [ ] 30-01-PLAN.md (Wave 1) — Worker X-PCT-Test-Mode guard + vitest-pool-workers integration test (INJ-01)
+- [ ] 30-02-PLAN.md (Wave 2, depends on 30-01) — Fault-injection E2E spec with route-abort + dual canaries + verifier gate (INJ-02)
+- [ ] 30-03-PLAN.md (Wave 3, depends on 30-01, 30-02) — WORKER_FALLBACK_FAILED taxonomy entry + nightly cron wiring (INJ-02)
 
 ### Phase 31: LLM Exploratory Mode + Docs
 **Goal**: Local-dev-only exploratory testing — `npm run e2e:explore` autonomously picks patents and unusual selections via headless `claude -p`, verifies them via the Phase 28 verifier, classifies plugin-vs-LLM failures distinctly, and enforces a hard $100/month spend cap before any LLM invocation

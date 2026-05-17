@@ -178,7 +178,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   2. A fault-injection E2E spec uses `page.route('https://patentimages.storage.googleapis.com/**', route => route.abort())` to force the Google PDF path to fail, then asserts the extension's citation matches the golden baseline AND the verifier independently confirms the cited text — proving the USPTO/Worker fallback path is wired correctly end-to-end
   3. The fault-injection spec runs as part of the nightly cron and counts in the `report.json` summary, so a future Worker regression (auth break, USPTO API change, KV quota exhaustion) surfaces as a tracked failure rather than a silent production outage
 **Plans**: 3 plans (3 waves)
-- [ ] 30-01-PLAN.md (Wave 1) — Worker X-PCT-Test-Mode guard + vitest-pool-workers integration test (INJ-01)
+- [x] 30-01-PLAN.md (Wave 1) — Worker X-PCT-Test-Mode guard + vitest-pool-workers integration test (INJ-01)
 - [ ] 30-02-PLAN.md (Wave 2, depends on 30-01) — Fault-injection E2E spec with route-abort + dual canaries + verifier gate (INJ-02)
 - [ ] 30-03-PLAN.md (Wave 3, depends on 30-01, 30-02) — WORKER_FALLBACK_FAILED taxonomy entry + nightly cron wiring (INJ-02)
 
@@ -227,5 +227,5 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 10/9 | Complete    | 2026-05-15 |
 | 28. Independent PDF Verifier | v3.0 | 5/5 | Complete    | 2026-05-15 |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 4/4 | Complete    | 2026-05-17 |
-| 30. Worker Fault-Injection | v3.0 | 0/0 | Not started | - |
+| 30. Worker Fault-Injection | v3.0 | 1/3 | In Progress|  |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 0/0 | Not started | - |

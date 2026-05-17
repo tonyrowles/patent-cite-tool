@@ -134,7 +134,7 @@ export default {
         headers: {
           ...corsHeaders(),
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-PCT-Test-Mode',
           'Access-Control-Max-Age': '86400',
         },
       });
@@ -226,7 +226,12 @@ export default {
         }
 
         // Write to KV (no TTL per design decision)
-        await env.PATENT_CACHE.put(key, JSON.stringify(payload));
+        // INJ-01: X-PCT-Test-Mode header suppresses KV write so CI E2E
+        // runs don't pollute the shared production cache. Response
+        // semantics are unchanged — still returns 201 "Cached" below.
+        if (request.headers.get('X-PCT-Test-Mode') !== 'true') {
+          await env.PATENT_CACHE.put(key, JSON.stringify(payload));
+        }
         return new Response('Cached', {
           status: 201,
           headers: {

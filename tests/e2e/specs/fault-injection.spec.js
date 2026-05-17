@@ -7,7 +7,7 @@
 //
 // Two-gate pass criteria:
 //   1. observed.citation === baseline['US11427642-spec-short-1'].citation ('1:26-27')
-//   2. verifyCitation(...) returns status: 'agree' (Tier A/B/C)
+//   2. verifyCitation(...) returns status: 'pass' (Tier A/B/C)
 //
 // Two-canary safety net (30-RESEARCH.md Risk A1):
 //   Playwright's page.route operates at the CDP level for the page's
@@ -80,8 +80,10 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
 
       // 2. Inject X-PCT-Test-Mode: true on all Worker calls so KV stays
       //    clean (Plan 30-01's guard wraps the put() in the Worker).
-      //    Helper returns { getCallCount } for the second canary.
-      const workerRoute = await installWorkerTestModeRoute(page);
+      //    Uses context.route (BrowserContext level) to reach the extension's
+      //    offscreen document context — resolves Risk A1 (Plan 30-02 canary).
+      //    Helper is synchronous; returns { getCallCount } for the second canary.
+      const workerRoute = installWorkerTestModeRoute(context);
 
       // 3. Trigger-mode override BEFORE navigation (regression.spec.js Pitfall B).
       await setTriggerMode(context, 'auto');
@@ -114,9 +116,9 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
       //    points at Risk A1, not a citation mismatch. (See Pitfall 5.)
       //
       //    DO NOT remove these canaries to "fix" a failing test. If either
-      //    canary fires zero, that means page.route did not reach the
+      //    canary fires zero, that means the route handler did not reach the
       //    extension's offscreen document context — escalate per 30-RESEARCH.md
-      //    Risk A1 (try context.route, or content-script bridge).
+      //    Risk A1 (Plan 30-04 switched to context.route to address this).
       expect(
         abortCount,
         'page.route did not intercept https://patentimages.storage.googleapis.com/** — ' +
@@ -126,9 +128,9 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
 
       expect(
         workerRoute.getCallCount(),
-        'page.route did not intercept https://pct.tonyrowles.com/** — Worker fallback was ' +
-          'not exercised OR header injection did not reach the extension offscreen context. ' +
-          'See 30-RESEARCH.md Risk A1.',
+        'context.route did not intercept https://pct.tonyrowles.com/** — Worker fallback was ' +
+          'not exercised OR cache-bypass nonce did not reach the extension offscreen context. ' +
+          'See 30-RESEARCH.md Risk A1 + Plan 30-04.',
       ).toBeGreaterThan(0);
 
       // Log canary counts for SUMMARY.md evidence.
@@ -139,7 +141,7 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
 
       // 8. PASS GATES — both required per 30-CONTEXT.md.
       expect(observed.citation).toBe(baseline[CASE_ID].citation); // '1:26-27'
-      expect(verifierVerdict.status).toBe('agree');
+      expect(verifierVerdict.status).toBe('pass');
 
       caseStatus = 'passed';
     } catch (e) {

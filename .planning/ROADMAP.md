@@ -99,7 +99,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 26: Playwright Harness Scaffolding** — Build the Playwright + Chromium foundation: load unpacked Chrome extension, shadow-pierce, clipboard shim, service-worker readiness, and `data-testid` UI hooks (completed 2026-05-14)
 - [x] **Phase 27: Selection Emulation + 76-Case Deterministic Suite** — Programmatic selection that triggers the extension; replay all 76 golden patents end-to-end; capture screenshot + DOM artifacts on failure (completed 2026-05-15)
 - [x] **Phase 28: Independent PDF Verifier** — Second code path that re-parses each PDF and confirms the cited text lives near the cited column:line; structured JSON report + failure taxonomy; PDF page snippet artifacts (completed 2026-05-15)
-- [ ] **Phase 29: CI Nightly Cron + Auto-Issue Filing** — GitHub Actions nightly cron (rotating 30-patent sample, full 76 on Sundays); fingerprint-based idempotent auto-issue filing on failure
+- [x] **Phase 29: CI Nightly Cron + Auto-Issue Filing** — GitHub Actions nightly cron (rotating 30-patent sample, full 76 on Sundays); fingerprint-based idempotent auto-issue filing on failure (completed 2026-05-17)
 - [ ] **Phase 30: Worker Fault-Injection** — Cloudflare Worker `X-PCT-Test-Mode` header skips KV writes; fault-injection E2E forces Google PDF failure and verifies USPTO fallback produces an accurate citation
 - [ ] **Phase 31: LLM Exploratory Mode + Docs** — `npm run e2e:explore` drives Claude Code headless against fresh patent selections with local spend ledger ($80 warn / $100 hard-stop, CI-blocked); structured exploration report + `tests/e2e/README.md`
 
@@ -167,7 +167,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] 29-01-PLAN.md — scripts/select-cron-cases.mjs (rotation algorithm + 8 Vitest unit tests for determinism, Sunday/weekday branching, modulus wrap-around) — CRON-02
 - [x] 29-02-PLAN.md — scripts/e2e-report-issue.mjs (fingerprint dedup issue filer + fixtures + 15+ Vitest tests for fingerprint, dedup, FLAKE filter, body template, sanitization) — CRON-04, CRON-05
 - [x] 29-03-PLAN.md — .github/workflows/e2e-nightly.yml (cron + workflow_dispatch + Playwright cache + smoke gate + artifact upload) + playwright.config.js CI retries — CRON-01, CRON-03
-- [ ] 29-04-PLAN.md — Label setup + workflow_dispatch smoke run + human verification checkpoint — CRON-01, CRON-03, CRON-04, CRON-05
+- [x] 29-04-PLAN.md — Label setup + workflow_dispatch smoke run + human verification checkpoint — CRON-01, CRON-03, CRON-04, CRON-05
 
 ### Phase 30: Worker Fault-Injection
 **Goal**: Coverage for the USPTO/Cloudflare Worker fallback path — both the test-mode contract (CI does not pollute the production KV cache) and the production fallback path (when Google PDF fetch fails, the extension still produces an accurate citation via USPTO)
@@ -223,6 +223,6 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 26. Playwright Harness Scaffolding | v3.0 | 3/3 | Complete    | 2026-05-14 |
 | 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 10/9 | Complete    | 2026-05-15 |
 | 28. Independent PDF Verifier | v3.0 | 5/5 | Complete    | 2026-05-15 |
-| 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 3/4 | In Progress|  |
+| 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 4/4 | Complete    | 2026-05-17 |
 | 30. Worker Fault-Injection | v3.0 | 0/0 | Not started | - |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 0/0 | Not started | - |

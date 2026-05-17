@@ -53,7 +53,7 @@
 ### Fault Injection (INJ)
 
 - [x] **INJ-01**: A Cloudflare Worker change adds an `X-PCT-Test-Mode: true` request header that, when present, causes the Worker to skip KV writes (so test runs do not pollute the shared cache).
-- [ ] **INJ-02**: A fault-injection E2E test route-aborts the Google Patents PDF fetch and verifies the extension's fallback path through the Cloudflare Worker / USPTO eGrant API completes successfully and produces an accurate citation.
+- [x] **INJ-02**: A fault-injection E2E test route-aborts the Google Patents PDF fetch and verifies the extension's fallback path through the Cloudflare Worker / USPTO eGrant API completes successfully and produces an accurate citation.
 
 ### LLM Exploratory Mode (LLM)
 

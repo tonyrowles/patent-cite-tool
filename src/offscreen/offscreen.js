@@ -8,9 +8,8 @@
  * - Parse PDF to extract positioned text items using PDF.js
  * - Report success/failure back to service worker via message passing
  *
- * NOTE: Offscreen documents only have access to chrome.runtime among
- * extension APIs. No chrome.storage, no chrome.tabs. IndexedDB is a
- * web API and works fine here.
+ * NOTE: Offscreen documents have access to chrome.runtime and chrome.storage
+ * (among other extension APIs). IndexedDB is a web API and works fine here.
  *
  * This file is an ES module (loaded via <script type="module">).
  */
@@ -26,6 +25,29 @@ const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09
 
 // Cache version — bump to invalidate all cached entries
 const CACHE_VERSION = 'v3';
+
+// ---------------------------------------------------------------------------
+// Test-mode hook — Phase 30 E2E fault-injection support
+// ---------------------------------------------------------------------------
+
+/**
+ * Read optional test-mode overrides from chrome.storage.local.
+ * In production, no keys are set and this returns defaults — behavior unchanged.
+ * Used ONLY by E2E fault-injection tests (Phase 30).
+ *
+ * @returns {Promise<{cacheVersion: string, testMode: boolean}>}
+ */
+async function readTestModeOverrides() {
+  try {
+    const result = await chrome.storage.local.get(['pct_test_cache_version', 'pct_test_mode']);
+    return {
+      cacheVersion: result.pct_test_cache_version || CACHE_VERSION,
+      testMode: result.pct_test_mode === true,
+    };
+  } catch {
+    return { cacheVersion: CACHE_VERSION, testMode: false };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Message listener — top-level registration
@@ -268,7 +290,8 @@ async function checkCache(patentId) {
   const timeoutId = setTimeout(() => controller.abort(), 3000);
 
   try {
-    const url = `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${CACHE_VERSION}`;
+    const { cacheVersion } = await readTestModeOverrides();
+    const url = `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${cacheVersion}`;
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${PROXY_TOKEN}` },
       signal: controller.signal,
@@ -394,13 +417,16 @@ async function uploadToCache(patentId) {
       version: CACHE_VERSION,
     };
 
-    const url = `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${CACHE_VERSION}`;
+    const { cacheVersion, testMode } = await readTestModeOverrides();
+    const url = `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${cacheVersion}`;
+    const headers = {
+      'Authorization': `Bearer ${PROXY_TOKEN}`,
+      'Content-Type': 'application/json',
+    };
+    if (testMode) headers['X-PCT-Test-Mode'] = 'true';
     const resp = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${PROXY_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(payload),
     });
     console.log(`[Offscreen] Cache upload for ${patentId}: ${resp.status} ${resp.statusText}`);

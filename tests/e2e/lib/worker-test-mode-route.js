@@ -1,70 +1,52 @@
 // tests/e2e/lib/worker-test-mode-route.js
 //
-// Phase 30 Plan 04 — Worker route-interception helper (gap-closure rewrite).
+// Phase 30 Plan 05 — Test-mode hook installer.
 //
-// Installs a context.route handler on the Cloudflare Worker URL
-// (https://pct.tonyrowles.com/**) at the BrowserContext level so it reaches
-// the extension's offscreen document context (page-level route handlers could
-// not reach offscreen — Risk A1 confirmed in Plan 30-02).
+// CDP-level routing (page.route / context.route) cannot intercept the
+// Chrome extension's offscreen-document outbound requests (confirmed in
+// Plans 30-02 and 30-04). Instead, this helper sets two chrome.storage.local
+// keys that offscreen.js reads at each /cache call site (added in Plan 30-05).
 //
-// Three-part interception:
-//   GET /cache   — rewrite `v=` query param to a per-test nonce → forces cache
-//                  miss (404), so the extension falls through to /?patent= USPTO
-//   POST /cache  — inject X-PCT-Test-Mode: true header → Plan 30-01 Worker guard
-//                  suppresses KV write; production cache stays clean
-//   GET /?patent= — continue unchanged (live USPTO eGrant fetch)
+// Keys set:
+//   - pct_test_cache_version: a per-test nonce that overrides v=CACHE_VERSION → forces cache miss
+//   - pct_test_mode: true → offscreen.js adds X-PCT-Test-Mode: true on POST /cache
 //
-// The helper returns { getCallCount(), nonce } for canary assertions.
-//
-// Source URL constant: src/offscreen/offscreen.js line 24
-//   const WORKER_URL = 'https://pct.tonyrowles.com';
-
-/** @typedef {import('@playwright/test').BrowserContext} BrowserContext */
-
-const WORKER_URL_PATTERN = 'https://pct.tonyrowles.com/**';
+// Production extension never sets these keys; behavior identical to today when absent.
 
 /**
- * Install the Worker test-mode route on the given browser context.
+ * Install the test-mode storage hook for a Playwright test.
  *
- * Uses context.route() — not page.route — so the handler reaches ALL pages
- * and extension offscreen documents within the context.
- *
- * @param {BrowserContext} context
- * @returns {{ getCallCount: () => number, nonce: string }}
+ * @param {import('@playwright/test').BrowserContext} context
+ * @param {string} extensionId  - Chrome extension ID from extension-loader.js
+ * @returns {Promise<{nonce: string, cleanup: () => Promise<void>}>}
  */
-export function installWorkerTestModeRoute(context) {
+export async function installWorkerTestModeRoute(context, extensionId) {
+  if (!context) throw new Error('installWorkerTestModeRoute: context is required');
+  if (!extensionId) throw new Error('installWorkerTestModeRoute: extensionId is required');
+
   const nonce = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  let callCount = 0;
 
-  context.route(WORKER_URL_PATTERN, async (route) => {
-    callCount += 1;
-    const req = route.request();
-    const url = new URL(req.url());
-    const method = req.method();
+  // Find the extension service worker
+  const serviceWorkers = context.serviceWorkers();
+  const extSw = serviceWorkers.find(sw => sw.url().includes(extensionId));
+  if (!extSw) {
+    throw new Error(`installWorkerTestModeRoute: service worker for extension ${extensionId} not found`);
+  }
 
-    if (url.pathname === '/cache' && method === 'GET') {
-      // Force cache miss by rewriting the version key to a unique nonce.
-      // The Worker has no KV entry for this key → returns 404 → extension
-      // falls through to its /?patent= USPTO fetch fallback.
-      url.searchParams.set('v', nonce);
-      return route.continue({ url: url.toString() });
-    }
-
-    if (url.pathname === '/cache' && method === 'POST') {
-      // KV write suppression: Plan 30-01's Worker guard skips the KV put()
-      // when X-PCT-Test-Mode: true is present. Production cache stays clean.
-      const headers = { ...req.headers(), 'x-pct-test-mode': 'true' };
-      return route.continue({ headers });
-    }
-
-    // /?patent= USPTO eGrant fetch and any OPTIONS preflight: proceed unchanged.
-    // Optionally, also inject x-pct-test-mode here for defence-in-depth;
-    // the Worker ignores it for this route, so it is safe to add.
-    return route.continue();
-  });
+  // Set the storage keys via the service worker context
+  await extSw.evaluate(async ({ nonce }) => {
+    await chrome.storage.local.set({
+      pct_test_cache_version: nonce,
+      pct_test_mode: true,
+    });
+  }, { nonce });
 
   return {
-    getCallCount: () => callCount,
     nonce,
+    async cleanup() {
+      await extSw.evaluate(async () => {
+        await chrome.storage.local.remove(['pct_test_cache_version', 'pct_test_mode']);
+      });
+    },
   };
 }

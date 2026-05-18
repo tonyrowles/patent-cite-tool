@@ -57,7 +57,7 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
   test.describe.configure({ retries: 0 });
 
   test(`${CASE_ID} @fault-injection`, async () => {
-    const { context, page, cleanup } = await loadExtension({
+    const { context, page, extensionId, cleanup } = await loadExtension({
       extensionPath: EXTENSION_PATH,
     });
 
@@ -66,6 +66,7 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
     let verifierVerdict = null;
     let caseStatus = 'failed';
     let errorClass = null;
+    let testHook = null;
     const artifacts = { screenshot: null, dom: null, pdf_snippet: null };
     const t0 = Date.now();
 
@@ -78,12 +79,14 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
         await route.abort();
       });
 
-      // 2. Inject X-PCT-Test-Mode: true on all Worker calls so KV stays
-      //    clean (Plan 30-01's guard wraps the put() in the Worker).
-      //    Uses context.route (BrowserContext level) to reach the extension's
-      //    offscreen document context — resolves Risk A1 (Plan 30-02 canary).
-      //    Helper is synchronous; returns { getCallCount } for the second canary.
-      const workerRoute = installWorkerTestModeRoute(context);
+      // 2. Install chrome.storage.local test-mode hook so offscreen.js uses a
+      //    unique nonce cache version (forces cache miss) and adds X-PCT-Test-Mode
+      //    header on POST /cache (Plan 30-01's guard suppresses KV write).
+      //    Sets keys via service-worker evaluate() — the only approach that reaches
+      //    the extension's isolated offscreen document context (Plans 30-02 and
+      //    30-04 confirmed CDP routing cannot reach offscreen; Plan 30-05 fix).
+      //    Returns {nonce, cleanup()} — cleanup called in finally block below.
+      testHook = await installWorkerTestModeRoute(context, extensionId);
 
       // 3. Trigger-mode override BEFORE navigation (regression.spec.js Pitfall B).
       await setTriggerMode(context, 'auto');
@@ -112,13 +115,15 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
         };
       }
 
-      // 7. CANARY ASSERTIONS — run BEFORE pass-gates so a routing failure
-      //    points at Risk A1, not a citation mismatch. (See Pitfall 5.)
+      // 7. CANARY ASSERTIONS — run BEFORE pass-gates so a hook failure
+      //    points at the install step, not a citation mismatch. (See Pitfall 5.)
       //
-      //    DO NOT remove these canaries to "fix" a failing test. If either
-      //    canary fires zero, that means the route handler did not reach the
-      //    extension's offscreen document context — escalate per 30-RESEARCH.md
-      //    Risk A1 (Plan 30-04 switched to context.route to address this).
+      //    DO NOT remove these canaries to "fix" a failing test. If canary 1
+      //    fires zero, the Google PDF abort never fired. If canary 2 fails,
+      //    the storage hook was not installed correctly — escalate per
+      //    30-RESEARCH.md Risk A1 + Plan 30-05 approach.
+
+      // Canary 1: Google Patents PDF abort fired (page.route reaches offscreen for googleapis).
       expect(
         abortCount,
         'page.route did not intercept https://patentimages.storage.googleapis.com/** — ' +
@@ -126,17 +131,27 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
           'the extension offscreen document context. See 30-RESEARCH.md Risk A1.',
       ).toBeGreaterThan(0);
 
+      // Canary 2: chrome.storage.local hook is installed (keys set via sw.evaluate()).
+      //    After the test action triggers, BEFORE cleanup, assert the keys are still set.
+      //    Proves the hook installation succeeded — only path to a passing test is:
+      //    Google aborted → cache miss (nonce v=) → USPTO fallback → citation parsed → matches golden.
+      const storageState = await context.serviceWorkers()[0].evaluate(() =>
+        chrome.storage.local.get(['pct_test_cache_version', 'pct_test_mode']),
+      );
       expect(
-        workerRoute.getCallCount(),
-        'context.route did not intercept https://pct.tonyrowles.com/** — Worker fallback was ' +
-          'not exercised OR cache-bypass nonce did not reach the extension offscreen context. ' +
-          'See 30-RESEARCH.md Risk A1 + Plan 30-04.',
-      ).toBeGreaterThan(0);
+        storageState.pct_test_cache_version,
+        'pct_test_cache_version not found in extension storage — installWorkerTestModeRoute failed. ' +
+          'Check that extSw.evaluate() succeeded and the extension has storage permission.',
+      ).toBe(testHook.nonce);
+      expect(
+        storageState.pct_test_mode,
+        'pct_test_mode not set to true in extension storage — installWorkerTestModeRoute failed.',
+      ).toBe(true);
 
-      // Log canary counts for SUMMARY.md evidence.
+      // Log canary state for SUMMARY.md evidence.
       // eslint-disable-next-line no-console
       console.log(
-        `[fault-injection canaries] abortCount=${abortCount} workerRouteCallCount=${workerRoute.getCallCount()}`,
+        `[fault-injection canaries] abortCount=${abortCount} storageNonce=${storageState.pct_test_cache_version} testMode=${storageState.pct_test_mode}`,
       );
 
       // 8. PASS GATES — both required per 30-CONTEXT.md.
@@ -168,6 +183,14 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
       } catch (reportErr) {
         // eslint-disable-next-line no-console
         console.error(`appendCase failed for ${CASE_ID}: ${reportErr.message}`);
+      }
+      if (testHook) {
+        try {
+          await testHook.cleanup();
+        } catch (cleanupErr) {
+          // eslint-disable-next-line no-console
+          console.warn(`testHook.cleanup failed: ${cleanupErr.message}`);
+        }
       }
       await cleanup();
     }

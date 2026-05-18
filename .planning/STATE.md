@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Autonomous E2E Testing Agent
 status: verifying
-last_updated: "2026-05-17T22:20:33.327Z"
-last_activity: 2026-05-17
+last_updated: "2026-05-18T16:10:47.843Z"
+last_activity: 2026-05-18
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 25
-  completed_plans: 25
+  total_plans: 26
+  completed_plans: 26
   percent: 100
 ---
 
@@ -28,7 +28,7 @@ Phase: 30 (Worker Fault-Injection) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
 Progress: [░░░░░░░░░░] 0/6 phases (0%)
-Last activity: 2026-05-17
+Last activity: 2026-05-18
 Next: `/gsd-plan-phase 26`
 
 ## Performance Metrics
@@ -49,6 +49,7 @@ Next: `/gsd-plan-phase 26`
 | Phase 30 P01 | 167 | 4 tasks | 6 files |
 | Phase 30 P02 | 4 | 2 tasks | 2 files |
 | Phase 30 P04 | 3 | 2 tasks | 2 files |
+| Phase 30 P05 | 25 | 4 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,9 @@ All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 30]: pdf-verifier returns status='pass' not 'agree' — fault-injection.spec.js line 141 assertion will need fix in Plan 30-04
 - [Phase 30]: context.route also does not reach extension offscreen document fetches (same Chrome isolation as page.route) — escalated to Plan 30-05
 - [Phase 30]: Verifier status assertion fixed: 'agree' → 'pass' (matches pdf-verifier.js actual return values from Tier A/B/C)
+- [Phase 30]: chrome.storage.local IS accessible from offscreen documents; comment in offscreen.js was incorrect
+- [Phase 30]: Only 2 /cache URL sites in offscreen.js (not 3 as plan estimated): checkCache() and uploadToCache()
+- [Phase 30]: Final test-mode approach: chrome.storage.local hook set via sw.evaluate() — CDP routing confirmed unreachable from offscreen context in Plans 30-02 and 30-04
 
 ### v3.0 Pre-locked Decisions (from milestone kickoff)
 

@@ -148,8 +148,35 @@ jobs:
         # tests/e2e/artifacts/${PLAYWRIGHT_RUN_ID}/report.json and files
         # per-case issues with fingerprint-based dedup (CRON-04, CRON-05).
 
+      - name: Run fault-injection spec
+        id: fault_injection
+        if: steps.smoke.outcome == 'success'
+        continue-on-error: true
+        run: |
+          npx playwright test \
+            --config tests/e2e/playwright.config.js \
+            specs/fault-injection.spec.js
+        # Phase 30 (INJ-02) — runs every nightly tick (NOT weekday-rotated;
+        # single-case smoke probe for the Worker/USPTO fallback path).
+        # No --grep — the spec file contains exactly one test.
+        # continue-on-error: true so the workflow proceeds to file an issue
+        # and upload artifacts. WORKER_FALLBACK_FAILED is logged into the
+        # same report.json that the regression step writes to (Phase 28's
+        # report.js appendCase is idempotent + per-id).
+        # retries: 0 inside the spec via test.describe.configure — overrides
+        # playwright.config.js retries:1; not FLAKE-eligible.
+
+      - name: File issues for fault-injection failure
+        if: steps.smoke.outcome == 'success' && steps.fault_injection.outcome == 'failure'
+        run: node scripts/e2e-report-issue.mjs
+        # Phase 30 (INJ-02) — reuses Phase 29's fingerprint-dedup reporter.
+        # report.json now contains a WORKER_FALLBACK_FAILED entry; the
+        # reporter's existing per-case logic handles it the same way as
+        # WRONG_CITATION / NO_CITATION_PRODUCED. Issue title prefix becomes
+        # "[e2e-nightly] US11427642-spec-short-1: WORKER_FALLBACK_FAILED".
+
       - name: Upload E2E artifacts
-        if: always() && (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure')
+        if: always() && (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure' || steps.fault_injection.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: e2e-nightly-${{ github.run_id }}

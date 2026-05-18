@@ -100,7 +100,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 27: Selection Emulation + 76-Case Deterministic Suite** — Programmatic selection that triggers the extension; replay all 76 golden patents end-to-end; capture screenshot + DOM artifacts on failure (completed 2026-05-15)
 - [x] **Phase 28: Independent PDF Verifier** — Second code path that re-parses each PDF and confirms the cited text lives near the cited column:line; structured JSON report + failure taxonomy; PDF page snippet artifacts (completed 2026-05-15)
 - [x] **Phase 29: CI Nightly Cron + Auto-Issue Filing** — GitHub Actions nightly cron (rotating 30-patent sample, full 76 on Sundays); fingerprint-based idempotent auto-issue filing on failure (completed 2026-05-17)
-- [ ] **Phase 30: Worker Fault-Injection** — Cloudflare Worker `X-PCT-Test-Mode` header skips KV writes; fault-injection E2E forces Google PDF failure and verifies USPTO fallback produces an accurate citation
+- [x] **Phase 30: Worker Fault-Injection** — Cloudflare Worker `X-PCT-Test-Mode` header skips KV writes; fault-injection E2E forces Google PDF failure and verifies USPTO fallback produces an accurate citation (completed 2026-05-18)
 - [ ] **Phase 31: LLM Exploratory Mode + Docs** — `npm run e2e:explore` drives Claude Code headless against fresh patent selections with local spend ledger ($80 warn / $100 hard-stop, CI-blocked); structured exploration report + `tests/e2e/README.md`
 
 ## Phase Details
@@ -180,7 +180,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 **Plans**: 3 plans (3 waves)
 - [x] 30-01-PLAN.md (Wave 1) — Worker X-PCT-Test-Mode guard + vitest-pool-workers integration test (INJ-01)
 - [x] 30-02-PLAN.md (Wave 2, depends on 30-01) — Fault-injection E2E spec with route-abort + dual canaries + verifier gate (INJ-02)
-- [ ] 30-03-PLAN.md (Wave 3, depends on 30-01, 30-02) — WORKER_FALLBACK_FAILED taxonomy entry + nightly cron wiring (INJ-02)
+- [x] 30-03-PLAN.md (Wave 3, depends on 30-01, 30-02) — WORKER_FALLBACK_FAILED taxonomy entry + nightly cron wiring (INJ-02)
 
 ### Phase 31: LLM Exploratory Mode + Docs
 **Goal**: Local-dev-only exploratory testing — `npm run e2e:explore` autonomously picks patents and unusual selections via headless `claude -p`, verifies them via the Phase 28 verifier, classifies plugin-vs-LLM failures distinctly, and enforces a hard $100/month spend cap before any LLM invocation
@@ -227,5 +227,5 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 10/9 | Complete    | 2026-05-15 |
 | 28. Independent PDF Verifier | v3.0 | 5/5 | Complete    | 2026-05-15 |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 4/4 | Complete    | 2026-05-17 |
-| 30. Worker Fault-Injection | v3.0 | 4/5 | In Progress|  |
+| 30. Worker Fault-Injection | v3.0 | 5/5 | Complete   | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 0/0 | Not started | - |

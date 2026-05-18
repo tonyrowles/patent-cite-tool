@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Autonomous E2E Testing Agent
 status: verifying
-last_updated: "2026-05-18T16:10:47.843Z"
+last_updated: "2026-05-18T16:14:57.703Z"
 last_activity: 2026-05-18
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 26
-  completed_plans: 26
+  completed_plans: 27
   percent: 100
 ---
 
@@ -50,6 +50,7 @@ Next: `/gsd-plan-phase 26`
 | Phase 30 P02 | 4 | 2 tasks | 2 files |
 | Phase 30 P04 | 3 | 2 tasks | 2 files |
 | Phase 30 P05 | 25 | 4 tasks | 4 files |
+| Phase 30 P03 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 30]: chrome.storage.local IS accessible from offscreen documents; comment in offscreen.js was incorrect
 - [Phase 30]: Only 2 /cache URL sites in offscreen.js (not 3 as plan estimated): checkCache() and uploadToCache()
 - [Phase 30]: Final test-mode approach: chrome.storage.local hook set via sw.evaluate() — CDP routing confirmed unreachable from offscreen context in Plans 30-02 and 30-04
+- [Phase 30]: WORKER_FALLBACK_FAILED appended as index 8 in ERROR_CLASSES (Object.freeze preserved)
+- [Phase 30]: Fault-injection step placed after regression issue-filer; runs every nightly tick (not weekday-rotated); no --grep since single-case spec
+- [Phase 30]: No changes to scripts/e2e-report-issue.mjs — existing per-case loop handles WORKER_FALLBACK_FAILED via report.json standard schema
 
 ### v3.0 Pre-locked Decisions (from milestone kickoff)
 

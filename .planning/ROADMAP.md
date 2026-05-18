@@ -227,5 +227,5 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 27. Selection Emulation + 76-Case Deterministic Suite | v3.0 | 10/9 | Complete    | 2026-05-15 |
 | 28. Independent PDF Verifier | v3.0 | 5/5 | Complete    | 2026-05-15 |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 4/4 | Complete    | 2026-05-17 |
-| 30. Worker Fault-Injection | v3.0 | 5/5 | Complete   | 2026-05-18 |
+| 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 0/0 | Not started | - |

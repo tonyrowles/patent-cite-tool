@@ -17,6 +17,11 @@
 //   GOOGLE_DOM_DRIFT       — pre-flight DOM probe failed (Google Patents layout changed)
 //   USPTO_API_DRIFT        — Worker/USPTO fallback returned unexpected shape
 //   FLAKE                  — transient failure (retry succeeds)
+//   WORKER_FALLBACK_FAILED — Phase 30 fault-injection spec failed
+//                            (Google PDF aborted, but Worker/USPTO
+//                            fallback did not produce an accurate
+//                            citation; distinct from WRONG_CITATION
+//                            which applies to the standard live path)
 //
 // Phase 27 back-compat aliases (DO NOT REMOVE — existing specs import these):
 //   DOM_DRIFT          → aliased to GOOGLE_DOM_DRIFT (semantic supersede;
@@ -38,6 +43,12 @@ export const GOOGLE_DOM_DRIFT = 'GOOGLE_DOM_DRIFT';
 export const USPTO_API_DRIFT = 'USPTO_API_DRIFT';
 export const FLAKE = 'FLAKE';
 
+// Phase 30 (INJ-02) — distinguishes a Worker/USPTO fallback path
+// breakage from a generic baseline-mismatch WRONG_CITATION. Set by
+// tests/e2e/specs/fault-injection.spec.js on any non-canary failure
+// (canary failures escalate to a Plan 30-04 investigation).
+export const WORKER_FALLBACK_FAILED = 'WORKER_FALLBACK_FAILED';
+
 // Phase 27 back-compat aliases
 export const DOM_DRIFT = GOOGLE_DOM_DRIFT;
 export const SELECTION_FAILED = 'SELECTION_FAILED';
@@ -58,4 +69,5 @@ export const ERROR_CLASSES = Object.freeze([
   'GOOGLE_DOM_DRIFT',
   'USPTO_API_DRIFT',
   'FLAKE',
+  'WORKER_FALLBACK_FAILED',  // Phase 30 (INJ-02) addition
 ]);

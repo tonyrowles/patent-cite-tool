@@ -483,20 +483,17 @@ Note A1 is PARTIALLY VERIFIED: confirmed that with no `ANTHROPIC_API_KEY` set, t
 
 ## Open Questions
 
-1. **Subscription exhaustion error shape**
-   - What we know: `is_error: true` with various subtypes observed for `error_max_turns`. Anthropic's Max 5 exhaustion may produce a different subtype or a non-JSON `stderr` message.
-   - What's unclear: The exact `subtype` string when the monthly credit pool is empty (cannot be tested without exhausting the real pool).
-   - Recommendation: In the driver, treat any `is_error: true` OR non-JSON stdout as `LLM_API_ERROR`. Log the full raw JSON for manual diagnosis. Document in README that if exhaustion is suspected, check `stderr` for a "subscription" keyword.
+1. **Subscription exhaustion error shape** (RESOLVED — 2026-05-18 by planner)
+   - **Resolution:** Driver treats any `is_error: true` OR non-JSON stdout OR exit code != 0 with non-empty stdout as `LLM_API_ERROR`. The full raw response (stdout + stderr) is recorded into the iteration's `llm_raw_response` field of `llm-report.json` (truncated to 2000 chars) for forensic diagnosis. README's Troubleshooting section calls out: "if iterations classify as `LLM_API_ERROR` and `stderr` contains the substring `subscription`, `quota`, or `credit`, the Max 5 monthly pool is likely exhausted — wait until the next billing cycle."
+   - Implementation site: `scripts/e2e-explore.mjs` `runClaudeIteration()` per Plan 31-02; documentation site: `tests/e2e/README.md` Troubleshooting section per Plan 31-04.
 
-2. **Spec text page range for LLM prompt**
-   - What we know: For US11427642, body description starts on page 13 (verified). Cover/abstract pages 1-2 contain no useful selection text.
-   - What's unclear: Whether all patents in the 66-case corpus follow the same "pages 1-12 = front matter" pattern.
-   - Recommendation: Send a wider range (e.g., pages 5-12 of the PDF, or detect first page with >500 chars of contiguous text). Alternatively, use the Phase 28 parsePdf column-detection logic to find the first description column. Document the chosen approach in `llm-hallucination.js`.
+2. **Spec text page range for LLM prompt** (RESOLVED — 2026-05-18 by planner)
+   - **Resolution:** Use a **text-density heuristic**, not a fixed page range. `llm-hallucination.js#extractSpecText(patentId, opts)` extracts up to `opts.maxPages` (default 15) pages of pdfjs text but skips leading pages whose extracted text is < 500 contiguous characters (cover/abstract/drawings). The first page with ≥ 500 chars marks `bodyStartPage`. Returns `{ text, bodyStartPage, pagesExtracted, totalPages }` so `llm-report.json` can record exactly which pages were sent to the LLM. This makes the prompt portable across the 66-case corpus without per-patent calibration.
+   - Implementation site: `tests/e2e/lib/llm-hallucination.js` per Plan 31-01.
 
-3. **Spec-cache vs fresh extract per iteration**
-   - What we know: Full 44-page extraction takes ~330ms. A 10-page extraction takes ~92ms.
-   - What's unclear: Whether the CONTEXT's "Claude's Discretion" area allows caching the spec excerpt per-patent in `.spec-cache/` to avoid re-extraction on repeated runs.
-   - Recommendation: Cache the extracted text per `(patentId, numPages)` in a module-level `Map`. For the git-ignored `.spec-cache/` directory approach (also discretionary), add it to `.gitignore` alongside `.llm-spend-ledger.json`.
+3. **Spec-cache vs fresh extract per iteration** (RESOLVED — 2026-05-18 by planner)
+   - **Resolution:** Use a **module-level in-memory `Map`** keyed by `${patentId}:${maxPages}` for the duration of a single `npm run e2e:explore` invocation. Do NOT create a persistent `tests/e2e/.spec-cache/` directory (avoids stale-cache concerns + the `.pdf-cache/` already provides PDF-level reuse). Re-extraction cost (~92ms for 10 pages) is negligible compared to the 30s LLM round-trip.
+   - Implementation site: `tests/e2e/lib/llm-hallucination.js` per Plan 31-01.
 
 ---
 

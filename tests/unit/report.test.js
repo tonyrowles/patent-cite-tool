@@ -141,12 +141,14 @@ describe('tests/e2e/lib/report.js — appendCase / writeReport / reportPathFor',
   });
 
   it('Test 6: by_error_class rejects unknown strings — closed-enum guard', () => {
-    // A future Phase 31 LLM mode might tag with LLM_HALLUCINATED_SELECTION;
-    // until that's added to RPT-02 it must NOT inflate by_error_class.
+    // The closed-enum guard must reject any errorClass that is NOT in
+    // ERROR_CLASSES. Phase 31 (LLM-04) promoted LLM_HALLUCINATED_SELECTION
+    // into the taxonomy, so we now use a hypothetical "future" code that is
+    // guaranteed-unknown to keep this guard test meaningful.
     appendCase(reportPath, makeCase({
       id: 'Z',
       status: 'failed',
-      errorClass: 'LLM_HALLUCINATED_SELECTION',
+      errorClass: 'FUTURE_UNCLASSIFIED_FAILURE_MODE_v999',
     }));
 
     const r = readReport();
@@ -155,7 +157,7 @@ describe('tests/e2e/lib/report.js — appendCase / writeReport / reportPathFor',
       expect(r.summary.by_error_class[k]).toBe(0);
     }
     // unknown key must NOT be added to by_error_class
-    expect(r.summary.by_error_class.LLM_HALLUCINATED_SELECTION).toBeUndefined();
+    expect(r.summary.by_error_class.FUTURE_UNCLASSIFIED_FAILURE_MODE_v999).toBeUndefined();
   });
 
   it('Test 7: skipped cases increment summary.skipped, not summary.failed', () => {
@@ -230,9 +232,15 @@ describe('tests/e2e/lib/report.js — appendCase / writeReport / reportPathFor',
   });
 
   it('Test 11 (sanity): ERROR_CLASSES re-export from report.js matches error-codes.js', () => {
-    expect(ERROR_CLASSES).toHaveLength(8);
+    // Phase 28 originally asserted length 8 (pre-WORKER_FALLBACK_FAILED).
+    // Phase 30 (INJ-02) added WORKER_FALLBACK_FAILED → length 9.
+    // Phase 31 (LLM-04) added LLM_HALLUCINATED_SELECTION + LLM_API_ERROR → length 11.
+    expect(ERROR_CLASSES).toHaveLength(11);
     expect(ERROR_CLASSES).toContain('EXTENSION_NOT_LOADED');
     expect(ERROR_CLASSES).toContain('VERIFIER_DISAGREE');
     expect(ERROR_CLASSES).toContain('FLAKE');
+    expect(ERROR_CLASSES).toContain('WORKER_FALLBACK_FAILED');
+    expect(ERROR_CLASSES).toContain('LLM_HALLUCINATED_SELECTION');
+    expect(ERROR_CLASSES).toContain('LLM_API_ERROR');
   });
 });

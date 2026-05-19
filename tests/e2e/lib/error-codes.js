@@ -22,6 +22,20 @@
 //                            fallback did not produce an accurate
 //                            citation; distinct from WRONG_CITATION
 //                            which applies to the standard live path)
+//   LLM_HALLUCINATED_SELECTION — Phase 31 exploratory mode: the LLM-chosen
+//                            selectedText was NOT found in the patent spec
+//                            (after wsNorm/tightNorm normalization). The
+//                            harness was NOT invoked. Distinct from
+//                            WRONG_CITATION so that "the LLM picks bad
+//                            selections" trends cannot be misattributed to
+//                            the plugin.
+//   LLM_API_ERROR          — Phase 31 exploratory mode: `claude -p`
+//                            invocation failed (timeout, JSON parse error,
+//                            is_error:true response, missing required
+//                            fields after 1 retry, claude CLI missing).
+//                            Cost may still be recorded if the response
+//                            contained total_cost_usd before the failure
+//                            (RESEARCH.md Pitfall 8).
 //
 // Phase 27 back-compat aliases (DO NOT REMOVE — existing specs import these):
 //   DOM_DRIFT          → aliased to GOOGLE_DOM_DRIFT (semantic supersede;
@@ -49,6 +63,19 @@ export const FLAKE = 'FLAKE';
 // (canary failures escalate to a Plan 30-04 investigation).
 export const WORKER_FALLBACK_FAILED = 'WORKER_FALLBACK_FAILED';
 
+// Phase 31 (LLM-04) — exploratory mode classifications.
+// LLM_HALLUCINATED_SELECTION: the LLM-chosen selectedText was not found
+//   in the patent spec (after wsNorm and tightNorm normalization). The
+//   harness was NOT invoked. Distinct from WRONG_CITATION (the plugin
+//   produced a wrong cite for valid selected text) so a "the LLM picks
+//   bad selections" trend cannot be misattributed to the plugin.
+// LLM_API_ERROR: claude -p invocation failed (timeout, JSON parse error,
+//   is_error: true, missing required JSON fields after 1 retry, claude
+//   CLI missing). Cost may still be recorded if the response contained
+//   total_cost_usd before failing (Phase 31 RESEARCH Pitfall 8).
+export const LLM_HALLUCINATED_SELECTION = 'LLM_HALLUCINATED_SELECTION';
+export const LLM_API_ERROR = 'LLM_API_ERROR';
+
 // Phase 27 back-compat aliases
 export const DOM_DRIFT = GOOGLE_DOM_DRIFT;
 export const SELECTION_FAILED = 'SELECTION_FAILED';
@@ -69,5 +96,7 @@ export const ERROR_CLASSES = Object.freeze([
   'GOOGLE_DOM_DRIFT',
   'USPTO_API_DRIFT',
   'FLAKE',
-  'WORKER_FALLBACK_FAILED',  // Phase 30 (INJ-02) addition
+  'WORKER_FALLBACK_FAILED',         // Phase 30 (INJ-02)
+  'LLM_HALLUCINATED_SELECTION',     // Phase 31 (LLM-04)
+  'LLM_API_ERROR',                  // Phase 31 (LLM-04)
 ]);

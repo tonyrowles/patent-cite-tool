@@ -33,10 +33,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// llm-pricing is imported (currently used only as fallback by callers).
-// Keep the import so the file relationship is explicit and the runtime
-// loader pre-parses both modules together. See RESEARCH.md Pitfall 6.
-import { PRICING_BY_MODEL } from './llm-pricing.js'; // eslint-disable-line no-unused-vars
+// llm-pricing is imported and re-exported so the file relationship is
+// explicit at the module graph level and callers can chain via llm-ledger
+// without taking a second import. See RESEARCH.md Pitfall 6 — total_cost_usd
+// is the canonical path; PRICING_BY_MODEL is fallback-only.
+import { PRICING_BY_MODEL } from './llm-pricing.js';
+export { PRICING_BY_MODEL };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

@@ -137,9 +137,23 @@ describe('tests/e2e/lib/llm-hallucination.js — extractSpecText (real PDF)', ()
     }
   }, 30_000);
 
-  itIfPdf('Test 11: density heuristic — bodyStartPage >= 2 for US11427642 (has cover page)', async () => {
-    const out = await extractSpecText('US11427642', { maxPages: 15 });
-    expect(out.bodyStartPage).toBeGreaterThanOrEqual(2);
+  itIfPdf('Test 11: density heuristic — high minBodyChars skips dense pages until threshold met', async () => {
+    // Empirically US11427642 page 1 is dense (~5068 chars — abstract + claims
+    // summary + references). With the default minBodyChars=500 the heuristic
+    // starts at page 1. To exercise the skip path itself we pass a
+    // minBodyChars threshold that is GUARANTEED higher than the early pages
+    // but lower than the body description pages.
+    //
+    // Per debug measurement of US11427642 pages 1-10: page 1 = 5068, page 6
+    // = 2859, page 7 = 745, page 9 = 2694, page 4 = 9325. A threshold of
+    // 6500 forces the skip path (skips pages 1, 2, 5, 6, 7, 8, 9, 10) until
+    // it finds a page with >=6500 chars (page 3 = 9247).
+    _clearSpecCache(); // ensure no warm cache from prior tests
+    const out = await extractSpecText('US11427642', { maxPages: 15, minBodyChars: 6500 });
+    // bodyStartPage must be the FIRST page >= 6500 chars. Per debug it's page 3.
+    expect(out.bodyStartPage).toBeGreaterThanOrEqual(3);
+    expect(out.bodyStartPage).toBeLessThanOrEqual(5);
+    expect(out.pagesExtracted).toBeGreaterThan(0);
   }, 30_000);
 
   itIfPdf('Test 12: _clearSpecCache empties the cache; next call re-reads PDF', async () => {

@@ -177,6 +177,20 @@ describe('parseClaudeResponse', () => {
     expect(r.ok).toBe(true);
     expect(r.modelId).toBe('unknown');
   });
+
+  // WR-03 — non-object JSON.parse results must NOT silently yield {ok:true}
+  // with empty fields (which would push validation into a misleading retry).
+  // All primitive-and-array payloads should classify as 'json_parse_error'.
+  it('8a (WR-03). non-object JSON payloads (null/number/string/bool/array) → json_parse_error, costUsd 0', () => {
+    const payloads = ['null', '42', '"a string"', 'true', '[1,2,3]'];
+    for (const stdout of payloads) {
+      const r = parseClaudeResponse({ timedOut: false, stdout, stderr: '', code: 0 });
+      expect(r.ok, `payload ${stdout}`).toBe(false);
+      expect(r.errorReason, `payload ${stdout}`).toBe('json_parse_error');
+      expect(r.costUsd, `payload ${stdout}`).toBe(0);
+      expect(r.rawSnippet.length, `payload ${stdout}`).toBeLessThanOrEqual(500);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -173,6 +173,21 @@ export function parseClaudeResponse(result) {
       rawSnippet: stdout.slice(0, 500),
     };
   }
+  // Non-object payload guard (WR-03). `JSON.parse('"a string"')`, '42', 'null',
+  // 'true', '[…]' all return non-object values for which `.total_cost_usd`,
+  // `.is_error`, `.modelUsage`, `.result` silently yield `undefined`. The
+  // original code would then return {ok:true, llmText:'', costUsd:0,
+  // modelId:'unknown'} and downstream validateLlmSelection('') would throw
+  // "JSON parse error: ... is not an object" — misclassified as schema failure
+  // (burning the retry budget) rather than a malformed claude response.
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {
+      ok: false,
+      errorReason: 'json_parse_error',
+      costUsd: 0,
+      rawSnippet: stdout.slice(0, 500),
+    };
+  }
   const costUsd = typeof parsed.total_cost_usd === 'number' ? parsed.total_cost_usd : 0;
   if (parsed.is_error) {
     return {

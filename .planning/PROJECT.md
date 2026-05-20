@@ -76,15 +76,15 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - ✓ **FOX-06**: Firefox extension passes `web-ext lint` with zero AMO-blocking validation errors/warnings — Validated in Phase 24: Firefox AMO Validation Cleanup
 - ✓ **CICD-04**: Pushing a `v*` tag triggers an automatic GitHub Release with built artifacts attached — Validated in Phase 25: Automatic Release Workflow
 
-### Active (v3.0)
+### Validated (v3.0)
 
-- Playwright + Chromium E2E harness that loads the unpacked extension and drives Google Patents pages
-- Deterministic regression mode against the 76 golden patents (local + nightly cron)
-- Independent PDF re-parse verifier (separate code path from the extension pipeline)
-- Nightly GitHub Actions cron with auto-issue filing on failure
-- Failure diagnostics capture: page screenshot, DOM snapshot, PDF page snippet for the cited column:line
-- USPTO/Worker fallback fault-injection test (catches silent regressions in the Cloudflare Worker path)
-- LLM exploratory mode using headless `claude -p` (Max 5 credit pool, local-dev only, soft monthly $100 cap with warning at $80)
+- Playwright + Chromium E2E harness that loads the unpacked extension and drives Google Patents pages — Phase 26
+- Deterministic regression mode against the 76 golden patents (local + nightly cron) — Phase 27
+- Independent PDF re-parse verifier (separate code path from the extension pipeline) — Phase 28
+- Nightly GitHub Actions cron with auto-issue filing on failure — Phase 29
+- Failure diagnostics capture: page screenshot, DOM snapshot, PDF page snippet for the cited column:line — Phase 27/28
+- USPTO/Worker fallback fault-injection test (catches silent regressions in the Cloudflare Worker path) — Phase 30
+- LLM exploratory mode using headless `claude -p` (Max 5 credit pool, local-dev only, hard $100 monthly cap with warning at $80, live-test deferred to HUMAN-UAT) — Phase 31
 
 ### Future
 
@@ -203,4 +203,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 — v3.0 milestone started (Autonomous E2E Testing Agent)*
+*Last updated: 2026-05-20 — v3.0 milestone all phases complete (LLM exploratory mode shipped; live LLM test deferred to HUMAN-UAT)*

@@ -3,7 +3,7 @@ phase: 31-llm-exploratory-mode-+-docs
 plan: 03
 subsystem: testing
 tags: [llm, claude-cli, driver, harness, exploratory-mode, vitest, esm]
-status: partial-checkpoint-pending
+status: complete-live-test-deferred
 
 # Dependency graph
 requires:
@@ -55,11 +55,17 @@ key-decisions:
   - "Per-iteration capCheck inside runOneIteration body (NOT just at startup) — LLM-06 contract: 'checked BEFORE each invocation, not after'"
   - "If LLM returns a different patentId than the candidate we sent, re-extract spec for the new patentId before hallucination check — never blame the plugin for an LLM patentId-substitution"
 
-requirements-completed: [LLM-01, LLM-02]
+requirements-completed: [LLM-01, LLM-02-by-construction]
+# Note: LLM-02 (subscription auth working in practice) is satisfied by construction
+# in the code (env: { ...process.env, ANTHROPIC_API_KEY: '' }) and by 27 mocked-spawn
+# unit tests, but has not been live-verified against the user's Max 5 subscription.
+# The live single-iteration test was deferred by the user during the human-verify
+# checkpoint — see "Task 3 — Deferred" section below. Tracked as a HUMAN-UAT item
+# for follow-up.
 
 # Metrics
-duration: TBD (live checkpoint outstanding)
-completed: 2026-05-19 (pending Task 3 live verification)
+duration: ~12 min (Tasks 1+2); Task 3 deferred
+completed: 2026-05-19 (Tasks 1+2 done; Task 3 live test deferred to HUMAN-UAT)
 ---
 
 # Phase 31 Plan 03: LLM Driver + Full Wiring Summary
@@ -171,11 +177,11 @@ Same as Plan 31-01's deferred list:
 
 Neither is in scope for Phase 31 plans.
 
-## Task 3 — CHECKPOINT (pending)
+## Task 3 — Deferred (live verification skipped at checkpoint)
 
 ### Status
 
-This plan is paused at Task 3 — a `checkpoint:human-verify` step that exercises the full driver against the user's real Max 5 subscription. The orchestrator has been notified and is expected to spawn a continuation agent after the user runs the verification and reports back.
+User chose **skip** at the human-verify checkpoint. Tasks 1+2 are merged; the live single-iteration test against the user's Max 5 subscription was NOT executed. LLM-02 is therefore satisfied by construction (env scrubbing + mocked-spawn tests prove the call shape) but has NOT been live-verified end-to-end. The deferred live test is tracked as a HUMAN-UAT item created by the phase verifier.
 
 ### What was built (for the human-verify)
 
@@ -189,26 +195,22 @@ A working `npm run e2e:explore -- --iterations 1` that, against the user's real 
 - Writes ONE iteration to `tests/e2e/artifacts/{run-id}/llm-report.json`
 - Writes ONE entry to `tests/e2e/.llm-spend-ledger.json` with non-zero cost
 
-### Continuation steps (for the next agent)
+### To execute the deferred live test later
 
-After the user runs the verification and reports back, the continuation agent must:
+From the main repo root, with no `ANTHROPIC_API_KEY` set:
 
-1. Update this SUMMARY's `duration:` and `completed:` frontmatter fields
-2. Update this SUMMARY's `status:` from `partial-checkpoint-pending` to (omit or `complete`)
-3. Append the Task 3 outcome section: cost, classification, run_id, model used
-4. Note any first-run observations (e.g., "first run cost $0.19 due to cache creation; subsequent ~$0.07") for Plan 04's troubleshooting section
-5. Run final self-check (3-step list)
-6. Commit the SUMMARY update and return PLAN COMPLETE to the orchestrator
+```bash
+unset ANTHROPIC_API_KEY
+npm run build:chrome   # if dist/chrome/manifest.json missing
+npm run e2e:explore -- --iterations 1
+LATEST=$(ls -t tests/e2e/artifacts/ | head -1)
+cat tests/e2e/artifacts/$LATEST/llm-report.json | jq .
+cat tests/e2e/.llm-spend-ledger.json | jq .
+```
 
-### Resume signal (per Plan 31-03 contract)
-
-User types `verified` and pastes:
-- the iteration's `classification` (from `tests/e2e/artifacts/{run-id}/llm-report.json` → `iterations[0].classification`)
-- the iteration's `cost_usd` (same file → `iterations[0].cost_usd`)
-
-If the run failed: user pastes stderr and stops; we triage instead.
+Expect: `iterations[0].cost_usd > 0`, a classification in {PASS, WRONG_CITATION, VERIFIER_DISAGREE, LLM_HALLUCINATED_SELECTION, LLM_API_ERROR}, and exactly one new ledger entry for the current month.
 
 ---
 *Phase: 31-llm-exploratory-mode-+-docs*
 *Plan: 03*
-*Status: PARTIAL — awaiting Task 3 human-verify checkpoint*
+*Status: Tasks 1+2 complete; Task 3 live test deferred to HUMAN-UAT*

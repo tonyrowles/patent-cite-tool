@@ -55,6 +55,24 @@ const RAW_RESPONSE_MAX_CHARS = 2000;
 const REQUIRED_ENTRY_FIELDS = ['iteration_n', 'iso', 'classification'];
 
 /**
+ * Crash-safe write (WR-04). Plain fs.writeFileSync truncates the destination
+ * before writing, so a crash, OOM, SIGKILL, or full-disk between the two
+ * leaves a corrupt JSON file — which readOrInit() treats as a fresh empty
+ * report, losing every iteration appended so far in the run. The temp-write
+ * + atomic rename pattern (POSIX rename(2) / Windows MoveFileEx) eliminates
+ * that truncate-and-die window: the destination always holds either the
+ * prior good state or the new good state.
+ *
+ * @param {string} destPath
+ * @param {string} content
+ */
+function atomicWriteJson(destPath, content) {
+  const tmpPath = `${destPath}.tmp.${process.pid}`;
+  fs.writeFileSync(tmpPath, content);
+  fs.renameSync(tmpPath, destPath);
+}
+
+/**
  * @param {string} runId
  * @returns {string} absolute path to that run's llm-report.json
  */
@@ -161,7 +179,7 @@ export function initLlmReport(reportPath, meta) {
   }
   const report = emptyReport(meta);
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  atomicWriteJson(reportPath, JSON.stringify(report, null, 2));
   return report;
 }
 
@@ -192,7 +210,7 @@ export function appendLlmIteration(reportPath, iteration) {
   report.summary = recomputeSummary(report.iterations);
   report.finished_iso = new Date().toISOString();
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  atomicWriteJson(reportPath, JSON.stringify(report, null, 2));
 }
 
 /**
@@ -206,6 +224,6 @@ export function finalizeLlmReport(reportPath) {
   const report = readOrInit(reportPath);
   report.finished_iso = new Date().toISOString();
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  atomicWriteJson(reportPath, JSON.stringify(report, null, 2));
   return report;
 }

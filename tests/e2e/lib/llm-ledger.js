@@ -181,5 +181,14 @@ export function appendLedgerEntry(ledgerPath, entry) {
   m.iterations.push(entry);
 
   fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
-  fs.writeFileSync(ledgerPath, JSON.stringify(ledger, null, 2));
+  // Crash-safe write (WR-04). fs.writeFileSync truncates first, then writes —
+  // a crash, OOM, SIGKILL, or full-disk between truncate and write would
+  // leave a partial/corrupt ledger that readLedger() treats as empty,
+  // silently zeroing the developer's monthly spend and bypassing the $100
+  // cap on the next run. The temp-write + rename pattern is atomic on the
+  // same filesystem (POSIX rename(2) / Windows MoveFileEx) and eliminates
+  // the truncate-and-die window.
+  const tmpPath = `${ledgerPath}.tmp.${process.pid}`;
+  fs.writeFileSync(tmpPath, JSON.stringify(ledger, null, 2));
+  fs.renameSync(tmpPath, ledgerPath);
 }

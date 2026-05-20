@@ -101,7 +101,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 28: Independent PDF Verifier** — Second code path that re-parses each PDF and confirms the cited text lives near the cited column:line; structured JSON report + failure taxonomy; PDF page snippet artifacts (completed 2026-05-15)
 - [x] **Phase 29: CI Nightly Cron + Auto-Issue Filing** — GitHub Actions nightly cron (rotating 30-patent sample, full 76 on Sundays); fingerprint-based idempotent auto-issue filing on failure (completed 2026-05-17)
 - [x] **Phase 30: Worker Fault-Injection** — Cloudflare Worker `X-PCT-Test-Mode` header skips KV writes; fault-injection E2E forces Google PDF failure and verifies USPTO fallback produces an accurate citation (completed 2026-05-18)
-- [ ] **Phase 31: LLM Exploratory Mode + Docs** — `npm run e2e:explore` drives Claude Code headless against fresh patent selections with local spend ledger ($80 warn / $100 hard-stop, CI-blocked); structured exploration report + `tests/e2e/README.md`
+- [x] **Phase 31: LLM Exploratory Mode + Docs** — `npm run e2e:explore` drives Claude Code headless against fresh patent selections with local spend ledger ($80 warn / $100 hard-stop, CI-blocked); structured exploration report + `tests/e2e/README.md` (completed 2026-05-20)
 
 ## Phase Details
 
@@ -228,4 +228,4 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 | 28. Independent PDF Verifier | v3.0 | 5/5 | Complete    | 2026-05-15 |
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 4/4 | Complete    | 2026-05-17 |
 | 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
-| 31. LLM Exploratory Mode + Docs | v3.0 | 0/0 | Not started | - |
+| 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete   | 2026-05-20 |

@@ -99,17 +99,34 @@ export async function invokeClaudeP({ systemPrompt, userPrompt, timeoutMs = LLM_
     child.stdout.on('data', (d) => { stdout += d.toString(); });
     child.stderr.on('data', (d) => { stderr += d.toString(); });
 
+    // SIGTERM → grace → SIGKILL escalation (WR-02). The `claude` CLI is
+    // Node-based and may install a graceful-shutdown handler that ignores
+    // SIGTERM for several seconds — during which it can still print
+    // `total_cost_usd` and incur billing. We resolve the promise immediately
+    // on timeout (so the runner can proceed) AND escalate to SIGKILL after a
+    // 2s grace if the child has not exited. Without the escalation, back-to-
+    // back timeouts could fan out orphan children that ALL bill the
+    // subscription pool — exactly what the spend cap is meant to prevent.
+    let killTimer = null;
     const timer = setTimeout(() => {
       try { child.kill('SIGTERM'); } catch { /* already exited */ }
+      killTimer = setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch { /* gone */ }
+      }, 2_000);
+      // Don't keep the event loop alive just to send SIGKILL — if the runner
+      // exits cleanly before grace elapses, that's fine.
+      if (typeof killTimer.unref === 'function') killTimer.unref();
       finish({ timedOut: true, stdout: '', stderr, code: null });
     }, timeoutMs);
 
     child.on('close', (code) => {
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       finish({ timedOut: false, stdout, stderr, code });
     });
     child.on('error', (err) => {
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       finish({ timedOut: false, stdout: '', stderr: err.message, code: -1 });
     });
   });

@@ -342,6 +342,54 @@ describe('buildPositionMap sequential column validation', () => {
     expect(cols).not.toContain(203);
     expect(cols).not.toContain(204);
   });
+
+  it('accepts a small forward gap (1,2 → 5,6) — figure pages between spec and claims', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 1, 2),
+      makeSpecPage(2, 5, 6), // gap of 2 missing columns (one figure page pair)
+    ]);
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).toContain(1);
+    expect(cols).toContain(2);
+    expect(cols).toContain(5);
+    expect(cols).toContain(6);
+  });
+
+  it('accepts gap and continues to next valid page (1,2 → 5,6 → 7,8)', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 1, 2),
+      makeSpecPage(2, 5, 6),
+      makeSpecPage(3, 7, 8),
+    ]);
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).toEqual(expect.arrayContaining([1, 2, 5, 6, 7, 8]));
+  });
+
+  it('rejects backward jump (3,4 → 1,2) — pages must advance, not retreat', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 3, 4),
+      makeSpecPage(2, 1, 2),
+    ]);
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).toContain(3);
+    expect(cols).toContain(4);
+    // Second page rejected — only the first page's columns appear after
+    // dedupe (assumes col 1 from the second page does not also appear).
+    expect(result.filter(e => e.column === 1).length).toBe(0);
+    expect(result.filter(e => e.column === 2).length).toBe(0);
+  });
+
+  it('rejects implausibly large forward gap (1,2 → 25,26) — patent-number contamination', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 1, 2),
+      makeSpecPage(2, 25, 26), // gap of 22 > MAX_PAGE_GAP=20
+    ]);
+    const cols = [...new Set(result.map(e => e.column))];
+    expect(cols).toContain(1);
+    expect(cols).toContain(2);
+    expect(cols).not.toContain(25);
+    expect(cols).not.toContain(26);
+  });
 });
 
 // ============================================================================

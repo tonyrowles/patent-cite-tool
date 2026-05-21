@@ -2,7 +2,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 1,
+    "lineNumber": 3,
     "text": "CONNECTING EXPANSION UNIT",
     "hasWrapHyphen": false,
     "x": 90.24000233559264,
@@ -14,7 +14,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 3,
+    "lineNumber": 5,
     "text": "This application is a Continuation of application Ser.",
     "hasWrapHyphen": false,
     "x": 65.04000554088071,
@@ -26,7 +26,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 4,
+    "lineNumber": 6,
     "text": "No. 07/578,533, filed on Sep. 7, 1990, now abandoned.",
     "hasWrapHyphen": false,
     "x": 56.400000364683834,
@@ -38,7 +38,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 6,
+    "lineNumber": 8,
     "text": "BACKGROUND OF THE INVENTION",
     "hasWrapHyphen": false,
     "x": 78.96000410837951,
@@ -50,7 +50,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 7,
+    "lineNumber": 9,
     "text": "1. Field of the Invention",
     "hasWrapHyphen": false,
     "x": 65.7599974665696,
@@ -62,7 +62,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 8,
+    "lineNumber": 10,
     "text": "The present invention relates to a computer capable O",
     "hasWrapHyphen": false,
     "x": 64.56000078945551,
@@ -74,7 +74,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 9,
+    "lineNumber": 11,
     "text": "of connecting an expansion unit.",
     "hasWrapHyphen": false,
     "x": 55.68000000275664,
@@ -86,7 +86,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 10,
+    "lineNumber": 12,
     "text": "2. Description of the Related Art",
     "hasWrapHyphen": false,
     "x": 64.31999640000001,
@@ -98,7 +98,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 11,
+    "lineNumber": 13,
     "text": "Various types of expansion units have recently been",
     "hasWrapHyphen": false,
     "x": 64.31999766546528,
@@ -110,7 +110,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 12,
+    "lineNumber": 14,
     "text": "developed to expand the functions of personal comput",
     "hasWrapHyphen": false,
     "x": 55.19999378207016,
@@ -122,7 +122,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 13,
+    "lineNumber": 15,
     "text": "ers such as laptop computers. When a computer main",
     "hasWrapHyphen": false,
     "x": 55.19999971246608,
@@ -134,7 +134,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 14,
+    "lineNumber": 16,
     "text": "body is connected to such an expansion unit, and power",
     "hasWrapHyphen": false,
     "x": 54.9600031592208,
@@ -146,7 +146,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 15,
+    "lineNumber": 17,
     "text": "supplies are subsequently turned on in accordance with",
     "hasWrapHyphen": false,
     "x": 54.95999902502256,
@@ -158,7 +158,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 16,
+    "lineNumber": 18,
     "text": "a predetermined sequence, a computer system consti",
     "hasWrapHyphen": false,
     "x": 54.96000462121728,
@@ -170,7 +170,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 17,
+    "lineNumber": 19,
     "text": "tuted by the computer main body and the expansion unit",
     "hasWrapHyphen": false,
     "x": 54.72000096269568,
@@ -182,7 +182,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 18,
+    "lineNumber": 20,
     "text": "is started.",
     "hasWrapHyphen": false,
     "x": 54.7200036,
@@ -194,7 +194,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 19,
+    "lineNumber": 21,
     "text": "The sequence of turning on the power supplies the",
     "hasWrapHyphen": false,
     "x": 63.60000405858215,
@@ -206,7 +206,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 20,
+    "lineNumber": 22,
     "text": "expansion unit and the computer main body connected",
     "hasWrapHyphen": false,
     "x": 54.7200067156272,
@@ -218,7 +218,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 21,
+    "lineNumber": 23,
     "text": "thereto is complicated for an operator. If the power",
     "hasWrapHyphen": false,
     "x": 54.48000374834904,
@@ -230,7 +230,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 22,
+    "lineNumber": 24,
     "text": "supplies are turned of in an incorrect sequence, an oper",
     "hasWrapHyphen": false,
     "x": 54.480001748744165,
@@ -242,7 +242,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 23,
+    "lineNumber": 25,
     "text": "ation error or a circuit breakdown may be caused.",
     "hasWrapHyphen": false,
     "x": 54.48000374834904,
@@ -254,7 +254,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 24,
+    "lineNumber": 26,
     "text": "In a conventional computer system, a connecting",
     "hasWrapHyphen": false,
     "x": 63.599995925021275,
@@ -266,7 +266,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 25,
+    "lineNumber": 27,
     "text": "state of an external I/O (input/output) device is",
     "hasWrapHyphen": false,
     "x": 54.239996812808634,
@@ -278,7 +278,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 26,
+    "lineNumber": 28,
     "text": "checked by an initial diagnosis test (IRT test). For ex",
     "hasWrapHyphen": false,
     "x": 54.23999564519352,
@@ -290,7 +290,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 27,
+    "lineNumber": 29,
     "text": "ample, a register capable of read/write operations is",
     "hasWrapHyphen": false,
     "x": 53.99999842506912,
@@ -302,7 +302,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 28,
+    "lineNumber": 30,
     "text": "arranged at an I/O port of each I/O interface, and data",
     "hasWrapHyphen": false,
     "x": 54.239996691681604,
@@ -314,7 +314,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 29,
+    "lineNumber": 31,
     "text": "representing a connecting state of an I/O device is",
     "hasWrapHyphen": false,
     "x": 54.479999278563845,
@@ -326,7 +326,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 30,
+    "lineNumber": 32,
     "text": "stored in the register in advance. In this case, when a",
     "hasWrapHyphen": false,
     "x": 53.9999970933744,
@@ -338,7 +338,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 31,
+    "lineNumber": 33,
     "text": "connecting state of an I/O device is to be checked, the",
     "hasWrapHyphen": false,
     "x": 54.00000528413327,
@@ -350,7 +350,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 32,
+    "lineNumber": 34,
     "text": "data in this register is read out. The I/O device, e.g., a",
     "hasWrapHyphen": false,
     "x": 53.7599961631248,
@@ -362,7 +362,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 33,
+    "lineNumber": 35,
     "text": "printer, connected to the I/O port is recognized on the",
     "hasWrapHyphen": false,
     "x": 53.759996400000006,
@@ -374,7 +374,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 34,
+    "lineNumber": 36,
     "text": "basis of the readout data.",
     "hasWrapHyphen": false,
     "x": 53.5199991522372,
@@ -386,7 +386,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 35,
+    "lineNumber": 37,
     "text": "In the above-described arrangement, no identical I/O",
     "hasWrapHyphen": false,
     "x": 62.64000097965504,
@@ -398,7 +398,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 36,
+    "lineNumber": 38,
     "text": "port addresses should be set on the same bus. However,",
     "hasWrapHyphen": false,
     "x": 53.760003303100326,
@@ -410,7 +410,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 37,
+    "lineNumber": 39,
     "text": "the port addresses of I/O devices are constant. There",
     "hasWrapHyphen": false,
     "x": 53.5200002264532,
@@ -422,7 +422,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 38,
+    "lineNumber": 40,
     "text": "fore, for example, the computer main body cannot be",
     "hasWrapHyphen": false,
     "x": 53.5200002264532,
@@ -434,7 +434,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 39,
+    "lineNumber": 41,
     "text": "connected to the expansion slot of an expansion unit",
     "hasWrapHyphen": false,
     "x": 53.5200002264532,
@@ -446,7 +446,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 40,
+    "lineNumber": 42,
     "text": "including an I/O interface which has the same I/O port",
     "hasWrapHyphen": false,
     "x": 53.51999389563288,
@@ -458,7 +458,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 41,
+    "lineNumber": 43,
     "text": "address as that of the I/O interface of the computer",
     "hasWrapHyphen": false,
     "x": 53.2800043880412,
@@ -470,7 +470,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 42,
+    "lineNumber": 44,
     "text": "main body because of the coincidence of the port ad",
     "hasWrapHyphen": false,
     "x": 53.280004588413114,
@@ -482,7 +482,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 43,
+    "lineNumber": 45,
     "text": "dresses. Accordingly, ifidentical I/O port addresses are",
     "hasWrapHyphen": false,
     "x": 53.51999885240184,
@@ -494,7 +494,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 44,
+    "lineNumber": 46,
     "text": "present on the same bus, an error occurs in the above",
     "hasWrapHyphen": false,
     "x": 53.03999981279999,
@@ -506,7 +506,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 45,
+    "lineNumber": 47,
     "text": "mentioned IRT test. Even if no error occurs in the IRT",
     "hasWrapHyphen": false,
     "x": 53.519999464799994,
@@ -518,7 +518,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 46,
+    "lineNumber": 48,
     "text": "test, collision of data on the data bus is caused during",
     "hasWrapHyphen": false,
     "x": 53.280002929377595,
@@ -530,7 +530,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 47,
+    "lineNumber": 49,
     "text": "execution of an application program. If an expansion",
     "hasWrapHyphen": false,
     "x": 53.04000086242631,
@@ -542,7 +542,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 48,
+    "lineNumber": 50,
     "text": "unit is used by changing its port address, an application",
     "hasWrapHyphen": false,
     "x": 53.28000335911176,
@@ -554,7 +554,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 49,
+    "lineNumber": 51,
     "text": "program cannot be operated.",
     "hasWrapHyphen": false,
     "x": 53.039996407061516,
@@ -566,7 +566,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 50,
+    "lineNumber": 52,
     "text": "Under the circumstances, a strong demand has arisen",
     "hasWrapHyphen": false,
     "x": 62.16000508020576,
@@ -578,7 +578,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 51,
+    "lineNumber": 53,
     "text": "for a computer system which can be efficiently operated",
     "hasWrapHyphen": false,
     "x": 53.040004759180796,
@@ -590,7 +590,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 52,
+    "lineNumber": 54,
     "text": "when a computer main body is connected to an expan",
     "hasWrapHyphen": false,
     "x": 53.039994241325516,
@@ -602,7 +602,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 53,
+    "lineNumber": 55,
     "text": "sion unit.",
     "hasWrapHyphen": false,
     "x": 52.800000345069115,
@@ -614,7 +614,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 55,
+    "lineNumber": 57,
     "text": "SUMMARY OF THE INVENTION",
     "hasWrapHyphen": false,
     "x": 85.91999972505599,
@@ -626,7 +626,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 56,
+    "lineNumber": 58,
     "text": "It is an object of the present invention to provide a",
     "hasWrapHyphen": false,
     "x": 62.15999398218072,
@@ -638,7 +638,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 57,
+    "lineNumber": 59,
     "text": "computer system capable of connecting an expansion",
     "hasWrapHyphen": false,
     "x": 52.80000520781952,
@@ -650,7 +650,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 58,
+    "lineNumber": 60,
     "text": "unit.",
     "hasWrapHyphen": false,
     "x": 52.80000033,
@@ -662,7 +662,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 59,
+    "lineNumber": 61,
     "text": "According to first aspect of the present invention,",
     "hasWrapHyphen": false,
     "x": 61.43999368362503,
@@ -674,7 +674,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 60,
+    "lineNumber": 62,
     "text": "there is provided a computer system comprising:",
     "hasWrapHyphen": false,
     "x": 52.56000082697327,
@@ -686,7 +686,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 61,
+    "lineNumber": 63,
     "text": "a computer main body having a plurality of main",
     "hasWrapHyphen": false,
     "x": 61.43999861748672,
@@ -698,7 +698,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 62,
+    "lineNumber": 64,
     "text": "elements;",
     "hasWrapHyphen": false,
     "x": 52.80000230285711,
@@ -710,7 +710,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 63,
+    "lineNumber": 65,
     "text": "an expansion unit having a plurality of expansion",
     "hasWrapHyphen": false,
     "x": 61.43999686565328,
@@ -722,7 +722,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 64,
+    "lineNumber": 66,
     "text": "elements;",
     "hasWrapHyphen": false,
     "x": 52.56000589479695,
@@ -734,7 +734,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 65,
+    "lineNumber": 67,
     "text": "interface means for connecting the expansion unit to",
     "hasWrapHyphen": false,
     "x": 61.4400012260208,
@@ -746,7 +746,7 @@
   {
     "page": 10,
     "column": 1,
-    "lineNumber": 66,
+    "lineNumber": 68,
     "text": "the computer main body;",
     "hasWrapHyphen": false,
     "x": 52.55999718382416,
@@ -758,7 +758,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 1,
+    "lineNumber": 2,
     "text": "voltages to the main elements when the main power",
     "hasWrapHyphen": false,
     "x": 285.59999520336385,
@@ -770,7 +770,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 2,
+    "lineNumber": 3,
     "text": "supply means is turned on and when a first power sup",
     "hasWrapHyphen": false,
     "x": 285.3599930433456,
@@ -782,7 +782,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 3,
+    "lineNumber": 4,
     "text": "ply voltage is received by the main power supply",
     "hasWrapHyphen": false,
     "x": 285.1200091875485,
@@ -794,7 +794,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 4,
+    "lineNumber": 5,
     "text": "means, and supplying a second power supply voltage",
     "hasWrapHyphen": false,
     "x": 285.12000242257676,
@@ -806,7 +806,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 5,
+    "lineNumber": 6,
     "text": "when the first element voltages are supplied to the main",
     "hasWrapHyphen": false,
     "x": 284.8799951916336,
@@ -818,7 +818,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 6,
+    "lineNumber": 7,
     "text": "elements; and",
     "hasWrapHyphen": false,
     "x": 284.87999232920305,
@@ -830,7 +830,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 7,
+    "lineNumber": 8,
     "text": "expansion power supply means for supplying the first",
     "hasWrapHyphen": false,
     "x": 293.52000489056445,
@@ -842,7 +842,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "power supply voltage to the main power supply means",
     "hasWrapHyphen": false,
     "x": 284.4000052220772,
@@ -854,7 +854,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 9,
+    "lineNumber": 10,
     "text": "when the expansion power supply means is turned on,",
     "hasWrapHyphen": false,
     "x": 284.4000056729411,
@@ -866,7 +866,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 10,
+    "lineNumber": 11,
     "text": "supplying second element voltages to the expansion",
     "hasWrapHyphen": false,
     "x": 284.1599953207476,
@@ -878,7 +878,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "elements when the second power supply voltage is",
     "hasWrapHyphen": false,
     "x": 284.16000172525395,
@@ -890,7 +890,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 12,
+    "lineNumber": 13,
     "text": "received by the expansion power supply means, and",
     "hasWrapHyphen": false,
     "x": 284.16000172525395,
@@ -902,7 +902,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "supplying an interface voltage to the interface means",
     "hasWrapHyphen": false,
     "x": 283.91999860223996,
@@ -914,7 +914,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "when the second element voltages are supplied to the",
     "hasWrapHyphen": false,
     "x": 283.9199975961466,
@@ -926,7 +926,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "expansion elements.",
     "hasWrapHyphen": false,
     "x": 283.6800065976264,
@@ -938,7 +938,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "According to second aspect of the present invention,",
     "hasWrapHyphen": false,
     "x": 292.3200039292075,
@@ -950,7 +950,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "there is provided a computer system comprising:",
     "hasWrapHyphen": false,
     "x": 283.44000160554043,
@@ -962,7 +962,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "a computer main body having a plurality of main",
     "hasWrapHyphen": false,
     "x": 292.08000233663995,
@@ -974,7 +974,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "input/output ports;",
     "hasWrapHyphen": false,
     "x": 283.2000044706878,
@@ -986,7 +986,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "an expansion unit having a plurality of expansion",
     "hasWrapHyphen": false,
     "x": 292.08000478755787,
@@ -998,7 +998,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "input/output ports;",
     "hasWrapHyphen": false,
     "x": 282.96000226368,
@@ -1010,7 +1010,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "determining means for determining whether or not",
     "hasWrapHyphen": false,
     "x": 291.84000115375824,
@@ -1022,7 +1022,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "main port addresses of the main input/output ports",
     "hasWrapHyphen": false,
     "x": 283.44000282496705,
@@ -1034,7 +1034,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "coincide with expansion port addresses ofthe expansion",
     "hasWrapHyphen": false,
     "x": 282.959996519159,
@@ -1046,7 +1046,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "input/output ports when the expansion unit is con",
     "hasWrapHyphen": false,
     "x": 282.72000437406336,
@@ -1058,7 +1058,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "nected to the computer main body; and",
     "hasWrapHyphen": false,
     "x": 282.96000577036915,
@@ -1070,7 +1070,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "port control means for disabling the main input/out",
     "hasWrapHyphen": false,
     "x": 291.36000493279533,
@@ -1082,7 +1082,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "put ports in accordance with a determination result.",
     "hasWrapHyphen": false,
     "x": 282.72000437406336,
@@ -1094,7 +1094,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "According to third aspect of the present invention,",
     "hasWrapHyphen": false,
     "x": 291.3599975153275,
@@ -1106,7 +1106,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "there is provided a computer system comprising:",
     "hasWrapHyphen": false,
     "x": 282.47999443824045,
@@ -1118,7 +1118,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "a computer main body having a plurality of main",
     "hasWrapHyphen": false,
     "x": 291.1199969124705,
@@ -1130,7 +1130,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "input/output ports; -",
     "hasWrapHyphen": true,
     "x": 282.4800048529524,
@@ -1142,7 +1142,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "an expansion unit having a plurality of expansion",
     "hasWrapHyphen": false,
     "x": 290.8800027990605,
@@ -1154,7 +1154,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "input/output ports;",
     "hasWrapHyphen": false,
     "x": 282.0000004296564,
@@ -1166,7 +1166,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "register means for storing identification data for iden",
     "hasWrapHyphen": false,
     "x": 291.59999738109883,
@@ -1178,7 +1178,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "tifying expansion input/output ports; and",
     "hasWrapHyphen": false,
     "x": 282.00000693186814,
@@ -1190,7 +1190,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "port control means for enabling/disabling the main",
     "hasWrapHyphen": false,
     "x": 290.880005841623,
@@ -1202,7 +1202,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "input/output ports in accordance with the stored identi",
     "hasWrapHyphen": false,
     "x": 281.99999802870576,
@@ -1214,7 +1214,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "fication data when the expansion unit is connected to",
     "hasWrapHyphen": false,
     "x": 282.00000244162555,
@@ -1226,7 +1226,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "the computer main body.",
     "hasWrapHyphen": false,
     "x": 281.7599922751334,
@@ -1238,7 +1238,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "BRIEF DESCRIPTION OF THE DRAWINGS",
     "hasWrapHyphen": false,
     "x": 291.35999616,
@@ -1250,7 +1250,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "The accompanying drawings, which are incorpo",
     "hasWrapHyphen": false,
     "x": 290.4000052606594,
@@ -1262,7 +1262,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "rated in and constitute a part of the specification, illus",
     "hasWrapHyphen": false,
     "x": 281.75999288430046,
@@ -1274,7 +1274,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "trate a presently preferred embodiment of the invention,",
     "hasWrapHyphen": false,
     "x": 281.51999515507464,
@@ -1286,7 +1286,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "and together with the general description given above",
     "hasWrapHyphen": false,
     "x": 281.51999515507464,
@@ -1298,7 +1298,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "and the detailed description of the preferred embodi",
     "hasWrapHyphen": false,
     "x": 281.51999515507464,
@@ -1310,7 +1310,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "ment given below, serve to explain the principles of the",
     "hasWrapHyphen": false,
     "x": 281.759998705974,
@@ -1322,7 +1322,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "invention.",
     "hasWrapHyphen": false,
     "x": 281.5200009384,
@@ -1334,7 +1334,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "FIGS. 1A and 1B are block diagrams showing an",
     "hasWrapHyphen": false,
     "x": 290.64000057581285,
@@ -1346,7 +1346,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "arrangement of a computer system according to an",
     "hasWrapHyphen": false,
     "x": 281.519992156294,
@@ -1358,7 +1358,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "embodiment of the present invention;",
     "hasWrapHyphen": false,
     "x": 281.51999711999997,
@@ -1370,7 +1370,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "FIG. 2 is a block diagram showing an arrangement of",
     "hasWrapHyphen": false,
     "x": 290.6400045631003,
@@ -1382,7 +1382,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "a power supply of an expansion unit in the computer",
     "hasWrapHyphen": false,
     "x": 281.5200036,
@@ -1394,7 +1394,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "system;",
     "hasWrapHyphen": false,
     "x": 281.5200017595,
@@ -1406,7 +1406,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "FIG. 3 is a block diagram showing an arrangement of",
     "hasWrapHyphen": false,
     "x": 290.6400045631003,
@@ -1418,7 +1418,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "an interface card in the computer system;",
     "hasWrapHyphen": false,
     "x": 281.5200010688738,
@@ -1430,7 +1430,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "FIGS. 4A to 4C are views each showing an outer",
     "hasWrapHyphen": false,
     "x": 290.8800042900912,
@@ -1442,7 +1442,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "appearance of the computer system; and",
     "hasWrapHyphen": false,
     "x": 281.5200036,
@@ -1454,7 +1454,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "FIGS. 5 and 6 are flow charts for explaining I/O",
     "hasWrapHyphen": false,
     "x": 290.40000660891434,
@@ -1466,7 +1466,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "interface selection processing.",
     "hasWrapHyphen": false,
     "x": 281.27999561389004,
@@ -1478,7 +1478,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "DETALED DESCRIPTION OF THE",
     "hasWrapHyphen": false,
     "x": 308.159999013888,
@@ -1490,7 +1490,7 @@
   {
     "page": 10,
     "column": 2,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "PREFERRED EMBODIMENTS",
     "hasWrapHyphen": false,
     "x": 320.640002004,
@@ -1538,7 +1538,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 1,
+    "lineNumber": 3,
     "text": "stant voltage circuit 52c, as shown in FIG. 2.",
     "hasWrapHyphen": false,
     "x": 54.720006319320476,
@@ -1550,7 +1550,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 2,
+    "lineNumber": 4,
     "text": "The AC/DC converter 52a rectifies/smooths a com",
     "hasWrapHyphen": false,
     "x": 63.120000794320084,
@@ -1562,7 +1562,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 3,
+    "lineNumber": 5,
     "text": "mercial AC voltage from the power supply adapter and",
     "hasWrapHyphen": false,
     "x": 54.71999850324527,
@@ -1574,7 +1574,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 4,
+    "lineNumber": 6,
     "text": "generates a DC voltage (-15 V, -12 V, -12V, +5 V,",
     "hasWrapHyphen": false,
     "x": 54.47999416554048,
@@ -1586,7 +1586,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 5,
+    "lineNumber": 7,
     "text": "and -5 v).",
     "hasWrapHyphen": false,
     "x": 54.4800052901004,
@@ -1598,7 +1598,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 6,
+    "lineNumber": 8,
     "text": "The constant voltage circuit 52c supplies DC operat",
     "hasWrapHyphen": false,
     "x": 62.879993400000004,
@@ -1610,7 +1610,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 7,
+    "lineNumber": 9,
     "text": "ing voltages (+12 V, -12 V, --5 V, and -5 V) from",
     "hasWrapHyphen": false,
     "x": 54.2400064541016,
@@ -1622,7 +1622,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 8,
+    "lineNumber": 10,
     "text": "the AC/DC converter 52a to the respective compo",
     "hasWrapHyphen": false,
     "x": 54.2400069,
@@ -1634,7 +1634,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 9,
+    "lineNumber": 11,
     "text": "nents of the expansion unit 2, and supplies a DC voltage",
     "hasWrapHyphen": false,
     "x": 54.240003232623366,
@@ -1646,7 +1646,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 10,
+    "lineNumber": 12,
     "text": "(+15 V) to the power supply 20 of the computer main",
     "hasWrapHyphen": false,
     "x": 54.239999267505596,
@@ -1658,7 +1658,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 11,
+    "lineNumber": 13,
     "text": "body 1.",
     "hasWrapHyphen": false,
     "x": 53.99999955,
@@ -1670,7 +1670,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 12,
+    "lineNumber": 14,
     "text": "The power supply controller 52b controls supply of",
     "hasWrapHyphen": false,
     "x": 62.64000008262215,
@@ -1682,7 +1682,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 13,
+    "lineNumber": 16,
     "text": "DC voltages from the constant voltage circuit 52c.",
     "hasWrapHyphen": false,
     "x": 54.48000576447001,
@@ -1694,7 +1694,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 14,
+    "lineNumber": 16,
     "text": "More specifically, no DC operating voltages (+12 V,",
     "hasWrapHyphen": false,
     "x": 54.000006448351684,
@@ -1706,7 +1706,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 15,
+    "lineNumber": 18,
     "text": "-12 V, --5V, and -5V) are supplied to the respective",
     "hasWrapHyphen": false,
     "x": 54.96000384,
@@ -1718,7 +1718,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 16,
+    "lineNumber": 18,
     "text": "components of the expansion unit 2 until a power supply",
     "hasWrapHyphen": false,
     "x": 53.999998080000005,
@@ -1730,7 +1730,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 17,
+    "lineNumber": 20,
     "text": "enable signal from the voltage detector (DET) 51 is",
     "hasWrapHyphen": false,
     "x": 54.000001548355684,
@@ -1742,7 +1742,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 18,
+    "lineNumber": 20,
     "text": "received.",
     "hasWrapHyphen": false,
     "x": 54.47999484851616,
@@ -1754,7 +1754,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 19,
+    "lineNumber": 22,
     "text": "A switch 53 is used to turn on and off the power",
     "hasWrapHyphen": false,
     "x": 62.399995014297595,
@@ -1766,7 +1766,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 20,
+    "lineNumber": 23,
     "text": "supply 52 of the expansion unit 2.",
     "hasWrapHyphen": false,
     "x": 54.0000043994976,
@@ -1778,7 +1778,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 21,
+    "lineNumber": 24,
     "text": "An ID register (ID-REG) 54 is connected to the",
     "hasWrapHyphen": false,
     "x": 62.39999674748543,
@@ -1790,7 +1790,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 22,
+    "lineNumber": 25,
     "text": "system bus 90 of the expansion unit 2 so as to store unit",
     "hasWrapHyphen": false,
     "x": 53.760004727586725,
@@ -1802,7 +1802,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 23,
+    "lineNumber": 26,
     "text": "ID data inherent in the expansion unit 2. A port address",
     "hasWrapHyphen": false,
     "x": 54.23999993166289,
@@ -1814,7 +1814,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 24,
+    "lineNumber": 27,
     "text": "assigned to the I/O port of each I/O interface of the",
     "hasWrapHyphen": false,
     "x": 53.76000295522272,
@@ -1826,7 +1826,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 25,
+    "lineNumber": 28,
     "text": "expansion unit 2 can be recognized by referring to this",
     "hasWrapHyphen": false,
     "x": 53.7599977374936,
@@ -1838,7 +1838,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 26,
+    "lineNumber": 29,
     "text": "unit ID data.",
     "hasWrapHyphen": false,
     "x": 53.999997937327194,
@@ -1850,7 +1850,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 27,
+    "lineNumber": 30,
     "text": "An address decoder (DEC) 55 performs address de",
     "hasWrapHyphen": false,
     "x": 62.40000069400559,
@@ -1862,7 +1862,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 28,
+    "lineNumber": 31,
     "text": "tection with respect to the ID register 54.",
     "hasWrapHyphen": false,
     "x": 53.760002459909764,
@@ -1874,7 +1874,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 29,
+    "lineNumber": 32,
     "text": "A printer interface 61 is arranged between the system",
     "hasWrapHyphen": false,
     "x": 62.39999682394559,
@@ -1886,7 +1886,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 30,
+    "lineNumber": 33,
     "text": "bus 90 and a printer connector 85a so as to transmit/-",
     "hasWrapHyphen": true,
     "x": 53.519994527403355,
@@ -1898,7 +1898,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 31,
+    "lineNumber": 34,
     "text": "receive data and the like to/from a device such as a",
     "hasWrapHyphen": false,
     "x": 54.47999937481152,
@@ -1910,7 +1910,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 32,
+    "lineNumber": 35,
     "text": "printer connected to the printer connector 85a. Note",
     "hasWrapHyphen": false,
     "x": 53.760003462594234,
@@ -1922,7 +1922,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 33,
+    "lineNumber": 36,
     "text": "that the printer interface 61 has the same arrangement as",
     "hasWrapHyphen": false,
     "x": 53.760006318805914,
@@ -1934,7 +1934,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 34,
+    "lineNumber": 37,
     "text": "that of the printer interface 31 and hence includes a",
     "hasWrapHyphen": false,
     "x": 53.76,
@@ -1946,7 +1946,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 35,
+    "lineNumber": 38,
     "text": "printer port (PRT-PORT) 611, an address decoder",
     "hasWrapHyphen": false,
     "x": 53.75999454584544,
@@ -1958,7 +1958,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 36,
+    "lineNumber": 39,
     "text": "(DEC) 612, an input/output port (I/O-PORT) 613, an",
     "hasWrapHyphen": false,
     "x": 53.999999087394954,
@@ -1970,7 +1970,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 37,
+    "lineNumber": 40,
     "text": "address decoder (DEC) 614, and a controller (CNT)",
     "hasWrapHyphen": false,
     "x": 53.75999454516527,
@@ -1982,7 +1982,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 38,
+    "lineNumber": 41,
     "text": "615.",
     "hasWrapHyphen": false,
     "x": 53.76000390100487,
@@ -1994,7 +1994,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 39,
+    "lineNumber": 42,
     "text": "A first RS-232C interface 62 is arranged between the",
     "hasWrapHyphen": false,
     "x": 62.400004955122085,
@@ -2006,7 +2006,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 40,
+    "lineNumber": 43,
     "text": "system bus 90 and an RS-232C connector 85b so as to",
     "hasWrapHyphen": false,
     "x": 53.76000247890719,
@@ -2018,7 +2018,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 41,
+    "lineNumber": 44,
     "text": "transmit/receive data and the like to/from a device",
     "hasWrapHyphen": false,
     "x": 53.760001461225116,
@@ -2030,7 +2030,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 42,
+    "lineNumber": 45,
     "text": "connected to the RS-232C connector 85b, In addition, a",
     "hasWrapHyphen": false,
     "x": 53.759997988848475,
@@ -2042,7 +2042,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 43,
+    "lineNumber": 46,
     "text": "second RS-232C interface 63 is arranged between the",
     "hasWrapHyphen": false,
     "x": 53.75999454516527,
@@ -2054,7 +2054,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 44,
+    "lineNumber": 47,
     "text": "system bus 90 and an RS-232C connector 85c so as to",
     "hasWrapHyphen": false,
     "x": 54.000000234129594,
@@ -2066,7 +2066,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 45,
+    "lineNumber": 48,
     "text": "transmit/receive data and the like to/from a device",
     "hasWrapHyphen": false,
     "x": 54.00000274619232,
@@ -2078,7 +2078,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 46,
+    "lineNumber": 49,
     "text": "connected to the RS-232C connector 85c. Note that the",
     "hasWrapHyphen": false,
     "x": 53.99999945999999,
@@ -2090,7 +2090,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 47,
+    "lineNumber": 50,
     "text": "RS-232C interfaces 62 and 63 have the same arrange",
     "hasWrapHyphen": false,
     "x": 54.95999466282624,
@@ -2102,7 +2102,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 48,
+    "lineNumber": 51,
     "text": "ment as that of the RS-232C interfaces 32 and 33 and",
     "hasWrapHyphen": false,
     "x": 54.23999849508864,
@@ -2114,7 +2114,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 49,
+    "lineNumber": 52,
     "text": "hence respectively include serial input/output ports",
     "hasWrapHyphen": false,
     "x": 54.00000630018719,
@@ -2126,7 +2126,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 50,
+    "lineNumber": 53,
     "text": "(SIOs) 621 and 631, drivers (DRVs) 622 and 632, ad",
     "hasWrapHyphen": false,
     "x": 54.24000426088032,
@@ -2138,7 +2138,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 51,
+    "lineNumber": 54,
     "text": "dress decoders (DECs) 623 and 633, input/output ports",
     "hasWrapHyphen": false,
     "x": 53.999999087394954,
@@ -2150,7 +2150,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 52,
+    "lineNumber": 55,
     "text": "(I/O-PORTs) 624 and 634, address decoders (DECs)",
     "hasWrapHyphen": false,
     "x": 54.24000243809856,
@@ -2162,7 +2162,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 53,
+    "lineNumber": 56,
     "text": "625 and 635, and controllers (CNTs) 626 and 636.",
     "hasWrapHyphen": false,
     "x": 54.239996783760475,
@@ -2174,7 +2174,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 54,
+    "lineNumber": 57,
     "text": "Referring to FIG. 3, the interface card 3 is used as an",
     "hasWrapHyphen": false,
     "x": 63.35999919861167,
@@ -2186,7 +2186,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 55,
+    "lineNumber": 58,
     "text": "interface between the system bus 70 of the computer",
     "hasWrapHyphen": false,
     "x": 54.00000648768,
@@ -2198,7 +2198,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 56,
+    "lineNumber": 59,
     "text": "main body1 and the system bus 90 ofthe expansion unit",
     "hasWrapHyphen": false,
     "x": 54.24000014679552,
@@ -2210,7 +2210,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 57,
+    "lineNumber": 60,
     "text": "2.",
     "hasWrapHyphen": false,
     "x": 53.76,
@@ -2222,7 +2222,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 58,
+    "lineNumber": 61,
     "text": "An address bus driver 3i transfers address data on the",
     "hasWrapHyphen": false,
     "x": 62.63999813373624,
@@ -2234,7 +2234,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 59,
+    "lineNumber": 62,
     "text": "address bus 70c of the computer main body 1 to the",
     "hasWrapHyphen": false,
     "x": 54.23999901589153,
@@ -2246,7 +2246,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 60,
+    "lineNumber": 63,
     "text": "address bus 90c of the expansion unit 2. A data bus",
     "hasWrapHyphen": false,
     "x": 54.24000108595488,
@@ -2258,7 +2258,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 61,
+    "lineNumber": 64,
     "text": "driver 3g transfers data on the data bus 70b to the data",
     "hasWrapHyphen": false,
     "x": 54.23999422673519,
@@ -2270,7 +2270,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 62,
+    "lineNumber": 65,
     "text": "bus 90b. Control bus drivers 3b and 3e transfer control",
     "hasWrapHyphen": false,
     "x": 54.24000048,
@@ -2282,7 +2282,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 63,
+    "lineNumber": 66,
     "text": "data on the control bus 70a to the control bus 90a. Note",
     "hasWrapHyphen": false,
     "x": 54.480003554102396,
@@ -2294,7 +2294,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 64,
+    "lineNumber": 67,
     "text": "that the bus drivers 3b, 3e, 3g, and 3i are enabled by a",
     "hasWrapHyphen": false,
     "x": 54.4800045174252,
@@ -2306,7 +2306,7 @@
   {
     "page": 12,
     "column": 5,
-    "lineNumber": 65,
+    "lineNumber": 68,
     "text": "voltage (+5 V) from the power supply 52.",
     "hasWrapHyphen": false,
     "x": 54.72000439490112,
@@ -2318,7 +2318,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 1,
+    "lineNumber": 3,
     "text": "bus 70c of the computer main body 1. A data bus driver",
     "hasWrapHyphen": false,
     "x": 282.9599995106866,
@@ -2330,7 +2330,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 2,
+    "lineNumber": 4,
     "text": "3ftransfers data on the data bus 90b to the data bus 70b.",
     "hasWrapHyphen": false,
     "x": 282.9600023681357,
@@ -2342,7 +2342,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 3,
+    "lineNumber": 5,
     "text": "Control bus drivers 3a and 3d transfer control data on",
     "hasWrapHyphen": false,
     "x": 282.95999676720965,
@@ -2354,7 +2354,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 4,
+    "lineNumber": 6,
     "text": "the control bus 90a to the control bus 70a. Note that the",
     "hasWrapHyphen": false,
     "x": 282.72000110999636,
@@ -2366,7 +2366,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 5,
+    "lineNumber": 7,
     "text": "bus drivers 3a, 3d, 3f, and 3h are enabled by a voltage",
     "hasWrapHyphen": false,
     "x": 282.47999811355226,
@@ -2378,7 +2378,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 6,
+    "lineNumber": 8,
     "text": "(+5 V) from the power supply 20.",
     "hasWrapHyphen": false,
     "x": 282.71999851199996,
@@ -2390,7 +2390,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 7,
+    "lineNumber": 9,
     "text": "A controller 3c controls driving ofthe bus drivers 3a,",
     "hasWrapHyphen": false,
     "x": 291.35999837959605,
@@ -2402,7 +2402,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 8,
+    "lineNumber": 10,
     "text": "3b, 3d to 3i. Note that the controller 3c is enabled by a",
     "hasWrapHyphen": false,
     "x": 282.72000312971426,
@@ -2414,7 +2414,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 9,
+    "lineNumber": 11,
     "text": "voltage (+5 V) from the power supply 20.",
     "hasWrapHyphen": false,
     "x": 282.47999974943497,
@@ -2426,7 +2426,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 10,
+    "lineNumber": 12,
     "text": "As described above, the bus drivers for transferring",
     "hasWrapHyphen": false,
     "x": 291.1200017246162,
@@ -2438,7 +2438,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 11,
+    "lineNumber": 13,
     "text": "data from the computer main body 1 to the expansion",
     "hasWrapHyphen": false,
     "x": 282.23999440946204,
@@ -2450,7 +2450,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 12,
+    "lineNumber": 14,
     "text": "unit 2 are not enabled until operating voltages are ap",
     "hasWrapHyphen": false,
     "x": 282.23999482469856,
@@ -2462,7 +2462,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 13,
+    "lineNumber": 15,
     "text": "plied from the power supply 52 of the expansion unit 2",
     "hasWrapHyphen": false,
     "x": 282.00000515061305,
@@ -2474,7 +2474,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 14,
+    "lineNumber": 16,
     "text": "to the respective components, and the expansion unit 2",
     "hasWrapHyphen": false,
     "x": 282.0000067361472,
@@ -2486,7 +2486,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 15,
+    "lineNumber": 17,
     "text": "is in an operative state. This prevents breakdown of the",
     "hasWrapHyphen": false,
     "x": 282.00000572694194,
@@ -2498,7 +2498,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 16,
+    "lineNumber": 18,
     "text": "components of the expansion unit 2 when data is trans",
     "hasWrapHyphen": false,
     "x": 282.00000572694194,
@@ -2510,7 +2510,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 17,
+    "lineNumber": 19,
     "text": "ferred from the computer main body 1 to the expansion",
     "hasWrapHyphen": false,
     "x": 282.00000693186814,
@@ -2522,7 +2522,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 18,
+    "lineNumber": 20,
     "text": "unit 2 before the expansion unit 2 is in an operative state.",
     "hasWrapHyphen": false,
     "x": 282.23999928784076,
@@ -2534,7 +2534,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 19,
+    "lineNumber": 21,
     "text": "An operation of the system of this embodiment will",
     "hasWrapHyphen": false,
     "x": 290.40000066,
@@ -2546,7 +2546,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 20,
+    "lineNumber": 22,
     "text": "be described below. In this case, after the expansion unit",
     "hasWrapHyphen": false,
     "x": 281.75999496000003,
@@ -2558,7 +2558,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 21,
+    "lineNumber": 23,
     "text": "2 is connected to the computer main body 1, the power",
     "hasWrapHyphen": false,
     "x": 281.75999798436357,
@@ -2570,7 +2570,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 22,
+    "lineNumber": 24,
     "text": "supplies are subsequently turned on.",
     "hasWrapHyphen": false,
     "x": 281.7599958652565,
@@ -2582,7 +2582,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 23,
+    "lineNumber": 25,
     "text": "After the interface card 3 is connected to the expan",
     "hasWrapHyphen": false,
     "x": 290.40000408000003,
@@ -2594,7 +2594,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 24,
+    "lineNumber": 26,
     "text": "sion bus connector 75 ofthe computer main body 1, the",
     "hasWrapHyphen": false,
     "x": 281.76000483825504,
@@ -2606,7 +2606,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 25,
+    "lineNumber": 27,
     "text": "expansion unit 2 is connected to the computer main",
     "hasWrapHyphen": false,
     "x": 281.76000343133825,
@@ -2618,7 +2618,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 26,
+    "lineNumber": 28,
     "text": "body 1 through the interface card 3. The power supply",
     "hasWrapHyphen": false,
     "x": 281.76000214420344,
@@ -2630,7 +2630,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 27,
+    "lineNumber": 29,
     "text": "connector 6 of the expansion unit 2 is connected to the",
     "hasWrapHyphen": false,
     "x": 281.5200019468872,
@@ -2642,7 +2642,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 28,
+    "lineNumber": 30,
     "text": "power supply connector 5 of the computer main body 1.",
     "hasWrapHyphen": false,
     "x": 281.76000214420344,
@@ -2654,7 +2654,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 29,
+    "lineNumber": 31,
     "text": "In addition, the power supply adapter is connected to",
     "hasWrapHyphen": false,
     "x": 281.7599936999184,
@@ -2666,7 +2666,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 30,
+    "lineNumber": 32,
     "text": "the expansion unit 2.",
     "hasWrapHyphen": false,
     "x": 281.5200012543739,
@@ -2678,7 +2678,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 31,
+    "lineNumber": 33,
     "text": "If the switch 53 of the expansion unit 2 is turned on",
     "hasWrapHyphen": false,
     "x": 290.4000013900061,
@@ -2690,7 +2690,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 32,
+    "lineNumber": 34,
     "text": "after completion of connection of the expansion unit 2,",
     "hasWrapHyphen": false,
     "x": 281.51999942077055,
@@ -2702,7 +2702,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 33,
+    "lineNumber": 35,
     "text": "a voltage (-15V) is applied from the power supply 52",
     "hasWrapHyphen": false,
     "x": 281.5199964461642,
@@ -2714,7 +2714,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 34,
+    "lineNumber": 36,
     "text": "to the computer main body 1. In this case, no operating",
     "hasWrapHyphen": false,
     "x": 281.5199935228435,
@@ -2726,7 +2726,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 35,
+    "lineNumber": 37,
     "text": "voltages (-- 12 V, -12 V, --5V, and -5V) are applied",
     "hasWrapHyphen": false,
     "x": 281.520004525897,
@@ -2738,7 +2738,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 36,
+    "lineNumber": 38,
     "text": "to the respective components of the expansion unit 2.",
     "hasWrapHyphen": false,
     "x": 281.519996255454,
@@ -2750,7 +2750,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 37,
+    "lineNumber": 39,
     "text": "If the switch 21 is turned on at this time, operating",
     "hasWrapHyphen": false,
     "x": 290.64000565655374,
@@ -2762,7 +2762,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 38,
+    "lineNumber": 40,
     "text": "voltages (-- 12 V, -12 V, -9 V, --5 V, and -5V) are",
     "hasWrapHyphen": false,
     "x": 281.51999241412034,
@@ -2774,7 +2774,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 39,
+    "lineNumber": 41,
     "text": "applied from the power supply 20 ofthe computer main",
     "hasWrapHyphen": false,
     "x": 281.5199964461642,
@@ -2786,7 +2786,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 40,
+    "lineNumber": 42,
     "text": "body 1 to the respective components of the computer",
     "hasWrapHyphen": false,
     "x": 281.27999576308224,
@@ -2798,7 +2798,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 41,
+    "lineNumber": 43,
     "text": "main body 1 on the basis of the voltage (--15V) from",
     "hasWrapHyphen": false,
     "x": 281.76000483825504,
@@ -2810,7 +2810,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 42,
+    "lineNumber": 44,
     "text": "the power supply 52. In addition, the voltage (+5 V)",
     "hasWrapHyphen": false,
     "x": 281.5199964461642,
@@ -2822,7 +2822,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 43,
+    "lineNumber": 45,
     "text": "from the power supply 20 is applied to the expansion",
     "hasWrapHyphen": false,
     "x": 281.76000322347096,
@@ -2834,7 +2834,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 44,
+    "lineNumber": 46,
     "text": "unit 2 through the interface card 3.",
     "hasWrapHyphen": false,
     "x": 281.75999581803075,
@@ -2846,7 +2846,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 45,
+    "lineNumber": 47,
     "text": "In the interface card 3, the bus drivers 3a, 3d, 3f, and",
     "hasWrapHyphen": false,
     "x": 291.1200006206688,
@@ -2858,7 +2858,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 46,
+    "lineNumber": 48,
     "text": "3h, and the controller 3c are enabled by the voltage (--5",
     "hasWrapHyphen": false,
     "x": 281.5199983207781,
@@ -2870,7 +2870,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 47,
+    "lineNumber": 49,
     "text": "V) from the power supply 20.",
     "hasWrapHyphen": false,
     "x": 281.7600012599097,
@@ -2882,7 +2882,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 48,
+    "lineNumber": 50,
     "text": "When the voltage (+5 V) from the power supply 20",
     "hasWrapHyphen": false,
     "x": 290.64000189888714,
@@ -2894,7 +2894,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 49,
+    "lineNumber": 51,
     "text": "is detected by the voltage detector 51 of the expansion",
     "hasWrapHyphen": false,
     "x": 282.00000572694194,
@@ -2906,7 +2906,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 50,
+    "lineNumber": 52,
     "text": "unit 2, an operation check signal is supplied to the",
     "hasWrapHyphen": false,
     "x": 282.0000041909561,
@@ -2918,7 +2918,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 51,
+    "lineNumber": 53,
     "text": "power supply 52. In response to the operation check",
     "hasWrapHyphen": false,
     "x": 282.00000223129246,
@@ -2930,7 +2930,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 52,
+    "lineNumber": 54,
     "text": "signal, the power supply controller 52b of the power",
     "hasWrapHyphen": false,
     "x": 281.99999747799,
@@ -2942,7 +2942,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 53,
+    "lineNumber": 55,
     "text": "supply 52 determines that the computer main body 1 is",
     "hasWrapHyphen": false,
     "x": 282.0000072889454,
@@ -2954,7 +2954,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 54,
+    "lineNumber": 56,
     "text": "in an operative state. As a result, an operating voltage is",
     "hasWrapHyphen": false,
     "x": 281.999995424365,
@@ -2966,7 +2966,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 55,
+    "lineNumber": 57,
     "text": "applied to each component of the expansion unit 2. That",
     "hasWrapHyphen": false,
     "x": 282.2399959498617,
@@ -2978,7 +2978,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 56,
+    "lineNumber": 58,
     "text": "is, when the expansion unit 2 receives the operation",
     "hasWrapHyphen": false,
     "x": 282.2400004065751,
@@ -2990,7 +2990,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 57,
+    "lineNumber": 59,
     "text": "check signal, which is supplied upon detection of the",
     "hasWrapHyphen": false,
     "x": 282.47999316070747,
@@ -3002,7 +3002,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 58,
+    "lineNumber": 60,
     "text": "voltage (--5 V) from the power supply 20 of the com",
     "hasWrapHyphen": false,
     "x": 282.4799986841933,
@@ -3014,7 +3014,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 59,
+    "lineNumber": 61,
     "text": "puter main body 1, through the interface card 3, the",
     "hasWrapHyphen": false,
     "x": 282.23999500049496,
@@ -3026,7 +3026,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 60,
+    "lineNumber": 62,
     "text": "operating voltage can be applied to each component.",
     "hasWrapHyphen": false,
     "x": 282.48000400238544,
@@ -3038,7 +3038,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 61,
+    "lineNumber": 63,
     "text": "Of the operating voltages (-12 V, -12 V, --5 V,",
     "hasWrapHyphen": false,
     "x": 291.35999837959605,
@@ -3050,7 +3050,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 62,
+    "lineNumber": 64,
     "text": "and -5 V) to be applied to the respective components,",
     "hasWrapHyphen": false,
     "x": 282.47999887289086,
@@ -3062,7 +3062,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 63,
+    "lineNumber": 65,
     "text": "a predetermined operating voltage (--5 V) is applied to",
     "hasWrapHyphen": false,
     "x": 282.719999311794,
@@ -3074,7 +3074,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 64,
+    "lineNumber": 66,
     "text": "the interface card 3. In the interface card 3, the bus",
     "hasWrapHyphen": false,
     "x": 282.7199984632858,
@@ -3086,7 +3086,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 65,
+    "lineNumber": 67,
     "text": "drivers 3b, 3e, 3g, and 3i are enabled by this operating",
     "hasWrapHyphen": false,
     "x": 282.9599963740339,
@@ -3098,7 +3098,7 @@
   {
     "page": 12,
     "column": 6,
-    "lineNumber": 66,
+    "lineNumber": 68,
     "text": "voltage (--5 V).",
     "hasWrapHyphen": false,
     "x": 282.9599978250225,
@@ -3110,7 +3110,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 1,
+    "lineNumber": 2,
     "text": "the start of the system is completed.",
     "hasWrapHyphen": false,
     "x": 56.63999346253871,
@@ -3122,7 +3122,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 2,
+    "lineNumber": 3,
     "text": "Selection processing of an I/O interface in a case",
     "hasWrapHyphen": false,
     "x": 65.5199995905,
@@ -3134,7 +3134,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 3,
+    "lineNumber": 4,
     "text": "wherein the expansion unit 2 is connected to the com",
     "hasWrapHyphen": false,
     "x": 56.63999429534447,
@@ -3146,7 +3146,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 4,
+    "lineNumber": 5,
     "text": "puter main body 1 will be described below.",
     "hasWrapHyphen": false,
     "x": 56.40000250623984,
@@ -3158,7 +3158,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 5,
+    "lineNumber": 6,
     "text": "As shown in FIGS. 4A to 4C, when the expansion",
     "hasWrapHyphen": false,
     "x": 65.03999969736094,
@@ -3170,7 +3170,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 6,
+    "lineNumber": 7,
     "text": "unit 2 is to be used, the expansion unit 2 is connected to",
     "hasWrapHyphen": false,
     "x": 56.39999652719328,
@@ -3182,7 +3182,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 7,
+    "lineNumber": 8,
     "text": "the rear surface side ofthe computer main body 1. Since",
     "hasWrapHyphen": false,
     "x": 56.39999440984128,
@@ -3194,7 +3194,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "the connectors 80a, 80b, and 80c are arranged on the",
     "hasWrapHyphen": false,
     "x": 56.1599941065912,
@@ -3206,7 +3206,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 9,
+    "lineNumber": 10,
     "text": "rear surface side of the computer main body 1, no other",
     "hasWrapHyphen": false,
     "x": 56.16000079511184,
@@ -3218,7 +3218,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 10,
+    "lineNumber": 11,
     "text": "unit can be physically connected to the computer main",
     "hasWrapHyphen": false,
     "x": 56.159997289033676,
@@ -3230,7 +3230,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "body 1. Therefore, as shown in FIG. 4A to 4C, when",
     "hasWrapHyphen": false,
     "x": 55.92000410449488,
@@ -3242,7 +3242,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 12,
+    "lineNumber": 13,
     "text": "the expansion unit 2 is connected to the computer main",
     "hasWrapHyphen": false,
     "x": 55.92000060386256,
@@ -3254,7 +3254,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "body 1, other units must be connected to the connectors",
     "hasWrapHyphen": false,
     "x": 55.91999711999999,
@@ -3266,7 +3266,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "85a, 85b, and 85c in place of the connectors 80a, 80b,",
     "hasWrapHyphen": false,
     "x": 55.91999640553536,
@@ -3278,7 +3278,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "and 80c.",
     "hasWrapHyphen": false,
     "x": 55.920000107231516,
@@ -3290,7 +3290,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "If the port addresses of the I/O ports of the I/O",
     "hasWrapHyphen": false,
     "x": 65.04000423345504,
@@ -3302,7 +3302,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "interfaces of the computer main body 1 and the expan",
     "hasWrapHyphen": false,
     "x": 55.67999448,
@@ -3314,7 +3314,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "sion unit 2 are identical, an I/O interface to be used",
     "hasWrapHyphen": false,
     "x": 55.68000005568,
@@ -3326,7 +3326,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "must be selected.",
     "hasWrapHyphen": false,
     "x": 56.159999568,
@@ -3338,7 +3338,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "Selection processing of an I/O interface to be exe",
     "hasWrapHyphen": false,
     "x": 64.3199997082236,
@@ -3350,7 +3350,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "cuted when the power supply is turned on will be de",
     "hasWrapHyphen": false,
     "x": 55.6800056362272,
@@ -3362,7 +3362,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "scribed below with reference to a flow chart in FIG. 5.",
     "hasWrapHyphen": false,
     "x": 55.43999837091359,
@@ -3374,7 +3374,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "When the expansion unit 2 is connected to the com",
     "hasWrapHyphen": false,
     "x": 64.08000609462144,
@@ -3386,7 +3386,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "puter main body 1, the power supply is turned on in step",
     "hasWrapHyphen": false,
     "x": 55.439997569906396,
@@ -3398,7 +3398,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "F1. When the power supply is turned on, a storage",
     "hasWrapHyphen": false,
     "x": 55.92000502343904,
@@ -3410,7 +3410,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "content of the ID register 54 of the expansion unit 2 is",
     "hasWrapHyphen": false,
     "x": 55.199995569971996,
@@ -3422,7 +3422,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "read out (step F2).",
     "hasWrapHyphen": false,
     "x": 55.67999696409024,
@@ -3434,7 +3434,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "In step F3, it is checked on the basis of the read con",
     "hasWrapHyphen": false,
     "x": 64.3199971298808,
@@ -3446,7 +3446,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "tent whether or not a desired expansion unit is con",
     "hasWrapHyphen": false,
     "x": 54.959994374438395,
@@ -3458,7 +3458,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "nected.",
     "hasWrapHyphen": false,
     "x": 55.44,
@@ -3470,7 +3470,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "If YES in step F3, the I/O ports 313, 324, and 334 of",
     "hasWrapHyphen": false,
     "x": 63.840005964438,
@@ -3482,7 +3482,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "the interfaces 31, 32, and 33 are disabled (step F4). In",
     "hasWrapHyphen": false,
     "x": 54.959994722178244,
@@ -3494,7 +3494,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "addition, the I/O ports 613,624, and 634 of the inter",
     "hasWrapHyphen": false,
     "x": 54.959994374438395,
@@ -3506,7 +3506,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "faces 61, 62, and 63 in the expansion unit 2 are enabled",
     "hasWrapHyphen": false,
     "x": 54.96000048,
@@ -3518,7 +3518,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "(step F5).",
     "hasWrapHyphen": false,
     "x": 54.9599952,
@@ -3530,7 +3530,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "In step F6, an enable/disable state of each I/O port is",
     "hasWrapHyphen": false,
     "x": 63.59999579585399,
@@ -3542,7 +3542,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "recognized.",
     "hasWrapHyphen": false,
     "x": 54.95999466282624,
@@ -3554,7 +3554,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "Note that selection processing ofan I/O interface can",
     "hasWrapHyphen": false,
     "x": 63.600000253050716,
@@ -3566,7 +3566,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "be performed in accordance with a sequence shown in",
     "hasWrapHyphen": false,
     "x": 54.7200054014028,
@@ -3578,7 +3578,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "FIG. 6. More specifically, when the expansion unit 2 is",
     "hasWrapHyphen": false,
     "x": 54.96000384,
@@ -3590,7 +3590,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "connected to the computer main body 1, the power",
     "hasWrapHyphen": false,
     "x": 54.7200054014028,
@@ -3602,7 +3602,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "supply is turned on in step S1. When the power supply",
     "hasWrapHyphen": false,
     "x": 54.720000455999994,
@@ -3614,7 +3614,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "is turned on, the I/O ports 313,324,334 of the interfaces",
     "hasWrapHyphen": false,
     "x": 54.479999427348005,
@@ -3626,7 +3626,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "31, 32, and 33 in the computer main body 1 are disabled",
     "hasWrapHyphen": false,
     "x": 54.479999659499995,
@@ -3638,7 +3638,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "(step S2).",
     "hasWrapHyphen": false,
     "x": 54.72000043776,
@@ -3650,7 +3650,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "In step S3, it is checked whether or not the expansion",
     "hasWrapHyphen": false,
     "x": 63.360006111311996,
@@ -3662,7 +3662,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "unit 2 includes an I/O interface having I/O ports with",
     "hasWrapHyphen": false,
     "x": 54.7200036753552,
@@ -3674,7 +3674,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "the same port address as each of the I/O ports 313, 324,",
     "hasWrapHyphen": false,
     "x": 54.47999392853472,
@@ -3686,7 +3686,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "and 334. That is, readout ofport addresses is performed",
     "hasWrapHyphen": false,
     "x": 54.479999427348005,
@@ -3698,7 +3698,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "to the respective I/O ports.",
     "hasWrapHyphen": false,
     "x": 54.47999826013751,
@@ -3710,7 +3710,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "If NO in step S3, the I/O ports 313, 324, and 334 of",
     "hasWrapHyphen": false,
     "x": 63.35999551110241,
@@ -3722,7 +3722,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "the interfaces 31, 32, and 33 are enabled (step S4).",
     "hasWrapHyphen": false,
     "x": 54.23999630609472,
@@ -3734,7 +3734,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "In step S5, an enable/disable state ofeach I/O port is",
     "hasWrapHyphen": false,
     "x": 63.11999596723296,
@@ -3746,7 +3746,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "recognized.",
     "hasWrapHyphen": false,
     "x": 54.720006319320476,
@@ -3758,7 +3758,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "As described above, when an expansion unit is to be",
     "hasWrapHyphen": false,
     "x": 62.87999891667912,
@@ -3770,7 +3770,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "connected to a computer main body, an operation error,",
     "hasWrapHyphen": false,
     "x": 54.4800045691176,
@@ -3782,7 +3782,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "a circuit breakdown, or the like which are caused when",
     "hasWrapHyphen": false,
     "x": 54.23999749753247,
@@ -3794,7 +3794,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "power supplies are turned on in an incorrect sequence",
     "hasWrapHyphen": false,
     "x": 54.4799972131344,
@@ -3806,7 +3806,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "can be prevented by performing power supply control",
     "hasWrapHyphen": false,
     "x": 54.2400012,
@@ -3818,7 +3818,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "as in the embodiment. In addition, if identical I/O port",
     "hasWrapHyphen": false,
     "x": 54.24000452982145,
@@ -3830,7 +3830,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "addresses are present on the same bus, an operation",
     "hasWrapHyphen": false,
     "x": 54.240006521540394,
@@ -3842,7 +3842,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "error of the computer system can be prevented by dis",
     "hasWrapHyphen": false,
     "x": 54.23999706596856,
@@ -3854,7 +3854,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "abling the I/O ports of the respective I/O interfaces in",
     "hasWrapHyphen": false,
     "x": 54.23999630609472,
@@ -3866,7 +3866,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "the computer main body and enabling the I/O ports of",
     "hasWrapHyphen": false,
     "x": 54.24000452982145,
@@ -3878,7 +3878,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "the respective I/O interfaces in the expansion unit.",
     "hasWrapHyphen": false,
     "x": 54.240006081168964,
@@ -3890,7 +3890,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "Additional advantages and modifications will readily",
     "hasWrapHyphen": false,
     "x": 62.8799937861084,
@@ -3902,7 +3902,7 @@
   {
     "page": 13,
     "column": 7,
-    "lineNumber": 67,
+    "lineNumber": 68,
     "text": "occur to those skilled in the art. Therefore, the inven",
     "hasWrapHyphen": false,
     "x": 54.23999749753247,
@@ -3914,7 +3914,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 1,
+    "lineNumber": 2,
     "text": "details, representative devices, and illustrated examples",
     "hasWrapHyphen": false,
     "x": 285.8400003666286,
@@ -3926,7 +3926,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 2,
+    "lineNumber": 3,
     "text": "shown and described herein. Accordingly, various",
     "hasWrapHyphen": false,
     "x": 285.83999628620614,
@@ -3938,7 +3938,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 3,
+    "lineNumber": 4,
     "text": "modifications may be made without departing from the",
     "hasWrapHyphen": false,
     "x": 285.84000569279135,
@@ -3950,7 +3950,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 4,
+    "lineNumber": 5,
     "text": "spirit or scope of the general inventive concept as de",
     "hasWrapHyphen": false,
     "x": 285.5999988245395,
@@ -3962,7 +3962,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 5,
+    "lineNumber": 6,
     "text": "fined by the appended claims and their equivalents.",
     "hasWrapHyphen": false,
     "x": 285.6000030400728,
@@ -3974,7 +3974,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 6,
+    "lineNumber": 7,
     "text": "What is claimed is:",
     "hasWrapHyphen": false,
     "x": 293.99999858885013,
@@ -3986,7 +3986,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 7,
+    "lineNumber": 8,
     "text": "1. Computer system comprising:",
     "hasWrapHyphen": false,
     "x": 294.240003759329,
@@ -3998,7 +3998,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "a computer main body which has a plurality of main",
     "hasWrapHyphen": false,
     "x": 293.7599999488325,
@@ -4010,7 +4010,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 9,
+    "lineNumber": 10,
     "text": "components and main power supply means for",
     "hasWrapHyphen": false,
     "x": 302.6399960440262,
@@ -4022,7 +4022,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 10,
+    "lineNumber": 11,
     "text": "supplying a plurality of first operating voltages to",
     "hasWrapHyphen": false,
     "x": 302.3999987318626,
@@ -4034,7 +4034,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "the main components;",
     "hasWrapHyphen": false,
     "x": 302.400000982266,
@@ -4046,7 +4046,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 12,
+    "lineNumber": 13,
     "text": "an expansion unit which has a plurality of expansion",
     "hasWrapHyphen": false,
     "x": 293.5199958050169,
@@ -4058,7 +4058,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "components and expansion power supply means",
     "hasWrapHyphen": false,
     "x": 302.400000982266,
@@ -4070,7 +4070,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "for supplying a plurality of second operating volt",
     "hasWrapHyphen": false,
     "x": 302.39999969172595,
@@ -4082,7 +4082,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "ages to the expansion components, the expansion",
     "hasWrapHyphen": false,
     "x": 301.92000757850883,
@@ -4094,7 +4094,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "power supply means to which a power source",
     "hasWrapHyphen": false,
     "x": 301.919994,
@@ -4106,7 +4106,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "voltage is supplied when the expansion unit is con",
     "hasWrapHyphen": false,
     "x": 301.92000405330816,
@@ -4118,7 +4118,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "nected to the computer main body; and",
     "hasWrapHyphen": false,
     "x": 301.92000542838,
@@ -4130,7 +4130,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "interface means for electrically connecting the expan",
     "hasWrapHyphen": false,
     "x": 293.0399986615905,
@@ -4142,7 +4142,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "sion unit to the computer main body,",
     "hasWrapHyphen": false,
     "x": 301.67999869678414,
@@ -4154,7 +4154,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "wherein the expansion power supply means receives",
     "hasWrapHyphen": false,
     "x": 292.7999928050217,
@@ -4166,7 +4166,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "the power source voltage, supplies the power",
     "hasWrapHyphen": false,
     "x": 301.4399938914062,
@@ -4178,7 +4178,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "source voltage to the main power supply means",
     "hasWrapHyphen": false,
     "x": 301.439999913677,
@@ -4190,7 +4190,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "through the interface means when the expansion",
     "hasWrapHyphen": false,
     "x": 301.4399936037096,
@@ -4202,7 +4202,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "power supply means is powered on and supplies",
     "hasWrapHyphen": false,
     "x": 301.679994,
@@ -4214,7 +4214,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "the second operating voltages to the expansion",
     "hasWrapHyphen": false,
     "x": 301.2000019835918,
@@ -4226,7 +4226,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "components in accordance with the power source",
     "hasWrapHyphen": false,
     "x": 301.2000019835918,
@@ -4238,7 +4238,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "voltage when the expansion power supply means",
     "hasWrapHyphen": false,
     "x": 301.2000019835918,
@@ -4250,7 +4250,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "receives a check signal, one of the second operat",
     "hasWrapHyphen": false,
     "x": 301.6800007402236,
@@ -4262,7 +4262,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "ing voltages being supplied to the interface means,",
     "hasWrapHyphen": false,
     "x": 301.1999952920719,
@@ -4274,7 +4274,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "and",
     "hasWrapHyphen": false,
     "x": 300.96000100320003,
@@ -4286,7 +4286,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "the main power supply means, when the main power",
     "hasWrapHyphen": false,
     "x": 292.080004724184,
@@ -4298,7 +4298,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "supply means is powered on and when the main",
     "hasWrapHyphen": false,
     "x": 300.95999888423256,
@@ -4310,7 +4310,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "power supply means receives the power source",
     "hasWrapHyphen": false,
     "x": 300.9600039419755,
@@ -4322,7 +4322,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "voltage from the expansion power supply means,",
     "hasWrapHyphen": false,
     "x": 300.9600010343333,
@@ -4334,7 +4334,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "supplies the first operating voltages to the main",
     "hasWrapHyphen": false,
     "x": 300.96,
@@ -4346,7 +4346,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "components in accordance with the power source",
     "hasWrapHyphen": false,
     "x": 300.9600039419755,
@@ -4358,7 +4358,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "voltage and supplies the check signal to the expan",
     "hasWrapHyphen": false,
     "x": 300.959995594236,
@@ -4370,7 +4370,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "sion power supply means through the interface",
     "hasWrapHyphen": false,
     "x": 300.95999218191645,
@@ -4382,7 +4382,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "e3S.",
     "hasWrapHyphen": false,
     "x": 308.15999999999997,
@@ -4394,7 +4394,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "2. A system according to claim 1, wherein data trans",
     "hasWrapHyphen": false,
     "x": 291.8399941494599,
@@ -4406,7 +4406,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "mission from the expansion unit to the computer main",
     "hasWrapHyphen": false,
     "x": 283.2000000884472,
@@ -4418,7 +4418,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "body is enabled by the interface means when the inter",
     "hasWrapHyphen": false,
     "x": 282.96000226368,
@@ -4430,7 +4430,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "face means receives the check signal, and data transmis",
     "hasWrapHyphen": false,
     "x": 283.19999865686754,
@@ -4442,7 +4442,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "sion from the computer main body to the expansion unit",
     "hasWrapHyphen": false,
     "x": 283.20000627885116,
@@ -4454,7 +4454,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "is enabled by the interface means when the interface",
     "hasWrapHyphen": false,
     "x": 283.20000109106155,
@@ -4466,7 +4466,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "means receives one of the second operating voltages.",
     "hasWrapHyphen": false,
     "x": 283.4400050702035,
@@ -4478,7 +4478,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "3. A system according to claim 1, wherein data trans",
     "hasWrapHyphen": false,
     "x": 291.8400031353955,
@@ -4490,7 +4490,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "mission from the expansion unit to the computer main",
     "hasWrapHyphen": false,
     "x": 283.2000000884472,
@@ -4502,7 +4502,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "body is disabled by the interface means until the main",
     "hasWrapHyphen": false,
     "x": 282.71999808,
@@ -4514,7 +4514,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "power supply means supplies the first operating volt",
     "hasWrapHyphen": false,
     "x": 283.19999349941713,
@@ -4526,7 +4526,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "ages to the main components, and data transmission",
     "hasWrapHyphen": false,
     "x": 282.96000226368,
@@ -4538,7 +4538,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "from the computer main body to the expansion unit is",
     "hasWrapHyphen": false,
     "x": 283.1999969729299,
@@ -4550,7 +4550,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "disabled by the interface means until the expansion",
     "hasWrapHyphen": false,
     "x": 282.95999474291636,
@@ -4562,7 +4562,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "power supply means supplies the second operating volt",
     "hasWrapHyphen": false,
     "x": 283.19999349941713,
@@ -4574,7 +4574,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "ages to the expansion components.",
     "hasWrapHyphen": false,
     "x": 282.96000040796355,
@@ -4586,7 +4586,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "4. A method for controlling a power supply in a",
     "hasWrapHyphen": false,
     "x": 291.599996336129,
@@ -4598,7 +4598,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "computer main body which has a plurality of main",
     "hasWrapHyphen": false,
     "x": 283.19999823,
@@ -4610,7 +4610,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "components and a main power source and to which an",
     "hasWrapHyphen": false,
     "x": 283.1999913511994,
@@ -4622,7 +4622,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "expansion unit is connectable by an interface, the expan",
     "hasWrapHyphen": false,
     "x": 283.2000000884472,
@@ -4634,7 +4634,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "sion unit which has a plurality ofexpansion components",
     "hasWrapHyphen": false,
     "x": 283.19999865686754,
@@ -4646,7 +4646,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "and an expansion power source to which a power",
     "hasWrapHyphen": false,
     "x": 283.19999823,
@@ -4658,7 +4658,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "source voltage is supplied when the expansion unit is",
     "hasWrapHyphen": false,
     "x": 283.1999950710866,
@@ -4670,7 +4670,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "connected to the computer main body, the method",
     "hasWrapHyphen": false,
     "x": 283.4400050702035,
@@ -4682,7 +4682,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "comprising the steps of:",
     "hasWrapHyphen": false,
     "x": 283.1999960881793,
@@ -4694,7 +4694,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "connecting the expansion unit to the computer main",
     "hasWrapHyphen": false,
     "x": 292.0800084119331,
@@ -4706,7 +4706,7 @@
   {
     "page": 13,
     "column": 8,
-    "lineNumber": 67,
+    "lineNumber": 68,
     "text": "body;",
     "hasWrapHyphen": false,
     "x": 300.9599933777143,
@@ -4718,7 +4718,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 1,
+    "lineNumber": 3,
     "text": "supplying the power source voltage from the expan",
     "hasWrapHyphen": false,
     "x": 62.160006641523836,
@@ -4730,7 +4730,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 2,
+    "lineNumber": 4,
     "text": "sion power source to the main power source",
     "hasWrapHyphen": false,
     "x": 70.80000514450944,
@@ -4742,7 +4742,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 3,
+    "lineNumber": 5,
     "text": "through the interface when the expansion power",
     "hasWrapHyphen": false,
     "x": 70.79999365398096,
@@ -4754,7 +4754,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 4,
+    "lineNumber": 6,
     "text": "source is powered on;",
     "hasWrapHyphen": false,
     "x": 70.55999295926686,
@@ -4766,7 +4766,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 5,
+    "lineNumber": 7,
     "text": "supplying first operating voltages to the main compo",
     "hasWrapHyphen": false,
     "x": 61.92000402608497,
@@ -4778,7 +4778,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 6,
+    "lineNumber": 8,
     "text": "nents in accordance with the power source voltage",
     "hasWrapHyphen": false,
     "x": 70.79999383581793,
@@ -4790,7 +4790,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 7,
+    "lineNumber": 9,
     "text": "when the main power source is powered on and",
     "hasWrapHyphen": false,
     "x": 70.56000354147072,
@@ -4802,7 +4802,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 8,
+    "lineNumber": 10,
     "text": "when the main power source receives the power 10 first operating voltage.",
     "hasWrapHyphen": false,
     "x": 70.32000265941456,
@@ -4814,7 +4814,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 9,
+    "lineNumber": 11,
     "text": "source voltage;",
     "hasWrapHyphen": false,
     "x": 70.31999414418048,
@@ -4826,7 +4826,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 10,
+    "lineNumber": 12,
     "text": "supplying a check signal corresponding to one ofthe",
     "hasWrapHyphen": false,
     "x": 61.43999816256961,
@@ -4838,7 +4838,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 11,
+    "lineNumber": 13,
     "text": "first operating voltages to the expansion power",
     "hasWrapHyphen": false,
     "x": 70.07999292448561,
@@ -4850,7 +4850,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 12,
+    "lineNumber": 14,
     "text": "source through the interface when the first operat",
     "hasWrapHyphen": false,
     "x": 70.08000145823665,
@@ -4862,7 +4862,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 13,
+    "lineNumber": 15,
     "text": "ing voltages are supplied to the main components;",
     "hasWrapHyphen": false,
     "x": 69.8400053153016,
@@ -4874,7 +4874,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 14,
+    "lineNumber": 16,
     "text": "and",
     "hasWrapHyphen": false,
     "x": 69.84,
@@ -4886,7 +4886,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 15,
+    "lineNumber": 17,
     "text": "supplying the second operating voltages to the expan",
     "hasWrapHyphen": false,
     "x": 61.20000204016223,
@@ -4898,7 +4898,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 16,
+    "lineNumber": 18,
     "text": "sion components in accordance with the power",
     "hasWrapHyphen": false,
     "x": 69.83999577874177,
@@ -4910,7 +4910,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 17,
+    "lineNumber": 19,
     "text": "source voltage when the expansion power source",
     "hasWrapHyphen": false,
     "x": 69.60000108850559,
@@ -4922,7 +4922,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 18,
+    "lineNumber": 20,
     "text": "receives the check signal, one ofthe second operat",
     "hasWrapHyphen": false,
     "x": 70.0800000768,
@@ -4934,7 +4934,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 19,
+    "lineNumber": 21,
     "text": "ing voltages being supplied to the interface.",
     "hasWrapHyphen": false,
     "x": 69.60000299103216,
@@ -4946,7 +4946,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 20,
+    "lineNumber": 22,
     "text": "5. The method according to claim 4, wherein data",
     "hasWrapHyphen": false,
     "x": 60.960002968926716,
@@ -4958,7 +4958,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 21,
+    "lineNumber": 23,
     "text": "transmission from the expansion unit to the computer",
     "hasWrapHyphen": false,
     "x": 52.31999771691863,
@@ -4970,7 +4970,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 22,
+    "lineNumber": 24,
     "text": "main body is enabled by the interface when the inter",
     "hasWrapHyphen": false,
     "x": 52.31999772088752,
@@ -4982,7 +4982,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 23,
+    "lineNumber": 25,
     "text": "face receives the check signal, and data transmission",
     "hasWrapHyphen": false,
     "x": 52.320001380995755,
@@ -4994,7 +4994,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 24,
+    "lineNumber": 26,
     "text": "from the computer main body to the expansion unit is",
     "hasWrapHyphen": false,
     "x": 52.31999687204232,
@@ -5006,7 +5006,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 25,
+    "lineNumber": 27,
     "text": "enabled by the interface when the interface receives one",
     "hasWrapHyphen": false,
     "x": 52.079999931696,
@@ -5018,7 +5018,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 26,
+    "lineNumber": 28,
     "text": "of the second operating voltages.",
     "hasWrapHyphen": false,
     "x": 52.080006017402646,
@@ -5030,7 +5030,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 27,
+    "lineNumber": 29,
     "text": "6. The method according to claim 4, wherein data",
     "hasWrapHyphen": false,
     "x": 60.7200031125072,
@@ -5042,7 +5042,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 28,
+    "lineNumber": 30,
     "text": "transmission from the expansion unit to the computer",
     "hasWrapHyphen": false,
     "x": 52.080006,
@@ -5054,7 +5054,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 29,
+    "lineNumber": 31,
     "text": "main body is disabled by the interface until the main",
     "hasWrapHyphen": false,
     "x": 52.32000494115504,
@@ -5066,7 +5066,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 30,
+    "lineNumber": 32,
     "text": "power source supplies the first operating voltages to the",
     "hasWrapHyphen": false,
     "x": 52.0799990171652,
@@ -5078,7 +5078,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 31,
+    "lineNumber": 33,
     "text": "main components, and data transmission from the com",
     "hasWrapHyphen": false,
     "x": 52.080006,
@@ -5090,7 +5090,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 32,
+    "lineNumber": 34,
     "text": "puter main body to the expansion unit is disabled by the",
     "hasWrapHyphen": false,
     "x": 51.83999879282111,
@@ -5102,7 +5102,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 33,
+    "lineNumber": 35,
     "text": "interface until the expansion power source supplies the",
     "hasWrapHyphen": false,
     "x": 51.840006688584005,
@@ -5114,7 +5114,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 34,
+    "lineNumber": 36,
     "text": "second operating voltages to the expansion compo",
     "hasWrapHyphen": false,
     "x": 51.83999365437696,
@@ -5126,7 +5126,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 35,
+    "lineNumber": 37,
     "text": "nents.",
     "hasWrapHyphen": false,
     "x": 52.320001855912075,
@@ -5138,7 +5138,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 36,
+    "lineNumber": 38,
     "text": "7. A computer system comprising:",
     "hasWrapHyphen": false,
     "x": 60.239995931854075,
@@ -5150,7 +5150,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 37,
+    "lineNumber": 39,
     "text": "a portable computer including a first connector, a",
     "hasWrapHyphen": false,
     "x": 60.23999619620568,
@@ -5162,7 +5162,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 38,
+    "lineNumber": 40,
     "text": "first component and a first power supply supplying",
     "hasWrapHyphen": false,
     "x": 68.88000634525824,
@@ -5174,7 +5174,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 39,
+    "lineNumber": 41,
     "text": "a first operating voltage to the main component;",
     "hasWrapHyphen": false,
     "x": 68.8800024,
@@ -5186,7 +5186,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 40,
+    "lineNumber": 42,
     "text": "and",
     "hasWrapHyphen": false,
     "x": 68.88000365817143,
@@ -5198,7 +5198,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 41,
+    "lineNumber": 43,
     "text": "an expansion unit removably connected to the porta",
     "hasWrapHyphen": false,
     "x": 60.23999594248104,
@@ -5210,7 +5210,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 42,
+    "lineNumber": 44,
     "text": "ble computer, and which includes a second connec",
     "hasWrapHyphen": false,
     "x": 68.639997,
@@ -5222,7 +5222,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 43,
+    "lineNumber": 45,
     "text": "tor adapted to be removably connected to the first",
     "hasWrapHyphen": false,
     "x": 68.88000066162384,
@@ -5234,7 +5234,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 44,
+    "lineNumber": 46,
     "text": "connectorso as to electrically couple the expansion",
     "hasWrapHyphen": false,
     "x": 68.88000075758256,
@@ -5246,7 +5246,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 45,
+    "lineNumber": 47,
     "text": "unit and the portable computer, a second compo",
     "hasWrapHyphen": false,
     "x": 69.1200048,
@@ -5258,7 +5258,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 46,
+    "lineNumber": 48,
     "text": "nent and a second power supply supplying a oper",
     "hasWrapHyphen": false,
     "x": 69.1199940337368,
@@ -5270,7 +5270,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 47,
+    "lineNumber": 49,
     "text": "ating voltage to the second component, the second",
     "hasWrapHyphen": false,
     "x": 68.87999286500975,
@@ -5282,7 +5282,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 48,
+    "lineNumber": 50,
     "text": "power supply supplying a source voltage to the",
     "hasWrapHyphen": false,
     "x": 68.64000531999262,
@@ -5294,7 +5294,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 49,
+    "lineNumber": 51,
     "text": "first power supply through the first and the second",
     "hasWrapHyphen": false,
     "x": 68.64000120723168,
@@ -5306,7 +5306,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 50,
+    "lineNumber": 52,
     "text": "connectors when the first connector is connected",
     "hasWrapHyphen": false,
     "x": 68.87999595987719,
@@ -5318,7 +5318,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 51,
+    "lineNumber": 53,
     "text": "to the second connector and the second power",
     "hasWrapHyphen": false,
     "x": 68.40000551159496,
@@ -5330,7 +5330,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 52,
+    "lineNumber": 54,
     "text": "supply is powered on,",
     "hasWrapHyphen": false,
     "x": 68.64000531999262,
@@ -5342,7 +5342,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 53,
+    "lineNumber": 55,
     "text": "wherein the first power supply supplies the first oper",
     "hasWrapHyphen": false,
     "x": 59.999999798772,
@@ -5354,7 +5354,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 54,
+    "lineNumber": 56,
     "text": "ating voltage to the first component and supplies a",
     "hasWrapHyphen": false,
     "x": 68.6399971963332,
@@ -5366,7 +5366,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 55,
+    "lineNumber": 57,
     "text": "check signal representing that the portable Com",
     "hasWrapHyphen": false,
     "x": 68.63999965983935,
@@ -5378,7 +5378,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 56,
+    "lineNumber": 58,
     "text": "puter is in an operative state to the second power",
     "hasWrapHyphen": false,
     "x": 68.64000456732144,
@@ -5390,7 +5390,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 57,
+    "lineNumber": 59,
     "text": "supply through the first and the second connectors",
     "hasWrapHyphen": false,
     "x": 68.64000531999262,
@@ -5402,7 +5402,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 58,
+    "lineNumber": 60,
     "text": "when the source voltage is supplied to the first",
     "hasWrapHyphen": false,
     "x": 68.63999704297345,
@@ -5414,7 +5414,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 59,
+    "lineNumber": 61,
     "text": "power supply and the first power supply is pow",
     "hasWrapHyphen": false,
     "x": 68.63999747534064,
@@ -5426,7 +5426,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 60,
+    "lineNumber": 62,
     "text": "ered on, and",
     "hasWrapHyphen": false,
     "x": 68.64000054912,
@@ -5438,7 +5438,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 61,
+    "lineNumber": 63,
     "text": "the second power supply supplies the second operat",
     "hasWrapHyphen": false,
     "x": 59.99999972626728,
@@ -5450,7 +5450,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 62,
+    "lineNumber": 64,
     "text": "ing voltage to the second component when the",
     "hasWrapHyphen": false,
     "x": 68.64000531999262,
@@ -5462,7 +5462,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 63,
+    "lineNumber": 65,
     "text": "second power supply receives the check signal.",
     "hasWrapHyphen": false,
     "x": 68.64000146640576,
@@ -5474,7 +5474,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 64,
+    "lineNumber": 66,
     "text": "8. A computer system according to claim 7, wherein",
     "hasWrapHyphen": false,
     "x": 60.23999566828512,
@@ -5486,7 +5486,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 65,
+    "lineNumber": 67,
     "text": "the first connector includes a first data connect portion",
     "hasWrapHyphen": false,
     "x": 51.35999823894816,
@@ -5498,7 +5498,7 @@
   {
     "page": 14,
     "column": 9,
-    "lineNumber": 66,
+    "lineNumber": 68,
     "text": "and a first power connect portion, the second connector",
     "hasWrapHyphen": false,
     "x": 51.5999947490148,
@@ -5510,7 +5510,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 1,
+    "lineNumber": 2,
     "text": "nected to the first data connect portion and a second",
     "hasWrapHyphen": false,
     "x": 283.19999236339964,
@@ -5522,7 +5522,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 2,
+    "lineNumber": 3,
     "text": "power connect portion removably connected to the",
     "hasWrapHyphen": false,
     "x": 282.719998123991,
@@ -5534,7 +5534,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 3,
+    "lineNumber": 4,
     "text": "first power connect portion, the source voltage is Sup",
     "hasWrapHyphen": false,
     "x": 282.7200039288777,
@@ -5546,7 +5546,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 4,
+    "lineNumber": 5,
     "text": "plied through the first and the second power connect",
     "hasWrapHyphen": false,
     "x": 282.4799960882064,
@@ -5558,7 +5558,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 5,
+    "lineNumber": 6,
     "text": "portions, the check signal is supplied through the first",
     "hasWrapHyphen": false,
     "x": 282.4799949397617,
@@ -5570,7 +5570,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 6,
+    "lineNumber": 7,
     "text": "and second data connect portions.",
     "hasWrapHyphen": false,
     "x": 282.4799967187334,
@@ -5582,7 +5582,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 7,
+    "lineNumber": 8,
     "text": "9. A computer system according to claim 7, wherein",
     "hasWrapHyphen": false,
     "x": 290.87999955686786,
@@ -5594,7 +5594,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "the check signal is a branch signal branched from the",
     "hasWrapHyphen": false,
     "x": 282.0000010391534,
@@ -5606,7 +5606,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 10,
+    "lineNumber": 11,
     "text": "10. A computer system comprising:",
     "hasWrapHyphen": false,
     "x": 290.88000189656856,
@@ -5618,7 +5618,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "a portable computer including a first connector, a",
     "hasWrapHyphen": false,
     "x": 290.3999972884656,
@@ -5630,7 +5630,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 12,
+    "lineNumber": 13,
     "text": "first power terminal, a first component and a first",
     "hasWrapHyphen": false,
     "x": 299.2799947664568,
@@ -5642,7 +5642,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "power supply supplying a first operating voltage to",
     "hasWrapHyphen": false,
     "x": 299.03999209923165,
@@ -5654,7 +5654,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "the first component;",
     "hasWrapHyphen": false,
     "x": 299.039998131,
@@ -5666,7 +5666,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "an interface card including a second connector elec",
     "hasWrapHyphen": false,
     "x": 290.16000471797923,
@@ -5678,7 +5678,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "trically connected to the first connector and a third",
     "hasWrapHyphen": false,
     "x": 298.79999548161504,
@@ -5690,7 +5690,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "connector electrically connected to the second",
     "hasWrapHyphen": false,
     "x": 298.79999922912765,
@@ -5702,7 +5702,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "connector; and",
     "hasWrapHyphen": false,
     "x": 298.8000044262374,
@@ -5714,7 +5714,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "an expansion unit removably connected to the porta",
     "hasWrapHyphen": false,
     "x": 289.679994259625,
@@ -5726,7 +5726,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "ble computer, including a fourth connector remov",
     "hasWrapHyphen": false,
     "x": 298.3200032519078,
@@ -5738,7 +5738,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "ably connected to the third connector so as to",
     "hasWrapHyphen": false,
     "x": 298.5599997457308,
@@ -5750,7 +5750,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "electrically coupling the expansion unit and the",
     "hasWrapHyphen": false,
     "x": 298.55999872469204,
@@ -5762,7 +5762,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "portable computer through the first, the second,",
     "hasWrapHyphen": false,
     "x": 298.3199990352163,
@@ -5774,7 +5774,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "the third and the fourth connectors, a second",
     "hasWrapHyphen": false,
     "x": 298.3199999848943,
@@ -5786,7 +5786,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "power terminal removably connected to the first",
     "hasWrapHyphen": false,
     "x": 298.5599963555789,
@@ -5798,7 +5798,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "power terminal, a second component and a second",
     "hasWrapHyphen": false,
     "x": 298.08000066653807,
@@ -5810,7 +5810,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "power supply supplying a second operating volt",
     "hasWrapHyphen": false,
     "x": 298.32000328875404,
@@ -5822,7 +5822,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "age to the second component, the second power",
     "hasWrapHyphen": false,
     "x": 298.0799994848155,
@@ -5834,7 +5834,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "supply supplying a source voltage to the first",
     "hasWrapHyphen": false,
     "x": 298.08000339324406,
@@ -5846,7 +5846,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "power supply through the first and the second",
     "hasWrapHyphen": false,
     "x": 298.08000066653807,
@@ -5858,7 +5858,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "power terminals when the first power terminal is",
     "hasWrapHyphen": false,
     "x": 298.08000066653807,
@@ -5870,7 +5870,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "connected to the second power terminal and the",
     "hasWrapHyphen": false,
     "x": 297.8399952,
@@ -5882,7 +5882,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "Second power supply is powered on,",
     "hasWrapHyphen": false,
     "x": 297.839993797452,
@@ -5894,7 +5894,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "wherein the first power supply supplies the first oper",
     "hasWrapHyphen": false,
     "x": 288.95999410691354,
@@ -5906,7 +5906,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "ating voltage to the first component and supplies",
     "hasWrapHyphen": false,
     "x": 298.08000339324406,
@@ -5918,7 +5918,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "the first operating voltage to the second power",
     "hasWrapHyphen": false,
     "x": 297.8399991866795,
@@ -5930,7 +5930,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "supply through the first, the second, the third and",
     "hasWrapHyphen": false,
     "x": 297.8400006375024,
@@ -5942,7 +5942,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "fourth connectors when the source voltage is Sup",
     "hasWrapHyphen": false,
     "x": 297.8399988,
@@ -5954,7 +5954,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "plied to the first power supply and the first power",
     "hasWrapHyphen": false,
     "x": 297.6000033516883,
@@ -5966,7 +5966,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "is powered on, and",
     "hasWrapHyphen": false,
     "x": 297.60000666651433,
@@ -5978,7 +5978,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "the second power supply supplies the second operat",
     "hasWrapHyphen": false,
     "x": 288.7200059598878,
@@ -5990,7 +5990,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "ing voltage to the second component when the",
     "hasWrapHyphen": false,
     "x": 297.60000379389817,
@@ -6002,7 +6002,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "second power supply receives the first operating",
     "hasWrapHyphen": false,
     "x": 297.8400005448609,
@@ -6014,7 +6014,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "voltage.",
     "hasWrapHyphen": false,
     "x": 297.8399943181353,
@@ -6026,7 +6026,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "11. A computer system according to claim 10,",
     "hasWrapHyphen": false,
     "x": 289.20000120000003,
@@ -6038,7 +6038,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "wherein the interface card includes a bus controller, the",
     "hasWrapHyphen": false,
     "x": 280.0800033968995,
@@ -6050,7 +6050,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "bus controller is enabled when the first operating volt",
     "hasWrapHyphen": false,
     "x": 279.8400029080788,
@@ -6062,7 +6062,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "age is supplied from the first power supply through the",
     "hasWrapHyphen": false,
     "x": 280.0799935144042,
@@ -6074,7 +6074,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "first and the second connectors.",
     "hasWrapHyphen": false,
     "x": 280.08000217319545,
@@ -6086,7 +6086,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "12. A computer system according to claim 10,",
     "hasWrapHyphen": false,
     "x": 289.1999973869851,
@@ -6098,7 +6098,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "wherein the interface card includes a first bus driver for",
     "hasWrapHyphen": false,
     "x": 280.32000562416744,
@@ -6110,7 +6110,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "transmitting data from the portable computer to the",
     "hasWrapHyphen": false,
     "x": 280.0800036103356,
@@ -6122,7 +6122,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "expansion unit and a second bus driver for transmitting",
     "hasWrapHyphen": false,
     "x": 280.3200037103664,
@@ -6134,7 +6134,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "data from the expansion unit to the portable computer,",
     "hasWrapHyphen": false,
     "x": 280.31999951662675,
@@ -6146,7 +6146,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "the first bus driver is enabled when the second operat",
     "hasWrapHyphen": false,
     "x": 280.0799935144042,
@@ -6158,7 +6158,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "ing voltage is supplied from the second power supply",
     "hasWrapHyphen": false,
     "x": 280.07999696418716,
@@ -6170,7 +6170,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "through the third and the fourth connectors, the second",
     "hasWrapHyphen": false,
     "x": 280.08000590571936,
@@ -6182,7 +6182,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "bus driver is enabled when the first operating voltage is",
     "hasWrapHyphen": false,
     "x": 280.08000239999996,
@@ -6194,7 +6194,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "supplied from the first power supply through the first",
     "hasWrapHyphen": false,
     "x": 280.3200037103664,
@@ -6206,7 +6206,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "and the second connectors.",
     "hasWrapHyphen": false,
     "x": 280.3199984651707,
@@ -6218,7 +6218,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "13. A method for controlling a power supply in a",
     "hasWrapHyphen": false,
     "x": 289.1999926606872,
@@ -6230,7 +6230,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "computer system comprising a portable computer in",
     "hasWrapHyphen": false,
     "x": 280.3199952263803,
@@ -6242,7 +6242,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "cluding a first connector, a first component and a first",
     "hasWrapHyphen": false,
     "x": 280.5600029249107,
@@ -6254,7 +6254,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "power supply supplying a first operating voltage, and",
     "hasWrapHyphen": false,
     "x": 280.3200039084715,
@@ -6266,7 +6266,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "an expansion unit removably connected to the portable",
     "hasWrapHyphen": false,
     "x": 280.5600042066074,
@@ -6278,7 +6278,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "computer, and which includes a second connector",
     "hasWrapHyphen": false,
     "x": 280.5599936243395,
@@ -6290,7 +6290,7 @@
   {
     "page": 14,
     "column": 10,
-    "lineNumber": 67,
+    "lineNumber": 68,
     "text": "adapted to be removably connected to the first connec",
     "hasWrapHyphen": false,
     "x": 280.559998881624,
@@ -6302,7 +6302,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 1,
+    "lineNumber": 2,
     "text": "the portable computer, a second component and a sec",
     "hasWrapHyphen": false,
     "x": 56.3999986983972,
@@ -6314,7 +6314,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 2,
+    "lineNumber": 3,
     "text": "ond power supply supplying a second operating voltage",
     "hasWrapHyphen": false,
     "x": 56.399999859,
@@ -6326,7 +6326,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 3,
+    "lineNumber": 4,
     "text": "and a source voltage, the method comprising the steps",
     "hasWrapHyphen": false,
     "x": 56.1599998596,
@@ -6338,7 +6338,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 4,
+    "lineNumber": 5,
     "text": "of:",
     "hasWrapHyphen": false,
     "x": 56.16000079046304,
@@ -6350,7 +6350,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 5,
+    "lineNumber": 6,
     "text": "connecting the expansion unit to the portable com",
     "hasWrapHyphen": false,
     "x": 65.0399998374,
@@ -6362,7 +6362,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 6,
+    "lineNumber": 7,
     "text": "puter;",
     "hasWrapHyphen": false,
     "x": 73.67999737672727,
@@ -6374,7 +6374,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 7,
+    "lineNumber": 8,
     "text": "enabling the second power supply;",
     "hasWrapHyphen": false,
     "x": 64.79999983799999,
@@ -6386,7 +6386,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "Supplying the source voltage from the second power",
     "hasWrapHyphen": false,
     "x": 64.79999983799999,
@@ -6398,7 +6398,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 9,
+    "lineNumber": 10,
     "text": "O",
     "hasWrapHyphen": false,
     "x": 275.2799968840879,
@@ -6422,7 +6422,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "and the second connectors;",
     "hasWrapHyphen": false,
     "x": 73.4399982420451,
@@ -6446,7 +6446,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "Supplying the first operating voltage from the first",
     "hasWrapHyphen": false,
     "x": 64.55999983859999,
@@ -6458,7 +6458,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "power supply to the first component when the",
     "hasWrapHyphen": false,
     "x": 73.19999981699999,
@@ -6470,7 +6470,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "- Source voltage is supplied to the first power supply;",
     "hasWrapHyphen": false,
     "x": 67.4399998314,
@@ -6482,7 +6482,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "Supplying a check signal representing that the porta",
     "hasWrapHyphen": false,
     "x": 64.3200038992056,
@@ -6494,7 +6494,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "ble computer is in an operative state from the first",
     "hasWrapHyphen": false,
     "x": 72.95999694558239,
@@ -6506,7 +6506,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "power supply to the second power supply when",
     "hasWrapHyphen": false,
     "x": 73.20000071824175,
@@ -6518,7 +6518,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "the first operating voltage is supplied from the first",
     "hasWrapHyphen": false,
     "x": 72.9599998176,
@@ -6530,7 +6530,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "power supply; and",
     "hasWrapHyphen": false,
     "x": 73.1999967692664,
@@ -6542,7 +6542,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "Supplying a second operating voltage from the sec",
     "hasWrapHyphen": false,
     "x": 64.31999983920001,
@@ -6554,7 +6554,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "Ond power supply to the second component when",
     "hasWrapHyphen": false,
     "x": 72.95999961599999,
@@ -6566,7 +6566,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "the first power supply supplies the check signal to",
     "hasWrapHyphen": false,
     "x": 72.9599998176,
@@ -6578,7 +6578,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "the second power supply.",
     "hasWrapHyphen": false,
     "x": 72.9599998176,
@@ -6590,7 +6590,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "14. A portable computer removably connected to an",
     "hasWrapHyphen": false,
     "x": 64.31999484413184,
@@ -6602,7 +6602,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "expansion unit, the expansion unit including a first con",
     "hasWrapHyphen": false,
     "x": 55.199999862000006,
@@ -6614,7 +6614,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "nector, a first component, and a first power supply",
     "hasWrapHyphen": false,
     "x": 55.439999861400004,
@@ -6626,7 +6626,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "supplying a first operating voltage to the first compo",
     "hasWrapHyphen": false,
     "x": 55.199999862000006,
@@ -6638,7 +6638,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "nent, the first power supply outputting a source voltage",
     "hasWrapHyphen": false,
     "x": 55.1999985687912,
@@ -6650,7 +6650,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "to the portable computer, the portable computer com",
     "hasWrapHyphen": false,
     "x": 55.199999862000006,
@@ -6662,7 +6662,7 @@
   {
     "page": 15,
     "column": 11,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "prising:",
     "hasWrapHyphen": false,
     "x": 55.19999805753696,
@@ -6674,7 +6674,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 1,
+    "lineNumber": 2,
     "text": "a second connector removably connected to the first",
     "hasWrapHyphen": false,
     "x": 294.24000462279696,
@@ -6686,7 +6686,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 2,
+    "lineNumber": 3,
     "text": "connector so as to electrically couple the portable",
     "hasWrapHyphen": false,
     "x": 303.11999223320305,
@@ -6698,7 +6698,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 3,
+    "lineNumber": 4,
     "text": "computer and the expansion unit; and",
     "hasWrapHyphen": false,
     "x": 302.8799929201804,
@@ -6710,7 +6710,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 4,
+    "lineNumber": 5,
     "text": "a second power supply supplying a second voltage to",
     "hasWrapHyphen": false,
     "x": 293.9999949934066,
@@ -6722,7 +6722,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 5,
+    "lineNumber": 6,
     "text": "the second component and a check signal repre",
     "hasWrapHyphen": false,
     "x": 302.8799929201804,
@@ -6734,7 +6734,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 6,
+    "lineNumber": 7,
     "text": "senting that the portable computer is in an opera",
     "hasWrapHyphen": false,
     "x": 302.8799929201804,
@@ -6746,7 +6746,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 7,
+    "lineNumber": 8,
     "text": "tive state to the first power supply through the first",
     "hasWrapHyphen": false,
     "x": 302.6399970948571,
@@ -6758,7 +6758,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "and the second connectors when the source volt",
     "hasWrapHyphen": false,
     "x": 302.6400028474838,
@@ -6770,7 +6770,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 9,
+    "lineNumber": 10,
     "text": "age is supplied from the first power supply and the",
     "hasWrapHyphen": false,
     "x": 302.4000066936264,
@@ -6782,7 +6782,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 10,
+    "lineNumber": 11,
     "text": "second power supply is powered on,",
     "hasWrapHyphen": false,
     "x": 302.40000287444013,
@@ -6794,7 +6794,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "wherein the first power supply supplies the first oper",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6806,7 +6806,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 12,
+    "lineNumber": 13,
     "text": "ating voltage to the first component when the",
     "hasWrapHyphen": false,
     "x": 302.40000287444013,
@@ -6818,7 +6818,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "check signal is supplied from the second power",
     "hasWrapHyphen": false,
     "x": 302.1600018452201,
@@ -6830,7 +6830,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "Supply.",
     "hasWrapHyphen": false,
     "x": 302.1600018452201,
@@ -6842,7 +6842,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "15. A portable computer according to claim 14 fur",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6854,7 +6854,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "ther comprising an interface portion to which the sec",
     "hasWrapHyphen": false,
     "x": 284.39999370315786,
@@ -6866,7 +6866,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "ond connector is disposed.",
     "hasWrapHyphen": false,
     "x": 284.40000174428565,
@@ -6878,7 +6878,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "16. A portable computer according to claim 15,",
     "hasWrapHyphen": false,
     "x": 293.2800018212201,
@@ -6890,7 +6890,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "wherein the interface portion includes a bus controller",
     "hasWrapHyphen": false,
     "x": 284.40000179722006,
@@ -6902,7 +6902,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "therein, the bus controller is enabled when the check",
     "hasWrapHyphen": false,
     "x": 284.16000730729417,
@@ -6914,7 +6914,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "signal is supplied from the second power supply.",
     "hasWrapHyphen": false,
     "x": 284.160000768,
@@ -6926,7 +6926,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "17. A portable computer according to claim 15,",
     "hasWrapHyphen": false,
     "x": 293.040000792,
@@ -6938,7 +6938,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "wherein the interface portion includes a first bus driver",
     "hasWrapHyphen": false,
     "x": 284.160000768,
@@ -6950,7 +6950,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "for transmitting data from the portable computer to the",
     "hasWrapHyphen": false,
     "x": 284.160000768,
@@ -6962,7 +6962,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "expansion unit, and a second bus driver for transmitting",
     "hasWrapHyphen": false,
     "x": 284.160000768,
@@ -6974,7 +6974,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "data from the expansion unit to the portable computer,",
     "hasWrapHyphen": false,
     "x": 283.9199950771128,
@@ -6986,7 +6986,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "the first bus driver is enabled when the first operating",
     "hasWrapHyphen": false,
     "x": 283.9199950771128,
@@ -6998,7 +6998,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "voltage is supplied from the first power supply and the",
     "hasWrapHyphen": false,
     "x": 283.9199950771128,
@@ -7010,7 +7010,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "second bus driver is enabled when the second operating",
     "hasWrapHyphen": false,
     "x": 283.9199997387799,
@@ -7022,7 +7022,7 @@
   {
     "page": 15,
     "column": 12,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "voltage is supplied from the second power supply.",
     "hasWrapHyphen": false,
     "x": 283.9199950771128,

@@ -19,3 +19,6 @@ tests/e2e/.pdf-cache/
 tests/e2e/.llm-spend-ledger.json
 # Phase 31 — optional spec excerpt cache (gitignored to avoid stale-extract concerns)
 tests/e2e/.spec-cache/
+
+# Local cron log for npm run e2e:explore (gitignored — paths + spend timing)
+.llm-cron.log

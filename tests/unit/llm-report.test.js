@@ -118,6 +118,7 @@ describe('tests/e2e/lib/llm-report.js — initLlmReport', () => {
       verifier_disagree: 0,
       llm_hallucinated_selection: 0,
       llm_api_error: 0,
+      harness_error: 0,
       total_cost_usd: 0,
     });
     expect(r.iterations).toEqual([]);

@@ -351,9 +351,14 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases }) {
     return { stopAll: false };
 
   } catch (err) {
-    // Any unexpected error → record as LLM_API_ERROR with diagnostic so the
-    // report still gets a row and the ledger entry is preserved.
-    classification = 'LLM_API_ERROR';
+    // Discriminate harness-side errors (selectText throws with err.code set to
+    // 'DOM_DRIFT' or 'SELECTION_FAILED' — see tests/e2e/lib/selection.js) from
+    // genuine LLM_API_ERROR. The LLM call has already succeeded by the time
+    // selectText runs, so attributing those to the LLM is misleading. The
+    // precise code is preserved in error_reason for triage.
+    classification = (err.code === 'DOM_DRIFT' || err.code === 'SELECTION_FAILED')
+      ? 'HARNESS_ERROR'
+      : 'LLM_API_ERROR';
     try {
       appendLlmIteration(reportPath, {
         iteration_n: iterationN, iso,

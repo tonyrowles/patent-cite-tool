@@ -80,7 +80,7 @@
     "confidence": 0.98
   },
   "US5440748-claims": {
-    "citation": "8:6-11",
+    "citation": "8:9-12",
     "confidence": 0.97
   },
   "US5440748-cross-col": {
@@ -88,7 +88,7 @@
     "confidence": 0.98
   },
   "US5440748-repetitive": {
-    "citation": "8:6-9",
+    "citation": "8:9-10",
     "confidence": 0.97
   },
   "US4723129-spec-short": {
@@ -144,7 +144,7 @@
     "confidence": 0.94
   },
   "US4723129-claims-repetitive": {
-    "citation": "34:25-29",
+    "citation": "34:28-30",
     "confidence": 0.97
   },
   "US8024718-claims-repetitive": {
@@ -240,7 +240,7 @@
     "confidence": 0.97
   },
   "US8352400-claims": {
-    "citation": "79:81-80:3",
+    "citation": "79:66-80:3",
     "confidence": 0.97
   },
   "US8352400-cross-col": {

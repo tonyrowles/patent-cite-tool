@@ -121,12 +121,16 @@ describe('runMatcher — 4-tier matcher', () => {
     expect(v.match_offset_lines).toBe(2);
   });
 
-  it('Test 4 — Tier C boundary: 3 lines off → Tier D', () => {
+  it('Test 4 — Tier C boundary: 11 lines off (just outside FUZZY_LINE_TOLERANCE=10) → Tier D', () => {
+    // FUZZY_LINE_TOLERANCE was tuned from ±2 to ±10 in Phase 28 calibration
+    // to absorb gutter-numbering vs text-cluster offset (see pdf-verifier.js).
+    // Test the boundary: 11 lines off must still disagree.
     const parsed = makeParsed([
       { col: 1, lineNumber: 26, text: 'cited line text' },
-      { col: 1, lineNumber: 27, text: 'nothing' },
-      { col: 1, lineNumber: 28, text: 'nothing' },
-      { col: 1, lineNumber: 29, text: 'the needle phrase appears here' },
+      ...Array.from({ length: 10 }, (_, i) => ({
+        col: 1, lineNumber: 27 + i, text: 'nothing',
+      })),
+      { col: 1, lineNumber: 37, text: 'the needle phrase appears here' },
     ]);
     const v = runMatcher(parsed, 'needle phrase', '1:26');
     expect(v.status).toBe('disagree');

@@ -76,6 +76,14 @@ export const WORKER_FALLBACK_FAILED = 'WORKER_FALLBACK_FAILED';
 export const LLM_HALLUCINATED_SELECTION = 'LLM_HALLUCINATED_SELECTION';
 export const LLM_API_ERROR = 'LLM_API_ERROR';
 
+// HARNESS_ERROR: exploratory-mode iteration failed inside the Playwright
+// harness after the LLM call already succeeded (selectText throws DOM_DRIFT
+// when the LLM-picked needle is absent from the live Google Patents DOM, or
+// SELECTION_FAILED on range round-trip mismatch). Distinct from LLM_API_ERROR
+// so "the harness can't drive this selection" is not misattributed to the
+// LLM. Not a member of ERROR_CLASSES — only the LLM report tallies it.
+export const HARNESS_ERROR = 'HARNESS_ERROR';
+
 // Phase 27 back-compat aliases
 export const DOM_DRIFT = GOOGLE_DOM_DRIFT;
 export const SELECTION_FAILED = 'SELECTION_FAILED';

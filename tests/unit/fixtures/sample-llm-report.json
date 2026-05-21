@@ -9,6 +9,7 @@
     "verifier_disagree": 0,
     "llm_hallucinated_selection": 1,
     "llm_api_error": 1,
+    "harness_error": 0,
     "total_cost_usd": 0.45
   },
   "iterations": [

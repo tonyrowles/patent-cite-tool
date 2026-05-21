@@ -87,6 +87,7 @@ function emptySummary() {
     verifier_disagree: 0,
     llm_hallucinated_selection: 0,
     llm_api_error: 0,
+    harness_error: 0,
     total_cost_usd: 0,
   };
 }
@@ -103,6 +104,7 @@ function classificationToSummaryKey(classification) {
     case 'VERIFIER_DISAGREE': return 'verifier_disagree';
     case 'LLM_HALLUCINATED_SELECTION': return 'llm_hallucinated_selection';
     case 'LLM_API_ERROR': return 'llm_api_error';
+    case 'HARNESS_ERROR': return 'harness_error';
     default: return null;
   }
 }

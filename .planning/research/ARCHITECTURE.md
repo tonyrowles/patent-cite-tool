@@ -1,489 +1,567 @@
-# Architecture: Autonomous E2E Testing Agent
+# Architecture Research
 
-**Domain:** Browser extension E2E + accuracy verification harness
-**Researched:** 2026-05-12
-**Overall confidence:** HIGH
-
-This document answers "How does the E2E testing agent integrate with the existing repo?" with concrete file paths, component boundaries, data flows, and a phased build order.
+**Domain:** LLM triage-and-quarantine feedback loop layered on top of a Playwright E2E testing infrastructure
+**Researched:** 2026-05-22
+**Confidence:** HIGH — all components are directly inspected from the existing codebase; no external research required
 
 ---
 
-## 1. Directory Layout
+## Standard Architecture
 
-### Recommended top-level shape
+### System Overview
 
 ```
-patent-cite-tool/
-├── src/                              # (unchanged) extension source
-├── dist/chrome/  dist/firefox/       # (unchanged) build output
-├── scripts/                          # (unchanged) build + tooling scripts
-│   └── e2e-report-issue.mjs          # NEW — files GitHub issue from a failure JSON
-├── tests/
-│   ├── unit/                         # (unchanged) vitest, Node-only
-│   ├── fixtures/                     # (unchanged) 23 raw PositionMap JSON files
-│   ├── golden/baseline.json          # (unchanged) 76-case oracle (reused by E2E)
-│   ├── test-cases.js                 # (unchanged) — reused as the E2E case registry
-│   └── e2e/                          # NEW — Playwright + agent harness lives here
-│       ├── README.md
-│       ├── playwright.config.ts
-│       ├── fixtures/                 # Playwright test fixtures (extension loader, etc.)
-│       │   └── extension.ts
-│       ├── lib/                      # Reusable modules (the "library" half of the harness)
-│       │   ├── extension-loader.ts   # launchPersistentContext + resolve extension ID
-│       │   ├── selection-coordinator.ts  # DOM contracts for selecting text on Google Patents
-│       │   ├── citation-observer.ts  # reads Shadow DOM / clipboard for plugin output
-│       │   ├── pdf-verifier.ts       # INDEPENDENT re-parse (NOT src/shared/matching)
-│       │   ├── artifact-capturer.ts  # screenshot, DOM snapshot, PDF page snippet
-│       │   ├── case-registry.ts      # loads tests/test-cases.js + tests/golden/baseline.json
-│       │   └── reporter.ts           # JSON + HTML + issue-body markdown emitters
-│       ├── specs/                    # Playwright test specs (deterministic mode)
-│       │   ├── golden-regression.spec.ts   # one test per golden case
-│       │   └── smoke.spec.ts               # 3-5 cases for fast smoke
-│       ├── exploratory/              # LLM mode entry point (NOT a Playwright spec)
-│       │   ├── run-exploratory.mjs   # Node script — orchestrates Claude Code subprocess
-│       │   └── prompts/              # Prompt templates handed to Claude Code
-│       │       └── pick-and-verify.md
-│       └── artifacts/                # (gitignored) run output: screenshots, DOM, JSON reports
-├── .github/workflows/
-│   ├── ci.yml                        # (modified) — gains an optional e2e-smoke job
-│   ├── release.yml                   # (unchanged)
-│   └── e2e-nightly.yml               # NEW — scheduled cron + workflow_dispatch
-└── .gitignore                        # (modified) — add tests/e2e/artifacts/
+LOCAL DEVELOPER MACHINE (subscription-budget gated)
+┌──────────────────────────────────────────────────────────────────┐
+│  scripts/e2e-explore.mjs                                          │
+│    claude -p (Max 5 subscription, 10-step runOneIteration loop)  │
+│         │                                                         │
+│         ▼                                                         │
+│  tests/e2e/artifacts/{run_id}/llm-report.json  ←── written here  │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │  committed to branch OR uploaded as
+                         │  GitHub Actions artifact
+                         ▼
+GITHUB ACTIONS NIGHTLY CRON (e2e-nightly.yml)
+┌──────────────────────────────────────────────────────────────────┐
+│  (existing) smoke → regression.spec.js → fault-injection.spec.js │
+│                                                                   │
+│  (new v3.1 steps, sequential, after regression)                  │
+│                                                                   │
+│  [1] lib/rerun-validator                                          │
+│       reads llm-report.json iterations where classification =     │
+│       VERIFIER_DISAGREE or WRONG_CITATION                         │
+│       runs verifyCitation() deterministically (no Playwright)    │
+│       writes rerun-report.json (reproducibility verdict per case) │
+│         │                                                         │
+│  [2] lib/triage-classifier                                        │
+│       reads rerun-report.json + llm-report.json row              │
+│       applies rule-based heuristics first (most cases decided)   │
+│       sends ambiguous remainder to claude -p second-pass          │
+│       writes triage-report.json (classification + confidence)    │
+│         │                                                         │
+│  [3] lib/issue-payload-builder                                    │
+│       reads triage-report.json (actionable cases only)           │
+│       assembles rich issue body (reproducer + verifier + snippet) │
+│         │                                                         │
+│  [4] scripts/e2e-report-issue.mjs (extended) OR new filer        │
+│       dedup fingerprint → create/comment GitHub issue            │
+│         │                                                         │
+│  [5] tests/e2e/quarantine.spec.js corpus append script           │
+│       adds confirmed anomalies to test-cases-quarantine.js       │
+│         │                                                         │
+│  [6] quarantine.spec.js (non-gating Playwright project)          │
+│       runs the quarantine corpus; uploads separate report         │
+│                                                                   │
+│  WEEKLY DIGEST JOB (separate cron, reads GitHub issue labels)    │
+│  ─────────────────────────────────────────────────────────────── │
+│  reads: open issues with e2e-nightly label via gh api            │
+│  computes: counts by errorClass label, quarantine growth metric  │
+│  writes: new GitHub Issue (type: analytics-digest) OR Discussion │
+└──────────────────────────────────────────────────────────────────┘
+
+PERSISTENCE LAYER (artifact uploads + test-cases-quarantine.js)
+┌──────────────────────────────────────────────────────────────────┐
+│  tests/e2e/artifacts/{run_id}/                                    │
+│    report.json          (deterministic regression)               │
+│    llm-report.json      (exploratory mode; local-only origin)    │
+│    rerun-report.json    (new; reproducibility verdicts)          │
+│    triage-report.json   (new; triage classifications)            │
+│    *.png / *.html       (screenshots + DOM snapshots)            │
+│                                                                   │
+│  tests/e2e/test-cases-quarantine.js   (promoted anomaly corpus)  │
+│  tests/golden/baseline.json           (existing, no change)      │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### Rationale for `tests/e2e/`
+### Component Responsibilities
 
-- **Parallel to `tests/unit/`** — matches the existing convention. The repo already uses `tests/` as the canonical test root with subdirectories for fixture corpora and per-suite folders. A top-level `agent/` would orphan it from the rest of the test tooling and force CI yaml to learn a new location.
-- **Self-contained subtree** — `tests/e2e/` owns its own `playwright.config.ts`, `lib/`, `specs/`, and `artifacts/`. Nothing inside `tests/e2e/` is imported by the extension build (esbuild only consumes `src/`), so the boundary is clean.
-- **Exploratory mode is NOT under `specs/`** — Playwright auto-discovers spec files; we do not want the LLM run to execute via `npx playwright test`. Putting it under `tests/e2e/exploratory/` with a different file extension/runner keeps it out of the default test glob.
-
-### LLM-exploratory entry point — choose ONE
-
-Three options were considered:
-
-| Option | Verdict | Reason |
-|--------|---------|--------|
-| Claude Code slash command (`.claude/commands/e2e-explore.md`) | NO | Couples developer-machine config to the repo; can't be invoked from a script; harder to evolve prompts in code review. |
-| Claude Agent SDK (TypeScript) library import | MAYBE later | Adds a runtime dependency to `package.json`. Defer until prompts have stabilized. |
-| **Plain `npm run e2e:explore` → Node script that spawns `claude -p` (headless mode) as subprocess** | **YES** | Zero new deps. Mirrors the existing `scripts/*` pattern. Claude Code's `--print` + `--output-format json` flags are designed for exactly this. Subscription-only, runs locally — perfect fit for the "local-dev only" constraint. |
-
-**Decision:** `tests/e2e/exploratory/run-exploratory.mjs` spawns the user's installed `claude` CLI in headless mode (`claude -p "..." --output-format json`), passing it the harness's Playwright primitives via MCP or a thin tool wrapper. The prompt template lives in `tests/e2e/exploratory/prompts/pick-and-verify.md`.
-
-### Failure artifacts → `tests/e2e/artifacts/` (gitignored)
-
-- Path is **inside `tests/e2e/`**, not a top-level `.test-results/`, so it co-locates with the harness that produces it.
-- Add `tests/e2e/artifacts/` to `.gitignore` alongside the existing `dist/` entry.
-- Playwright's `reporter` writes here; `artifact-capturer.ts` writes here; nightly cron uploads here as a workflow artifact.
+| Component | Status | Responsibility | Communicates With |
+|-----------|--------|----------------|-------------------|
+| `scripts/e2e-explore.mjs` | EXISTING | LLM exploratory runner (local-only); writes llm-report.json | `lib/llm-driver.js`, `lib/llm-report.js`, `lib/llm-ledger.js`, `lib/pdf-verifier.js` |
+| `tests/e2e/lib/llm-report.js` | EXISTING | Append-only writer for llm-report.json iterations | Called by e2e-explore.mjs only |
+| `tests/e2e/lib/pdf-verifier.js` | EXISTING | Independent PDF re-parse oracle; produces Verdict objects | Called by regression.spec.js AND rerun-validator |
+| `tests/e2e/lib/report.js` | EXISTING | Append-only writer for regression report.json | Called by regression.spec.js |
+| `scripts/e2e-report-issue.mjs` | EXISTING (EXTEND) | Fingerprint-based dedup GitHub issue filer | gh CLI, reads report.json |
+| `tests/e2e/lib/rerun-validator.js` | NEW | Deterministic replay of each LLM-flagged anomaly via verifyCitation(); confirms reproducibility | `lib/pdf-verifier.js` (calls verifyCitation), reads llm-report.json, writes rerun-report.json |
+| `tests/e2e/lib/triage-classifier.js` | NEW | Pure data in/out classifier: takes one iteration row → classification object; heuristic-first then LLM second-pass for ambiguous | reads rerun-report.json rows, calls `lib/llm-driver.js` invokeClaudeP for ambiguous pass |
+| `tests/e2e/lib/issue-payload-builder.js` | NEW | Assembles rich issue body: reproducer seed, verifier disagreement detail, LLM rationale, golden diff | reads triage-report.json + llm-report.json, calls `lib/pdf-snippet.js` for PDF crops |
+| `scripts/quarantine-append.mjs` | NEW | Idempotent script to insert confirmed anomalies into test-cases-quarantine.js | reads triage-report.json, writes/appends tests/e2e/test-cases-quarantine.js |
+| `tests/e2e/specs/quarantine.spec.js` | NEW | Playwright spec for the quarantine corpus; non-gating; separate Playwright project; writes quarantine-report.json | reads test-cases-quarantine.js, uses existing lib/ primitives |
+| `tests/e2e/test-cases-quarantine.js` | NEW | Tiered corpus of anomalies not yet promoted to golden | written by quarantine-append.mjs, read by quarantine.spec.js |
+| `scripts/weekly-digest.mjs` | NEW | Reads open GitHub issues by label; computes counts by errorClass tag; files a digest issue | gh CLI (gh api /issues), reads no local files |
 
 ---
 
-## 2. Component Boundaries
+## Data Flow: llm-report.json Ingestion
 
-The harness is **NOT a single 800-line spec file**. It is a small library of focused modules under `tests/e2e/lib/`, consumed by either:
-- Playwright spec files (`tests/e2e/specs/*.spec.ts`) for deterministic regression
-- A Node entry script (`tests/e2e/exploratory/run-exploratory.mjs`) for LLM exploration
+The critical design question is how `llm-report.json` (produced locally) reaches the nightly CI cron.
 
-This separation is the single most important architectural decision: **the deterministic mode and LLM mode share the same primitives, so a fix to selection logic benefits both**.
+**Recommended pattern: GitHub Actions artifact upload, consumed by a separate triggered workflow run.**
 
-### Module responsibility table
+Rationale:
 
-| Module | File | Owns | Does NOT own |
-|--------|------|------|--------------|
-| Extension loader | `tests/e2e/lib/extension-loader.ts` | `launchPersistentContext`, `--load-extension` arg, dynamic extension-ID resolution from service worker URL, headless-vs-headed selection | Test orchestration, navigation, selection |
-| Selection coordinator | `tests/e2e/lib/selection-coordinator.ts` | Given a `(patentId, selectedText)`, navigates to `patents.google.com/patent/{id}`, finds the text node containing the selection, creates a DOM `Range`, dispatches `selectionchange`/`mouseup` to trigger the extension's listeners | Knowing what citation should result; reading the extension's output |
-| Citation observer | `tests/e2e/lib/citation-observer.ts` | Reads the citation from (a) the Shadow DOM popover OR (b) clipboard after Ctrl+C, normalizes to `{citation, confidence}` | Comparing to expected; triggering selections |
-| Case registry | `tests/e2e/lib/case-registry.ts` | Loads `tests/test-cases.js` + `tests/golden/baseline.json`, joins them into iterable `(id, patentNumber, selectedText, expectedCitation, expectedConfidence)` records | PDF parsing; Playwright glue |
-| PDF verifier (independent) | `tests/e2e/lib/pdf-verifier.ts` | Given `(patentNumber, selectedText, citedColumn, citedLineRange)`: fetches the PDF, parses it via an **independent code path**, searches for `selectedText` near the cited location, returns `{verified: bool, foundLine: int}` | Anything the extension does; reading golden baseline |
-| Artifact capturer | `tests/e2e/lib/artifact-capturer.ts` | `page.screenshot()`, `page.content()`, PDF page snippet via pdf-lib or pdfjs, writes to `tests/e2e/artifacts/{caseId}/` | When to capture (caller decides); reporting |
-| Reporter | `tests/e2e/lib/reporter.ts` | Emits run summary as JSON (machine-readable) + Markdown (for GH issue body) + optional HTML index | Filing the issue (workflow does that) |
-| Exploratory orchestrator | `tests/e2e/exploratory/run-exploratory.mjs` | Spawns `claude -p`, passes prompts, parses JSON output, invokes harness primitives, loops | Anything Playwright-specific (delegates to lib/) |
+1. Committing llm-report.json to a branch creates repo clutter, merge conflicts between developer runs, and encodes ephemeral test data in git history. It also requires write permissions that the nightly workflow should not have for arbitrary branches.
 
-### Why a verifier separate from `src/shared/matching.js`
+2. S3/external storage adds infrastructure dependencies the project explicitly avoids (Cloudflare KV is sufficient for the extension; test reporting should not need a separate storage service).
 
-The verifier exists **specifically to catch bugs in `src/shared/matching.js`**. If both used the same matching code, a bug there would produce a "passing" verification (garbage-in, garbage-out). Therefore:
+3. The cleanest pattern matching the existing CI model: the developer runs `npm run e2e:explore`, then explicitly uploads the resulting `tests/e2e/artifacts/{run_id}/llm-report.json` as a named artifact via `gh run upload-artifact` (or a helper script). The nightly workflow, when triggered manually with a `llm_run_id` input, downloads that artifact and runs the triage pipeline against it.
 
-- **Implementation language/library:** Use `pdfjs-dist` differently (e.g., raw `getTextContent()` items, no column inference) OR use `pdf-parse` / `pdftotext` (different library entirely)
-- **Algorithm:** Simple "does `selectedText` appear in the PDF text on the cited page within ±5 lines of the cited line?" — NOT the 6-tier matcher
-- **Code-share rule:** `tests/e2e/lib/pdf-verifier.ts` MUST NOT import from `src/` or `dist/`. Lint rule or ESLint `no-restricted-imports` to enforce.
+**Concrete flow:**
 
-### Single executable test file? — No
+```
+[local]
+npm run e2e:explore
+  → tests/e2e/artifacts/{run_id}/llm-report.json
 
-A single spec would force the LLM mode to either duplicate primitives or import from a Playwright spec (awkward — specs are designed to be discovered, not imported). The library/spec split is the canonical Playwright pattern and matches how the existing repo already separates `tests/test-cases.js` (data) from `tests/unit/*.test.js` (runners).
+gh workflow run e2e-nightly.yml \
+  -f llm_run_id={run_id}
+  [or: developer manually uploads artifact, then triggers]
+
+[CI - e2e-nightly.yml, new inputs block]
+  inputs:
+    llm_run_id: (optional) artifact run_id containing llm-report.json
+
+Step: Download llm-report.json artifact
+  if: inputs.llm_run_id is set
+  uses: actions/download-artifact@v4
+  with:
+    run-id: ${{ inputs.llm_run_id }}
+    name: llm-exploratory-{run_id}
+    path: tests/e2e/artifacts/{run_id}/
+
+Step: Run rerun-validator
+  if: llm-report.json present
+  node scripts/run-triage-pipeline.mjs
+    → rerun-report.json
+    → triage-report.json
+    → calls quarantine-append.mjs
+    → calls e2e-report-issue.mjs (extended)
+
+Step: Run quarantine spec (non-gating)
+  npx playwright test --project quarantine
+
+Step: Upload all artifacts (always)
+```
+
+The nightly regression continues to run unconditionally. The triage pipeline runs only when `llm_run_id` is provided. This keeps the nightly cron's existing behavior unmodified and avoids coupling the triage pipeline to a schedule that cannot guarantee an llm-report.json is present.
+
+**Alternative considered and rejected: always run triage on the previous night's committed report.** This would require committing llm-report.json on a `data/llm-reports` branch. The commit-based approach loses the per-run_id artifact directory structure, complicates the path resolution in all lib/ readers, and adds a git push step inside CI. The artifact-download pattern is already established by `upload-artifact@v4` in e2e-nightly.yml.
 
 ---
 
-## 3. Integration Points With Existing Code
+## Component Design Decisions
 
-### Reuse, don't duplicate
+### lib/rerun-validator — Placement and Runner Mode
 
-| Existing asset | E2E reuse? | How |
-|----------------|-----------|-----|
-| `tests/test-cases.js` (76 cases with `id`, `patentFile`, `selectedText`, `category`) | YES — direct import | `case-registry.ts` does `import { TEST_CASES } from '../../test-cases.js'` and joins with golden baseline |
-| `tests/golden/baseline.json` (oracle: `{id: {citation, confidence}}`) | YES — direct import | `case-registry.ts` reads JSON and zips into test cases |
-| `tests/fixtures/US*.json` (raw PositionMap data) | YES — but only by the verifier | `pdf-verifier.ts` can use these as a SECONDARY oracle when the PDF isn't reachable. Primary oracle is golden baseline; fixtures provide page/column/line ground truth for sanity checks |
-| `src/shared/matching.js` | NO — forbidden | The verifier is independent by design (see §2) |
-| `dist/chrome/` | YES — loaded as the extension under test | `extension-loader.ts` reads from `dist/chrome/` after `npm run build:chrome` |
-| `npm run build:chrome` | YES — pre-step | Playwright config includes `webServer`-style `globalSetup` that runs the Chrome build first |
-| Cloudflare Worker fallback (USPTO proxy) | YES — verifier may use it | When `pdf-verifier.ts` needs a PDF and Google's CDN fails, fall back to the same Worker the extension uses |
+**Decision: lib/ callable module, NOT a Playwright spec.**
 
-### Build coupling: who builds the extension?
+Rationale: The rerun-validator's job is to call `verifyCitation({ patentId, selectedText, observedCitation })` deterministically — the exact same function already imported by regression.spec.js. That function is Playwright-free (it uses pdfjs-dist directly via `lib/pdf-fetch.js`). Wrapping it in a Playwright spec would add 2-3 seconds of browser launch overhead per iteration, introduce unnecessary `test()` scaffolding, and create a third Playwright "project" just for a PDF-parsing oracle.
 
-**Decision:** Playwright's `globalSetup` runs `npm run build:chrome` once before any spec. Locally this is ~1 second; in CI it's already part of the existing pipeline so the work is effectively cached.
+The validator runs as a Node script or is called from the triage pipeline orchestrator (`scripts/run-triage-pipeline.mjs`). It:
+1. Reads `llm-report.json`.
+2. Filters iterations where `classification` is `VERIFIER_DISAGREE` or `WRONG_CITATION` (anomalies worth re-validating).
+3. Calls `verifyCitation()` once per filtered iteration.
+4. Writes `rerun-report.json` with a `reproducible: boolean` + full new Verdict per iteration.
 
-```ts
-// tests/e2e/playwright.config.ts (sketch)
-import { defineConfig } from '@playwright/test';
-export default defineConfig({
-  testDir: './specs',
-  globalSetup: './lib/global-setup.ts',  // runs `node scripts/build.js --chrome-only`
-  use: { trace: 'retain-on-failure' },
-  reporter: [['html', { outputFolder: 'artifacts/html-report' }], ['json', { outputFile: 'artifacts/summary.json' }]],
-  workers: 1,                            // extensions need persistent context — keep serial
-});
-```
-
-### Installing Playwright + Chromium without clone bloat
-
-- **Add `@playwright/test` to `devDependencies`** in `package.json` (small — the binary lives in `~/.cache/ms-playwright`, not `node_modules/`)
-- **Do NOT vendor Chromium in the repo.** Developers run `npx playwright install chromium` once; CI does the same in a workflow step.
-- **No package-lock.json today** — the existing CI gracefully handles `npm install` when no lockfile is present (see `ci.yml` lines 36-42). Continue that pattern.
-- **Browser binary cache in CI:** Playwright's official advice is that caching is often slower than re-downloading. Skip it initially; add only if cron-job time becomes a problem.
-
-### Confirmed package additions (devDependencies only)
-
-```jsonc
+Shape of one `rerun-report.json` entry:
+```json
 {
-  "devDependencies": {
-    "@playwright/test": "^1.50.0",   // E2E runner — version current as of May 2026
-    // existing deps unchanged
-  },
-  "scripts": {
-    // existing scripts unchanged
-    "e2e": "playwright test --config tests/e2e/playwright.config.ts",
-    "e2e:smoke": "playwright test --config tests/e2e/playwright.config.ts --grep @smoke",
-    "e2e:explore": "node tests/e2e/exploratory/run-exploratory.mjs",
-    "e2e:report-issue": "node scripts/e2e-report-issue.mjs"
-  }
+  "iteration_n": 3,
+  "patent_id": "US11427642",
+  "selected_text": "plasma cells and plasmablasts",
+  "observed_citation": "63:1-4",
+  "original_classification": "VERIFIER_DISAGREE",
+  "rerun_verdict": { "status": "disagree", "tier_used": "C", "reason": "..." },
+  "reproducible": true
 }
 ```
 
----
+Only reproducible anomalies pass to triage-classifier. Non-reproducible ones are logged but not triaged (they are one-off transients, not actionable bugs).
 
-## 4. Data Flow
+### lib/triage-classifier — Pure Data Module with Inline Heuristics
 
-### Deterministic mode (golden regression)
+**Decision: Pure data in/out module. Heuristic→LLM fall-through decision lives inside the module, not in the orchestrator.**
 
+Rationale: The classifier is a function that takes a single iteration row (from llm-report.json) plus the rerun verdict and returns a `ClassificationResult` object. Keeping the heuristic→LLM decision inside the module ensures the fall-through logic is unit-testable without mocking any workflow orchestrator state.
+
+The module has no intermediate on-disk state. The orchestrator calls it once per anomaly and collects results into `triage-report.json`. If a LLM second-pass is needed, the module calls `invokeClaudeP` directly (same function used by e2e-explore.mjs).
+
+Heuristic rules (decide without LLM):
+- `LLM_HALLUCINATED_SELECTION` with `reproducible: true` → `TRIAGE: confirmed_hallucination` (the LLM consistently picks text not in the spec — LLM prompt bug, not extension bug)
+- `WRONG_CITATION` with rerun `tier_used: A` (exact match) and citation differs from golden → `TRIAGE: confirmed_extension_bug`
+- `WRONG_CITATION` with rerun `status: fail` (Tier D) → `TRIAGE: unverifiable` (PDF fetch may have failed; file with low confidence)
+- `VERIFIER_DISAGREE` with `reproducible: true` AND rerun `tier_used: C` (fuzzy, ±10 lines) → `TRIAGE: verifier_calibration_issue` (verifier line-counting vs extension's gutter-number offset — known systematic gap, documented in pdf-verifier.js line 48)
+- Anything remaining → send to LLM second-pass
+
+LLM second-pass prompt structure: provide the iteration row, verifier detail, and ask for one of the following triage labels: `confirmed_extension_bug`, `confirmed_hallucination`, `verifier_calibration_issue`, `unverifiable`, `investigate`. The LLM response schema must include `triage_label` and `confidence` (high/medium/low) and `rationale` (one sentence).
+
+The cost of second-pass LLM calls is charged to the existing `llm-ledger.js` (same file, same monthly cap). The monthly cap covers both exploratory iterations and triage second-passes.
+
+### lib/issue-payload-builder — Seam with e2e-report-issue.mjs
+
+**Decision: New `lib/issue-payload-builder.js` module for rich body assembly; extend `scripts/e2e-report-issue.mjs` as the filer (do NOT rewrite to octokit).**
+
+Rationale: `e2e-report-issue.mjs` already has working fingerprint dedup, `findMatchingIssue`, `isRecentlyUpdated`, and the `makeRealGhClient` gh CLI wrapper. All 8+ unit tests for it pass. Rewriting to octokit would duplicate all of that. The seam is clean: `buildIssueBody()` currently lives in `e2e-report-issue.mjs` and builds a modest body. In v3.1, it should delegate to `lib/issue-payload-builder.js` for LLM-sourced anomaly issues while keeping its current body format for deterministic regression failures.
+
+The seam:
+- `e2e-report-issue.mjs` gets a new `--source triage` flag.
+- When `--source triage`, it reads `triage-report.json` instead of `report.json` and calls `lib/issue-payload-builder.buildTriageIssueBody(caseEntry)` for the body.
+- When `--source regression` (default), it uses the existing `buildIssueBody()` unchanged.
+
+The `lib/issue-payload-builder.js` module is responsible for:
+- Assembling the reproducer command: `npm run e2e:explore -- --patent US11427642`
+- Embedding the selected text seed verbatim
+- Formatting verifier disagreement detail (expected tier, actual tier, cited_text_window from Verdict)
+- Rendering a PDF snippet path (calling `renderPdfSnippet` from `lib/pdf-snippet.js`)
+- Including LLM triage rationale + confidence from triage-report.json
+- Including golden citation diff: `baseline.json[caseId].citation` vs `observed_citation` (when the case-id matches a golden entry)
+
+Golden citation diff: `baseline.json` already contains the authoritative citation per case-id. For LLM-discovered anomalies, the case-id is the LLM-generated `caseId` field (e.g. `US11427642-cross-col-llm-3`). These will not exist in `baseline.json`, so the diff is "no prior golden" rather than a regression diff. That is expected and should be surfaced clearly in the issue body.
+
+### Quarantine Corpus — File, Project, and Promotion Path
+
+**Decision: Separate file (`test-cases-quarantine.js`), separate Playwright project (`quarantine`), separate npm script (`npm run e2e:quarantine`). Promotion via PR script.**
+
+File structure:
 ```
-case-registry.ts
-   │ TEST_CASES + baseline.json
-   ▼
-specs/golden-regression.spec.ts  (one test.each entry per case)
-   │
-   ├─► extension-loader.ts        ──► launches Chromium with dist/chrome/ loaded
-   ├─► selection-coordinator.ts   ──► navigates, creates DOM Range, fires mouseup
-   ├─► citation-observer.ts       ──► reads Shadow DOM / clipboard
-   ▼
-compare observed vs baseline.json
-   │
-   ├─ pass → no artifact write, test passes
-   └─ fail → artifact-capturer.ts ──► tests/e2e/artifacts/{caseId}/{screenshot, dom, summary.json}
-              reporter.ts          ──► appends to run-level summary.json
-```
-
-### LLM exploratory mode
-
-```
-run-exploratory.mjs
-   │
-   ├─► spawns `claude -p --output-format json` with prompt from prompts/pick-and-verify.md
-   │       The prompt tells Claude: "pick a US patent number, choose an unusual selection,
-   │       call the harness primitives, verify, report"
-   │
-   ├─► For each iteration Claude requests:
-   │       extension-loader.ts ─► selection-coordinator.ts ─► citation-observer.ts
-   │                                                                  │
-   │                                                                  ▼
-   │                                                  pdf-verifier.ts (independent re-parse)
-   │                                                                  │
-   │                                                                  ▼
-   │                                                            verdict + artifact
-   │
-   └─► After N iterations or budget exhausted, reporter.ts emits a session report
-```
-
-The exploratory orchestrator does NOT use Playwright's test runner. It instantiates `lib/extension-loader.ts` directly and drives a single persistent context across many iterations. This is **why** those modules are framework-agnostic library code, not Playwright fixtures.
-
-### Verifier flow (used by both modes)
-
-```
-(patentNumber, selectedText, citedColumn, citedLineStart, citedLineEnd)
-   │
-   ▼
-1. Try local fixture: tests/fixtures/{patentNumber}.json (PositionMap)
-   │ found? ──► search PositionMap for selectedText, check page/column/line proximity
-   │ miss → continue
-   ▼
-2. Fetch PDF from Google Patents CDN
-   │ ok? ──► parse with INDEPENDENT pdfjs call (raw text only, no column inference)
-   │ fail → continue
-   ▼
-3. Fetch via Cloudflare Worker (USPTO eGrant API)
-   │ same parse path
-   ▼
-{verified: true|false, foundOn: "L:C", source: "fixture"|"google"|"worker"}
+tests/
+  test-cases.js              (existing 76-case golden corpus — unchanged)
+  test-cases-quarantine.js   (new — LLM-confirmed anomalies)
+  e2e/
+    specs/
+      regression.spec.js     (existing — reads test-cases.js)
+      quarantine.spec.js     (new — reads test-cases-quarantine.js)
+    playwright.config.js     (add 'quarantine' project pointing at quarantine.spec.js)
 ```
 
-### Anti-coupling rules
+The quarantine Playwright project must be configured with `retries: 0` (flake-ineligible — these are known problem cases) and must NOT be referenced by the `--grep` in the existing regression step. The nightly workflow runs quarantine separately after the regression step, with `continue-on-error: true` and its own artifact upload.
 
-These rules MUST hold for the architecture to remain modular:
+CI display pattern: two separate `continue-on-error: true` steps means the CI matrix shows "regression: pass/fail" and "quarantine: pass/fail" independently. The quarantine step failing is informational, not gating. The summary comment or issue body for the quarantine run reports "X cases in quarantine, Y still failing" rather than blocking the PR.
 
-1. **`lib/pdf-verifier.ts` MUST NOT import from `src/`** — enforced by ESLint `no-restricted-imports`.
-2. **Playwright spec files MUST NOT contain selection/observation logic inline** — they call into `lib/`. A spec file should read like a recipe, not a kitchen.
-3. **`lib/*.ts` modules MUST NOT import each other except through narrow exported interfaces** — e.g., `selection-coordinator.ts` receives a `Page`, not an `ExtensionLoader`.
-4. **`exploratory/run-exploratory.mjs` MUST NOT import any file under `specs/`** — specs are runtime-only.
-5. **No module under `tests/e2e/` may be imported by `src/`** — extension code is independent of testing.
+Promotion to golden: a `scripts/promote-from-quarantine.mjs` script that takes a case-id argument, copies the entry from `test-cases-quarantine.js` to `test-cases.js`, updates `tests/golden/baseline.json` with the observed citation (treating the observed value as the new golden), and removes the entry from `test-cases-quarantine.js`. This is a human-triggered PR action, not automated. Automation ends at "confirm the anomaly is reproducible and consistent" — the human decides whether a quarantine case represents a correct extension behavior or a bug to fix before promotion.
 
----
+### Weekly Digest — State Source and Output
 
-## 5. CI/Cron Integration
+**Decision: Read state from GitHub Issues API (open issues with `e2e-nightly` label), grouped by errorClass label; write to a new GitHub Issue tagged `e2e-digest`.**
 
-### Decision: separate workflow, not extending `ci.yml` heavily
+Rationale: The existing issues are the canonical state — they are created by the auto-filer with fingerprint dedup and accumulate comments on recurrence. Scanning for open issues is sufficient for "what's currently broken." The alternative (scanning report.json files from artifact downloads) requires iterating over many artifact archives with the gh CLI, which is slow and brittle (artifacts expire in 14 days).
 
-**`ci.yml` (push/PR) — minimal change:**
-Add a `e2e-smoke` job that runs 3-5 cases (`@smoke` tag), takes <2 min, runs on every push. This catches "extension fundamentally broken" without slowing PRs.
+The weekly digest does NOT need a new persistence layer. The issues themselves are the persistence. The digest reads:
+- Count of open `e2e-nightly` issues per `errorClass` label (add `errorClass` as an issue label in the filer — currently it's only in the body)
+- Count of entries in `test-cases-quarantine.js` (requires checking out the repo in the weekly cron)
+- Recent trend: issues opened in last 7 days vs closed in last 7 days
 
-```yaml
-# .github/workflows/ci.yml (additions)
-  e2e-smoke:
-    runs-on: ubuntu-latest
-    needs: ci                      # only run if unit/lint pass
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: npm install
-      - run: npx playwright install chromium --with-deps
-      - run: npm run build:chrome
-      - run: npm run e2e:smoke
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: e2e-smoke-artifacts
-          path: tests/e2e/artifacts/
-```
+Output: a new GitHub Issue with label `e2e-digest` and title `[e2e-digest] Weekly summary YYYY-WW`. The issue body is a markdown table of counts. The filer uses the existing `makeRealGhClient` pattern (gh CLI). The week number in the title provides natural dedup if the cron runs twice in one week.
 
-**`e2e-nightly.yml` (NEW) — full 76-case run + issue filing:**
+Alternative considered: posting to GitHub Discussions. Requires the Discussions feature to be enabled on the repo and a different API surface. GitHub Issues are simpler, already used for nightly failures, and can be referenced from PRs. Rejected in favor of issues.
 
-```yaml
-name: E2E Nightly
-on:
-  schedule:
-    - cron: '0 6 * * *'           # 06:00 UTC daily (~01:00 ET, ~22:00 PT prev day)
-  workflow_dispatch: {}            # manual trigger from Actions UI
+### State Persistence — Historical Citations
 
-permissions:
-  contents: read
-  issues: write                    # for gh issue create on failure
+**Decision: No new persistence layer. Use `tests/golden/baseline.json` for golden diffs and artifact-uploaded report files for historical snapshots.**
 
-jobs:
-  e2e-full:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: npm install
-      - run: npx playwright install chromium --with-deps
-      - run: npm run build:chrome
-      - run: npm run e2e                # all 76 cases
-        id: e2e
-        continue-on-error: true
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: { name: e2e-nightly-artifacts, path: tests/e2e/artifacts/ }
-      - name: File or update GitHub issue on failure
-        if: steps.e2e.outcome == 'failure'
-        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
-        run: npm run e2e:report-issue -- --summary tests/e2e/artifacts/summary.json
-      - name: Fail the job if E2E failed
-        if: steps.e2e.outcome == 'failure'
-        run: exit 1
-```
+The `tests/golden/baseline.json` already contains `{ citation, confidence }` per case-id for all 76 golden cases. For LLM-discovered anomalies:
+- The observed citation from the LLM run (stored in `llm-report.json` iterations) is compared against `baseline.json[caseId]` if the case-id matches a golden entry.
+- For new LLM-generated case-ids (not in baseline), the diff is "no prior golden" and that's a meaningful signal in itself (the LLM found a citation for text the golden corpus doesn't cover).
 
-### Why a separate workflow file (not just a job in `ci.yml`)
-
-1. **Different triggers.** `ci.yml` runs on every push; nightly runs on `schedule`. Mixing both adds conditionals to every step.
-2. **Different permissions.** Nightly needs `issues: write`; PR runs do not. Separate files = least-privilege.
-3. **Different timeout.** Nightly is 30 min; CI is 10 min. Workflow-level `timeout-minutes` is cleaner per-file.
-4. **Different concurrency.** Nightly should NOT cancel an in-progress nightly. The existing `ci.yml` concurrency group cancels in-progress PR runs — wrong semantics for cron.
-
-### Issue filing: separate script, not inline workflow yaml
-
-**Decision:** `scripts/e2e-report-issue.mjs` — a Node script invoked from the workflow.
-
-- **Workflow YAML cannot build a rich issue body.** Markdown tables of 76 cases, artifact links, screenshot embeds — that's hundreds of lines of bash heredoc. Don't do that in YAML.
-- **The script is testable.** It reads `tests/e2e/artifacts/summary.json`, formats markdown, calls `gh issue create` or `gh issue comment` (deduplicating against an open "[E2E Nightly] regression" issue using a label).
-- **Co-locates with other scripts** — `scripts/` is the established home for repo tooling (`build.js`, `update-golden.js`, `accuracy-report.js`).
-
-Deduplication strategy:
-- Search for open issues with label `e2e-nightly`
-- If found and ≤7 days old → `gh issue comment` with the new run summary
-- Otherwise → `gh issue create` with title `[E2E Nightly] {failCount}/76 regressions on {date}`
+Nightly reports (`report.json`) are uploaded as GitHub Actions artifacts with 14-day retention. The weekly digest does not need to read them directly — it aggregates from open issues instead. If historical trend analysis beyond 14 days is needed in a future milestone, a `data/nightly-summaries.jsonl` commit-based append pattern is the minimal extension (one line per run, summary counts only, no per-case detail). That is out of scope for v3.1.
 
 ---
 
-## 6. Phase Build Order
-
-**Total: 5 phases.** This sits in the 4-6 phase target. Each phase ships a usable increment.
-
-### Phase 1: Playwright harness + extension load + smoke spec
-**Goal:** `npm run e2e:smoke` loads the extension, navigates to one Google Patents page, asserts the extension's content script registered.
-
-**Builds:**
-- `tests/e2e/playwright.config.ts`
-- `tests/e2e/lib/extension-loader.ts` (launchPersistentContext, dynamic extension ID)
-- `tests/e2e/lib/global-setup.ts` (runs `npm run build:chrome`)
-- `tests/e2e/specs/smoke.spec.ts` (1 case — "extension loads on US11427642")
-- `package.json` deps: `@playwright/test`
-- `package.json` scripts: `e2e`, `e2e:smoke`
-- `.gitignore`: `tests/e2e/artifacts/`
-
-**Depends on:** existing build pipeline (must keep working).
-**Validates:** Playwright + MV3 service worker integration works at all on Ubuntu CI and locally.
-
-### Phase 2: Selection automation + citation observation
-**Goal:** Drive a real selection on one patent, observe the extension's citation output, compare to expected.
-
-**Builds:**
-- `tests/e2e/lib/selection-coordinator.ts` (DOM Range creation, mouseup dispatch — this is the tricky bit; needs research on how Google Patents renders the spec text in the DOM)
-- `tests/e2e/lib/citation-observer.ts` (Shadow DOM piercing — Playwright auto-pierces, so this is straightforward)
-- `tests/e2e/lib/case-registry.ts` (joins `test-cases.js` + `baseline.json`)
-- Extend `smoke.spec.ts` to: select → observe → assert exact match against golden
-
-**Depends on:** Phase 1 (extension loaded).
-**Validates:** Selection contract is reliable. This is where Google UI drift will most likely bite.
-
-### Phase 3: Deterministic regression mode (all 76 cases)
-**Goal:** `npm run e2e` runs the full corpus, fails on any deviation from `baseline.json`.
-
-**Builds:**
-- `tests/e2e/specs/golden-regression.spec.ts` (one `test.each` over all 76 cases)
-- `tests/e2e/lib/artifact-capturer.ts` (only invoked on failure)
-- `tests/e2e/lib/reporter.ts` (JSON summary)
-
-**Depends on:** Phase 2 (selection + observation primitives).
-**Validates:** The harness is reliable at scale — flake rate must be measured here. Likely needs retries, longer timeouts for OCR-heavy patents.
-
-### Phase 4: Independent PDF re-parse verifier + CI integration
-**Goal:** Catch regressions where the extension reports a citation that's wrong even though it matches the (potentially stale) baseline. Add CI smoke job + nightly workflow.
-
-**Builds:**
-- `tests/e2e/lib/pdf-verifier.ts` (fixture-first, then PDF fetch, then Worker fallback)
-- ESLint rule (or simple grep test) preventing `pdf-verifier.ts` from importing `src/`
-- `scripts/e2e-report-issue.mjs` (GH issue formatter + dedup)
-- `.github/workflows/ci.yml` — add `e2e-smoke` job
-- `.github/workflows/e2e-nightly.yml` — NEW
-
-**Depends on:** Phase 3 (full corpus runnable). The verifier needs the deterministic harness to feed it cases.
-**Validates:** End-to-end production loop — nightly cron, failure routes to GitHub issue.
-
-### Phase 5: LLM exploratory mode
-**Goal:** `npm run e2e:explore` runs Claude Code locally for N iterations against fresh patents.
-
-**Builds:**
-- `tests/e2e/exploratory/run-exploratory.mjs` (subprocess spawn, prompt + tool-permission scoping)
-- `tests/e2e/exploratory/prompts/pick-and-verify.md`
-- Documentation in `tests/e2e/README.md` for the subscription requirement
-- Possibly an MCP server exposing `selection-coordinator` + `citation-observer` + `pdf-verifier` as tools (defer judgment to Phase 5 implementation)
-
-**Depends on:** Phases 1-4 (all primitives + verifier). Cannot build LLM mode before deterministic harness exists — Claude needs to call tested primitives, not invent them.
-**Validates:** Discovery of patents/selections that human curation missed.
-
-### What about failure artifact capture as its own phase?
-
-The original question listed Phase 7 = "Failure artifact capture." **Folded into Phase 3** — capture is a 1-file concern (`artifact-capturer.ts`) that's only useful once the deterministic mode is producing failures. Splitting it out would create a phase with no validation criteria.
-
-### Phase dependency graph
+## Recommended Project Structure (v3.1 additions)
 
 ```
-Phase 1 (load) ──► Phase 2 (select/observe) ──► Phase 3 (full corpus + artifacts)
-                                                       │
-                                                       ▼
-                                                Phase 4 (verifier + CI/cron)
-                                                       │
-                                                       ▼
-                                                Phase 5 (LLM)
-```
+tests/
+  test-cases.js                        (existing — unchanged)
+  test-cases-quarantine.js             (NEW — quarantine corpus)
+  golden/
+    baseline.json                      (existing — unchanged)
+  e2e/
+    specs/
+      regression.spec.js               (existing — unchanged)
+      fault-injection.spec.js          (existing — unchanged)
+      quarantine.spec.js               (NEW — non-gating quarantine runner)
+    lib/
+      pdf-verifier.js                  (existing — called by rerun-validator)
+      llm-driver.js                    (existing — called by triage-classifier)
+      llm-report.js                    (existing — read by rerun-validator)
+      report.js                        (existing — unchanged)
+      rerun-validator.js               (NEW — reproducibility confirmation)
+      triage-classifier.js             (NEW — heuristic + LLM second-pass)
+      issue-payload-builder.js         (NEW — rich body assembly)
+      [existing: error-codes, artifacts, run-id, ...]
+    playwright.config.js               (MODIFIED — add quarantine project)
+    artifacts/
+      {run_id}/
+        llm-report.json                (existing schema, local-origin)
+        rerun-report.json              (NEW — rerun-validator output)
+        triage-report.json             (NEW — triage-classifier output)
 
-Strict sequential. No parallelism possible — each phase ships a tool the next phase needs.
+scripts/
+  e2e-explore.mjs                      (existing — unchanged)
+  e2e-report-issue.mjs                 (MODIFIED — add --source triage flag)
+  quarantine-append.mjs                (NEW — append confirmed anomalies to corpus)
+  promote-from-quarantine.mjs          (NEW — human-triggered promotion to golden)
+  weekly-digest.mjs                    (NEW — reads GitHub issues, files digest)
+  run-triage-pipeline.mjs              (NEW — orchestrator: rerun → triage → issue → quarantine)
+
+.github/workflows/
+  e2e-nightly.yml                      (MODIFIED — add triage pipeline steps + llm_run_id input)
+  e2e-weekly-digest.yml                (NEW — weekly cron for digest job)
+```
 
 ---
 
-## Patterns to Follow
+## New vs Modified Components Table
 
-### Pattern: Library-first, runner-thin
-**What:** Selection, observation, verification, and reporting live in `tests/e2e/lib/`. Playwright specs are 5-15 lines that wire them together.
-**When:** Always for this milestone.
-**Why:** The LLM mode is not a Playwright test — it needs to import the same primitives. Thin specs = no duplication.
+| Component | v3.1 Status | Change Description |
+|-----------|-------------|-------------------|
+| `tests/e2e/lib/rerun-validator.js` | NEW | Deterministic re-validation of LLM-flagged anomalies via verifyCitation |
+| `tests/e2e/lib/triage-classifier.js` | NEW | Heuristic-first + LLM second-pass classification; pure data in/out |
+| `tests/e2e/lib/issue-payload-builder.js` | NEW | Rich GitHub issue body assembler (reproducer, verifier detail, LLM rationale, golden diff) |
+| `tests/e2e/specs/quarantine.spec.js` | NEW | Non-gating Playwright spec for quarantine corpus |
+| `tests/e2e/test-cases-quarantine.js` | NEW | Quarantine case corpus (separate from golden test-cases.js) |
+| `scripts/quarantine-append.mjs` | NEW | Idempotent script to add confirmed anomalies to quarantine corpus |
+| `scripts/promote-from-quarantine.mjs` | NEW | Human-triggered promotion from quarantine to golden |
+| `scripts/weekly-digest.mjs` | NEW | Weekly GitHub issue analytics digest filer |
+| `scripts/run-triage-pipeline.mjs` | NEW | Orchestrator: chains rerun → triage → issue → quarantine |
+| `scripts/e2e-report-issue.mjs` | MODIFIED | Add `--source triage` flag; delegate body to issue-payload-builder for LLM anomalies; add errorClass as GitHub label |
+| `.github/workflows/e2e-nightly.yml` | MODIFIED | Add `llm_run_id` workflow_dispatch input; add artifact download step; add triage pipeline step; add quarantine spec step; add weekly digest workflow |
+| `tests/e2e/playwright.config.js` | MODIFIED | Add `quarantine` Playwright project |
+| `tests/e2e/lib/pdf-verifier.js` | UNCHANGED | Called as-is by rerun-validator |
+| `tests/e2e/lib/llm-driver.js` | UNCHANGED | Called as-is by triage-classifier for LLM second-pass |
+| `tests/e2e/lib/llm-report.js` | UNCHANGED | Read as-is by rerun-validator |
+| `tests/e2e/lib/report.js` | UNCHANGED | |
+| `tests/golden/baseline.json` | UNCHANGED | Referenced for golden diffs; modified only by promote-from-quarantine.mjs |
+| `tests/test-cases.js` | UNCHANGED | Modified only by promote-from-quarantine.mjs |
 
-### Pattern: Resolve extension ID at runtime
-**What:** After `launchPersistentContext`, wait for the `serviceworker` event, parse the URL for the extension ID. Never hardcode.
-**When:** Every test setup.
+---
 
-### Pattern: Two oracles for verification
-**What:** Compare against `baseline.json` (regression oracle) AND independently re-parse the PDF (correctness oracle).
-**When:** Verifier path only. Specs use baseline alone for speed.
+## Data Flow Diagram (Text)
+
+```
+[LOCAL] npm run e2e:explore
+    │
+    ├── lib/llm-driver.js (invokeClaudeP, validateLlmSelection)
+    ├── lib/llm-hallucination.js (selectionInSpec)
+    ├── lib/pdf-verifier.js (verifyCitation)
+    ├── lib/llm-ledger.js (spend tracking)
+    └── lib/llm-report.js (appendLlmIteration)
+           │
+           ▼
+  artifacts/{run_id}/llm-report.json
+
+[DEVELOPER] gh workflow run e2e-nightly.yml -f llm_run_id={run_id}
+  [CI downloads artifact: llm-report.json]
+
+[CI] scripts/run-triage-pipeline.mjs
+    │
+    ├── [STEP 1] lib/rerun-validator.js
+    │    reads:  llm-report.json (VERIFIER_DISAGREE + WRONG_CITATION iterations)
+    │    calls:  lib/pdf-verifier.js verifyCitation (verifier-only, no Playwright)
+    │    writes: artifacts/{run_id}/rerun-report.json
+    │
+    ├── [STEP 2] lib/triage-classifier.js
+    │    reads:  llm-report.json (iteration metadata)
+    │            rerun-report.json (reproducibility verdicts)
+    │    calls:  lib/llm-driver.js invokeClaudeP (ambiguous cases only)
+    │    uses:   lib/llm-ledger.js (charge second-pass cost to monthly cap)
+    │    writes: artifacts/{run_id}/triage-report.json
+    │
+    ├── [STEP 3] lib/issue-payload-builder.js (called from step 4)
+    │    reads:  triage-report.json, llm-report.json
+    │            tests/golden/baseline.json (for citation diff)
+    │    calls:  lib/pdf-snippet.js renderPdfSnippet (for PNG crops)
+    │    output: rich issue body string (not written to disk; passed to filer)
+    │
+    ├── [STEP 4] scripts/e2e-report-issue.mjs --source triage
+    │    reads:  triage-report.json (actionable cases: confirmed_extension_bug, investigate)
+    │    calls:  lib/issue-payload-builder.buildTriageIssueBody()
+    │    calls:  gh CLI (create/comment issues with fingerprint dedup)
+    │    labels: adds errorClass as GitHub label on created issues
+    │
+    └── [STEP 5] scripts/quarantine-append.mjs
+         reads:  triage-report.json (confirmed_extension_bug + investigate cases)
+         writes: tests/e2e/test-cases-quarantine.js (idempotent upsert by caseId)
+
+[CI] npx playwright test --project quarantine
+    reads:  tests/e2e/test-cases-quarantine.js
+    uses:   existing lib/pdf-verifier.js, lib/artifacts.js, lib/report.js
+    writes: artifacts/{run_id}/quarantine-report.json
+    uploads: as separate artifact (non-gating, continue-on-error: true)
+
+[WEEKLY CRON] scripts/weekly-digest.mjs
+    reads:  gh api /repos/{repo}/issues?labels=e2e-nightly (open issues)
+            checkout tests/e2e/test-cases-quarantine.js (line count)
+    writes: gh issue create --label e2e-digest (new issue per week)
+```
+
+---
+
+## Build Order (Dependency-Justified)
+
+The dependency graph determines sequencing. Components can only be built after their inputs exist.
+
+**Phase 1 — Foundations (no inter-v3.1 dependencies)**
+- `tests/e2e/lib/rerun-validator.js`
+  - Depends only on existing `lib/pdf-verifier.js` and `lib/llm-report.js`
+  - Must exist before triage-classifier can consume its output
+  - Unit-testable immediately with mock llm-report.json fixtures
+
+**Phase 2 — Classifier (depends on rerun-validator output schema)**
+- `tests/e2e/lib/triage-classifier.js`
+  - Consumes rerun-report.json schema (defined in Phase 1)
+  - Calls `lib/llm-driver.js` (existing) for second-pass — no new dependency
+  - Must exist before issue-payload-builder and quarantine-append
+
+**Phase 3 — Payload + Corpus (depends on triage output schema)**
+- `tests/e2e/lib/issue-payload-builder.js`
+  - Consumes triage-report.json schema (defined in Phase 2)
+  - References `lib/pdf-snippet.js` (existing) and `baseline.json` (existing)
+- `scripts/quarantine-append.mjs`
+  - Consumes triage-report.json schema (defined in Phase 2)
+  - Writes `test-cases-quarantine.js` (can create empty file to unblock Phase 4)
+
+**Phase 4 — CI wiring + quarantine spec (depends on quarantine corpus)**
+- `tests/e2e/test-cases-quarantine.js` (file created by quarantine-append.mjs — Phase 3)
+- `tests/e2e/specs/quarantine.spec.js`
+  - Reads test-cases-quarantine.js (Phase 3)
+  - Uses existing lib/ primitives unchanged
+- `tests/e2e/playwright.config.js` modification (add quarantine project)
+- `scripts/e2e-report-issue.mjs` modification (add --source triage, delegate to issue-payload-builder)
+- `scripts/run-triage-pipeline.mjs` (orchestrator, chains all Phase 1-3 components)
+
+**Phase 5 — Workflow extension (depends on all Phase 1-4 components being testable)**
+- `.github/workflows/e2e-nightly.yml` additions (llm_run_id input, triage steps, quarantine step)
+- Requires run-triage-pipeline.mjs to exist and pass a dry-run test before wiring into CI
+
+**Phase 6 — Weekly digest (no dependency on Phase 1-5 output; depends only on existing GitHub issues existing)**
+- `scripts/weekly-digest.mjs`
+  - Reads GitHub Issues API — no local file dependencies from Phases 1-5
+  - Can be built and tested independently of the triage pipeline
+  - `.github/workflows/e2e-weekly-digest.yml` (separate weekly cron)
+
+**Dependency-justified total ordering:**
+
+```
+1. rerun-validator.js          (consumes only existing pdf-verifier + llm-report.js)
+2. triage-classifier.js        (consumes rerun-report.json schema from step 1)
+3. issue-payload-builder.js    (consumes triage-report.json schema from step 2)
+4. quarantine-append.mjs       (consumes triage-report.json schema from step 2)
+5. test-cases-quarantine.js    (created by step 4; needed by step 6)
+6. quarantine.spec.js          (reads step 5; uses existing lib/)
+7. playwright.config.js mod    (enables quarantine project from step 6)
+8. e2e-report-issue.mjs mod    (delegates to step 3; adds errorClass labeling)
+9. run-triage-pipeline.mjs     (orchestrates steps 1-4, 8)
+10. e2e-nightly.yml additions  (wires step 9 into CI)
+11. promote-from-quarantine.mjs (utility; no blocking dependency)
+12. weekly-digest.mjs          (independent of steps 1-10; parallel track)
+13. e2e-weekly-digest.yml      (wires step 12)
+```
+
+Steps 11 and 12/13 are on independent tracks and can be built in parallel with steps 8-10 once the quarantine corpus file exists (step 5).
+
+---
+
+## Architectural Patterns
+
+### Pattern 1: Pure-Data Library Module with Orchestrator Script
+
+**What:** All new `lib/` modules (rerun-validator, triage-classifier, issue-payload-builder) are pure-function Node.js modules with no side effects in their exported functions except file reads/writes explicitly passed as parameters. The orchestrator (`scripts/run-triage-pipeline.mjs`) sequences them and handles error recovery.
+
+**When to use:** Whenever a component needs to be unit-tested with mock data in vitest without spinning up Playwright or making network calls. All three new lib/ components fit this pattern.
+
+**Trade-offs:** The orchestrator script becomes the seam where error handling and retry logic lives. This is acceptable because the orchestrator is CI-only (not unit-tested at the same depth) and its failure modes are CI step failures (visible, not silent).
+
+### Pattern 2: Verifier-Only Replay (No Browser)
+
+**What:** rerun-validator.js calls `verifyCitation()` directly without loading the extension or Playwright. The verifier uses `pdfjs-dist` directly in Node — no browser context required.
+
+**When to use:** Any time the question is "does the cited text exist in the PDF at this location?" not "does the extension produce the right citation?" The rerun-validator is answering the first question.
+
+**Trade-offs:** The verifier has a known ±10-line calibration gap vs the extension's gutter-printed line numbering (documented in pdf-verifier.js line 48). The heuristic rule in triage-classifier explicitly handles `VERIFIER_DISAGREE` cases where the re-run verdict is Tier C — these are classified as `verifier_calibration_issue` rather than `confirmed_extension_bug`, preserving the distinction.
+
+### Pattern 3: Closed-Enum Extension for Triage Labels
+
+**What:** The triage-report.json uses a new closed set of triage labels (`confirmed_extension_bug`, `confirmed_hallucination`, `verifier_calibration_issue`, `unverifiable`, `investigate`) analogous to how ERROR_CLASSES is a closed enum in error-codes.js.
+
+**When to use:** Anywhere that downstream consumers (quarantine-append, issue-payload-builder, weekly-digest) need to branch on the triage result. Closed enums make it safe to assert exhaustiveness in those consumers.
+
+**Trade-offs:** Adding a new triage label requires updating all consumers. This is the same trade-off accepted for ERROR_CLASSES in Phase 28 — the closed-enum guarantee is worth the maintenance discipline.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern: One giant spec file
-**Why bad:** Forces LLM mode to either duplicate selection logic or hack imports from spec files.
-**Instead:** Library modules + thin spec files.
+### Anti-Pattern 1: Running Playwright in the Rerun Validator
 
-### Anti-Pattern: Verifier imports `src/shared/matching.js`
-**Why bad:** Defeats the whole point of "independent." A bug in matching.js would pass verification.
-**Instead:** Different library (`pdf-parse` or raw `pdfjs.getTextContent()`), different algorithm, ESLint enforcement.
+**What people might do:** Run `quarantine.spec.js` as the rerun-validator (load the extension, drive the page, check the citation).
 
-### Anti-Pattern: Running E2E full corpus on every push
-**Why bad:** 76 cases × Chromium launch overhead = slow PRs. PRs will start landing without E2E feedback.
-**Instead:** Smoke (3-5 cases) on push; full on nightly cron + manual dispatch.
+**Why it's wrong:** The question at re-run time is "is this anomaly reproducible deterministically?" not "does the extension still produce the same wrong citation?" The verifyCitation oracle answers reproducibility without a browser. Introducing Playwright adds 30+ seconds per case (browser launch + Google Patents navigation + CAPTCHA risk) to what is already a slow pipeline. The deterministic regression suite already answers "does the extension produce the right citation."
 
-### Anti-Pattern: GH issue body built in workflow YAML
-**Why bad:** Multi-line heredoc with markdown tables is unreadable and untestable.
-**Instead:** `scripts/e2e-report-issue.mjs` — testable Node code.
+**Do this instead:** rerun-validator.js calls `verifyCitation()` directly. Playwright tests remain confined to regression.spec.js and quarantine.spec.js, which run against the live extension.
 
-### Anti-Pattern: Hardcoding extension ID
-**Why bad:** Non-portable. Breaks on any rebuild that regenerates a key.
-**Instead:** Dynamic resolution from `context.serviceWorkers()[0].url()`.
+### Anti-Pattern 2: Committing llm-report.json to git
 
-### Anti-Pattern: Caching Playwright browsers in CI (initially)
-**Why bad:** Playwright's official docs say cache restore is often comparable to re-download. Adds complexity for no gain.
-**Instead:** Re-install on each run; revisit only if cron-job time becomes a problem.
+**What people might do:** Add a `git commit -m "chore: update llm-report.json"` step in CI or in the local explore script.
+
+**Why it's wrong:** The llm-report.json is a per-run artifact with a run-scoped run_id in its path. Committing it conflates ephemeral test runs with permanent project history, creates merge conflicts on concurrent runs, and leaks cost information (total_cost_usd per iteration) into git history. The llm-ledger.js is already gitignored for this reason.
+
+**Do this instead:** Upload as a GitHub Actions artifact with the gh CLI or an `upload-artifact` step. Pass the run_id as a workflow_dispatch input to the nightly pipeline.
+
+### Anti-Pattern 3: Entangling Triage Cost with the Exploratory Monthly Cap
+
+**What people might do:** Maintain a separate spend cap for triage second-pass LLM calls, distinct from the llm-ledger monthly cap.
+
+**Why it's wrong:** Two caps mean two code paths for cap enforcement, two ledger files, two WARN_THRESHOLD checks. The total developer cost is the sum of both pools, but visibility is split.
+
+**Do this instead:** All `invokeClaudeP` calls — whether from e2e-explore.mjs (exploratory) or triage-classifier.js (second-pass) — record their cost in the same `llm-ledger.js` under the same monthly key. The second-pass calls should be infrequent (only ambiguous cases bypass heuristics) and the $100 hard cap protects against runaway spending from either source.
+
+### Anti-Pattern 4: Blocking CI on Quarantine Failures
+
+**What people might do:** Remove `continue-on-error: true` from the quarantine spec step so a failing quarantine case blocks merging.
+
+**Why it's wrong:** Quarantine cases are known-failing by definition — they are confirmed anomalies awaiting either extension fix or promotion to golden. Making them gating would mean every PR fails until every quarantine case is resolved, which defeats the purpose of the tiered corpus.
+
+**Do this instead:** Quarantine spec always runs with `continue-on-error: true`. The quarantine result is reported in the weekly digest and tracked via GitHub issues with the `e2e-nightly` label. Promotion to golden (after an extension fix) is the graduation mechanism, not blocking CI.
 
 ---
 
-## Scalability Considerations
+## Integration Points with Existing v3.0 Modules
 
-| Concern | Today (76 cases) | At 200 cases | At 500 cases |
-|---------|------------------|--------------|--------------|
-| Full-run wall time | ~10 min (extrapolated) | ~25 min | ~60 min |
-| Approach | Single Chromium worker (extensions require persistent context) | Same — bottleneck is page load, not parallelism | Shard across N jobs in matrix; each job loads extension once and runs a slice |
-| Artifact size | <10 MB | ~25 MB | ~60 MB — switch to "failures only" with explicit `retain-on-failure` |
-| Flake handling | `retries: 1` in config | `retries: 2`; track flake rate in reporter | Quarantine list; auto-rerun quarantined separately |
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| GitHub Issues API | gh CLI via `execSync` in `e2e-report-issue.mjs` (existing); extended with errorClass label | New: add label creation for errorClass values in `Ensure labels exist` step |
+| GitHub Actions Artifacts | `upload-artifact@v4` / `download-artifact@v4` | llm-report.json transit from local to CI |
+| claude -p (Max 5) | `invokeClaudeP` from `lib/llm-driver.js` | Reused by triage-classifier second-pass; same spend cap enforcement |
+| pdfjs-dist | Node-side direct import in `lib/pdf-verifier.js` | Reused by rerun-validator; no new dependency |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `rerun-validator.js` ↔ `lib/pdf-verifier.js` | Direct function call: `verifyCitation({patentId, selectedText, observedCitation})` | Returns Verdict `{status, tier_used, reason, cited_text_window}` — existing schema, unchanged |
+| `rerun-validator.js` ↔ `lib/llm-report.js` | Read-only: imports `llmReportPathFor`, parses file directly | Does NOT write to llm-report.json; only reads |
+| `triage-classifier.js` ↔ `lib/llm-driver.js` | Direct function call: `invokeClaudeP({systemPrompt, userPrompt})` then `parseClaudeResponse` | Reuses existing API contract unchanged |
+| `triage-classifier.js` ↔ `lib/llm-ledger.js` | Direct function call: `appendLedgerEntry` after every invokeClaudeP call | Same monthly cap applies |
+| `issue-payload-builder.js` ↔ `lib/pdf-snippet.js` | Direct function call: `renderPdfSnippet({patentId, page, line, runId, caseId})` | Returns PNG path; existing API unchanged |
+| `e2e-report-issue.mjs` ↔ `lib/issue-payload-builder.js` | New import; called in `--source triage` branch only | Existing `buildIssueBody()` function remains for regression source |
+| `quarantine.spec.js` ↔ `tests/e2e/lib/*` | Same imports as regression.spec.js | Specifically: `extension-loader`, `navigation`, `selection`, `observation`, `pdf-verifier`, `report`, `artifacts` |
+| `scripts/run-triage-pipeline.mjs` ↔ all new lib/ | Orchestrator: sequential calls with error trapping per step | Exits 0 always (same philosophy as e2e-nightly.yml — the issue IS the signal) |
 
 ---
 
 ## Sources
 
-- [Playwright — Chrome extensions documentation](https://playwright.dev/docs/chrome-extensions) — `launchPersistentContext` is mandatory for extension loading; service worker URL is the canonical extension-ID source. HIGH confidence (official docs).
-- [Playwright — Continuous Integration guide](https://playwright.dev/docs/ci) — Browser caching guidance, `--with-deps` install pattern. HIGH confidence.
-- [BrowserStack — Playwright Chrome Extension testing guide (2026)](https://www.browserstack.com/guide/playwright-chrome-extension) — MV3 service-worker suspension handling; multi-surface extension testing. MEDIUM confidence.
-- [Testomat.io — Playwright tutorial for browser extensions](https://testomat.io/blog/playwright-tutorial-experience-testing-browser-extensions/) — Persistent context per test-file vs per-test trade-offs. MEDIUM confidence.
-- [Playwright Solutions — caching browser binaries in GitHub Actions](https://playwrightsolutions.com/playwright-github-action-to-cache-the-browser-binaries/) — Cache-vs-redownload trade-off. MEDIUM confidence.
-- [Anthropic — Claude Code headless mode docs and ecosystem coverage (amux.io, mindstudio.ai)](https://amux.io/guides/claude-code-headless/) — `claude -p --output-format json` subprocess pattern, `.claude/settings.json` tool scoping. MEDIUM confidence (vendor + secondary sources agree).
-- [@anthropic-ai/claude-agent-sdk on npm](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) — TypeScript SDK alternative if subprocess approach proves limiting. HIGH confidence (package exists, current).
-- Repo files inspected: `.planning/PROJECT.md`, `package.json`, `scripts/build.js`, `tests/golden/baseline.json`, `tests/test-cases.js`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `tests/fixtures/US11427642.json`, `.gitignore`. HIGH confidence (direct read).
+- Direct code inspection: `tests/e2e/lib/pdf-verifier.js`, `lib/llm-driver.js`, `lib/llm-report.js`, `lib/error-codes.js`, `lib/report.js`
+- Direct code inspection: `scripts/e2e-report-issue.mjs`, `scripts/e2e-explore.mjs`
+- Direct code inspection: `.github/workflows/e2e-nightly.yml`, `tests/e2e/specs/regression.spec.js`
+- `.planning/PROJECT.md` — v3.1 milestone target features
+- Confidence: HIGH — all architectural decisions derived from reading existing code contracts, not from external research or training-time knowledge
+
+---
+
+*Architecture research for: v3.1 LLM-Driven Product Improvement Loop (patent-cite-tool)*
+*Researched: 2026-05-22*

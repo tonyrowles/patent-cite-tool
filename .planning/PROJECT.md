@@ -8,18 +8,19 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v3.0 Autonomous E2E Testing Agent
+## Current Milestone: v3.1 LLM-Driven Product Improvement Loop
 
-**Goal:** Build a Playwright-driven testing agent that exercises the extension against real Google Patents pages, observes the citations the plugin produces, and verifies them by independently re-parsing the source PDF — catching cross-browser bugs, Google UI drift, and accuracy regressions that unit tests cannot.
+**Goal:** Close the loop from v3.0's LLM exploratory testing into actionable product fixes — reproducibility-validated, hybrid-triaged findings flow into rich-context GitHub issues and a tiered quarantine→golden corpus, with a weekly analytics digest driving roadmap prioritization.
 
 **Target features:**
-- Playwright + Chromium harness that loads the extension and drives Google Patents pages (highlight → observe citation)
-- Deterministic regression mode covering the 76 golden patents (runs locally + GitHub Actions nightly cron)
-- Independent PDF re-parse verifier (separate pdf.js/pdftotext code path) that searches for the selected text near the cited column:line
-- Nightly cron failure routing — auto-files (or comments on) a GitHub issue with screenshot, DOM snapshot, and PDF page snippet
-- USPTO/Worker fallback fault-injection test (catches silent regressions in the Cloudflare Worker path)
-- LLM exploratory mode driven by headless `claude -p` against the Max 5 subscription credit pool — picks fresh patents and unusual selections; local-dev only; soft monthly $100 cap with warning at $80
-- Only non-functional changes to the extension: `data-testid` attributes on UI hooks + one Cloudflare Worker header for test-mode skip-KV-writes
+- Close out Phase 31 HUMAN-UAT: verify `npm run e2e:explore` against the Max 5 subscription credit produces usable findings end-to-end (de-risks the rest of the milestone)
+- Re-run validator: every LLM-flagged anomaly is auto-replayed deterministically (verifier-only path) to confirm reproducibility before triage
+- Hybrid triage classifier: rule-based heuristics on existing `report.json` fields handle clear cases; second `claude -p` pass classifies only ambiguous remainder (cost-controlled)
+- Auto-issue filer with rich payload — extends Phase 29 fingerprint scheme; issues include reproducer + seed, verifier disagreement detail (expected vs observed + tier + PDF snippet), LLM classifier rationale + confidence, diff vs last known-good golden citation
+- Tiered corpus promotion: confirmed findings auto-add to `test-cases-quarantine.js`; quarantine suite runs in CI as non-gating separate report; human promotes stable entries to golden corpus via PR
+- Local + CI runtime split: LLM exploratory stays local-only (subscription budget); triage / validator / quarantine pipeline runs in the nightly GitHub Actions cron on the resulting `llm-report.json`
+- Weekly analytics digest: automated weekly summary of findings count, classification breakdown, top failure categories, quarantine growth — drives roadmap prioritization
+- Source-side changes remain minimal — no new core extension functionality; reuses v3.0 report.json schema, pdf-verifier, e2e-report-issue.mjs, fingerprint scheme
 
 ## Requirements
 
@@ -112,9 +113,9 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - webextension-polyfill — Firefox supports chrome.* natively; unnecessary dependency
 - Build-time minification — keep source readable for extension store review
 
-## Latest Milestone: v2.2 Matching Robustness (Shipped 2026-03-05)
+## Latest Milestone: v3.0 Autonomous E2E Testing Agent (Shipped 2026-05-20)
 
-Hardened the text matching pipeline against stray gutter line numbers and OCR discrepancies. Added OCR-aware normalization (Tier 0b) and gutter-tolerant matching (Tier 5). Golden baseline expanded from 71 to 75 cases with zero regressions.
+Built a Playwright-driven testing agent that exercises the extension against real Google Patents, with independent PDF re-parse verification, nightly GitHub Actions cron with auto-issue filer, Worker fault-injection coverage, and LLM exploratory mode scaffolding (`claude -p` against Max 5 subscription; live UAT deferred to v3.1). 6 phases (26-31), 30 plans, 32 requirements shipped. Only non-functional source changes (data-testids + `X-PCT-Test-Mode` header).
 
 ## Context
 
@@ -203,4 +204,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-20 — v3.0 milestone all phases complete (LLM exploratory mode shipped; live LLM test deferred to HUMAN-UAT)*
+*Last updated: 2026-05-22 — v3.1 milestone kicked off (LLM-Driven Product Improvement Loop)*

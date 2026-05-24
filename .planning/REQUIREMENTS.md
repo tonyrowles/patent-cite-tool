@@ -101,41 +101,41 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UAT-01 | TBD | Pending |
-| UAT-02 | TBD | Pending |
-| UAT-03 | TBD | Pending |
-| RERUN-01 | TBD | Pending |
-| RERUN-02 | TBD | Pending |
-| RERUN-03 | TBD | Pending |
-| RERUN-04 | TBD | Pending |
-| TRIAGE-01 | TBD | Pending |
-| TRIAGE-02 | TBD | Pending |
-| TRIAGE-03 | TBD | Pending |
-| TRIAGE-04 | TBD | Pending |
-| TRIAGE-05 | TBD | Pending |
-| TRIAGE-06 | TBD | Pending |
-| ISSUE-01 | TBD | Pending |
-| ISSUE-02 | TBD | Pending |
-| ISSUE-03 | TBD | Pending |
-| ISSUE-04 | TBD | Pending |
-| QUAR-01 | TBD | Pending |
-| QUAR-02 | TBD | Pending |
-| QUAR-03 | TBD | Pending |
-| QUAR-04 | TBD | Pending |
-| QUAR-05 | TBD | Pending |
-| ORCH-01 | TBD | Pending |
-| ORCH-02 | TBD | Pending |
-| ORCH-03 | TBD | Pending |
-| DIGEST-01 | TBD | Pending |
-| DIGEST-02 | TBD | Pending |
-| DIGEST-03 | TBD | Pending |
-| DIGEST-04 | TBD | Pending |
+| UAT-01 | Phase 32 | Pending |
+| UAT-02 | Phase 32 | Pending |
+| UAT-03 | Phase 32 | Pending |
+| RERUN-01 | Phase 33 | Pending |
+| RERUN-02 | Phase 33 | Pending |
+| RERUN-03 | Phase 33 | Pending |
+| RERUN-04 | Phase 33 | Pending |
+| TRIAGE-01 | Phase 34 | Pending |
+| TRIAGE-02 | Phase 34 | Pending |
+| TRIAGE-03 | Phase 34 | Pending |
+| TRIAGE-04 | Phase 34 | Pending |
+| TRIAGE-05 | Phase 34 | Pending |
+| TRIAGE-06 | Phase 34 | Pending |
+| ISSUE-01 | Phase 35 | Pending |
+| ISSUE-02 | Phase 35 | Pending |
+| ISSUE-03 | Phase 35 | Pending |
+| ISSUE-04 | Phase 35 | Pending |
+| QUAR-01 | Phase 35 | Pending |
+| QUAR-02 | Phase 35 | Pending |
+| QUAR-03 | Phase 36 | Pending |
+| QUAR-04 | Phase 36 | Pending |
+| QUAR-05 | Phase 35 | Pending |
+| ORCH-01 | Phase 36 | Pending |
+| ORCH-02 | Phase 36 | Pending |
+| ORCH-03 | Phase 36 | Pending |
+| DIGEST-01 | Phase 37 | Pending |
+| DIGEST-02 | Phase 37 | Pending |
+| DIGEST-03 | Phase 37 | Pending |
+| DIGEST-04 | Phase 37 | Pending |
 
 **Coverage:**
 - v3.1 requirements: 29 total
-- Mapped to phases: 0 (TBD — roadmapper will assign)
-- Unmapped: 29 ⚠️ (will be 0 after roadmap creation)
+- Mapped to phases: 29
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-22*
-*Last updated: 2026-05-22 after initial definition*
+*Last updated: 2026-05-22 — Traceability table populated after roadmap creation (Phases 32-37)*

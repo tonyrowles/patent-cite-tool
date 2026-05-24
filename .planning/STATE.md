@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: LLM-Driven Product Improvement Loop
 status: planning
-last_updated: "2026-05-22T18:52:33.799Z"
+last_updated: "2026-05-22T00:00:00.000Z"
 last_activity: 2026-05-22
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,19 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-13)
+See: .planning/PROJECT.md (updated 2026-05-22)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 30 — Worker Fault-Injection
+**Current focus:** Phase 32 — HUMAN-UAT Verification (not started)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 32 — HUMAN-UAT Verification
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-22 — Milestone v3.1 started
+Status: Phase 32 not started
+Last activity: 2026-05-22 — v3.1 roadmap created (Phases 32-37, 29 requirements mapped)
+
+Progress: ░░░░░░░░░░ 0% (0/6 phases complete)
 
 ## Performance Metrics
 
@@ -42,13 +44,8 @@ Last activity: 2026-05-22 — Milestone v3.1 started
 | v2.1 CI/CD Pipeline | 2 | 2 | 2 days |
 | v2.2 Matching Robustness | 3 | 4 | 2 days |
 | v2.3 Post-v2.2 Hardening | 3 | 5 | 1 day |
-| v3.0 Autonomous E2E Testing Agent | 6 (planned) | TBD | TBD |
-| Phase 29 P03 | 155 | 2 tasks | 2 files |
-| Phase 30 P01 | 167 | 4 tasks | 6 files |
-| Phase 30 P02 | 4 | 2 tasks | 2 files |
-| Phase 30 P04 | 3 | 2 tasks | 2 files |
-| Phase 30 P05 | 25 | 4 tasks | 4 files |
-| Phase 30 P03 | 8 | 2 tasks | 2 files |
+| v3.0 Autonomous E2E Testing Agent | 6 | 30 | ~7 days |
+| v3.1 LLM-Driven Product Improvement Loop | 6 (planned) | TBD | TBD |
 
 ## Accumulated Context
 
@@ -74,6 +71,19 @@ All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 30]: Fault-injection step placed after regression issue-filer; runs every nightly tick (not weekday-rotated); no --grep since single-case spec
 - [Phase 30]: No changes to scripts/e2e-report-issue.mjs — existing per-case loop handles WORKER_FALLBACK_FAILED via report.json standard schema
 
+### v3.1 Pre-locked Decisions (from roadmap research)
+
+- **Zero new npm dependencies**: All new scripts are pure Node 22 built-ins layered on existing `llm-driver.js`, `pdf-verifier.js`, `e2e-report-issue.mjs`, and Playwright config primitives
+- **LLM triage path**: Subscription-local only (not API-billed); `invokeClaudePWithLedger` wrapper required; direct `invokeClaudeP` calls ESLint-restricted outside test files
+- **Fingerprint immutability**: v1 fingerprint formula (`sha256(caseId | errorClass | "")`) is immutable; v3.1 adds only `topOfStackHashFromCase` for NEW error classes; `findMatchingIssue` performs dual v1+v2 search during transition
+- **ERROR_CLASSES / fingerprint formula**: Immutable for v3.0 consumers (Phase 29, Phase 30); any new error class or fingerprint variant is additive only
+- **Quarantine CI placement**: Quarantine spec runs inside `e2e-nightly.yml` (not a separate workflow) — avoids concurrency group collision risk
+- **Automatic golden promotion**: Blocked — destroys trust invariant; promotion stays human-gated via `promote-from-quarantine.mjs`
+- **Weekly digest delivery**: GitHub Discussion via `gh api graphql createDiscussion`; Issue with `e2e-digest` label as fallback if Discussions disabled — verify at Phase 37 start
+- **Triage cluster pre-filter**: N≥5 same-errorClass findings route to single grouped LLM call (DOM_DRIFT saturation prevention)
+- **Tier C masking prevention**: `verifier_strong_agreement` named constant (status==='pass' AND tier ∈ {A,B}); Tier C escalates to LLM second-pass; Vitest guard test required
+- **Issue body fingerprint placement**: Fingerprint comment on line 1 of body (prevents 65,536-char overflow displacement)
+
 ### v3.0 Pre-locked Decisions (from milestone kickoff)
 
 - **Test harness:** Playwright + Chromium (Chrome only for v3.0; Firefox E2E deferred to v3.1+)
@@ -85,24 +95,17 @@ All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
 - **No HAR/network trace** (explicitly declined to keep artifacts small)
 - **No new extension functionality** — milestone is testing infrastructure only; only allowed source change is `data-testid` attributes on the citation UI and an `X-PCT-Test-Mode` header on the Cloudflare Worker
 
-### v3.0 Roadmap Decisions (2026-05-13)
-
-- **Phase count:** 6 phases (26-31), strictly sequential (each phase ships a primitive the next phase consumes)
-- **Phase 26 → 27 → 28 → 29 → 31 dependency chain** with Phase 30 (fault-injection) branching off Phase 26 + Phase 28
-- **Granularity:** standard (matches the 6-phase scope derived from the 9 requirement categories)
-- **Coverage:** 32/32 v3.0 requirements mapped — no orphans
-
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
 
-**Open questions surfaced in research (to resolve during phase planning, not blocking roadmap):**
+**Design locks to confirm at phase start (not blocking roadmap):**
 
-- Browser-cache decision (Stack research says skip; Pitfalls research says cache) — resolve in Phase 29 planning by measuring an uncached cron run first
-- `pdftotext` cross-check (Poppler) — Phase 28 plan should decide whether to add a system-dep cross-check or ship pdfjs-only
-- Verifier ±2-line tolerance calibration — Phase 28 execution will run the verifier against the 76-case golden corpus first and tune until the Tier-A/B/C pass rate is >95%
+- [Phase 34]: Confirm LLM invocation path is subscription-local only before any triage code is written; document as acceptance criterion in plan
+- [Phase 36]: Calculate timeout budget (existing nightly runtime + N_quarantine_cases × per-case-time) before adding quarantine steps; document in YAML comment
+- [Phase 37]: Verify GitHub Discussions is enabled on repo at phase start; implement Issue fallback if not
 
 ### Quick Tasks Completed
 
@@ -113,6 +116,6 @@ None.
 
 ## Session Continuity
 
-Last activity: 2026-05-13 — v3.0 roadmap created (Phases 26-31, 32 requirements mapped)
-Status: Phase 26 pending
-Next: `/gsd-plan-phase 26` to plan Playwright Harness Scaffolding
+Last activity: 2026-05-22 — v3.1 roadmap created (Phases 32-37, 29 requirements mapped)
+Status: Phase 32 not started
+Next: `/gsd:plan-phase 32` to plan HUMAN-UAT Verification

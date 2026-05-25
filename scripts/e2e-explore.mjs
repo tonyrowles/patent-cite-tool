@@ -161,8 +161,36 @@ function checkClaudeCli() {
 
 // ---- 4. Per-iteration -------------------------------------------------
 //
-// Returns { stopAll: boolean } — when stopAll is true, main() breaks the
-// iteration loop (used for the LLM-06 hard cap mid-run).
+// Returns { stopAll: boolean, reason?: 'phase_cap' | 'monthly_cap' } — when
+// stopAll is true, main() breaks the iteration loop and uses `reason` to
+// route to the correct documented exit code (CR-04).
+
+/**
+ * WR-08 (Phase 32 review): mid-run phase-cap helper extracted out of the
+ * two identical 11-line in-line blocks that previously sat at the two
+ * post-ledger-append sites in runOneIteration. The helper re-reads the
+ * ledger (so the just-appended entry is included in the phase sum),
+ * delegates to checkPhaseSpendCap, prints any warn/block message, and
+ * returns a structured signal the caller maps to a {stopAll, reason}
+ * return value. Pairing this extraction with the CR-04 reason-routing
+ * makes each call site a single line.
+ *
+ * @param {string} phase — current --phase value (only called when phase != null)
+ * @returns {{ block: boolean }} — `block: true` ⇒ caller should stop iterations
+ */
+function checkMidRunPhaseCap(phase) {
+  const freshLedger = readLedger(LEDGER_PATH);
+  const phaseCap = checkPhaseSpendCap(freshLedger, phase);
+  if (phaseCap.status === 'block') {
+    process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+    return { block: true };
+  }
+  if (phaseCap.status === 'warn') {
+    process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+  }
+  return { block: false };
+}
+
 async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase }) {
   const iso = new Date().toISOString();
   const tStart = Date.now();
@@ -174,7 +202,10 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
   const capCheck = checkSpendCap(capLedger);
   if (capCheck.status === 'block') {
     process.stderr.write(`[e2e-explore] ${capCheck.message}\n`);
-    return { stopAll: true };
+    // CR-04 (Phase 32 review): tag the stopAll signal with reason so main()
+    // can route to the documented exit 4 (monthly cap) instead of silently
+    // exiting 0 after finalizeLlmReport.
+    return { stopAll: true, reason: 'monthly_cap' };
   }
   if (capCheck.status === 'warn') {
     process.stderr.write(`[e2e-explore] ${capCheck.message}\n`);
@@ -235,19 +266,15 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
       iteration_n: iterationN, run_id: runId, phase: phase,
     });
 
-    // Mid-run phase cap check (D-16) — only when --phase was supplied. Re-read
-    // the ledger so the just-appended entry is included in the phase sum.
-    // On block: return stopAll:true so main() breaks the loop and lets
-    // finalizeLlmReport run. On warn: print and continue.
+    // Mid-run phase cap check (D-16) — only when --phase was supplied.
+    // WR-08 extraction: delegate the read-ledger + checkPhaseSpendCap +
+    // print-message dance to the shared `checkMidRunPhaseCap` helper.
+    // CR-04: tag the stopAll signal with reason='phase_cap' so main()
+    // routes to the documented exit 6 instead of silently exiting 0.
     if (phase != null) {
-      const freshLedger = readLedger(LEDGER_PATH);
-      const phaseCap = checkPhaseSpendCap(freshLedger, phase);
-      if (phaseCap.status === 'block') {
-        process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
-        return { stopAll: true };
-      }
-      if (phaseCap.status === 'warn') {
-        process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+      const midCap = checkMidRunPhaseCap(phase);
+      if (midCap.block) {
+        return { stopAll: true, reason: 'phase_cap' };
       }
     }
 
@@ -290,15 +317,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
       // Mid-run phase cap check after the retry append (D-16) — same pattern
       // as the first-call site. The retry burns extra credit, so the cap
       // could trip here even when the first append left us under it.
+      // WR-08 extraction + CR-04 reason routing (see first call site above).
       if (phase != null) {
-        const freshLedger = readLedger(LEDGER_PATH);
-        const phaseCap = checkPhaseSpendCap(freshLedger, phase);
-        if (phaseCap.status === 'block') {
-          process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
-          return { stopAll: true };
-        }
-        if (phaseCap.status === 'warn') {
-          process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+        const midCap = checkMidRunPhaseCap(phase);
+        if (midCap.block) {
+          return { stopAll: true, reason: 'phase_cap' };
         }
       }
       if (retryParsed.ok) {
@@ -512,18 +535,32 @@ async function main() {
     process.exit(5);
   }
 
+  // CR-04 (Phase 32 review): distinguish a cap-trip stop from a natural
+  // loop-completion stop so the documented exit codes (4 = monthly cap,
+  // 6 = phase cap) actually fire mid-run instead of being swallowed by
+  // an unconditional process.exit(0) after finalizeLlmReport. The header
+  // contract promises a mid-run phase-cap trip exits 6 (and monthly-cap
+  // exits 4) — prior to this fix the script reached exit 0 in both cases.
+  let stopReason = null;
   for (let n = 1; n <= iterations; n++) {
     process.stdout.write(`[e2e-explore] iteration ${n}/${iterations}...\n`);
     // eslint-disable-next-line no-await-in-loop
     const result = await runOneIteration({ iterationN: n, runId, reportPath, liveCases, phase });
     if (result.stopAll) {
       process.stderr.write('[e2e-explore] aborting remaining iterations (cap reached).\n');
+      stopReason = result.reason ?? null;
       break;
     }
   }
 
   finalizeLlmReport(reportPath);
   process.stdout.write(`[e2e-explore] done. Report: ${reportPath}\n`);
+  if (stopReason === 'phase_cap') {
+    process.exit(6);
+  }
+  if (stopReason === 'monthly_cap') {
+    process.exit(4);
+  }
   process.exit(0);
 }
 

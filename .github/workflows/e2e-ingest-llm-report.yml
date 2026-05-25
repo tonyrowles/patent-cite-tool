@@ -1,0 +1,57 @@
+# .github/workflows/e2e-ingest-llm-report.yml
+#
+# Phase 32 Plan 32-04 (UAT-03) — workflow_dispatch-only ingest endpoint that
+# accepts a base64-encoded llm-report.json from a local helper
+# (scripts/e2e-upload-llm-report.mjs) and re-uploads it as a 14-day-retention
+# artifact named `llm-report`. The nightly workflow (e2e-nightly.yml) then
+# downloads + schema-validates the artifact when invoked with a non-empty
+# llm_run_id input. This is Stage 1 of the two-stage architecture (D-05).
+#
+# Permissions are intentionally minimal: only `contents: read` is needed for
+# checkout-less artifact uploads. No issues:write, no actions:write — this
+# workflow has no other side effects (D-05, threat model T-32-17).
+#
+# Concurrency is a static group with no cancel-on-new-trigger semantics,
+# mirroring the e2e-nightly.yml decision rationale (29-RESEARCH.md Risk 1)
+# — prevents two simultaneous helper invocations from racing on the
+# artifact namespace (threat model T-32-18).
+
+name: E2E Ingest LLM Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload_b64:
+        description: 'Base64-encoded llm-report.json (≤ ~60KB encoded; 65535 char GH cap)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-ingest-llm-report
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Decode payload
+        run: |
+          mkdir -p ingest-out
+          echo "${{ inputs.payload_b64 }}" | base64 -d > ingest-out/llm-report.json
+          # Sanity check: must be valid JSON. `jq -e .` exits non-zero on
+          # parse failure, failing the whole workflow before the artifact
+          # is uploaded. ubuntu-latest has jq pre-installed.
+          # Threat model T-32-14 mitigation (tampered base64 payload).
+          jq -e . ingest-out/llm-report.json > /dev/null
+
+      - name: Upload as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-report
+          path: ingest-out/llm-report.json
+          retention-days: 14
+          if-no-files-found: error

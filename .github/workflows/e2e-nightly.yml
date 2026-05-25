@@ -24,6 +24,14 @@ on:
         description: 'Run all 66 live cases (override day-of-week rotation)'
         type: boolean
         default: false
+      llm_run_id:
+        description: 'Ingest workflow run_id containing llm-report artifact (Phase 32)'
+        type: string
+        required: false
+        default: ''
+        # An explicit empty-string default (single-quoted) is mandatory per
+        # Phase 32 Pitfall 3 — null-or-omitted defaults break the gating
+        # expression below under cron-triggered runs.
 
 # Static concurrency group prevents schedule + workflow_dispatch from racing
 # (per 29-RESEARCH.md Risk 1 — overrides CONTEXT.md dynamic expression).
@@ -95,6 +103,35 @@ jobs:
         # --force updates if exists; || true makes the step safe if gh rejects --force.
         # Color uses 6-char hex WITHOUT # prefix (gh CLI requirement).
         # See 29-RESEARCH.md Risk 6.
+
+      - name: Download and validate LLM report (if llm_run_id provided)
+        if: inputs.llm_run_id != ''
+        run: |
+          mkdir -p downloaded-llm-report
+          gh run download ${{ inputs.llm_run_id }} -n llm-report -D downloaded-llm-report
+          node -e "
+            import('./tests/e2e/lib/llm-report.js').then(({ appendLlmIteration }) => {
+              const fs = require('node:fs');
+              const r = JSON.parse(fs.readFileSync('downloaded-llm-report/llm-report.json', 'utf8'));
+              const tmp = require('node:os').tmpdir() + '/uat-validate.json';
+              fs.writeFileSync(tmp, JSON.stringify({
+                run_id: r.run_id, started_iso: r.started_iso, finished_iso: r.finished_iso,
+                iterations_total: 0, summary: r.summary, iterations: []
+              }));
+              for (const it of r.iterations) appendLlmIteration(tmp, it);
+              console.log('schema OK: ' + r.iterations.length + ' iterations');
+            });
+          "
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Phase 32 Plan 32-04 (UAT-03) — gated download + schema-validate step.
+        # Placed AFTER the label step and BEFORE pre-flight smoke so malformed
+        # artifacts fail fast, before consuming smoke / regression budget.
+        # Schema validity is a hard gate per D-03/D-06 — appendLlmIteration
+        # throws on missing required fields, which fails the workflow. This
+        # step intentionally omits the error-tolerance escape valve used by
+        # the smoke / regression / fault-injection steps below.
+        # Gating uses an explicit empty-string comparison per Pitfall 3.
 
       - name: Pre-flight smoke (1 case)
         id: smoke

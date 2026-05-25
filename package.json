@@ -11,6 +11,7 @@
     "e2e:silent": "npm run build:chrome && playwright test --config tests/e2e/playwright.config.js specs/silent.spec.js",
     "e2e:smoke": "npm run build:chrome && playwright test --config tests/e2e/playwright.config.js --grep @smoke",
     "e2e:explore": "node scripts/e2e-explore.mjs",
+    "e2e:upload-llm-report": "node scripts/e2e-upload-llm-report.mjs",
     "lint": "eslint tests/e2e/lib/",
     "test": "npm run build && npm run test:src && npm run test:chrome && npm run test:firefox && npm run lint && npm run test:lint",
     "test:src": "vitest run",

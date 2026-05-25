@@ -111,7 +111,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 
 ### v3.1 LLM-Driven Product Improvement Loop (Phases 32-37)
 
-- [ ] **Phase 32: HUMAN-UAT Verification** - Live end-to-end validation of `npm run e2e:explore` with Max 5 subscription credit; confirms `llm-report.json` usability and establishes local→CI handoff helper
+- [x] **Phase 32: HUMAN-UAT Verification** - Live end-to-end validation of `npm run e2e:explore` with Max 5 subscription credit; confirms `llm-report.json` usability and establishes local→CI handoff helper (completed 2026-05-25)
 - [ ] **Phase 33: Re-run Validator** - Deterministic 3-replay verifier-only confirm gate; defines `rerun-report.json` schema; extends `llm-report.json` iteration schema with scroll/viewport fields
 - [ ] **Phase 34: Hybrid Triage Classifier** - Heuristic-first + LLM second-pass classification; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster pre-filter and prompt-injection defense
 - [ ] **Phase 35: Rich Issue Filer + Quarantine Corpus** - `issue-payload-builder.js`; `quarantine-append.mjs`; `test-cases-quarantine.js`; `e2e-report-issue.mjs` `--source triage` extension; fingerprint dual-search
@@ -133,8 +133,8 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] 32-01-PLAN.md — Wave 0 test infrastructure scaffolding (fixtures dir + Vitest stubs)
 - [x] 32-02-PLAN.md — Ledger `phase` field + `phaseTotal` + `checkPhaseSpendCap` helpers (UAT-02)
 - [x] 32-03-PLAN.md — `--phase` flag + pre-flight + mid-run cap enforcement on e2e-explore.mjs (UAT-02)
-- [ ] 32-04-PLAN.md — Upload helper + ingest workflow + nightly llm_run_id input + download/validate step (UAT-03)
-- [ ] 32-05-PLAN.md — Live UAT execution + evidence + fixture commit + sign-off (UAT-01)
+- [x] 32-04-PLAN.md — Upload helper + ingest workflow + nightly llm_run_id input + download/validate step (UAT-03)
+- [x] 32-05-PLAN.md — Live UAT execution + evidence + fixture commit + sign-off (UAT-01)
 
 ### Phase 33: Re-run Validator
 **Goal**: Every LLM-flagged anomaly in `llm-report.json` can be deterministically replayed 3 times via the verifier-only path to produce a `rerun-report.json` verdict, and the `llm-report.json` iteration schema carries scroll/viewport state required for accurate replay
@@ -229,7 +229,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 4/4 | Complete    | 2026-05-17 |
 | 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
-| 32. HUMAN-UAT Verification | v3.1 | 3/5 | In Progress|  |
+| 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete   | 2026-05-25 |
 | 33. Re-run Validator | v3.1 | 0/? | Not started | - |
 | 34. Hybrid Triage Classifier | v3.1 | 0/? | Not started | - |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |

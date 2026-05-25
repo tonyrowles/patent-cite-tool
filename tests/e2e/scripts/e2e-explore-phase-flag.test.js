@@ -102,6 +102,18 @@ describe('--phase flag (Phase 32)', () => {
     }
     // Spawn timed out → status === null → script proceeded past parseArgs
     // and got stuck on something downstream. That is also a PASS.
+
+    // WR-07 (Phase 32 review): the original assertions above are too lenient
+    // — a future regression where parseArgs incorrectly rejected --phase 32
+    // with a DIFFERENT exit code (e.g. a refactor that introduces a strict
+    // exit 5 path) would still pass `status !== 2`. Strengthen by asserting
+    // stderr does NOT contain any of the parseArgs rejection signatures
+    // tested in the three negative tests above — that proves the value was
+    // ACCEPTED, not rejected via some other route.
+    const stderrText = r.stderr || '';
+    expect(stderrText).not.toMatch(/invalid --phase value/i);
+    expect(stderrText).not.toMatch(/missing value for --phase/i);
+    expect(stderrText).not.toMatch(/equals syntax not supported for --phase/i);
   });
 });
 

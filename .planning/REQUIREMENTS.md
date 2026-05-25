@@ -10,9 +10,9 @@ Requirements for this milestone. Each maps to roadmap phases (continued numberin
 
 ### UAT — HUMAN-UAT Verification (Phase 31 close-out)
 
-- [ ] **UAT-01**: Developer can run `npm run e2e:explore` against the Max 5 subscription credit and receive a valid `llm-report.json` with ≥10 real iterations end-to-end
-- [ ] **UAT-02**: Spend ledger correctly records each iteration's `claude -p` invocation against the $80/$100 monthly cap
-- [ ] **UAT-03**: `npm run e2e:upload-llm-report` helper triggers the nightly workflow with the local `llm-report.json` as a workflow_dispatch input (local→CI handoff)
+- [x] **UAT-01**: Developer can run `npm run e2e:explore` against the Max 5 subscription credit and receive a valid `llm-report.json` with ≥10 real iterations end-to-end
+- [x] **UAT-02**: Spend ledger correctly records each iteration's `claude -p` invocation against the $80/$100 monthly cap
+- [x] **UAT-03**: `npm run e2e:upload-llm-report` helper triggers the nightly workflow with the local `llm-report.json` as a workflow_dispatch input (local→CI handoff)
 
 ### RERUN — Re-run Validator
 
@@ -101,9 +101,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UAT-01 | Phase 32 | Pending |
-| UAT-02 | Phase 32 | Pending |
-| UAT-03 | Phase 32 | Pending |
+| UAT-01 | Phase 32 | Complete |
+| UAT-02 | Phase 32 | Complete |
+| UAT-03 | Phase 32 | Complete |
 | RERUN-01 | Phase 33 | Pending |
 | RERUN-02 | Phase 33 | Pending |
 | RERUN-03 | Phase 33 | Pending |

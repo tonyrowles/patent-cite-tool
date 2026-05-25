@@ -22,3 +22,7 @@ tests/e2e/.spec-cache/
 
 # Local cron log for npm run e2e:explore (gitignored — paths + spend timing)
 .llm-cron.log
+
+# Claude Code local state (worktrees, settings, scheduled-task locks). Never commit:
+# worktrees leak transient agent-* dirs; settings.local.json contains per-machine prefs.
+.claude/

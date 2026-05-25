@@ -63,13 +63,31 @@ const REQUIRED_ENTRY_FIELDS = ['iteration_n', 'iso', 'classification'];
  * that truncate-and-die window: the destination always holds either the
  * prior good state or the new good state.
  *
+ * WR-06 (Phase 32 review): fs.renameSync raises EXDEV when the temp file
+ * and the destination live on different filesystems (tmpfs vs the repo's
+ * regular FS, bind-mounted Docker dev env, etc.). Catch EXDEV and fall back
+ * to a direct fs.writeFileSync on the destination — atomicity is lost on
+ * that one write, but the alternative is a hard failure on every iteration
+ * append. Same fallback as in tests/e2e/lib/llm-ledger.js appendLedgerEntry.
+ *
  * @param {string} destPath
  * @param {string} content
  */
 function atomicWriteJson(destPath, content) {
   const tmpPath = `${destPath}.tmp.${process.pid}`;
   fs.writeFileSync(tmpPath, content);
-  fs.renameSync(tmpPath, destPath);
+  try {
+    fs.renameSync(tmpPath, destPath);
+  } catch (err) {
+    if (err && err.code === 'EXDEV') {
+      // Cross-device rename — direct write fallback (loses atomicity but
+      // unblocks the append).
+      fs.writeFileSync(destPath, content);
+      try { fs.unlinkSync(tmpPath); } catch { /* best-effort */ }
+      return;
+    }
+    throw err;
+  }
 }
 
 /**

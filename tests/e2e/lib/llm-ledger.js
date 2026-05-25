@@ -330,7 +330,27 @@ export function appendLedgerEntry(ledgerPath, entry) {
   // cap on the next run. The temp-write + rename pattern is atomic on the
   // same filesystem (POSIX rename(2) / Windows MoveFileEx) and eliminates
   // the truncate-and-die window.
+  //
+  // WR-06 (Phase 32 review): fs.renameSync raises EXDEV when the temp file
+  // and the destination live on different filesystems — e.g. tmpfs vs the
+  // repo's regular FS, or a bind-mounted Docker dev environment. Catch
+  // EXDEV and fall back to a direct fs.writeFileSync on the destination
+  // (losing the atomic guarantee, but the alternative is the call throwing
+  // and the developer hitting a hard failure on any iteration). The temp
+  // file is cleaned up best-effort either way.
   const tmpPath = `${ledgerPath}.tmp.${process.pid}`;
   fs.writeFileSync(tmpPath, JSON.stringify(ledger, null, 2));
-  fs.renameSync(tmpPath, ledgerPath);
+  try {
+    fs.renameSync(tmpPath, ledgerPath);
+  } catch (err) {
+    if (err && err.code === 'EXDEV') {
+      // Cross-device rename — fall back to direct write. Lose atomicity but
+      // gain the ability to complete the append. The corrupt-on-crash window
+      // returns here; caller (single-process developer use) accepts that.
+      fs.writeFileSync(ledgerPath, JSON.stringify(ledger, null, 2));
+      try { fs.unlinkSync(tmpPath); } catch { /* best-effort */ }
+      return;
+    }
+    throw err;
+  }
 }

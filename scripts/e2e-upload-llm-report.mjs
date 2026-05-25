@@ -306,13 +306,18 @@ export function makeRealGhClient() {
 
     workflowRun(file, inputs, opts) {
       // Build the `gh workflow run <file> -f k=v ...` invocation. If a stdin
-      // payload is provided, pass it via `-f payload_b64=@-` (Pitfall 5).
+      // payload is provided, pass it via `-F payload_b64=@-` (Pitfall 5).
+      // Note: `-F` (capital) respects @-syntax for stdin/file refs; `-f`
+      // (lowercase) treats the value as a literal string. The original
+      // `-f payload_b64=@-` sent the literal two-char "@-" string to the
+      // workflow, breaking the base64 decode step. Found during Plan 32-05
+      // Task 3 UAT.
       const parts = ['gh', 'workflow', 'run', file];
       for (const [k, v] of Object.entries(inputs || {})) {
         parts.push('-f', `${k}=${v}`);
       }
       if (opts?.stdinPayload !== undefined) {
-        parts.push('-f', 'payload_b64=@-');
+        parts.push('-F', 'payload_b64=@-');
       }
       const cmd = parts.join(' ');
       execSync(cmd, {

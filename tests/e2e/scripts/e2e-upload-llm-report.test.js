@@ -159,7 +159,10 @@ describe('e2e-upload-llm-report helper (Phase 32 Plan 32-04)', () => {
 
     expect(ghCalls[2].op).toBe('runList');
     expect(ghCalls[2].file).toBe('e2e-ingest-llm-report.yml');
-    expect(ghCalls[2].limit).toBe(5);
+    // WR-03 (Phase 32 review): limit raised from 5 to 20 so concurrent
+    // operators cannot push the helper's own run out of the window
+    // (the real client additionally passes `--user @me`).
+    expect(ghCalls[2].limit).toBe(20);
 
     expect(ghCalls[3].op).toBe('workflowRun');
     expect(ghCalls[3].file).toBe('e2e-nightly.yml');

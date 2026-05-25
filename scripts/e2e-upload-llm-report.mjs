@@ -203,9 +203,14 @@ export async function uploadReport({
   await sleep(SETTLE_DELAY_MS);
 
   // ---- Stage 1.5: capture ingest run_id via filtered run-list ----
+  // WR-03 (Phase 32 review): limit 5 + 3-second settle could miss the just-
+  // dispatched run if four+ other operators dispatched concurrently — the
+  // helper's own run would not be in the top 5 newest. Bump to 20 entries and
+  // restrict to the current authenticated user (makeRealGhClient passes
+  // --user @me) so only the current user's runs occupy the window.
   let runs;
   try {
-    runs = ghClient.runList(INGEST_WORKFLOW, 5);
+    runs = ghClient.runList(INGEST_WORKFLOW, 20);
   } catch (err) {
     stderr(
       `[e2e-upload] could not query \`gh run list --workflow=${INGEST_WORKFLOW}\`: ` +
@@ -351,12 +356,19 @@ export function makeRealGhClient() {
     },
 
     runList(file, limit) {
+      // WR-03 (Phase 32 review): `--user @me` restricts the list to runs
+      // dispatched by the currently authenticated user, eliminating the
+      // race where 5+ concurrent operators push the helper's own run out
+      // of the visible window. The orchestrator also bumps `limit` to 20
+      // (was 5) for additional headroom.
       const raw = execFileSync(
         'gh',
         [
           'run',
           'list',
           `--workflow=${file}`,
+          '--user',
+          '@me',
           '--limit',
           String(limit),
           '--json',

@@ -39,14 +39,23 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Decode payload
+        env:
+          # CR-01 (Phase 32 review): env-var hop prevents GitHub Actions
+          # script injection (CWE-94). The previous `${{ inputs.payload_b64 }}`
+          # interpolation inside a `run:` step let a workflow-dispatch caller
+          # inject shell commands. Routing the value through the runner's
+          # environment keeps it out of the shell parser.
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
         run: |
           mkdir -p ingest-out
-          echo "${{ inputs.payload_b64 }}" | base64 -d > ingest-out/llm-report.json
-          # Sanity check: must be valid JSON. `jq -e .` exits non-zero on
-          # parse failure, failing the whole workflow before the artifact
-          # is uploaded. ubuntu-latest has jq pre-installed.
+          printf '%s' "$PAYLOAD_B64" | base64 -d > ingest-out/llm-report.json
+          # Structural validation (WR-09): `jq -e .` exits non-zero only on
+          # parse failure or on the values `null`/`false`. A valid but empty
+          # `null` payload would slip past `jq -e .`. Explicitly require an
+          # object shape with at least the `iterations` field — matches the
+          # minimum shape consumed by Stage 2 (e2e-nightly.yml).
           # Threat model T-32-14 mitigation (tampered base64 payload).
-          jq -e . ingest-out/llm-report.json > /dev/null
+          jq -e 'type == "object" and has("iterations")' ingest-out/llm-report.json > /dev/null
 
       - name: Upload as artifact
         uses: actions/upload-artifact@v4

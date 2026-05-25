@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       payload_b64:
-        description: 'Base64-encoded llm-report.json (≤ ~60KB encoded; 65535 char GH cap)'
+        description: 'Base64-encoded llm-report.json (≤ 65000 chars encoded; 65535 char GH cap)'
         required: true
         type: string
 

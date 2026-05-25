@@ -24,8 +24,9 @@
 //
 // Mitigated pitfalls:
 //   Pitfall 1 — workflow_dispatch payload is hard-capped at 65,535 chars; the
-//               helper enforces a 60KB ceiling on the base64 form before any
-//               gh call. Oversize → exit code 2 with explicit remediation.
+//               helper enforces a 65,000-char ceiling on the base64 form
+//               (WR-04: was 60KB; now 535-byte headroom) before any gh
+//               call. Oversize → exit code 2 with explicit remediation.
 //   Pitfall 3 — workflow_dispatch YAML defaults: NOT this file's concern, but
 //               the corresponding ingest/nightly workflows MUST use
 //               `default: ''` (not null, not omitted) on their inputs.
@@ -48,7 +49,7 @@
 // Exit codes:
 //   0 — success (both stages dispatched, browser opened)
 //   1 — no report at canonical path (run `npm run e2e:explore` first)
-//   2 — base64 payload > MAX_BASE64_BYTES (60KB ceiling, 65,535-char GH cap)
+//   2 — base64 payload > MAX_BASE64_BYTES (65,000-char ceiling, 65,535-char GH cap)
 //   3 — ingest run not found after settle+filter (race; retry)
 //   4 — Stage 1 `gh workflow run e2e-ingest-llm-report.yml` failed
 //   5 — Stage 2 `gh workflow run e2e-nightly.yml` failed
@@ -83,17 +84,19 @@ import { llmReportPathFor } from '../tests/e2e/lib/llm-report.js';
  * Maximum allowed length (in bytes / chars) of the base64-encoded payload.
  *
  * GitHub's `workflow_dispatch` input has a hard cap of 65,535 chars per input
- * (community#120093). The helper enforces a 60KB ceiling (61,440 bytes) on the
- * base64 form to leave headroom for any wrapper escaping `gh workflow run`
- * applies internally before submission. A 60KB base64 payload corresponds to
- * ~45KB of raw JSON — comfortably above the typical llm-report.json size
- * (Phase 31 reports cap at ~250KB raw via per-iteration truncation, but a
- * typical UAT run produces ~10-30KB).
+ * (community#120093). WR-04 (Phase 32 review): the previous 60KB (61,440)
+ * ceiling artificially rejected up to ~4KB of payloads that GH would have
+ * accepted. The ceiling is now 65,000 chars — 535 bytes (<1%) of headroom
+ * for any wrapper escaping `gh workflow run` applies internally before
+ * submission. A 65,000-char base64 payload corresponds to ~48.7KB of raw
+ * JSON — well above the typical llm-report.json size (Phase 31 reports cap
+ * at ~250KB raw via per-iteration truncation, but a typical UAT run
+ * produces ~10-30KB).
  *
  * Exported for testability: tests construct payloads whose b64 length is
  * deliberately just over or under this value to exercise the size guard.
  */
-export const MAX_BASE64_BYTES = 60 * 1024;
+export const MAX_BASE64_BYTES = 65000;
 
 // Static workflow filenames — these MUST match the YAML files shipped in this
 // same plan (.github/workflows/e2e-ingest-llm-report.yml and e2e-nightly.yml).
@@ -176,7 +179,7 @@ export async function uploadReport({
   if (b64.length > MAX_BASE64_BYTES) {
     stderr(
       `[e2e-upload] base64 payload is ${b64.length} bytes; ceiling is ${MAX_BASE64_BYTES} ` +
-        `(60KB; GH workflow_dispatch hard cap is 65535 chars).\n`,
+        `(GH workflow_dispatch hard cap is 65535 chars; helper reserves 535 chars headroom).\n`,
     );
     stderr(
       `[e2e-upload] reduce iterations in your llm-report.json, or shorten ` +

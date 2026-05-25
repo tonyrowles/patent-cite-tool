@@ -389,7 +389,14 @@ export function makeRealGhClient() {
 // CLI shim — wires real deps and dispatches uploadReport()
 // ---------------------------------------------------------------------------
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+// WR-02 (Phase 32 review): `import.meta.url === \`file://${process.argv[1]}\``
+// never matches on Windows (where import.meta.url is `file:///C:/...` and
+// process.argv[1] is `C:\\...`), and breaks on POSIX paths containing
+// spaces (no URL-encoding on either side of the comparison). Normalize via
+// fileURLToPath + path.resolve before comparing.
+const isMain =
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
   // Real production sleep — async setTimeout. Tests inject `async () => {}`
   // to skip the 3s settle delay and keep the suite fast.

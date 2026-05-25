@@ -249,6 +249,51 @@ A single `npm run e2e:explore` run writes two files:
 
 ---
 
+## Uploading an exploratory report to CI
+
+After running `npm run e2e:explore` locally, ship the resulting
+`llm-report.json` into the nightly CI pipeline without any manual
+GitHub Actions clicks:
+
+```bash
+npm run e2e:upload-llm-report
+```
+
+This invokes `scripts/e2e-upload-llm-report.mjs`, which:
+
+1. Pre-flights `gh auth status` (exit 7 with `gh auth login` guidance
+   if not authenticated).
+2. Reads the canonical `llm-report.json` (no path flag — uses
+   `llmReportPathFor(resolveRunId())` from `tests/e2e/lib/`).
+3. Base64-encodes the report and size-guards at 60KB (GitHub's
+   `workflow_dispatch` input hard cap is 65,535 chars; exit 2 on
+   oversize).
+4. Dispatches the ingest workflow
+   (`.github/workflows/e2e-ingest-llm-report.yml`) with the payload
+   passed via STDIN (`-f payload_b64=@-`, to avoid `E2BIG` from
+   oversized command-line args).
+5. Sleeps 3 s to settle the `gh run list` race (cli/cli#5493), then
+   captures the new ingest run's `databaseId` with a
+   `createdAt >= triggerISO − 1 s` filter.
+6. Dispatches `e2e-nightly.yml` with `llm_run_id=<captured id>` so
+   the next nightly run downloads and schema-validates the artifact.
+7. Prints the ingest run URL and opens it in your default browser
+   (`gh run view --web`).
+
+### Exit codes
+
+| Code | Meaning                                                         |
+| ---- | --------------------------------------------------------------- |
+| 0    | Both stages dispatched, browser opened                          |
+| 1    | No `llm-report.json` at canonical path                          |
+| 2    | Base64 payload exceeded 60KB (reduce iterations and retry)      |
+| 3    | Ingest run not found after settle+filter (race; retry helper)   |
+| 4    | Stage 1 `gh workflow run e2e-ingest-llm-report.yml` failed      |
+| 5    | Stage 2 `gh workflow run e2e-nightly.yml` failed                |
+| 7    | `gh auth status` failed (run `gh auth login`)                   |
+
+---
+
 ## Test-hook contract
 
 The extension exposes two `data-testid` attributes on its Shadow DOM

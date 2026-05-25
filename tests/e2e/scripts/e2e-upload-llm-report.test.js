@@ -1,222 +1,306 @@
 // tests/e2e/scripts/e2e-upload-llm-report.test.js
 //
-// Phase 32 Plan 32-01 (Wave 0 scaffolding, UAT-02) — contract test for the
-// two-stage upload helper that Wave 2 Plan 32-04 will ship at
-// scripts/e2e-upload-llm-report.mjs. The helper file does not exist yet, so
-// this spec is SKIP in Wave 0 — it turns RUN-and-GREEN once Plan 32-04 ships
-// the pure-function export with the documented orchestration contract.
+// Phase 32 Plan 32-04 (UAT-03) — GREEN in Wave 2 — covers four behaviors of
+// the upload orchestrator exported by scripts/e2e-upload-llm-report.mjs:
+//   1. Happy path: call ordering through authStatus → workflowRun(ingest, stdin)
+//      → sleep → runList(ingest) → workflowRun(nightly, llm_run_id) →
+//      repoView → runView(web:true); stdout includes the ingest run URL.
+//   2. Race-mitigation filter: when runList returns mixed pre/post-trigger
+//      entries, the captured run_id is the POST-trigger one (Pattern 1 in
+//      32-RESEARCH.md).
+//   3. Oversize payload (>60KB base64) exits with code 2 BEFORE any
+//      gh.workflowRun invocation.
+//   4. gh auth status failure exits with code 7 BEFORE any other gh call.
 //
-// The mock-ghClient DI pattern mirrors tests/unit/e2e-report-issue.test.js
-// (lines 282-363, processReport()) — pure-function entry point receives an
-// injected gh client whose methods record calls into an array the test then
-// asserts against.
+// Plan 32-01 (Wave 0) shipped a stub for this file that used a conditional-
+// skip wrapper plus a dynamic helper-module import so the file would not crash
+// before the helper existed. Plan 32-04 ships the helper, so this rewrite
+// uses static imports and a recording mock-ghClient DI pattern that mirrors
+// tests/unit/e2e-report-issue.test.js processReport() coverage.
 //
-// Why dynamic import (not static): static `import` of the not-yet-existing
-// helper would crash at file-load time, marking the entire test file as
-// failed rather than skipped. Wrapping the describe in
-// `describe.skipIf(!fs.existsSync(HELPER_PATH))` plus a per-test
-// `await import(HELPER_PATH)` lets Vitest discover the file without crashing.
-//
-// Behaviors asserted (Plan 32-04 contract):
-//   1. Happy path: orchestrates auth-status → workflow-run ingest (payload via
-//      stdin --json) → run-list (--json databaseId,createdAt) → workflow-run
-//      nightly (-f llm_run_id=<captured>) → run-view --web (browser open)
-//   2. Race-mitigation: filter rejects stale entries (createdAt < trigger ISO);
-//      the captured run_id is the post-trigger one (Pattern 1 in RESEARCH)
-//   3. Oversized payload (>60KB base64) exits with code 2 BEFORE any gh call
-//      (RESEARCH "Payload Size Constraint")
-//   4. gh auth status failure exits with code 7 BEFORE any other gh call
+// Mock-ghClient design: `makeMockGhClient(overrides)` returns an object whose
+// methods push `{op, ...args}` into a shared `ghCalls` array passed in from
+// the test. Defaults cover the happy path; overrides exercise oversize,
+// auth-fail, and stale-entry-filter scenarios.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  uploadReport,
+  MAX_BASE64_BYTES,
+} from '../../../scripts/e2e-upload-llm-report.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const HELPER_PATH = path.resolve(__dirname, '../../../scripts/e2e-upload-llm-report.mjs');
+// Deterministic fixed-time fixture used by every test. The helper reads
+// triggerIsoMs = now() before Stage 1; the mock runList returns entries whose
+// createdAt is either before (stale) or after this anchor.
+const FIXED_NOW_MS = 1_700_000_000_000; // 2023-11-14T22:13:20Z
 
-// Minimal valid llm-report.json payload — used by happy-path and stale-filter
-// tests. Schema matches tests/unit/fixtures/sample-llm-report.json.
+// Minimal valid llm-report.json payload — schema matches initLlmReport's
+// emptyReport() shape from tests/e2e/lib/llm-report.js. Used by happy-path
+// and race-filter tests.
 const MINIMAL_REPORT = {
   run_id: '2026-05-24T12-00-00Z',
   started_iso: '2026-05-24T12:00:00.000Z',
   finished_iso: '2026-05-24T12:05:00.000Z',
   iterations_total: 1,
   summary: {
-    passed: 1, wrong_citation: 0, verifier_disagree: 0,
-    llm_hallucinated_selection: 0, llm_api_error: 0, harness_error: 0,
+    passed: 1,
+    wrong_citation: 0,
+    verifier_disagree: 0,
+    llm_hallucinated_selection: 0,
+    llm_api_error: 0,
+    harness_error: 0,
     total_cost_usd: 0.19,
   },
-  iterations: [{
-    iteration_n: 1,
-    iso: '2026-05-24T12:00:30.000Z',
-    classification: 'PASS',
-    cost_usd: 0.19,
-  }],
+  iterations: [
+    {
+      iteration_n: 1,
+      iso: '2026-05-24T12:00:30.000Z',
+      classification: 'PASS',
+      cost_usd: 0.19,
+    },
+  ],
 };
 
-// SKIP in Wave 0 — turns RUN-and-GREEN once Plan 32-04 ships
-// scripts/e2e-upload-llm-report.mjs. The dynamic `await import(HELPER_PATH)`
-// inside each test keeps the file parseable when the helper is absent.
-describe.skipIf(!fs.existsSync(HELPER_PATH))('e2e-upload-llm-report helper (Phase 32)', () => {
+/**
+ * Build a recording mock ghClient. Every method pushes `{op, ...args}` into
+ * the supplied `ghCalls` array so tests can assert order + arguments.
+ * `overrides` shallow-merges into the default methods so a single test can
+ * replace e.g. authStatus to throw or runList to return stale entries.
+ */
+function makeMockGhClient(ghCalls, overrides = {}) {
+  const defaults = {
+    authStatus: () => {
+      ghCalls.push({ op: 'authStatus' });
+    },
+    workflowRun: (file, inputs, opts) => {
+      ghCalls.push({ op: 'workflowRun', file, inputs, opts });
+    },
+    runList: (file, limit) => {
+      ghCalls.push({ op: 'runList', file, limit });
+      // Default: one entry POST-trigger so the happy path resolves.
+      return [
+        {
+          databaseId: 999,
+          createdAt: new Date(FIXED_NOW_MS + 1000).toISOString(),
+        },
+      ];
+    },
+    runView: (id, opts) => {
+      ghCalls.push({ op: 'runView', id, opts });
+    },
+    repoView: () => {
+      ghCalls.push({ op: 'repoView' });
+      return { nameWithOwner: 'owner/repo' };
+    },
+  };
+  return { ...defaults, ...overrides };
+}
+
+// Tmp report file — written in beforeEach so the helper's
+// `fs.existsSync(reportPath)` check passes. The helper reads via the injected
+// `readFile` seam (not fs directly), so the on-disk content does not matter
+// for tests that override readFile — but the existsSync check is real.
+let tmpReportPath;
+
+beforeEach(() => {
+  tmpReportPath = path.join(
+    os.tmpdir(),
+    `uat-helper-test-${process.pid}-${Date.now()}.json`,
+  );
+  fs.writeFileSync(tmpReportPath, JSON.stringify(MINIMAL_REPORT));
+});
+
+afterEach(() => {
+  try {
+    fs.unlinkSync(tmpReportPath);
+  } catch {
+    // best-effort cleanup
+  }
+});
+
+describe('e2e-upload-llm-report helper (Phase 32 Plan 32-04)', () => {
   it('happy path: orchestrates ingest → run-list → nightly → browser-open', async () => {
-    const helper = await import(HELPER_PATH);
     const ghCalls = [];
-    const triggerIso = '2026-05-24T12:10:00.000Z';
-    const realRunId = 7700000001;
+    const exitCalls = [];
+    const stdoutLines = [];
+    const stderrLines = [];
+    const sleepCalls = [];
 
-    const ghClient = {
-      authStatus: () => { ghCalls.push({ op: 'authStatus' }); },
-      workflowRun: (workflowFile, inputs, opts) => {
-        ghCalls.push({ op: 'workflowRun', workflowFile, inputs, opts });
+    const ghClient = makeMockGhClient(ghCalls);
+
+    await uploadReport({
+      reportPath: tmpReportPath,
+      ghClient,
+      readFile: () => Buffer.from(JSON.stringify(MINIMAL_REPORT)),
+      now: () => FIXED_NOW_MS,
+      sleep: async (ms) => {
+        sleepCalls.push(ms);
       },
-      runList: (workflowFile) => {
-        ghCalls.push({ op: 'runList', workflowFile });
-        return [
-          { databaseId: realRunId, createdAt: '2026-05-24T12:10:30.000Z' },
-        ];
-      },
-      runView: (id, opts) => { ghCalls.push({ op: 'runView', id, opts }); },
-      repoView: () => {
-        ghCalls.push({ op: 'repoView' });
-        return { nameWithOwner: 'owner/repo' };
-      },
-    };
+      stdout: (s) => stdoutLines.push(s),
+      stderr: (s) => stderrLines.push(s),
+      exit: (code) => exitCalls.push(code),
+    });
 
-    // The helper's pure-function export (name TBD by Plan 32-04 — common
-    // candidates: uploadLlmReport, runUploadFlow, main). The test imports
-    // whatever Plan 32-04 exports as the orchestration entry point.
-    const fn = helper.uploadLlmReport ?? helper.runUploadFlow ?? helper.default;
-    expect(typeof fn).toBe('function');
+    // Call ORDER assertion (index-based — order matters).
+    expect(ghCalls[0].op).toBe('authStatus');
 
-    await fn(MINIMAL_REPORT, { ghClient, triggerIso });
+    expect(ghCalls[1].op).toBe('workflowRun');
+    expect(ghCalls[1].file).toBe('e2e-ingest-llm-report.yml');
+    expect(ghCalls[1].inputs).toEqual({});
+    expect(typeof ghCalls[1].opts?.stdinPayload).toBe('string');
+    expect(ghCalls[1].opts.stdinPayload.length).toBeGreaterThan(0);
 
-    // Call sequence: authStatus → workflowRun (ingest) → runList → workflowRun
-    // (nightly with captured run_id) → runView (browser).
-    const ops = ghCalls.map(c => c.op);
-    expect(ops[0]).toBe('authStatus');
-    expect(ops).toContain('workflowRun');
-    expect(ops).toContain('runList');
-    expect(ops).toContain('runView');
+    // Sleep MUST be invoked between Stage 1 and run-list query (settle delay).
+    expect(sleepCalls.length).toBe(1);
+    expect(sleepCalls[0]).toBeGreaterThanOrEqual(2000);
 
-    // The ingest workflowRun MUST carry the report payload base64-encoded.
-    const ingestCall = ghCalls.find(
-      c => c.op === 'workflowRun' && c.workflowFile && /ingest/i.test(c.workflowFile),
+    expect(ghCalls[2].op).toBe('runList');
+    expect(ghCalls[2].file).toBe('e2e-ingest-llm-report.yml');
+    expect(ghCalls[2].limit).toBe(5);
+
+    expect(ghCalls[3].op).toBe('workflowRun');
+    expect(ghCalls[3].file).toBe('e2e-nightly.yml');
+    expect(ghCalls[3].inputs).toEqual({ llm_run_id: '999' });
+
+    expect(ghCalls[4].op).toBe('repoView');
+
+    expect(ghCalls[5].op).toBe('runView');
+    expect(ghCalls[5].id).toBe('999');
+    expect(ghCalls[5].opts).toEqual({ web: true });
+
+    // No exit() should be called on the happy path.
+    expect(exitCalls).toEqual([]);
+
+    // stdout should include the constructed ingest run URL.
+    const allStdout = stdoutLines.join('');
+    expect(allStdout).toContain(
+      'https://github.com/owner/repo/actions/runs/999',
     );
-    expect(ingestCall).toBeTruthy();
-    expect(ingestCall.inputs).toHaveProperty('payload_b64');
-
-    // The runList call MUST request --json databaseId,createdAt for the
-    // race-mitigation filter (Pattern 1).
-    const listCall = ghCalls.find(c => c.op === 'runList');
-    expect(listCall.workflowFile).toMatch(/ingest/i);
-
-    // The nightly workflowRun MUST forward llm_run_id = captured databaseId.
-    const nightlyCall = ghCalls.find(
-      c => c.op === 'workflowRun' && c.workflowFile && /nightly/i.test(c.workflowFile),
-    );
-    expect(nightlyCall).toBeTruthy();
-    expect(String(nightlyCall.inputs.llm_run_id)).toBe(String(realRunId));
-
-    // The runView call MUST open the nightly run in the browser.
-    const viewCall = ghCalls.find(c => c.op === 'runView');
-    expect(viewCall.opts).toHaveProperty('web', true);
   });
 
-  it('race-mitigation filter rejects stale entries (createdAt < trigger ISO)', async () => {
-    const helper = await import(HELPER_PATH);
-    const triggerIso = '2026-05-24T12:10:00.000Z';
-    const staleRunId = 7700000000;  // BEFORE triggerIso — must be filtered
-    const realRunId = 7700000001;   // AFTER triggerIso — the actual one
-
+  it('race-mitigation filter rejects stale entries (createdAt before trigger)', async () => {
     const ghCalls = [];
-    const ghClient = {
-      authStatus: () => {},
-      workflowRun: (workflowFile, inputs, opts) => {
-        ghCalls.push({ op: 'workflowRun', workflowFile, inputs, opts });
-      },
-      runList: () => [
-        { databaseId: staleRunId, createdAt: '2026-05-24T12:09:30.000Z' },
-        { databaseId: realRunId, createdAt: '2026-05-24T12:10:30.000Z' },
-      ],
-      runView: () => {},
-      repoView: () => ({ nameWithOwner: 'owner/repo' }),
+    const exitCalls = [];
+
+    const staleEntry = {
+      databaseId: 100,
+      createdAt: new Date(FIXED_NOW_MS - 5000).toISOString(), // 5s before trigger
+    };
+    const realEntry = {
+      databaseId: 999,
+      createdAt: new Date(FIXED_NOW_MS + 1000).toISOString(), // 1s after trigger
     };
 
-    const fn = helper.uploadLlmReport ?? helper.runUploadFlow ?? helper.default;
-    await fn(MINIMAL_REPORT, { ghClient, triggerIso });
+    const ghClient = makeMockGhClient(ghCalls, {
+      runList: (file, limit) => {
+        ghCalls.push({ op: 'runList', file, limit });
+        return [staleEntry, realEntry]; // intentionally NOT pre-sorted
+      },
+    });
 
-    // The nightly workflow MUST receive the POST-trigger run_id, not the stale one.
+    await uploadReport({
+      reportPath: tmpReportPath,
+      ghClient,
+      readFile: () => Buffer.from(JSON.stringify(MINIMAL_REPORT)),
+      now: () => FIXED_NOW_MS,
+      sleep: async () => {},
+      stdout: () => {},
+      stderr: () => {},
+      exit: (code) => exitCalls.push(code),
+    });
+
+    // Find the nightly workflowRun call — its llm_run_id MUST be the
+    // POST-trigger entry's databaseId (999), NOT the stale one (100).
     const nightlyCall = ghCalls.find(
-      c => c.op === 'workflowRun' && c.workflowFile && /nightly/i.test(c.workflowFile),
+      (c) => c.op === 'workflowRun' && c.file === 'e2e-nightly.yml',
     );
     expect(nightlyCall).toBeTruthy();
-    expect(String(nightlyCall.inputs.llm_run_id)).toBe(String(realRunId));
-    expect(String(nightlyCall.inputs.llm_run_id)).not.toBe(String(staleRunId));
+    expect(nightlyCall.inputs.llm_run_id).toBe('999');
+    expect(nightlyCall.inputs.llm_run_id).not.toBe('100');
+
+    // No error exit.
+    expect(exitCalls).toEqual([]);
   });
 
-  it('oversized payload (>60KB base64) exits with code 2 BEFORE any gh call', async () => {
-    const helper = await import(HELPER_PATH);
+  it('oversized payload (>60KB base64) exits with code 2 BEFORE any gh workflow call', async () => {
     const ghCalls = [];
-    const ghClient = {
-      authStatus: () => { ghCalls.push({ op: 'authStatus' }); },
-      workflowRun: (...args) => { ghCalls.push({ op: 'workflowRun', args }); },
-      runList: () => { ghCalls.push({ op: 'runList' }); return []; },
-      runView: () => { ghCalls.push({ op: 'runView' }); },
-      repoView: () => { ghCalls.push({ op: 'repoView' }); return { nameWithOwner: 'o/r' }; },
-    };
+    const exitCalls = [];
+    const stderrLines = [];
 
-    // Build a synthetic report whose base64-encoded form exceeds 60KB.
-    // ~50KB of raw JSON → ~67KB base64 (4/3 expansion).
-    const huge = 'x'.repeat(50_000);
-    const oversized = {
-      ...MINIMAL_REPORT,
-      iterations: [
-        { ...MINIMAL_REPORT.iterations[0], llm_raw_response: huge },
-      ],
-    };
+    const ghClient = makeMockGhClient(ghCalls);
 
-    const fn = helper.uploadLlmReport ?? helper.runUploadFlow ?? helper.default;
-    // The helper MUST reject before any gh invocation. Either throw with
-    // exitCode 2 OR return { exitCode: 2 } — Plan 32-04 picks the shape; the
-    // test accepts either.
-    let exitCode = null;
-    try {
-      const r = await fn(oversized, { ghClient, triggerIso: '2026-05-24T12:10:00.000Z' });
-      exitCode = r?.exitCode ?? null;
-    } catch (e) {
-      exitCode = e?.exitCode ?? e?.code ?? null;
-    }
-    expect(exitCode).toBe(2);
-    expect(ghCalls).toEqual([]);
+    // 50KB of raw bytes → ~67KB base64 (4/3 expansion), comfortably over
+    // MAX_BASE64_BYTES (61440 = 60 * 1024).
+    const oversizedBuf = Buffer.alloc(50_000, 'x');
+    // Sanity check the test fixture itself — if MAX_BASE64_BYTES changes in
+    // the future, this guards against a silently-passing test.
+    expect(Buffer.from(oversizedBuf).toString('base64').length).toBeGreaterThan(
+      MAX_BASE64_BYTES,
+    );
+
+    await uploadReport({
+      reportPath: tmpReportPath,
+      ghClient,
+      readFile: () => oversizedBuf,
+      now: () => FIXED_NOW_MS,
+      sleep: async () => {},
+      stdout: () => {},
+      stderr: (s) => stderrLines.push(s),
+      exit: (code) => exitCalls.push(code),
+    });
+
+    expect(exitCalls).toEqual([2]);
+
+    // No workflowRun (or any subsequent gh call) should have fired. Only
+    // authStatus (which runs before the size guard) may appear.
+    expect(ghCalls.filter((c) => c.op === 'workflowRun').length).toBe(0);
+    expect(ghCalls.filter((c) => c.op === 'runList').length).toBe(0);
+    expect(ghCalls.filter((c) => c.op === 'runView').length).toBe(0);
+    expect(ghCalls.filter((c) => c.op === 'repoView').length).toBe(0);
+
+    // stderr should mention at least one of the relevant size constants for
+    // grep-friendliness.
+    const allStderr = stderrLines.join('');
+    const mentionsSize =
+      allStderr.includes('60') ||
+      allStderr.includes('61440') ||
+      allStderr.includes('65535');
+    expect(mentionsSize).toBe(true);
   });
 
   it('gh auth status failure exits with code 7 BEFORE any other gh call', async () => {
-    const helper = await import(HELPER_PATH);
     const ghCalls = [];
-    const ghClient = {
+    const exitCalls = [];
+    const stderrLines = [];
+
+    const ghClient = makeMockGhClient(ghCalls, {
       authStatus: () => {
         ghCalls.push({ op: 'authStatus' });
-        const err = new Error('not logged in');
-        err.exitCode = 7;
-        throw err;
+        throw new Error('not authenticated');
       },
-      workflowRun: (...args) => { ghCalls.push({ op: 'workflowRun', args }); },
-      runList: () => { ghCalls.push({ op: 'runList' }); return []; },
-      runView: () => { ghCalls.push({ op: 'runView' }); },
-      repoView: () => { ghCalls.push({ op: 'repoView' }); return { nameWithOwner: 'o/r' }; },
-    };
+    });
 
-    const fn = helper.uploadLlmReport ?? helper.runUploadFlow ?? helper.default;
-    let exitCode = null;
-    try {
-      const r = await fn(MINIMAL_REPORT, { ghClient, triggerIso: '2026-05-24T12:10:00.000Z' });
-      exitCode = r?.exitCode ?? null;
-    } catch (e) {
-      exitCode = e?.exitCode ?? e?.code ?? null;
-    }
-    expect(exitCode).toBe(7);
-    // ONLY authStatus was invoked. No subsequent gh calls.
-    expect(ghCalls.map(c => c.op)).toEqual(['authStatus']);
+    await uploadReport({
+      reportPath: tmpReportPath,
+      ghClient,
+      readFile: () => Buffer.from(JSON.stringify(MINIMAL_REPORT)),
+      now: () => FIXED_NOW_MS,
+      sleep: async () => {},
+      stdout: () => {},
+      stderr: (s) => stderrLines.push(s),
+      exit: (code) => exitCalls.push(code),
+    });
+
+    expect(exitCalls).toEqual([7]);
+
+    // ONLY authStatus should appear. No subsequent gh calls.
+    expect(ghCalls.filter((c) => c.op !== 'authStatus').length).toBe(0);
+
+    // stderr should guide the user to `gh auth login`.
+    const allStderr = stderrLines.join('');
+    expect(allStderr).toContain('gh auth login');
   });
 });

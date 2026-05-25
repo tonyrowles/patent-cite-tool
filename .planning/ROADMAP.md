@@ -129,7 +129,12 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   2. Spend ledger file reflects each `claude -p` invocation cost and correctly tracks accumulated spend against the $80 warning and $100 hard-cap thresholds
   3. Developer runs `npm run e2e:upload-llm-report` and the nightly workflow is triggered with the local `llm-report.json` artifact available as a downloadable Actions artifact — no manual artifact upload steps required
   4. The 461 existing Vitest tests and 76-case Playwright golden suite continue to pass (no regressions introduced)
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 32-01-PLAN.md — Wave 0 test infrastructure scaffolding (fixtures dir + Vitest stubs)
+- [ ] 32-02-PLAN.md — Ledger `phase` field + `phaseTotal` + `checkPhaseSpendCap` helpers (UAT-02)
+- [ ] 32-03-PLAN.md — `--phase` flag + pre-flight + mid-run cap enforcement on e2e-explore.mjs (UAT-02)
+- [ ] 32-04-PLAN.md — Upload helper + ingest workflow + nightly llm_run_id input + download/validate step (UAT-03)
+- [ ] 32-05-PLAN.md — Live UAT execution + evidence + fixture commit + sign-off (UAT-01)
 
 ### Phase 33: Re-run Validator
 **Goal**: Every LLM-flagged anomaly in `llm-report.json` can be deterministically replayed 3 times via the verifier-only path to produce a `rerun-report.json` verdict, and the `llm-report.json` iteration schema carries scroll/viewport state required for accurate replay

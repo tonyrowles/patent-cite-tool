@@ -37,10 +37,16 @@ const SCRIPT_PATH = path.resolve(__dirname, '../../../scripts/e2e-explore.mjs');
 // scripts/e2e-explore.mjs line 72 does not short-circuit parseArgs.
 // Mirrors e2e-explore-ci-guard.test.js Test 3 (lines 51-55).
 function spawnExplore(args) {
+  // spawn-timeout (3000ms) is intentionally below vitest's default test
+  // timeout (5000ms) — otherwise the test-4 "accepts --phase 32" case
+  // (which spawnSync expects to time out, status===null) races vitest's
+  // timer and falsely fails as "Test timed out". Mirrors the 3000ms used
+  // in tests/e2e/scripts/e2e-explore-ci-guard.test.js Test 3 (line 54).
+  // [Rule 1 - Bug] fix for Plan 32-01 Wave 0 scaffolding race condition.
   return spawnSync('node', [SCRIPT_PATH, ...args], {
     env: { ...process.env, CI: '', GITHUB_ACTIONS: '' },
     encoding: 'utf8',
-    timeout: 5000,
+    timeout: 3000,
   });
 }
 

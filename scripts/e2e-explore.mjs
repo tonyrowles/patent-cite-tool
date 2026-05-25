@@ -29,10 +29,11 @@
 // Exit codes:
 //   0 — run completed (zero or more iterations; not all need to PASS)
 //   1 — CI guard fired (LLM-07: exploratory mode is local-only)
-//   2 — bad --iterations argument
+//   2 — bad --iterations argument (or bad --phase value / equals syntax / missing value)
 //   3 — claude CLI not found on PATH
 //   4 — monthly spend cap reached at STARTUP (LLM-06 hard block at $100)
 //   5 — fatal/unexpected error in main()
+//   6 — phase spend cap reached at STARTUP or mid-run (D-13/D-15/D-16; --phase flag)
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +41,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
   LEDGER_PATH, readLedger, checkSpendCap, appendLedgerEntry,
+  phaseTotal, checkPhaseSpendCap, PHASE_HARD_CAP_USD, PHASE_WARN_THRESHOLD_USD,
 } from '../tests/e2e/lib/llm-ledger.js';
 import {
   extractSpecText, selectionInSpec,
@@ -77,9 +79,10 @@ if (process.env.CI || process.env.GITHUB_ACTIONS) {
   process.exit(1);
 }
 
-// ---- 2. Arg parsing (--iterations N, default 5) -----------------------
+// ---- 2. Arg parsing (--iterations N, default 5; --phase N optional) ---
 function parseArgs(argv) {
   let iterations = 5;
+  let phase = null;
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--iterations' && argv[i + 1]) {
       iterations = parseInt(argv[i + 1], 10);
@@ -88,22 +91,49 @@ function parseArgs(argv) {
         process.exit(2);
       }
       i++;
+    } else if (argv[i].startsWith('--phase=')) {
+      // Pitfall 2 — equals syntax not supported; reject explicitly so the
+      // operator is told what went wrong instead of silently falling into
+      // the unknown-flag bucket.
+      process.stderr.write(
+        '[e2e-explore] equals syntax not supported for --phase; use `--phase <value>`\n'
+      );
+      process.exit(2);
+    } else if (argv[i] === '--phase') {
+      const next = argv[i + 1];
+      if (next === undefined || next === null || next === '') {
+        process.stderr.write('[e2e-explore] missing value for --phase\n');
+        process.exit(2);
+      }
+      if (!/^\d+$/.test(next)) {
+        process.stderr.write(
+          `[e2e-explore] invalid --phase value: ${next} (must match /^\\d+$/)\n`
+        );
+        process.exit(2);
+      }
+      phase = next;
+      i++;
     } else if (argv[i] === '--help' || argv[i] === '-h') {
       process.stdout.write(
-        'Usage: node scripts/e2e-explore.mjs [--iterations N]\n' +
+        'Usage: node scripts/e2e-explore.mjs [--iterations N] [--phase N]\n' +
         '\n' +
         '  --iterations N   number of LLM iterations to run (default 5)\n' +
+        '  --phase N        tag every ledger entry with phase=N (numeric)\n' +
+        '                   and enforce the per-phase spend cap ($10 hard /\n' +
+        '                   $8 warn). Without this flag the script behaves\n' +
+        '                   exactly as in Phase 31 (no phase enforcement).\n' +
         '  --help, -h       print this help and exit\n' +
         '\n' +
         'LLM exploratory mode — refuses to run when process.env.CI or\n' +
         'process.env.GITHUB_ACTIONS is set. Checks `which claude` before\n' +
         'invoking. Reads tests/e2e/.llm-spend-ledger.json and aborts when\n' +
-        'monthly spend >= $100.\n'
+        'monthly spend >= $100. With --phase, also aborts when the phase\n' +
+        'cumulative spend reaches $10 (pre-flight) or crosses $10 mid-run.\n'
       );
       process.exit(0);
     }
   }
-  return { iterations };
+  return { iterations, phase };
 }
 
 // ---- 3. claude CLI check ---------------------------------------------
@@ -123,7 +153,7 @@ function checkClaudeCli() {
 //
 // Returns { stopAll: boolean } — when stopAll is true, main() breaks the
 // iteration loop (used for the LLM-06 hard cap mid-run).
-async function runOneIteration({ iterationN, runId, reportPath, liveCases }) {
+async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase }) {
   const iso = new Date().toISOString();
   const tStart = Date.now();
 
@@ -192,8 +222,24 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases }) {
       iso, model: modelId, cost_usd: costUsd,
       tokens_in: parsed.rawJson?.usage?.input_tokens ?? 0,
       tokens_out: parsed.rawJson?.usage?.output_tokens ?? 0,
-      iteration_n: iterationN, run_id: runId,
+      iteration_n: iterationN, run_id: runId, phase: phase,
     });
+
+    // Mid-run phase cap check (D-16) — only when --phase was supplied. Re-read
+    // the ledger so the just-appended entry is included in the phase sum.
+    // On block: return stopAll:true so main() breaks the loop and lets
+    // finalizeLlmReport run. On warn: print and continue.
+    if (phase != null) {
+      const freshLedger = readLedger(LEDGER_PATH);
+      const phaseCap = checkPhaseSpendCap(freshLedger, phase);
+      if (phaseCap.status === 'block') {
+        process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+        return { stopAll: true };
+      }
+      if (phaseCap.status === 'warn') {
+        process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+      }
+    }
 
     if (!parsed.ok) {
       classification = 'LLM_API_ERROR';
@@ -228,8 +274,23 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases }) {
         cost_usd: retryCost,
         tokens_in: retryParsed.rawJson?.usage?.input_tokens ?? 0,
         tokens_out: retryParsed.rawJson?.usage?.output_tokens ?? 0,
-        iteration_n: iterationN, run_id: runId, retry: true,
+        iteration_n: iterationN, run_id: runId, retry: true, phase: phase,
       });
+
+      // Mid-run phase cap check after the retry append (D-16) — same pattern
+      // as the first-call site. The retry burns extra credit, so the cap
+      // could trip here even when the first append left us under it.
+      if (phase != null) {
+        const freshLedger = readLedger(LEDGER_PATH);
+        const phaseCap = checkPhaseSpendCap(freshLedger, phase);
+        if (phaseCap.status === 'block') {
+          process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+          return { stopAll: true };
+        }
+        if (phaseCap.status === 'warn') {
+          process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+        }
+      }
       if (retryParsed.ok) {
         validation = validateLlmSelection(retryParsed.llmText);
         if (validation.ok) {
@@ -392,7 +453,7 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases }) {
 
 // ---- 5. Main ---------------------------------------------------------
 async function main() {
-  const { iterations } = parseArgs(process.argv);
+  const { iterations, phase } = parseArgs(process.argv);
   const claudeVer = checkClaudeCli();
   process.stdout.write(`[e2e-explore] claude ${claudeVer}\n`);
 
@@ -408,12 +469,32 @@ async function main() {
     process.stderr.write(`[e2e-explore] ${initialCap.message}\n`);
   }
 
+  // Pre-flight phase cap check (D-15) — only when --phase was supplied. Uses
+  // the already-read `initialLedger` (no second I/O) for the startup check;
+  // mid-run checks inside runOneIteration re-read the ledger after each
+  // append to catch crossings within this run.
+  if (phase != null) {
+    const phaseCap = checkPhaseSpendCap(initialLedger, phase);
+    if (phaseCap.status === 'block') {
+      process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+      process.exit(6);
+    }
+    if (phaseCap.status === 'warn') {
+      process.stderr.write(`[e2e-explore] ${phaseCap.message}\n`);
+    }
+  }
+
   const runId = resolveRunId();
   const reportPath = llmReportPathFor(runId);
   initLlmReport(reportPath, { run_id: runId, iterations_total: iterations });
   process.stdout.write(
     `[e2e-explore] run_id=${runId} iterations=${iterations} report=${reportPath}\n`
   );
+  if (phase != null) {
+    process.stdout.write(
+      `[e2e-explore] phase=${phase} (per-phase cap $${PHASE_HARD_CAP_USD} / warn $${PHASE_WARN_THRESHOLD_USD})\n`
+    );
+  }
 
   const liveCases = getLiveCases();
   if (liveCases.length === 0) {
@@ -424,7 +505,7 @@ async function main() {
   for (let n = 1; n <= iterations; n++) {
     process.stdout.write(`[e2e-explore] iteration ${n}/${iterations}...\n`);
     // eslint-disable-next-line no-await-in-loop
-    const result = await runOneIteration({ iterationN: n, runId, reportPath, liveCases });
+    const result = await runOneIteration({ iterationN: n, runId, reportPath, liveCases, phase });
     if (result.stopAll) {
       process.stderr.write('[e2e-explore] aborting remaining iterations (cap reached).\n');
       break;

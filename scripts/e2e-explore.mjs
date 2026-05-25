@@ -85,9 +85,19 @@ function parseArgs(argv) {
   let phase = null;
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--iterations' && argv[i + 1]) {
-      iterations = parseInt(argv[i + 1], 10);
-      if (Number.isNaN(iterations) || iterations < 1) {
-        process.stderr.write(`[e2e-explore] invalid --iterations value: ${argv[i + 1]}\n`);
+      // WR-01 (Phase 32 review): parseInt('5abc', 10) silently returns 5,
+      // so a typo like `--iterations 5abc` would silently run 5 iterations
+      // instead of being rejected. Use the same strict-digit regex pattern
+      // that --phase uses below for consistency. parseInt is still used to
+      // convert the validated string into a Number for the loop counter.
+      const itersRaw = argv[i + 1];
+      if (!/^\d+$/.test(itersRaw)) {
+        process.stderr.write(`[e2e-explore] invalid --iterations value: ${itersRaw} (must match /^\\d+$/)\n`);
+        process.exit(2);
+      }
+      iterations = parseInt(itersRaw, 10);
+      if (iterations < 1) {
+        process.stderr.write(`[e2e-explore] invalid --iterations value: ${itersRaw} (must be >= 1)\n`);
         process.exit(2);
       }
       i++;

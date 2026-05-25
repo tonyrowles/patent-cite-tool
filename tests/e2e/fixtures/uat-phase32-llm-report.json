@@ -1,0 +1,239 @@
+{
+  "run_id": "2026-05-25T05-22-53Z",
+  "started_iso": "2026-05-25T05:22:53.262Z",
+  "finished_iso": "2026-05-25T05:26:45.054Z",
+  "iterations_total": 10,
+  "summary": {
+    "passed": 0,
+    "wrong_citation": 0,
+    "verifier_disagree": 0,
+    "llm_hallucinated_selection": 0,
+    "llm_api_error": 2,
+    "harness_error": 8,
+    "total_cost_usd": 0.829699
+  },
+  "iterations": [
+    {
+      "iteration_n": 1,
+      "iso": "2026-05-25T05:22:53.263Z",
+      "llm_selection": null,
+      "hallucination_check": null,
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "LLM_API_ERROR",
+      "cost_usd": 0.25912075,
+      "duration_ms": 27335,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"us6738932-modern-long-001\",\"patentId\":\"US6738932\",\"selectedText\":\"Positive identification of Software is achieved with the identification mechanism by comparing at each matching offset the lengths of executable text segments the Signature information and for the executable in the memory image. Positive identification of Software is achieved with the identification mechanism by comparing each checksum in a Signature\",\"category\":\"repetitive\",\"rationale\":\"Two consecutive sentences begin with the identical phrase 'Positive identification of Software is achieved with the identification mechanism by comparing', which stresses parser handling of near-duplicate adjacent boilerplate that could be mis-deduplicated or merged.\"}",
+      "error_reason": "schema_validation_failed: selectedText too long (> 300): length=400",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 2,
+      "iso": "2026-05-25T05:23:20.598Z",
+      "llm_selection": {
+        "caseId": "test-001",
+        "patentId": "US5371234",
+        "selectedText": "These ferric-ion chelators, termed siderophores (Gr. \"iron bearer'), for the most part contain three bidentate ligands, which octahedrally bind the metal ion. The bidentate ligands found in the siderophores are quite limited in number.",
+        "category": "cross-column",
+        "rationale": "This selection straddles a column boundary with mismatched OCR quote characters (Gr. \"iron bearer') and dense bidentate-ligand repetition, likely to stress quote normalization and cross-column reflow logic in the parser."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.07911575,
+      "duration_ms": 17094,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"test-001\",\"patentId\":\"US5371234\",\"selectedText\":\"These ferric-ion chelators, termed siderophores (Gr. \\\"iron bearer'), for the most part contain three bidentate ligands, which octahedrally bind the metal ion. The bidentate ligands found in the siderophores are quite limited in number.\",\"category\":\"cross-column\",\"rationale\":\"This selection straddles a column boundary with mismatched OCR quote characters (Gr. \\\"iron bearer') and dense bidentate-ligand repetition, likely to stress quote normalization and cross-column reflow logic in the parser.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 3,
+      "iso": "2026-05-25T05:23:37.829Z",
+      "llm_selection": {
+        "caseId": "cc-us10592688-01",
+        "patentId": "US10592688",
+        "selectedText": "In certain specific embodi ments   , these dynamic and customizable   medical formsmay be automatically presented to users based on a predefined series of   rules which allow multiple users having different roles in the clinical process to collaborate and contribute to a medical examination report",
+        "category": "cross-column",
+        "rationale": "This abstract passage spans a column-wrap hyphenation ('embodi ments') and contains a fused-word OCR artifact ('formsmay') that will stress whitespace normalization and hyphen-rejoin logic across column boundaries."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.0909345,
+      "duration_ms": 17373,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"cc-us10592688-01\",\"patentId\":\"US10592688\",\"selectedText\":\"In certain specific embodi ments   , these dynamic and customizable   medical formsmay be automatically presented to users based on a predefined series of   rules which allow multiple users having different roles in the clinical process to collaborate and contribute to a medical examination report\",\"category\":\"cross-column\",\"rationale\":\"This abstract passage spans a column-wrap hyphenation ('embodi ments') and contains a fused-word OCR artifact ('formsmay') that will stress whitespace normalization and hyphen-rejoin logic across column boundaries.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 4,
+      "iso": "2026-05-25T05:23:55.337Z",
+      "llm_selection": {
+        "caseId": "ocr-us6324676-001",
+        "patentId": "US6324676",
+        "selectedText": "The configu ration memories are typically arranged in rows and columns. The columns are loaded from a frame register which is in turn Sequentially loaded fr",
+        "category": "cross-column",
+        "rationale": "This selection captures multiple OCR cross-column artifacts including the wrap-hyphenated 'configu ration', a truncated trailing 'fr' at the column boundary, and inconsistent capitalization ('Sequentially'), which should stress the parser's handling of broken words across column breaks."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.080197,
+      "duration_ms": 18485,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"ocr-us6324676-001\",\"patentId\":\"US6324676\",\"selectedText\":\"The configu ration memories are typically arranged in rows and columns. The columns are loaded from a frame register which is in turn Sequentially loaded fr\",\"category\":\"cross-column\",\"rationale\":\"This selection captures multiple OCR cross-column artifacts including the wrap-hyphenated 'configu ration', a truncated trailing 'fr' at the column boundary, and inconsistent capitalization ('Sequentially'), which should stress the parser's handling of broken words across column breaks.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 5,
+      "iso": "2026-05-25T05:24:13.949Z",
+      "llm_selection": {
+        "caseId": "us8024718-modern-long-01",
+        "patentId": "US8024718",
+        "selectedText": "maxdiff compute a maxl3 (abs (gauss xy pixels ( (x-2) 3) 3   y-1) 3 gauss-XY middle), maxdiff compute); max   diff compute - maxil 3 (abs (gauss Xy pixels ( {x-2) 3) 3 (y-3) 3 gauss Xy middle), maxdiff compute) ;",
+        "category": "repetitive",
+        "rationale": "This passage contains near-identical repeated function-call patterns with OCR-fragmented identifiers and a hyphen-broken 'max   diff' wrap across a line break, likely to stress the parser's handling of repetitive language and intra-token whitespace."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.07016575,
+      "duration_ms": 18678,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"us8024718-modern-long-01\",\"patentId\":\"US8024718\",\"selectedText\":\"maxdiff compute a maxl3 (abs (gauss xy pixels ( (x-2) 3) 3   y-1) 3 gauss-XY middle), maxdiff compute); max   diff compute - maxil 3 (abs (gauss Xy pixels ( {x-2) 3) 3 (y-3) 3 gauss Xy middle), maxdiff compute) ;\",\"category\":\"repetitive\",\"rationale\":\"This passage contains near-identical repeated function-call patterns with OCR-fragmented identifiers and a hyphen-broken 'max   diff' wrap across a line break, likely to stress the parser's handling of repetitive language and intra-token whitespace.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 6,
+      "iso": "2026-05-25T05:24:32.757Z",
+      "llm_selection": {
+        "caseId": "us5440748-cross-col-hyphen",
+        "patentId": "US5440748",
+        "selectedText": "the computer main body cannot be connected to the expansion slot of an expansion unit including an I/O interface which has the same I/O port address as that of the I/O interface of the computer main body because of the coincidence of the port ad dresses.",
+        "category": "cross-column",
+        "rationale": "Contains a wrap-hyphenated word ('ad dresses') split across a line break alongside repetitive 'I/O port'/'I/O interface' phrasing, likely to stress hyphen-rejoin and token deduplication logic in the parser."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.074922,
+      "duration_ms": 16618,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"us5440748-cross-col-hyphen\",\"patentId\":\"US5440748\",\"selectedText\":\"the computer main body cannot be connected to the expansion slot of an expansion unit including an I/O interface which has the same I/O port address as that of the I/O interface of the computer main body because of the coincidence of the port ad dresses.\",\"category\":\"cross-column\",\"rationale\":\"Contains a wrap-hyphenated word ('ad dresses') split across a line break alongside repetitive 'I/O port'/'I/O interface' phrasing, likely to stress hyphen-rejoin and token deduplication logic in the parser.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 7,
+      "iso": "2026-05-25T05:24:49.505Z",
+      "llm_selection": null,
+      "hallucination_check": null,
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "LLM_API_ERROR",
+      "cost_usd": 0,
+      "duration_ms": 60036,
+      "artifacts": [],
+      "llm_raw_response": "",
+      "error_reason": "timeout",
+      "model": "unknown"
+    },
+    {
+      "iteration_n": 8,
+      "iso": "2026-05-25T05:25:49.543Z",
+      "llm_selection": {
+        "caseId": "test-001",
+        "patentId": "US5371234",
+        "selectedText": "These ferric-ion chelators, termed siderophores (Gr. \"iron bearer'), for the most part contain three bidentate ligands, which octahedrally bind the metal ion.",
+        "category": "repetitive",
+        "rationale": "This selection contains mismatched quotation marks (opening double quote with closing single quote) from OCR artifacts, which tests parser handling of inconsistent punctuation pairs within a verbatim citation."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.07826575,
+      "duration_ms": 17855,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"test-001\",\"patentId\":\"US5371234\",\"selectedText\":\"These ferric-ion chelators, termed siderophores (Gr. \\\"iron bearer'), for the most part contain three bidentate ligands, which octahedrally bind the metal ion.\",\"category\":\"repetitive\",\"rationale\":\"This selection contains mismatched quotation marks (opening double quote with closing single quote) from OCR artifacts, which tests parser handling of inconsistent punctuation pairs within a verbatim citation.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 9,
+      "iso": "2026-05-25T05:26:07.529Z",
+      "llm_selection": {
+        "caseId": "chem-001",
+        "patentId": "US9688736",
+        "selectedText": "Tyr-Ser-His-Gly-Thr-Phe-Thr-Ser-Asp-Val-Ser-Lys-Tyr Leu-Asp-(Aib)-Lys-Lys-Ala-Ala-Glu-Phe-Val-Ala-Trp Leu-Leu-Glu-Glu (SEQ ID NO: 2)",
+        "category": "cross-column",
+        "rationale": "This amino acid sequence spans column/line boundaries with hyphenated residue tokens broken across wraps, testing whether the parser preserves chemical sequence integrity across cross-column line breaks."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.07749075,
+      "duration_ms": 19901,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"chem-001\",\"patentId\":\"US9688736\",\"selectedText\":\"Tyr-Ser-His-Gly-Thr-Phe-Thr-Ser-Asp-Val-Ser-Lys-Tyr Leu-Asp-(Aib)-Lys-Lys-Ala-Ala-Glu-Phe-Val-Ala-Trp Leu-Leu-Glu-Glu (SEQ ID NO: 2)\",\"category\":\"cross-column\",\"rationale\":\"This amino acid sequence spans column/line boundaries with hyphenated residue tokens broken across wraps, testing whether the parser preserves chemical sequence integrity across cross-column line breaks.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    },
+    {
+      "iteration_n": 10,
+      "iso": "2026-05-25T05:26:27.547Z",
+      "llm_selection": {
+        "caseId": "US6738932-modern-long-001",
+        "patentId": "US6738932",
+        "selectedText": "The task of identifying and correcting the cause of the problem in the currently running Software is further com plicated because the perSon or mechanism performing the dump analysis usually needs to first identify what version of kernel (or other) Software was running on the computer System",
+        "category": "modern-long",
+        "rationale": "This selection spans a wrap-hyphenated word ('com plicated') broken across a line in the OCR'd two-column layout, testing whether the parser correctly rejoins hyphenated tokens while preserving the verbatim substring."
+      },
+      "hallucination_check": {
+        "passed": true,
+        "method": "wsNorm"
+      },
+      "citation": null,
+      "verifier_verdict": null,
+      "classification": "HARNESS_ERROR",
+      "cost_usd": 0.0194845,
+      "duration_ms": 17372,
+      "artifacts": [],
+      "llm_raw_response": "{\"caseId\":\"US6738932-modern-long-001\",\"patentId\":\"US6738932\",\"selectedText\":\"The task of identifying and correcting the cause of the problem in the currently running Software is further com plicated because the perSon or mechanism performing the dump analysis usually needs to first identify what version of kernel (or other) Software was running on the computer System\",\"category\":\"modern-long\",\"rationale\":\"This selection spans a wrap-hyphenated word ('com plicated') broken across a line in the OCR'd two-column layout, testing whether the parser correctly rejoins hyphenated tokens while preserving the verbatim substring.\"}",
+      "error_reason": "runtime_error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize",
+      "model": "claude-opus-4-7[1m]"
+    }
+  ]
+}

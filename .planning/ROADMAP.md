@@ -131,7 +131,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   4. The 461 existing Vitest tests and 76-case Playwright golden suite continue to pass (no regressions introduced)
 **Plans**: 5 plans
 - [x] 32-01-PLAN.md — Wave 0 test infrastructure scaffolding (fixtures dir + Vitest stubs)
-- [ ] 32-02-PLAN.md — Ledger `phase` field + `phaseTotal` + `checkPhaseSpendCap` helpers (UAT-02)
+- [x] 32-02-PLAN.md — Ledger `phase` field + `phaseTotal` + `checkPhaseSpendCap` helpers (UAT-02)
 - [ ] 32-03-PLAN.md — `--phase` flag + pre-flight + mid-run cap enforcement on e2e-explore.mjs (UAT-02)
 - [ ] 32-04-PLAN.md — Upload helper + ingest workflow + nightly llm_run_id input + download/validate step (UAT-03)
 - [ ] 32-05-PLAN.md — Live UAT execution + evidence + fixture commit + sign-off (UAT-01)
@@ -229,7 +229,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 29. CI Nightly Cron + Auto-Issue Filing | v3.0 | 4/4 | Complete    | 2026-05-17 |
 | 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
-| 32. HUMAN-UAT Verification | v3.1 | 1/5 | In Progress|  |
+| 32. HUMAN-UAT Verification | v3.1 | 2/5 | In Progress|  |
 | 33. Re-run Validator | v3.1 | 0/? | Not started | - |
 | 34. Hybrid Triage Classifier | v3.1 | 0/? | Not started | - |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |

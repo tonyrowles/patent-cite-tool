@@ -2,16 +2,22 @@
 //
 // Phase 31 (LLM-05 + LLM-06) — append-only spend ledger for the LLM
 // exploratory runner.
+// Phase 32 (UAT-02) — per-phase spend accounting helpers (D-13/D-14/D-15/D-16).
 //
 // Public surface:
-//   LEDGER_PATH                       absolute path to the default ledger file
-//   HARD_CAP_USD = 100                refuse-to-invoke threshold
-//   WARN_THRESHOLD_USD = 80           print-warning threshold
-//   currentMonth()                    "YYYY-MM" for now
-//   readLedger(ledgerPath?)           {version:1, months:{}} on missing/corrupt
-//   monthlyTotal(ledger, month?)      number; 0 when month absent
-//   checkSpendCap(ledger, month?)     { status, monthly_total_usd, month, message }
-//   appendLedgerEntry(ledgerPath, entry)
+//   LEDGER_PATH                            absolute path to the default ledger file
+//                                          (TEST-ONLY env override via E2E_LEDGER_PATH_OVERRIDE)
+//   HARD_CAP_USD = 100                     refuse-to-invoke threshold (monthly)
+//   WARN_THRESHOLD_USD = 80                print-warning threshold (monthly)
+//   PHASE_HARD_CAP_USD = 10                refuse-to-invoke threshold (per-phase, D-13)
+//   PHASE_WARN_THRESHOLD_USD = 8           print-warning threshold (per-phase, D-13)
+//   currentMonth()                         "YYYY-MM" for now
+//   readLedger(ledgerPath?)                {version:1, months:{}} on missing/corrupt
+//   monthlyTotal(ledger, month?)           number; 0 when month absent
+//   checkSpendCap(ledger, month?)          { status, monthly_total_usd, month, message }
+//   phaseTotal(ledger, phase)              cross-month sum of cost_usd for entries with .phase===phase
+//   checkPhaseSpendCap(ledger, phase)      { status, phase_total_usd, phase, message }
+//   appendLedgerEntry(ledgerPath, entry)   entry may carry an optional `phase` field (D-14 back-compat)
 //
 // Design notes:
 //   - Pattern mirrors tests/e2e/lib/report.js (Phase 28) — single-process
@@ -47,9 +53,30 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * directory up from this module (in tests/e2e/) so it sits beside the
  * artifacts/ dir but is NOT inside it — keeps the ledger surviving
  * artifacts cleanup between runs.
+ *
+ * TEST-ONLY: set `E2E_LEDGER_PATH_OVERRIDE=<absolute-or-relative-path>` to
+ * redirect this constant at module-load time. Used exclusively by integration
+ * tests (Plan 32-03 Test 5) that need to seed a throwaway ledger without
+ * polluting the real per-repo file. DO NOT set this env var in production,
+ * cron, or CI release contexts — Phase 32 D-15 pre-flight gate is the public
+ * safety mechanism; this override exists solely so the gate itself can be
+ * exercised by a real spawnSync integration test rather than only by
+ * unit-test mocks.
+ *
+ * Resolution rule:
+ *   - When process.env.E2E_LEDGER_PATH_OVERRIDE is set AND non-empty
+ *     (after .trim()), LEDGER_PATH = path.resolve(<trimmed value>)
+ *   - Otherwise LEDGER_PATH falls back to the canonical per-repo location.
+ *
  * @type {string}
  */
-export const LEDGER_PATH = path.resolve(__dirname, '../.llm-spend-ledger.json');
+export const LEDGER_PATH = (() => {
+  const overrideRaw = process.env.E2E_LEDGER_PATH_OVERRIDE;
+  if (typeof overrideRaw === 'string' && overrideRaw.trim().length > 0) {
+    return path.resolve(overrideRaw.trim());
+  }
+  return path.resolve(__dirname, '../.llm-spend-ledger.json');
+})();
 
 /**
  * Hard cap: monthly spend >= this triggers status:'block' (refuse to
@@ -62,6 +89,21 @@ export const HARD_CAP_USD = 100;
  * invocation. Locked at $80 per CONTEXT.md.
  */
 export const WARN_THRESHOLD_USD = 80;
+
+/**
+ * Per-phase hard cap (D-13): if the cumulative spend tagged with a given
+ * phase value reaches this dollar amount, callers MUST NOT invoke `claude -p`
+ * for that phase any further. Applied on top of the global monthly cap —
+ * either cap triggering is a refusal.
+ */
+export const PHASE_HARD_CAP_USD = 10;
+
+/**
+ * Per-phase warn threshold (D-13): cumulative phase spend at-or-above this
+ * value triggers a printed warning, but does not block further invocations
+ * until PHASE_HARD_CAP_USD is reached.
+ */
+export const PHASE_WARN_THRESHOLD_USD = 8;
 
 /**
  * @returns {string} the current month as "YYYY-MM" (UTC; ISO 8601 prefix)
@@ -96,6 +138,39 @@ export function readLedger(ledgerPath = LEDGER_PATH) {
  */
 export function monthlyTotal(ledger, month = currentMonth()) {
   return ledger?.months?.[month]?.total_usd ?? 0;
+}
+
+/**
+ * Cross-month sum of `cost_usd` for entries tagged with `phase`. A phase
+ * (e.g., "32") can span multiple calendar months, so this helper iterates
+ * every month bucket rather than only the current month. Entries that lack
+ * a phase field or whose phase value differs are ignored.
+ *
+ * Entries with non-finite cost_usd (NaN, undefined, null, Infinity) are
+ * excluded from the sum — mirrors the defensive pattern at appendLedgerEntry.
+ *
+ * The result is rounded to 6 decimal places to avoid float drift across many
+ * small additions, matching the established convention in monthlyTotal /
+ * appendLedgerEntry.
+ *
+ * @param {object} ledger
+ * @param {string} phase  e.g., "32"
+ * @returns {number}
+ */
+export function phaseTotal(ledger, phase) {
+  const months = ledger?.months;
+  if (!months || typeof months !== 'object') return 0;
+  let sum = 0;
+  for (const bucket of Object.values(months)) {
+    const iterations = bucket?.iterations;
+    if (!Array.isArray(iterations)) continue;
+    for (const it of iterations) {
+      if (it && it.phase === phase && Number.isFinite(it.cost_usd)) {
+        sum += it.cost_usd;
+      }
+    }
+  }
+  return +sum.toFixed(6);
 }
 
 /**
@@ -139,6 +214,50 @@ export function checkSpendCap(ledger, month = currentMonth()) {
 }
 
 /**
+ * Classify the ledger's cumulative phase spend against the per-phase
+ * warn/block thresholds (D-13). Mirrors checkSpendCap exactly in shape
+ * except that the return object uses `phase_total_usd` / `phase` keys
+ * (NOT `monthly_total_usd` / `month`) so callers cannot accidentally
+ * mix the two views.
+ *
+ * @param {object} ledger
+ * @param {string} phase  e.g., "32"
+ * @returns {{ status: 'ok'|'warn'|'block', phase_total_usd: number, phase: string, message: string }}
+ *   status === 'block'   ⇒ caller MUST NOT invoke claude -p for this phase
+ *   status === 'warn'    ⇒ approaching per-phase cap; print message and continue
+ *   status === 'ok'      ⇒ silent pass; message is empty string
+ */
+export function checkPhaseSpendCap(ledger, phase) {
+  const total = phaseTotal(ledger, phase);
+  if (total >= PHASE_HARD_CAP_USD) {
+    return {
+      status: 'block',
+      phase_total_usd: total,
+      phase,
+      message:
+        `Phase ${phase} LLM spend $${total.toFixed(2)} >= $${PHASE_HARD_CAP_USD.toFixed(2)}. ` +
+        `Refusing to invoke claude -p. Reset phase entries in ledger or end the phase.`,
+    };
+  }
+  if (total >= PHASE_WARN_THRESHOLD_USD) {
+    return {
+      status: 'warn',
+      phase_total_usd: total,
+      phase,
+      message:
+        `⚠ Phase ${phase} spend $${total.toFixed(2)} >= $${PHASE_WARN_THRESHOLD_USD.toFixed(2)} ` +
+        `— approaching $${PHASE_HARD_CAP_USD.toFixed(2)} cap`,
+    };
+  }
+  return {
+    status: 'ok',
+    phase_total_usd: total,
+    phase,
+    message: '',
+  };
+}
+
+/**
  * Append a single iteration entry to the ledger. Reads the current ledger
  * (or initializes an empty one), creates the current-month bucket if
  * absent, increments invocations and total_usd, updates last_invocation_iso,
@@ -157,7 +276,12 @@ export function checkSpendCap(ledger, month = currentMonth()) {
  *   tokens_out?: number,
  *   iteration_n: number,
  *   run_id: string,
+ *   phase?: string|null,
  * }} entry
+ *   Phase 32 (D-14) backward compatibility: the optional `phase` field is
+ *   spread through to iterations[] verbatim — the function body is unchanged.
+ *   Legacy callers that omit `phase` continue to produce valid entries; new
+ *   callers may set `phase: '32'` (etc.) to feed phaseTotal / checkPhaseSpendCap.
  */
 export function appendLedgerEntry(ledgerPath, entry) {
   const ledger = readLedger(ledgerPath);

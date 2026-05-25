@@ -71,7 +71,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { resolveRunId } from '../tests/e2e/lib/run-id.js';
 import { llmReportPathFor } from '../tests/e2e/lib/llm-report.js';
 
@@ -233,6 +233,21 @@ export async function uploadReport({
 
   const ingestRunId = filtered[0].databaseId;
 
+  // CR-03 (Phase 32 review): boundary validator. Even though execFileSync
+  // already neutralizes shell-injection, the captured `databaseId` flows
+  // into a downstream workflow input (and is rendered into a URL); enforce
+  // pure-decimal shape so a corrupted `gh run list --json` response (MitM,
+  // compromised gh binary, etc.) cannot supply a non-numeric run-id. Pair
+  // with the server-side numeric case-statement in e2e-nightly.yml (CR-02).
+  if (!/^\d+$/.test(String(ingestRunId))) {
+    stderr(
+      `[e2e-upload] invalid ingest run id from \`gh run list\` ` +
+        `(expected decimal digits, got: ${JSON.stringify(ingestRunId)})\n`,
+    );
+    exit(3);
+    return;
+  }
+
   // ---- Stage 2: dispatch nightly with captured run_id (D-05) ----
   try {
     ghClient.workflowRun(NIGHTLY_WORKFLOW, { llm_run_id: String(ingestRunId) });
@@ -296,12 +311,21 @@ export async function uploadReport({
  * }}
  */
 export function makeRealGhClient() {
+  // CR-03 (Phase 32 review): switch from `execSync(string)` to
+  // `execFileSync(file, argv)` everywhere. `execSync(string)` invokes
+  // `/bin/sh -c <string>`, so any unvalidated value concatenated into the
+  // command (e.g. a compromised `gh run list --json` response feeding
+  // `databaseId` into `gh run view ${id}`) becomes a shell-injection
+  // vector. `execFileSync('gh', [...args])` spawns gh directly with each
+  // argv element passed as a discrete syscall argument — the shell is
+  // never invoked, so injection via argument content is structurally
+  // impossible.
   return {
     authStatus() {
       // stdio: 'ignore' so gh's status banner does not leak into the helper's
       // own stdout/stderr. A non-zero exit code throws — caught by the
       // orchestrator and translated to exit code 7.
-      execSync('gh auth status', { stdio: 'ignore' });
+      execFileSync('gh', ['auth', 'status'], { stdio: 'ignore' });
     },
 
     workflowRun(file, inputs, opts) {
@@ -312,15 +336,14 @@ export function makeRealGhClient() {
       // `-f payload_b64=@-` sent the literal two-char "@-" string to the
       // workflow, breaking the base64 decode step. Found during Plan 32-05
       // Task 3 UAT.
-      const parts = ['gh', 'workflow', 'run', file];
+      const args = ['workflow', 'run', file];
       for (const [k, v] of Object.entries(inputs || {})) {
-        parts.push('-f', `${k}=${v}`);
+        args.push('-f', `${k}=${v}`);
       }
       if (opts?.stdinPayload !== undefined) {
-        parts.push('-F', 'payload_b64=@-');
+        args.push('-F', 'payload_b64=@-');
       }
-      const cmd = parts.join(' ');
-      execSync(cmd, {
+      execFileSync('gh', args, {
         encoding: 'utf8',
         input: opts?.stdinPayload,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -328,8 +351,17 @@ export function makeRealGhClient() {
     },
 
     runList(file, limit) {
-      const raw = execSync(
-        `gh run list --workflow=${file} --limit ${limit} --json databaseId,createdAt`,
+      const raw = execFileSync(
+        'gh',
+        [
+          'run',
+          'list',
+          `--workflow=${file}`,
+          '--limit',
+          String(limit),
+          '--json',
+          'databaseId,createdAt',
+        ],
         { encoding: 'utf8' },
       );
       const parsed = JSON.parse(raw);
@@ -337,13 +369,15 @@ export function makeRealGhClient() {
     },
 
     runView(id, opts) {
-      const cmd = `gh run view ${id}${opts?.web ? ' --web' : ''}`;
-      execSync(cmd, { encoding: 'utf8' });
+      const args = ['run', 'view', String(id)];
+      if (opts?.web) args.push('--web');
+      execFileSync('gh', args, { encoding: 'utf8' });
     },
 
     repoView() {
-      const out = execSync(
-        'gh repo view --json nameWithOwner -q .nameWithOwner',
+      const out = execFileSync(
+        'gh',
+        ['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'],
         { encoding: 'utf8' },
       );
       return { nameWithOwner: out.trim() };

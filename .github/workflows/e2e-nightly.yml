@@ -106,9 +106,24 @@ jobs:
 
       - name: Download and validate LLM report (if llm_run_id provided)
         if: inputs.llm_run_id != ''
+        env:
+          # CR-02 (Phase 32 review): env-var hop prevents GitHub Actions
+          # script injection (CWE-94). The previous `gh run download
+          # ${{ inputs.llm_run_id }}` interpolation let a workflow-dispatch
+          # caller execute arbitrary commands on the runner under the
+          # nightly's `issues: write` token. Numeric guard below enforces
+          # the value is a pure decimal run-id before passing to gh.
+          LLM_RUN_ID: ${{ inputs.llm_run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          case "$LLM_RUN_ID" in
+            ''|*[!0-9]*)
+              echo "invalid llm_run_id (must be all decimal digits): $LLM_RUN_ID" >&2
+              exit 1
+              ;;
+          esac
           mkdir -p downloaded-llm-report
-          gh run download ${{ inputs.llm_run_id }} -n llm-report -D downloaded-llm-report
+          gh run download "$LLM_RUN_ID" -n llm-report -D downloaded-llm-report
           node -e "
             import('./tests/e2e/lib/llm-report.js').then(({ appendLlmIteration }) => {
               const fs = require('node:fs');
@@ -122,8 +137,6 @@ jobs:
               console.log('schema OK: ' + r.iterations.length + ' iterations');
             });
           "
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Phase 32 Plan 32-04 (UAT-03) — gated download + schema-validate step.
         # Placed AFTER the label step and BEFORE pre-flight smoke so malformed
         # artifacts fail fast, before consuming smoke / regression budget.
@@ -152,8 +165,15 @@ jobs:
       - name: Select test cases for today
         id: cases
         if: steps.smoke.outcome == 'success'
+        env:
+          # CR-02 (Phase 32 review): env-var hop. `force_full_suite` is declared
+          # as `type: boolean`, so GH normally coerces it to a literal 'true'/
+          # 'false' string — but routing through env keeps the value out of
+          # the shell parser regardless of any future schema drift (defense
+          # in depth against CWE-94).
+          FORCE_FULL_SUITE: ${{ inputs.force_full_suite }}
         run: |
-          if [ "${{ inputs.force_full_suite }}" = "true" ]; then
+          if [ "$FORCE_FULL_SUITE" = "true" ]; then
             CASES=$(node scripts/select-cron-cases.mjs --full)
           else
             CASES=$(node scripts/select-cron-cases.mjs)

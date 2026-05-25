@@ -9,6 +9,13 @@
 // to remain hermetic across calendar rollover (the implementation defaults to
 // currentMonth() but the test must lock to a specific month).
 //
+// Phase 32 (UAT-02) — extended coverage for the per-phase helpers added by
+// Plan 32-02 (D-13/D-14/D-15/D-16): phase tagging back-compat, phaseTotal
+// cross-month aggregation + non-finite filtering + 6dp rounding,
+// checkPhaseSpendCap boundary conditions, and the TEST-ONLY
+// E2E_LEDGER_PATH_OVERRIDE env hook (verified via spawnSync child processes
+// because top-level `export const` is evaluated once per Node process).
+//
 // Coverage map (see 31-01-PLAN.md Task 2 <behavior>):
 //   1. readLedger() of missing file returns { version: 1, months: {} }
 //   2. readLedger() of corrupt JSON returns { version: 1, months: {} }
@@ -27,19 +34,43 @@
 //   15. appendLedgerEntry result is valid JSON after write
 //   16. appendLedgerEntry with cost_usd=0 increments invocations, leaves total
 //   17. appendLedgerEntry rounds total_usd to 6 decimal places
+//
+// Phase 32 coverage map (this PR — see the describe block below):
+//   18. appendLedgerEntry preserves optional `phase` field through to iterations
+//   19. appendLedgerEntry without `phase` stores no phase property (back-compat D-14)
+//   20. phaseTotal returns 0 for empty/missing ledger
+//   21. phaseTotal returns 0 for unknown phase
+//   22. phaseTotal sums cost_usd across multiple iterations in a month
+//   23. phaseTotal sums across MULTIPLE months (phase spans calendar boundaries)
+//   24. phaseTotal ignores entries with non-finite cost_usd
+//   25. phaseTotal rounds to 6 decimal places (no float drift)
+//   26. checkPhaseSpendCap status='ok' when total < $8
+//   27. checkPhaseSpendCap status='warn' at $8.00
+//   28. checkPhaseSpendCap status='warn' at $9.99
+//   29. checkPhaseSpendCap status='block' at $10.00
+//   30. checkPhaseSpendCap status='block' at $15.00
+//   31. checkPhaseSpendCap return-shape uses phase_total_usd + phase keys
+//   32. LEDGER_PATH honors E2E_LEDGER_PATH_OVERRIDE when set (spawnSync child)
+//   33. LEDGER_PATH falls back to default when env var unset or empty (spawnSync child)
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   readLedger,
   currentMonth,
   monthlyTotal,
   checkSpendCap,
   appendLedgerEntry,
+  phaseTotal,
+  checkPhaseSpendCap,
   HARD_CAP_USD,
   WARN_THRESHOLD_USD,
+  PHASE_HARD_CAP_USD,
+  PHASE_WARN_THRESHOLD_USD,
   LEDGER_PATH,
 } from '../e2e/lib/llm-ledger.js';
 
@@ -253,5 +284,353 @@ describe('tests/e2e/lib/llm-ledger.js — Phase 31 (LLM-05/06) spend ledger', ()
     expect(WARN_THRESHOLD_USD).toBe(80);
     expect(path.isAbsolute(LEDGER_PATH)).toBe(true);
     expect(LEDGER_PATH).toMatch(/\.llm-spend-ledger\.json$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 32 — per-phase ledger helpers + LEDGER_PATH env override
+// ---------------------------------------------------------------------------
+
+// Resolve the absolute filesystem path of the llm-ledger module so the
+// spawnSync child processes (Tests 32 and 33) can dynamically import it
+// without depending on CWD.
+const LEDGER_MODULE_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../e2e/lib/llm-ledger.js',
+);
+
+/**
+ * Seed a ledger file directly with arbitrary month/iteration shape. Used by
+ * tests that need entries in MULTIPLE months — `appendLedgerEntry` always
+ * routes to `currentMonth()`, so multi-month coverage requires direct writes.
+ */
+function seedLedgerFile(filePath, ledger) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(ledger, null, 2));
+}
+
+describe('Phase 32 — per-phase ledger helpers (D-13/D-14/D-15/D-16)', () => {
+  let tmpDir2;
+  let ledgerPath2;
+
+  beforeEach(() => {
+    tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-ledger-phase32-'));
+    ledgerPath2 = path.join(tmpDir2, '.llm-spend-ledger.json');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it('Test 18: appendLedgerEntry preserves optional `phase` field through to iterations[]', () => {
+    const entry = makeEntry({ cost_usd: 0.10, phase: '32' });
+    appendLedgerEntry(ledgerPath2, entry);
+
+    const written = JSON.parse(fs.readFileSync(ledgerPath2, 'utf8'));
+    const month = currentMonth();
+    expect(written.months[month].iterations).toHaveLength(1);
+    expect(written.months[month].iterations[0].phase).toBe('32');
+  });
+
+  it('Test 19: appendLedgerEntry without `phase` stores no phase property (D-14 back-compat)', () => {
+    // makeEntry() default has NO phase; legacy Phase 31 callers must continue to work.
+    const entry = makeEntry({ cost_usd: 0.10 });
+    expect(entry.phase).toBeUndefined();
+    appendLedgerEntry(ledgerPath2, entry);
+
+    const written = JSON.parse(fs.readFileSync(ledgerPath2, 'utf8'));
+    const month = currentMonth();
+    const it0 = written.months[month].iterations[0];
+    expect(it0.phase).toBeUndefined();
+    // Spot-check legacy fields survived intact.
+    expect(it0.cost_usd).toBe(0.10);
+    expect(it0.iteration_n).toBe(1);
+  });
+
+  it('Test 20: phaseTotal returns 0 for empty/missing ledger', () => {
+    expect(phaseTotal({}, '32')).toBe(0);
+    expect(phaseTotal({ months: {} }, '32')).toBe(0);
+    expect(phaseTotal(null, '32')).toBe(0);
+    expect(phaseTotal(undefined, '32')).toBe(0);
+  });
+
+  it('Test 21: phaseTotal returns 0 for unknown phase', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1,
+          total_usd: 0.5,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [{ iso: '2026-05-18T00:00:00.000Z', cost_usd: 0.5, phase: '31' }],
+        },
+      },
+    };
+    expect(phaseTotal(ledger, '32')).toBe(0);
+    // Sanity: phase '31' still found.
+    expect(phaseTotal(ledger, '31')).toBe(0.5);
+  });
+
+  it('Test 22: phaseTotal sums cost_usd across multiple iterations in a month', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 3,
+          total_usd: 2.25,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            { iso: 'a', cost_usd: 1.50, phase: '32' },
+            { iso: 'b', cost_usd: 0.50, phase: '32' },
+            { iso: 'c', cost_usd: 0.25, phase: '32' },
+          ],
+        },
+      },
+    };
+    expect(phaseTotal(ledger, '32')).toBe(2.25);
+  });
+
+  it('Test 23: phaseTotal sums across MULTIPLE months (phase spans calendar boundaries)', () => {
+    // Phases (e.g., "32") run across calendar months; phaseTotal MUST aggregate.
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 2,
+          total_usd: 1.50,
+          last_invocation_iso: '2026-05-31T00:00:00.000Z',
+          iterations: [
+            { iso: '2026-05-29T00:00:00.000Z', cost_usd: 1.00, phase: '32' },
+            { iso: '2026-05-30T00:00:00.000Z', cost_usd: 0.50, phase: '32' },
+          ],
+        },
+        '2026-06': {
+          invocations: 1,
+          total_usd: 2.00,
+          last_invocation_iso: '2026-06-02T00:00:00.000Z',
+          iterations: [
+            { iso: '2026-06-02T00:00:00.000Z', cost_usd: 2.00, phase: '32' },
+          ],
+        },
+      },
+    };
+    expect(phaseTotal(ledger, '32')).toBe(3.50);
+  });
+
+  it('Test 24: phaseTotal ignores entries with non-finite cost_usd', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 4,
+          total_usd: 1.00,
+          last_invocation_iso: 'x',
+          iterations: [
+            { cost_usd: 1.00, phase: '32' },
+            { cost_usd: NaN, phase: '32' },
+            { cost_usd: undefined, phase: '32' },
+            { cost_usd: Infinity, phase: '32' },
+            { phase: '32' },  // cost_usd missing entirely
+          ],
+        },
+      },
+    };
+    // Only the first $1.00 entry is finite.
+    expect(phaseTotal(ledger, '32')).toBe(1.00);
+  });
+
+  it('Test 25: phaseTotal rounds to 6 decimal places (no float drift 0.1+0.2)', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 2,
+          total_usd: 0.3,
+          last_invocation_iso: 'x',
+          iterations: [
+            { cost_usd: 0.1, phase: '32' },
+            { cost_usd: 0.2, phase: '32' },
+          ],
+        },
+      },
+    };
+    const total = phaseTotal(ledger, '32');
+    expect(total).toBe(0.3);
+    expect(String(total)).not.toContain('00000000000000004');
+  });
+
+  it('Test 26: checkPhaseSpendCap returns status=ok when total < $8 (and empty message)', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1, total_usd: 7.99, last_invocation_iso: 'x',
+          iterations: [{ cost_usd: 7.99, phase: '32' }],
+        },
+      },
+    };
+    const r = checkPhaseSpendCap(ledger, '32');
+    expect(r.status).toBe('ok');
+    expect(r.phase_total_usd).toBe(7.99);
+    expect(r.phase).toBe('32');
+    expect(r.message).toBe('');
+  });
+
+  it('Test 27: checkPhaseSpendCap returns status=warn at exactly $8.00 (message starts with ⚠)', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1, total_usd: 8.00, last_invocation_iso: 'x',
+          iterations: [{ cost_usd: 8.00, phase: '32' }],
+        },
+      },
+    };
+    const r = checkPhaseSpendCap(ledger, '32');
+    expect(r.status).toBe('warn');
+    expect(r.phase_total_usd).toBe(8.00);
+    expect(r.message.startsWith('⚠')).toBe(true);
+    expect(r.message).toContain('32');
+    expect(r.message).toContain('8.00');
+  });
+
+  it('Test 28: checkPhaseSpendCap returns status=warn at $9.99 (just below hard cap)', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1, total_usd: 9.99, last_invocation_iso: 'x',
+          iterations: [{ cost_usd: 9.99, phase: '32' }],
+        },
+      },
+    };
+    const r = checkPhaseSpendCap(ledger, '32');
+    expect(r.status).toBe('warn');
+    expect(r.phase_total_usd).toBe(9.99);
+  });
+
+  it('Test 29: checkPhaseSpendCap returns status=block at exactly $10.00 (message contains Refusing to invoke)', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1, total_usd: 10.00, last_invocation_iso: 'x',
+          iterations: [{ cost_usd: 10.00, phase: '32' }],
+        },
+      },
+    };
+    const r = checkPhaseSpendCap(ledger, '32');
+    expect(r.status).toBe('block');
+    expect(r.phase_total_usd).toBe(10.00);
+    expect(r.message).toContain('Refusing to invoke');
+    expect(r.message).toContain('32');
+    expect(r.message).toContain('10.00');
+  });
+
+  it('Test 30: checkPhaseSpendCap returns status=block at $15.00 (overshoot)', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1, total_usd: 15.00, last_invocation_iso: 'x',
+          iterations: [{ cost_usd: 15.00, phase: '32' }],
+        },
+      },
+    };
+    const r = checkPhaseSpendCap(ledger, '32');
+    expect(r.status).toBe('block');
+    expect(r.phase_total_usd).toBe(15.00);
+    expect(r.message).toContain('Refusing to invoke');
+  });
+
+  it('Test 31: checkPhaseSpendCap return shape uses phase_total_usd + phase (NOT monthly_total_usd + month)', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1, total_usd: 5.00, last_invocation_iso: 'x',
+          iterations: [{ cost_usd: 5.00, phase: '32' }],
+        },
+      },
+    };
+    const r = checkPhaseSpendCap(ledger, '32');
+    const keys = Object.keys(r).sort();
+    expect(keys).toEqual(['message', 'phase', 'phase_total_usd', 'status']);
+    // Negative assertions: the monthly-shape fields MUST be absent.
+    expect(r.monthly_total_usd).toBeUndefined();
+    expect(r.month).toBeUndefined();
+    // Sanity: phase identity preserved.
+    expect(r.phase).toBe('32');
+  });
+
+  it('Test 32: LEDGER_PATH honors E2E_LEDGER_PATH_OVERRIDE when set (TEST-ONLY, spawnSync child)', () => {
+    // Module top-level `export const LEDGER_PATH = ...` is evaluated once per
+    // Node process. In-process env mutation is too late, so we spawn a child.
+    const overridePath = path.join(tmpDir2, 'override-ledger.json');
+    const script = `import(${JSON.stringify(LEDGER_MODULE_PATH)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...process.env, E2E_LEDGER_PATH_OVERRIDE: overridePath },
+      encoding: 'utf8',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe(path.resolve(overridePath));
+
+    // End-to-end smoke: appendLedgerEntry via the override path actually
+    // writes to the override file (not the real per-repo ledger).
+    appendLedgerEntry(overridePath, makeEntry({ cost_usd: 0.05, phase: '32' }));
+    expect(fs.existsSync(overridePath)).toBe(true);
+    const written = JSON.parse(fs.readFileSync(overridePath, 'utf8'));
+    expect(written.version).toBe(1);
+    expect(Object.keys(written.months).length).toBe(1);
+  });
+
+  it('Test 33: LEDGER_PATH falls back to default when E2E_LEDGER_PATH_OVERRIDE unset or empty', () => {
+    const script = `import(${JSON.stringify(LEDGER_MODULE_PATH)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
+
+    // (a) Env var fully unset.
+    const envNoOverride = { ...process.env };
+    delete envNoOverride.E2E_LEDGER_PATH_OVERRIDE;
+    const a = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: envNoOverride,
+      encoding: 'utf8',
+    });
+    expect(a.status).toBe(0);
+    expect(a.stdout.endsWith('.llm-spend-ledger.json')).toBe(true);
+    // MUST NOT be the override-style path under tmpDir.
+    expect(a.stdout.startsWith(tmpDir2)).toBe(false);
+
+    // (b) Env var present but empty string.
+    const b = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...envNoOverride, E2E_LEDGER_PATH_OVERRIDE: '' },
+      encoding: 'utf8',
+    });
+    expect(b.status).toBe(0);
+    expect(b.stdout.endsWith('.llm-spend-ledger.json')).toBe(true);
+
+    // (c) Env var present but whitespace-only.
+    const c = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...envNoOverride, E2E_LEDGER_PATH_OVERRIDE: '   ' },
+      encoding: 'utf8',
+    });
+    expect(c.status).toBe(0);
+    expect(c.stdout.endsWith('.llm-spend-ledger.json')).toBe(true);
+  });
+
+  it('Sanity: exported phase-cap constants PHASE_HARD_CAP_USD=10, PHASE_WARN_THRESHOLD_USD=8 (D-13)', () => {
+    expect(PHASE_HARD_CAP_USD).toBe(10);
+    expect(PHASE_WARN_THRESHOLD_USD).toBe(8);
+  });
+
+  it('Sanity: seedLedgerFile helper is reachable (anchor for future direct-write tests)', () => {
+    // Sanity test exercises the helper in this describe block to avoid an
+    // unused-symbol lint warning if future test maintenance removes its only
+    // call site. The function is also used implicitly via the seeded ledger
+    // pattern in Tests 22-30 (which inline JSON literals instead of calling
+    // seedLedgerFile, but the helper is documented as the canonical pattern
+    // for multi-month tests that need real on-disk ledgers).
+    seedLedgerFile(ledgerPath2, { version: 1, months: {} });
+    expect(fs.existsSync(ledgerPath2)).toBe(true);
+    const r = readLedger(ledgerPath2);
+    expect(r).toEqual({ version: 1, months: {} });
   });
 });

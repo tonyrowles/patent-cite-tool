@@ -73,6 +73,24 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const LEDGER_PATH = (() => {
   const overrideRaw = process.env.E2E_LEDGER_PATH_OVERRIDE;
   if (typeof overrideRaw === 'string' && overrideRaw.trim().length > 0) {
+    // WR-05 (Phase 32 review): defense-in-depth runtime CI guard. The
+    // E2E_LEDGER_PATH_OVERRIDE escape hatch is documented above as test-
+    // only, but a misconfigured CI step (or a future contributor who
+    // copy-pastes the integration-test env block) could quietly redirect
+    // the ledger and bypass the spend caps. Throw loudly in CI so the
+    // CI step fails the run rather than silently shipping with caps
+    // disabled. The CI guard at scripts/e2e-explore.mjs:74 already
+    // refuses to invoke claude in CI, but this is a separate failure
+    // mode (any module-load on a CI runner with both flags set).
+    if (process.env.CI || process.env.GITHUB_ACTIONS) {
+      throw new Error(
+        'E2E_LEDGER_PATH_OVERRIDE must NOT be set in CI ' +
+          '(detected process.env.CI or process.env.GITHUB_ACTIONS). ' +
+          'This override is integration-test-only; setting it on a CI ' +
+          'runner would bypass Phase 32 spend caps. Unset it in the ' +
+          'workflow env block.',
+      );
+    }
     return path.resolve(overrideRaw.trim());
   }
   return path.resolve(__dirname, '../.llm-spend-ledger.json');

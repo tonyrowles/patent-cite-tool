@@ -566,10 +566,14 @@ describe('Phase 32 — per-phase ledger helpers (D-13/D-14/D-15/D-16)', () => {
   it('Test 32: LEDGER_PATH honors E2E_LEDGER_PATH_OVERRIDE when set (TEST-ONLY, spawnSync child)', () => {
     // Module top-level `export const LEDGER_PATH = ...` is evaluated once per
     // Node process. In-process env mutation is too late, so we spawn a child.
+    // WR-05 (Phase 32 review): the resolver now THROWS when CI or
+    // GITHUB_ACTIONS is set alongside the override (defense-in-depth against
+    // misconfigured CI). Strip both env vars from the child so this test
+    // exercises the local override path on CI runners.
     const overridePath = path.join(tmpDir2, 'override-ledger.json');
     const script = `import(${JSON.stringify(LEDGER_MODULE_PATH)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
-      env: { ...process.env, E2E_LEDGER_PATH_OVERRIDE: overridePath },
+      env: { ...process.env, CI: '', GITHUB_ACTIONS: '', E2E_LEDGER_PATH_OVERRIDE: overridePath },
       encoding: 'utf8',
     });
     expect(result.status).toBe(0);
@@ -614,6 +618,42 @@ describe('Phase 32 — per-phase ledger helpers (D-13/D-14/D-15/D-16)', () => {
     });
     expect(c.status).toBe(0);
     expect(c.stdout.endsWith('.llm-spend-ledger.json')).toBe(true);
+  });
+
+  it('WR-05: LEDGER_PATH resolver THROWS when E2E_LEDGER_PATH_OVERRIDE is set under CI', () => {
+    // WR-05 (Phase 32 review) — defense-in-depth runtime CI guard. A
+    // misconfigured CI step setting the override would otherwise silently
+    // redirect the ledger and bypass spend caps. The resolver MUST throw
+    // when both the override AND a CI flag are set together. Verify both
+    // CI and GITHUB_ACTIONS flag values trigger the guard.
+    const overridePath = path.join(tmpDir2, 'should-not-be-used.json');
+    const script = `import(${JSON.stringify(LEDGER_MODULE_PATH)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
+
+    // (a) CI=1 plus override → throw.
+    const a = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: {
+        ...process.env,
+        CI: '1',
+        GITHUB_ACTIONS: '',
+        E2E_LEDGER_PATH_OVERRIDE: overridePath,
+      },
+      encoding: 'utf8',
+    });
+    expect(a.status).toBe(2);
+    expect(a.stderr).toMatch(/E2E_LEDGER_PATH_OVERRIDE must NOT be set in CI/);
+
+    // (b) GITHUB_ACTIONS=true plus override → throw.
+    const b = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: {
+        ...process.env,
+        CI: '',
+        GITHUB_ACTIONS: 'true',
+        E2E_LEDGER_PATH_OVERRIDE: overridePath,
+      },
+      encoding: 'utf8',
+    });
+    expect(b.status).toBe(2);
+    expect(b.stderr).toMatch(/E2E_LEDGER_PATH_OVERRIDE must NOT be set in CI/);
   });
 
   it('Sanity: exported phase-cap constants PHASE_HARD_CAP_USD=10, PHASE_WARN_THRESHOLD_USD=8 (D-13)', () => {

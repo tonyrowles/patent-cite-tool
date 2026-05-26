@@ -289,6 +289,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
         artifacts: [], llm_raw_response: rawSnippet,
         error_reason: parsed.errorReason,
         model: modelId,
+        // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+        scroll_y: null,
+        viewport_width: null,
+        viewport_height: null,
+        selected_node_xpath: null,
       });
       return { stopAll: false };
     }
@@ -343,6 +348,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
           artifacts: [], llm_raw_response: rawSnippet,
           error_reason: `schema_validation_failed: ${validation.reason}`,
           model: modelId,
+          // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+          scroll_y: null,
+          viewport_width: null,
+          viewport_height: null,
+          selected_node_xpath: null,
         });
         return { stopAll: false };
       }
@@ -370,6 +380,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
           artifacts: [], llm_raw_response: rawSnippet,
           error_reason: `llm_picked_off_corpus_patentId: ${sel.patentId}`,
           model: modelId,
+          // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+          scroll_y: null,
+          viewport_width: null,
+          viewport_height: null,
+          selected_node_xpath: null,
         });
         return { stopAll: false };
       }
@@ -396,6 +411,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
         duration_ms: Date.now() - tStart,
         artifacts: [], llm_raw_response: rawSnippet,
         model: modelId,
+        // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+        scroll_y: null,
+        viewport_width: null,
+        viewport_height: null,
+        selected_node_xpath: null,
       });
       return { stopAll: false };
     }
@@ -470,6 +490,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
       artifacts: [], // future: screenshots on failure
       llm_raw_response: rawSnippet,
       model: modelId,
+      // D-14 Phase 33 — captured values (RERUN-03)
+      scroll_y,
+      viewport_width: vp.width,
+      viewport_height: vp.height,
+      selected_node_xpath,
     });
     return { stopAll: false };
 
@@ -495,6 +520,13 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
         artifacts: [], llm_raw_response: rawSnippet,
         error_reason: `runtime_error: ${err.message}`,
         model: modelId,
+        // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+        // capture block const declarations live inside the try, so they are not
+        // in scope here; pass null regardless of where the throw originated.
+        scroll_y: null,
+        viewport_width: null,
+        viewport_height: null,
+        selected_node_xpath: null,
       });
     } catch (writeErr) {
       // If even the report write fails, log to stderr — we cannot do more.

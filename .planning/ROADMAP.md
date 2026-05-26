@@ -146,7 +146,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   3. `llm-report.json` iteration schema includes `scroll_y`, `viewport_width`, `viewport_height`, `selected_node_xpath` fields; existing `appendLlmIteration` call site in `e2e-explore.mjs` writes them; Vitest schema guard test enforces presence
   4. ESLint `no-restricted-imports` guard covers the re-run validator module — running `npm run lint` on a file that imports the validator from `src/` emits a lint error
 **Plans**: 5 plans
-- [ ] 33-01-PLAN.md — Atomic D-13 + D-15 schema split and UAT fixture re-stamp (RERUN-03 schema side)
+- [x] 33-01-PLAN.md — Atomic D-13 + D-15 schema split and UAT fixture re-stamp (RERUN-03 schema side)
 - [ ] 33-02-PLAN.md — rerun-validator.js module + unit tests (RERUN-01 core, RERUN-02)
 - [ ] 33-03-PLAN.md — e2e-explore.mjs capture block + 6 call-site threading (RERUN-03 capture side)
 - [ ] 33-04-PLAN.md — e2e-rerun-validator.mjs CLI runner + spawnSync integration tests (RERUN-01 CLI surface)
@@ -235,7 +235,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
-| 33. Re-run Validator | v3.1 | 0/5 | Not started | - |
+| 33. Re-run Validator | v3.1 | 1/5 | In Progress|  |
 | 34. Hybrid Triage Classifier | v3.1 | 0/? | Not started | - |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |

@@ -410,6 +410,35 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
     await gotoPatent(extInstance.page, sel.patentId, { timeout: 30_000 });
     await selectText({ page: extInstance.page, uniqueSubstring: sel.selectedText });
 
+    // --- D-14 Phase 33 capture block (RERUN-03) ----------------------------
+    // Captures scroll/viewport/xpath state at the moment of selection so a
+    // future Playwright-driven full-replay mode can navigate to the same
+    // observation context. The verifier-only rerun in Phase 33 does NOT
+    // consume these fields — they ship in the schema only.
+    const scroll_y = await extInstance.page.evaluate(() => window.scrollY);
+    const vp = extInstance.page.viewportSize(); // { width, height } — synchronous
+    const selected_node_xpath = await extInstance.page.evaluate(() => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return null;
+      let node = sel.anchorNode;
+      if (!node) return null;
+      // Text nodes — walk up to the nearest element parent.
+      if (node.nodeType === 3) node = node.parentNode;
+      const parts = [];
+      while (node && node.nodeType === 1 && node.nodeName !== 'HTML') {
+        let idx = 1;
+        let sib = node.previousElementSibling;
+        while (sib) {
+          if (sib.nodeName === node.nodeName) idx += 1;
+          sib = sib.previousElementSibling;
+        }
+        parts.unshift(`${node.nodeName.toLowerCase()}[${idx}]`);
+        node = node.parentNode;
+      }
+      return parts.length ? '/html/' + parts.join('/') : null;
+    });
+    // --- end capture -------------------------------------------------------
+
     // Step 9 — Observe the citation pill.
     const obs = await getCitation(extInstance.page, { mode: 'auto', timeout: 30_000 });
     citation = obs.citation;

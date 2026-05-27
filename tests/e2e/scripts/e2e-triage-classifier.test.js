@@ -1,0 +1,84 @@
+// tests/e2e/scripts/e2e-triage-classifier.test.js
+//
+// Phase 34 (TRIAGE-04 — D-15) — integration tests for the CLI shim.
+// Mirrors tests/e2e/scripts/e2e-rerun-validator.test.js structure + adds
+// one NEW test case for the sibling rerun-report.json auto-discovery path.
+//
+// These tests cover:
+//   1. --input= (equals syntax) → exit 2 + stderr signaling equals syntax unsupported
+//   2. --input (trailing flag, missing value) → exit 2 + stderr signaling missing value
+//   3. --input <missing-file> → exit 1 + stderr naming the path
+//   4. Sibling rerun-report.json missing → exit 1 + stderr naming sibling path (D-15 NEW)
+//   5. --help → exit 0 + stdout usage text
+//
+// CI env var is cleared in all spawnTriage calls so the CI guard does NOT fire
+// during these argument-parsing tests.
+
+import { describe, it, expect } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SCRIPT_PATH = path.resolve(__dirname, '../../../scripts/e2e-triage-classifier.mjs');
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+
+/**
+ * Spawn the triage CLI with the given args.
+ * CI and GITHUB_ACTIONS are cleared so the CI guard does NOT fire during
+ * argument-parsing and file-resolution tests.
+ */
+function spawnTriage(args, env = {}) {
+  return spawnSync('node', [SCRIPT_PATH, ...args], {
+    env: { ...process.env, CI: '', GITHUB_ACTIONS: '', ...env },
+    encoding: 'utf8',
+    timeout: 5000,
+    cwd: PROJECT_ROOT,
+  });
+}
+
+describe('--input flag (TRIAGE-04 / D-15)', () => {
+  it('rejects --input= (equals syntax) with exit 2', () => {
+    const r = spawnTriage(['--input=/tmp/foo.json']);
+    expect(r.status).toBe(2);
+    expect(r.stderr || '').toMatch(/equals syntax not supported/i);
+  });
+
+  it('rejects --input with no value with exit 2', () => {
+    const r = spawnTriage(['--input']);
+    expect(r.status).toBe(2);
+    expect(r.stderr || '').toMatch(/missing value/i);
+  });
+
+  it('exits 1 when --input file does not exist', () => {
+    const r = spawnTriage(['--input', '/tmp/definitely-does-not-exist-pct-test.json']);
+    expect(r.status).toBe(1);
+    expect(r.stderr || '').toMatch(/input not found/i);
+  });
+
+  it('exits 1 when sibling rerun-report.json missing (D-15 sibling-discovery contract)', () => {
+    // Stage a valid llm-report.json but NOT a sibling rerun-report.json.
+    // The CLI must detect the missing sibling and exit 1 with the appropriate message.
+    // Expected stderr: "sibling rerun-report.json not found: <path>"
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-triage-cli-test-'));
+    try {
+      const llmReportPath = path.join(tmpDir, 'llm-report.json');
+      fs.writeFileSync(llmReportPath, JSON.stringify({
+        schema_version: 1, run_id: 'test', iterations: [],
+      }));
+      const r = spawnTriage(['--input', llmReportPath]);
+      expect(r.status).toBe(1);
+      expect(r.stderr || '').toMatch(/sibling rerun-report\.json not found/i);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('--help prints usage and exits 0', () => {
+    const r = spawnTriage(['--help']);
+    expect(r.status).toBe(0);
+    expect(r.stdout || '').toMatch(/usage:.*e2e-triage-classifier/i);
+  });
+});

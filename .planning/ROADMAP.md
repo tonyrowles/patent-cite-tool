@@ -167,7 +167,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] 34-02-PLAN.md — triage-classifier.js heuristic core: VERIFIER_STRONG_AGREEMENT + SEVERITIES + rule chain + triage-report.json schema (TRIAGE-01, TRIAGE-02, TRIAGE-05)
 - [x] 34-03-PLAN.md — cluster pre-filter + wrapPatentData + LLM second-pass dispatch (TRIAGE-03, TRIAGE-06)
 - [ ] 34-04-PLAN.md — e2e-triage-classifier.mjs CLI + spawnSync tests + npm script + CI guard (TRIAGE-04 script-layer)
-- [ ] 34-05-PLAN.md — eslint.config.js D-07 per-file block + scope-extension test (TRIAGE-04 ESLint-layer)
+- [x] 34-05-PLAN.md — eslint.config.js D-07 per-file block + scope-extension test (TRIAGE-04 ESLint-layer)
 
 ### Phase 35: Rich Issue Filer + Quarantine Corpus
 **Goal**: Confirmed triaged findings are filed as richly-structured GitHub issues with reproducer, verifier detail, LLM rationale, and golden diff — all within character budgets — and are simultaneously appended to `test-cases-quarantine.js` for downstream CI coverage
@@ -241,7 +241,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
 | 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
-| 34. Hybrid Triage Classifier | v3.1 | 3/5 | In Progress|  |
+| 34. Hybrid Triage Classifier | v3.1 | 4/5 | In Progress|  |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |
 | 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |

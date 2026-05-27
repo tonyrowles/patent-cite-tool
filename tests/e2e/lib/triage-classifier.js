@@ -189,14 +189,21 @@ function parseSingleResponse(llmText, iter) {
       rationale: parsed.rationale ?? '',
       path_taken: 'llm_single',
     };
-  } catch {
+  } catch (e) {
+    // WR-06: include the JSON.parse error message AND the first ~200 chars of
+    // the LLM output in the rationale. Without these, a developer auditing
+    // a parse-error finding has to manually re-invoke the LLM (cost!) to
+    // see what came back — the original llmText is not preserved anywhere
+    // else in the triage report. 200 chars is enough to spot truncation,
+    // markdown fences, leading prose, etc.
+    const head = typeof llmText === 'string' ? llmText.slice(0, 200) : '';
     return {
       iteration_n: iter.iteration_n,
       severity: 'low',
       category: 'HARNESS_ERROR',
       root_cause_hypothesis: 'LLM response failed to parse',
       confidence: 0,
-      rationale: 'parseSingleResponse: invalid JSON',
+      rationale: `parseSingleResponse: invalid JSON (${e.message}); head: ${head}`,
       path_taken: 'llm_single_parse_error',
     };
   }
@@ -214,9 +221,19 @@ function parseSingleResponse(llmText, iter) {
  */
 function parseClusterResponse(llmText, group) {
   // Pitfall 6: enforce parity — parsed.length === group.length AND iteration_n set equality.
+  // WR-06: capture the JSON.parse error message and a head excerpt so the
+  // per-iteration fallback findings can include them in rationale. Without
+  // this, debugging a cluster-parse failure requires re-invoking the LLM.
   let parsed;
-  try { parsed = JSON.parse(llmText); } catch { parsed = []; }
-  if (!Array.isArray(parsed)) parsed = [];
+  let parseError = null;
+  try { parsed = JSON.parse(llmText); } catch (e) { parseError = e.message; parsed = []; }
+  if (!Array.isArray(parsed)) {
+    if (parseError === null) {
+      parseError = `expected JSON array, got ${typeof parsed === 'object' && parsed !== null ? 'object' : typeof parsed}`;
+    }
+    parsed = [];
+  }
+  const headSnippet = typeof llmText === 'string' ? llmText.slice(0, 200) : '';
 
   // Build a lookup from iteration_n → parsed finding (ignore fabricated entries)
   const byIterN = new Map();
@@ -241,14 +258,22 @@ function parseClusterResponse(llmText, group) {
         path_taken: 'llm_cluster',
       });
     } else {
-      // Pitfall 6: synthesize HARNESS_ERROR-shaped finding for missing iteration_n
+      // Pitfall 6: synthesize HARNESS_ERROR-shaped finding for missing iteration_n.
+      // WR-06: include the parse error (if any) and the LLM-output head so a
+      // developer auditing the parse-error finding does not have to re-invoke
+      // the LLM to see what came back. parseError is null when the JSON parsed
+      // successfully but the iteration_n simply wasn't present in the array
+      // — in that case the head excerpt is still useful.
+      const causeBits = parseError
+        ? `parse error: ${parseError}; head: ${headSnippet}`
+        : `iteration_n not present in LLM array; head: ${headSnippet}`;
       findings.push({
         iteration_n: iter.iteration_n,
         severity: 'low',
         category: 'HARNESS_ERROR',
         root_cause_hypothesis: 'cluster response missing this iteration_n',
         confidence: 0,
-        rationale: 'parseClusterResponse: iteration_n not present in LLM array',
+        rationale: `parseClusterResponse: ${causeBits}`,
         path_taken: 'llm_cluster_parse_error',
       });
     }

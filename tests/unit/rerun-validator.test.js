@@ -506,4 +506,86 @@ describe('rerun-validator', () => {
     expect(isEligibleForReplay(makeIteration({ classification: 'PASS' }))).toBe(false);
   });
 
+  // -------------------------------------------------------------------------
+  // WR-01 (Phase 33 review) regression: per-replay throw must not abort the
+  // outer loop. Verifies the runValidator try/catch wrapper:
+  //   1. The iteration that throws produces a NOT_REPLAYABLE entry with the
+  //      throw message captured in `reason: replay threw: <message>`.
+  //   2. The throw is recorded on the iteration where it fired; later
+  //      eligible iterations are still replayed.
+  //   3. summary.not_replayable_count counts the throw entry; the surviving
+  //      iterations are counted in confirmed_count / flake_count as usual.
+  //   4. writeReport STILL runs at the end (rerun-report.json is produced
+  //      instead of the run aborting mid-loop with exit 1).
+  // Prior to the WR-01 fix, the throw would propagate to the CLI wrapper,
+  // which printed `runValidator failed: ${e.message}` and exited 1; no
+  // rerun-report.json was written and every prior iteration's work was lost.
+  // -------------------------------------------------------------------------
+  it('captures a per-replay throw as NOT_REPLAYABLE and continues the loop (WR-01)', async () => {
+    const iterations = [
+      makeIteration({ iteration_n: 1, classification: 'WRONG_CITATION',
+        verifier_verdict: { status: 'pass', tier_used: 'A', reason: 'exact match' } }),
+      // iteration 2 will trigger the throw on the 2nd verifyCitation call below
+      makeIteration({ iteration_n: 2, classification: 'WRONG_CITATION',
+        verifier_verdict: { status: 'pass', tier_used: 'A', reason: 'exact match' } }),
+      makeIteration({ iteration_n: 3, classification: 'WRONG_CITATION',
+        verifier_verdict: { status: 'pass', tier_used: 'A', reason: 'exact match' } }),
+    ];
+
+    // Mock verifyCitation: succeed for iteration 1 (3 calls), throw on the
+    // FIRST call of iteration 2 (the 4th overall), succeed again for
+    // iteration 3 (3 calls). This proves the throw on iteration 2 does NOT
+    // abort iteration 3.
+    let totalCalls = 0;
+    const spy = vi.fn(async () => {
+      totalCalls += 1;
+      if (totalCalls === 4) {
+        throw new Error('verifyCitation: requires { observedCitation }');
+      }
+      return { status: 'pass', tier_used: 'A', reason: 'exact match' };
+    });
+    const writer = makeCaptureWriter();
+
+    await runValidator({
+      inputLlmReport: makeReport({ iterations }),
+      sourceLlmReportPath: reportPath,
+      outputPath,
+      verifyCitation: spy,
+      writeReport: writer,
+      now: () => new Date('2026-05-25T10:00:00Z'),
+    });
+
+    const output = writer.getResult();
+    // Writer ran — the run completed instead of aborting at the throw site.
+    expect(output).not.toBeNull();
+    expect(output.replays).toHaveLength(3);
+
+    // Iteration 1 — CONFIRMED on 3 successful calls.
+    expect(output.replays[0].iteration_n).toBe(1);
+    expect(output.replays[0].verdict).toBe('CONFIRMED');
+    expect(output.replays[0].confirmed_count).toBe(3);
+    expect(output.replays[0].total_runs).toBe(3);
+
+    // Iteration 2 — NOT_REPLAYABLE with `replay threw:` reason; runs[] holds
+    // zero successful entries because the throw fired on the 1st replay call.
+    expect(output.replays[1].iteration_n).toBe(2);
+    expect(output.replays[1].verdict).toBe('NOT_REPLAYABLE');
+    expect(output.replays[1].total_runs).toBe(0);
+    expect(output.replays[1].runs).toHaveLength(0);
+    expect(typeof output.replays[1].reason).toBe('string');
+    expect(output.replays[1].reason).toMatch(/^replay threw: /);
+    expect(output.replays[1].reason).toMatch(/observedCitation/);
+
+    // Iteration 3 — CONFIRMED. Proves the throw did NOT abort the outer loop.
+    expect(output.replays[2].iteration_n).toBe(3);
+    expect(output.replays[2].verdict).toBe('CONFIRMED');
+    expect(output.replays[2].confirmed_count).toBe(3);
+
+    // Summary tallies the NOT_REPLAYABLE entry into not_replayable_count
+    // and the two CONFIRMED iterations into confirmed_count.
+    expect(output.summary.confirmed_count).toBe(2);
+    expect(output.summary.flake_count).toBe(0);
+    expect(output.summary.not_replayable_count).toBe(1);
+  });
+
 });

@@ -175,18 +175,54 @@ export async function runValidator({
       report.summary.not_replayable_count += 1;
     } else {
       // Eligible: run verifyCitation exactly 3 times (D-03)
+      //
+      // WR-01 (Phase 33 review): wrap each per-replay verifyCitation call in
+      // try/catch. verifyCitation throws on (1) missing required args
+      // (e.g. citation === null on a hand-constructed input), (2) PDF cache
+      // miss / file-not-found, (3) malformed citation strings, (4) any I/O
+      // or network error inside ensureCachedPdf. Without the guard, a single
+      // throw would abort the iteration loop BEFORE writeReport runs at the
+      // end of runValidator, silently discarding every prior eligible
+      // iteration's result and producing exit 1 with no rerun-report.json.
+      // Catching here preserves partial progress: each iteration becomes
+      // either CONFIRMED / FLAKE (verifier path completed) or NOT_REPLAYABLE
+      // with a `replay threw: ...` reason (verifier path errored).
       const runs = [];
+      let replayError = null;
       for (let i = 0; i < 3; i++) {
-        const r = await verifyCitation({
-          patentId: iter.llm_selection?.patentId,
-          selectedText: iter.llm_selection?.selectedText,
-          observedCitation: iter.citation,
+        try {
+          const r = await verifyCitation({
+            patentId: iter.llm_selection?.patentId,
+            selectedText: iter.llm_selection?.selectedText,
+            observedCitation: iter.citation,
+          });
+          runs.push({
+            status: r.status,
+            tier_used: r.tier_used ?? null,
+            reason: r.reason ?? null,
+          });
+        } catch (err) {
+          replayError = err;
+          break;
+        }
+      }
+
+      if (replayError) {
+        // D-02-shaped NOT_REPLAYABLE entry; reason names the throw so
+        // downstream triage (Phase 34) can distinguish "ineligible
+        // classification" (existing branch above) from "eligible but
+        // verifier threw mid-replay".
+        report.replays.push({
+          iteration_n: iter.iteration_n,
+          original_verdict_status: iter.verifier_verdict?.status ?? null,
+          runs,
+          confirmed_count: 0,
+          total_runs: runs.length,
+          verdict: 'NOT_REPLAYABLE',
+          reason: `replay threw: ${replayError.message}`,
         });
-        runs.push({
-          status: r.status,
-          tier_used: r.tier_used ?? null,
-          reason: r.reason ?? null,
-        });
+        report.summary.not_replayable_count += 1;
+        continue;
       }
 
       // D-03: confirm = string equality on verifier_verdict.status

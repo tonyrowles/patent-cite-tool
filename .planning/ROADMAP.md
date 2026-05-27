@@ -179,7 +179,13 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   3. `findMatchingIssue` performs dual-search across v1 and v2 fingerprint formulas; Vitest tests confirm an issue with a v1 fingerprint is correctly deduplicated and not re-filed
   4. `tests/e2e/test-cases-quarantine.js` exists with schema identical to `test-cases.js`; Vitest schema-guard test in `test:src` suite passes and would fail on a deliberately introduced field mismatch
   5. Running `scripts/quarantine-append.mjs` twice with the same CONFIRMED finding produces only one entry in `test-cases-quarantine.js` (idempotent upsert); entries with `stable_runs ≥ 3` are auto-tagged `quarantine:ready-for-promotion`; `scripts/promote-from-quarantine.mjs` moves the entry to `test-cases.js` and regenerates the golden baseline for that case
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 35-00-PLAN.md — Plan-0 prerequisites: `update-golden.js --case` flag + GitHub label creation (enables QUAR-05)
+- [ ] 35-01-PLAN.md — `tests/e2e/lib/issue-payload-builder.js` pure builder + char-budget enforcement (ISSUE-01, ISSUE-04)
+- [ ] 35-02-PLAN.md — `test-cases-quarantine.js` empty seed + Vitest schema-guard (QUAR-01)
+- [ ] 35-03-PLAN.md — `e2e-report-issue.mjs --source triage` extension + dual-search + CONFIRMED filter (ISSUE-02, ISSUE-03)
+- [ ] 35-04-PLAN.md — `quarantine-append.mjs` idempotent upsert + stable_runs≥3 auto-label (QUAR-02)
+- [ ] 35-05-PLAN.md — `promote-from-quarantine.mjs` human-gated promotion + spawnSync update-golden.js (QUAR-05)
 
 ### Phase 36: Quarantine CI Integration + Pipeline Orchestrator
 **Goal**: The full triage pipeline (rerun → triage → issue-file → quarantine-append) runs end-to-end in the nightly cron when an `llm_run_id` input is provided, the quarantine corpus runs as a non-gating Playwright project, and timeout budget is documented and within job limits
@@ -242,6 +248,6 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
 | 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
 | 34. Hybrid Triage Classifier | v3.1 | 5/5 | Complete    | 2026-05-27 |
-| 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
+| 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/6 | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |
 | 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |

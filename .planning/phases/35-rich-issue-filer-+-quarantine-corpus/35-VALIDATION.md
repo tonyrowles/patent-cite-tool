@@ -39,7 +39,7 @@ created: 2026-05-27
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command |
 |---------|------|------|-------------|-----------|-------------------|
-| 35-00-XX | 00 (prereqs) | 1 | enables QUAR-05 | unit | `vitest run scripts/__tests__/update-golden.test.js` (per-case flag); manual `gh label list` for label creation |
+| 35-00-XX | 00 (prereqs) | 1 | enables QUAR-05 | unit | `vitest run tests/unit/update-golden-case-flag.test.js` (per-case flag); manual `gh label list` for label creation |
 | 35-01-XX | 01 (issue-payload-builder) | 2 | ISSUE-01, ISSUE-04 | unit | `vitest run tests/unit/issue-payload-builder.test.js` |
 | 35-02-XX | 02 (e2e-report-issue --source triage + dual-search + topOfStackHashFromTriage) | 3 | ISSUE-02, ISSUE-03 | integration (mock-gh spawnSync) | `vitest run tests/e2e/scripts/e2e-report-issue-triage.test.js` |
 | 35-03-XX | 03 (test-cases-quarantine.js seed + schema-guard) | 2 | QUAR-01 | unit | `vitest run tests/unit/test-cases-quarantine-schema.test.js` |
@@ -58,7 +58,7 @@ created: 2026-05-27
 - [ ] `tests/unit/quarantine-append.test.js` — stub for idempotent upsert (append twice → 1 entry, stable_runs === 2)
 - [ ] `tests/e2e/scripts/e2e-quarantine-append.test.js` — stub for spawnSync CLI + mock-gh add-label assertion
 - [ ] `tests/unit/promote-from-quarantine.test.js` — stub for tmpDir-clone promotion test
-- [ ] `scripts/__tests__/update-golden.test.js` — stub for `--case <id>` per-case flag verification (new in Plan 35-00)
+- [ ] `tests/unit/update-golden-case-flag.test.js` — stub for `--case <id>` per-case flag verification (new in Plan 35-00)
 - [ ] GitHub labels created (`gh label create triage`, `gh label create quarantine:ready-for-promotion`) — manual gate, NOT a Vitest test
 - [ ] Synthetic fixtures: small triage-report.json + sibling rerun-report.json + llm-report.json covering CONFIRMED severity-high finding (for issue filer) + N≥3 stable_runs finding (for ready-for-promotion auto-label)
 

@@ -165,7 +165,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 **Plans**: 5 plans
 - [x] 34-01-PLAN.md — invokeClaudePWithLedger wrapper in llm-driver.js + Vitest tests (TRIAGE-04 wrapper-layer)
 - [x] 34-02-PLAN.md — triage-classifier.js heuristic core: VERIFIER_STRONG_AGREEMENT + SEVERITIES + rule chain + triage-report.json schema (TRIAGE-01, TRIAGE-02, TRIAGE-05)
-- [ ] 34-03-PLAN.md — cluster pre-filter + wrapPatentData + LLM second-pass dispatch (TRIAGE-03, TRIAGE-06)
+- [x] 34-03-PLAN.md — cluster pre-filter + wrapPatentData + LLM second-pass dispatch (TRIAGE-03, TRIAGE-06)
 - [ ] 34-04-PLAN.md — e2e-triage-classifier.mjs CLI + spawnSync tests + npm script + CI guard (TRIAGE-04 script-layer)
 - [ ] 34-05-PLAN.md — eslint.config.js D-07 per-file block + scope-extension test (TRIAGE-04 ESLint-layer)
 
@@ -241,7 +241,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
 | 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
-| 34. Hybrid Triage Classifier | v3.1 | 2/5 | In Progress|  |
+| 34. Hybrid Triage Classifier | v3.1 | 3/5 | In Progress|  |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |
 | 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |

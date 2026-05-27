@@ -341,8 +341,12 @@ export function emptyTriageReport({ sourceLlm, sourceRerun, runId, now = () => n
  * Pure orchestrator: applies the D-03 heuristic rule chain to each iteration
  * in inputLlmReport, linking by iteration_n to inputRerunReport.replays[].
  * Heuristically-resolved findings get path_taken:'heuristic'. Ambiguous
- * findings (Tier C + CONFIRMED) get a placeholder path_taken:'pending_llm'
- * that Plan 03 replaces with 'llm_single' or 'llm_cluster'.
+ * findings (Tier C + CONFIRMED, or any other case not heuristically resolved)
+ * are dispatched to the LLM second-pass via the cluster pre-filter (D-11):
+ * groups of N≥CLUSTER_THRESHOLD same-category findings get a single grouped
+ * call (path_taken: 'llm_cluster' or 'llm_cluster_parse_error' on parse
+ * failure or full-call failure), smaller groups get one call per finding
+ * (path_taken: 'llm_single' or 'llm_single_parse_error').
  *
  * The function is PURE EXCEPT FOR THE SINGLE writeReport CALL — no other side effects.
  * Injected deps (invokeLlm, writeReport, now) allow full unit-test isolation.

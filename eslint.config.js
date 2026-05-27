@@ -69,4 +69,35 @@ export default [
       }],
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // Re-run Validator independence rule — scoped ONLY to rerun-validator.js.
+  // ---------------------------------------------------------------------------
+  //
+  // D-16 (33-CONTEXT.md): Clone the pdf-verifier.js block EXACTLY as a
+  // separate per-file block — NOT a glob like `{pdf-verifier,rerun-validator}.js`.
+  // Per-file scoping keeps the independence-claim audit story readable and
+  // allows each module's claim to evolve independently.
+  {
+    files: ['tests/e2e/lib/rerun-validator.js'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '**/src/**',
+              '../../../src/**',
+              '../../src/**',
+              '../src/**',
+              '/src/**',
+            ],
+            message:
+              'rerun-validator.js must not import from src/ — RERUN-04 independence claim. ' +
+              'Use a fresh implementation; mirror production logic conceptually, do not reuse it. ' +
+              'See .planning/phases/33-re-run-validator/33-RESEARCH.md §"Pattern 3".',
+          },
+        ],
+      }],
+    },
+  },
 ];

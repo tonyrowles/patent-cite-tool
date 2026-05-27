@@ -30,6 +30,14 @@ import { invokeClaudePWithLedger } from '../tests/e2e/lib/llm-driver.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ARTIFACTS_ROOT = path.resolve(PROJECT_ROOT, 'tests/e2e/artifacts');
+const FIXTURES_ROOT = path.resolve(PROJECT_ROOT, 'tests/e2e/fixtures');
+
+// WR-05: legitimate input roots. The resolved --input path must live under
+// one of these directories — this bounds where the CLI can read inputs from
+// AND, by D-12 sibling-write semantics, where triage-report.json gets written.
+// ARTIFACTS_ROOT is the normal Phase 31/32/33 output destination; FIXTURES_ROOT
+// allows UAT fixture-driven runs (e.g., tests/e2e/fixtures/uat-phase32-llm-report.json).
+const ALLOWED_INPUT_ROOTS = [ARTIFACTS_ROOT, FIXTURES_ROOT];
 
 // ---------------------------------------------------------------------------
 // parseArgs — strict CLI argument parser (D-15)
@@ -161,6 +169,23 @@ async function main() {
       : newestLlmReportPath(ARTIFACTS_ROOT);
   } catch (e) {
     process.stderr.write('[e2e-triage-classifier] ' + e.message + '\n');
+    process.exit(1);
+  }
+
+  // WR-05: bound --input path to artifacts/ or fixtures/ roots. Without this
+  // guard, `--input ../../../tmp/llm-report.json` resolves outside the repo
+  // and (by D-12 sibling-write semantics) the resulting triage-report.json
+  // also lands outside the repo. The newest-by-mtime default already lives
+  // under ARTIFACTS_ROOT so it passes unchanged; only explicit --input is
+  // exercised in practice.
+  const insideAllowedRoot = ALLOWED_INPUT_ROOTS.some(
+    (root) => resolvedInputPath === root || resolvedInputPath.startsWith(root + path.sep),
+  );
+  if (!insideAllowedRoot) {
+    process.stderr.write(
+      '[e2e-triage-classifier] --input must reside under tests/e2e/artifacts/ or ' +
+        'tests/e2e/fixtures/; got: ' + resolvedInputPath + '\n',
+    );
     process.exit(1);
   }
 

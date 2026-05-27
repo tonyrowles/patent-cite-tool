@@ -17,7 +17,6 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,16 +52,38 @@ describe('--input flag (TRIAGE-04 / D-15)', () => {
   });
 
   it('exits 1 when --input file does not exist', () => {
-    const r = spawnTriage(['--input', '/tmp/definitely-does-not-exist-pct-test.json']);
+    // WR-05: input path must be under tests/e2e/artifacts/ or tests/e2e/fixtures/.
+    // Use a non-existent path inside ARTIFACTS_ROOT so the test exercises the
+    // 'input not found' branch (NOT the path-prefix-rejection branch).
+    const fakePath = path.join(
+      PROJECT_ROOT, 'tests/e2e/artifacts/definitely-does-not-exist-pct-test/llm-report.json',
+    );
+    const r = spawnTriage(['--input', fakePath]);
     expect(r.status).toBe(1);
     expect(r.stderr || '').toMatch(/input not found/i);
+  });
+
+  it('exits 1 when --input lies outside artifacts/ or fixtures/ (WR-05 path-bound)', () => {
+    // WR-05 NEW: --input must reside under tests/e2e/artifacts/ or
+    // tests/e2e/fixtures/. A path outside both roots (here: /tmp) must be
+    // rejected with exit 1 and a stderr message naming the allowed roots
+    // — BEFORE any filesystem reads or sibling-discovery happens.
+    const r = spawnTriage(['--input', '/tmp/some-llm-report.json']);
+    expect(r.status).toBe(1);
+    expect(r.stderr || '').toMatch(/must reside under tests\/e2e\/artifacts.*fixtures/i);
   });
 
   it('exits 1 when sibling rerun-report.json missing (D-15 sibling-discovery contract)', () => {
     // Stage a valid llm-report.json but NOT a sibling rerun-report.json.
     // The CLI must detect the missing sibling and exit 1 with the appropriate message.
     // Expected stderr: "sibling rerun-report.json not found: <path>"
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-triage-cli-test-'));
+    //
+    // WR-05: staging must happen INSIDE tests/e2e/artifacts/ (one of the
+    // allowed input roots). Use a uniquely-named subdirectory under artifacts/
+    // and clean it up in finally.
+    const artifactsRoot = path.resolve(PROJECT_ROOT, 'tests/e2e/artifacts');
+    fs.mkdirSync(artifactsRoot, { recursive: true });
+    const tmpDir = fs.mkdtempSync(path.join(artifactsRoot, 'pct-triage-cli-test-'));
     try {
       const llmReportPath = path.join(tmpDir, 'llm-report.json');
       fs.writeFileSync(llmReportPath, JSON.stringify({

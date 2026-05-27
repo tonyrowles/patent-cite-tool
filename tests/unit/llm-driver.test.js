@@ -45,6 +45,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
+import * as childProcess from 'node:child_process';
 
 // We mock node:child_process at the top of the file so that any later
 // import of llm-driver.js receives our captured `spawn`.
@@ -458,18 +459,43 @@ const IS_ERROR_STDOUT = JSON.stringify({
 const EMPTY_LEDGER = { version: 1, months: {} };
 
 describe('invokeClaudePWithLedger', () => {
+  // spawnStdout controls the stdout that the mocked child process emits.
+  // Tests that reach invokeClaudeP (happy path, is_error path) set this
+  // before calling the wrapper so the mocked child resolves with the right data.
+  let spawnStdout = HAPPY_STDOUT;
   let invokeSpy;
   let readLedgerSpy;
   let appendSpy;
 
   beforeEach(() => {
-    // Spy on invokeClaudeP in the namespace so wrapper calls are intercepted.
-    invokeSpy = vi.spyOn(drv, 'invokeClaudeP').mockResolvedValue({
-      timedOut: false,
-      stdout: HAPPY_STDOUT,
-      stderr: '',
-      code: 0,
+    spawnStdout = HAPPY_STDOUT;
+    spawnCalls.length = 0;
+
+    // Override the outer vi.mock so the child auto-emits stdout + close,
+    // making invokeClaudeP resolve immediately in tests 5 and 6.
+    // `childProcess.spawn` is already a vi.fn() from the outer vi.mock() call.
+    childProcess.spawn.mockImplementation((cmd, args, options) => {
+      spawnCalls.push({ cmd, args, options });
+      const child = makeMockChild();
+      // Emit stdout and close asynchronously so the promise-based invokeClaudeP
+      // resolves cleanly without hanging.
+      setTimeout(() => {
+        child.stdout.emit('data', spawnStdout);
+        child.emit('close', 0);
+      }, 0);
+      mockChild = child;
+      return child;
     });
+
+    // Spy on invokeClaudeP via namespace — used to assert callCount === 0
+    // on the gated branches (CI gate, cap block). The spy does NOT intercept
+    // internal ESM calls (live-binding limitation), but that is fine:
+    //   - Tests 1-4 (gated): internal call never reaches invokeClaudeP, so
+    //     spawnCalls.length === 0 is the authoritative "never called" check.
+    //   - Tests 5-6 (success/error): real invokeClaudeP is called via the
+    //     auto-resolving spawn mock above.
+    invokeSpy = vi.spyOn(drv, 'invokeClaudeP');
+
     // Spy on readLedger so tests don't touch the real ledger file.
     readLedgerSpy = vi.spyOn(ledgerNs, 'readLedger').mockReturnValue(EMPTY_LEDGER);
     // Spy on appendLedgerEntry so tests don't write real files.
@@ -492,7 +518,8 @@ describe('invokeClaudePWithLedger', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.ciGate).toBe(true);
-    expect(invokeSpy).toHaveBeenCalledTimes(0);
+    // CI gate fires before invokeClaudeP: no spawn calls, no ledger writes.
+    expect(spawnCalls.length).toBe(0);
     expect(appendSpy).toHaveBeenCalledTimes(0);
   });
 
@@ -507,7 +534,7 @@ describe('invokeClaudePWithLedger', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.ciGate).toBe(true);
-    expect(invokeSpy).toHaveBeenCalledTimes(0);
+    expect(spawnCalls.length).toBe(0);
     expect(appendSpy).toHaveBeenCalledTimes(0);
   });
 
@@ -534,7 +561,8 @@ describe('invokeClaudePWithLedger', () => {
     expect(result.capBlocked).toBe(true);
     expect(result.monthly).toBeDefined();
     expect(result.monthly.status).toBe('block');
-    expect(invokeSpy).toHaveBeenCalledTimes(0);
+    // Cap block fires before invokeClaudeP: no spawn calls.
+    expect(spawnCalls.length).toBe(0);
   });
 
   it('Test 4: Phase cap block → {ok:false, capBlocked:true, phaseCap.status=block}; invokeClaudeP never called', async () => {
@@ -563,10 +591,14 @@ describe('invokeClaudePWithLedger', () => {
     expect(result.capBlocked).toBe(true);
     expect(result.phaseCap).toBeDefined();
     expect(result.phaseCap.status).toBe('block');
-    expect(invokeSpy).toHaveBeenCalledTimes(0);
+    // Cap block fires before invokeClaudeP: no spawn calls.
+    expect(spawnCalls.length).toBe(0);
+    // Verify stderr absence from spawnCalls too — belt-and-suspenders for the guard.
+    expect(appendSpy).toHaveBeenCalledTimes(0);
   });
 
   it('Test 5: Happy path → {ok:true, llmText, modelId, costUsd:0.01} and appendLedgerEntry called once with correct args', async () => {
+    // spawnStdout is already HAPPY_STDOUT from beforeEach.
     const result = await drv.invokeClaudePWithLedger({
       systemPrompt: 'sys',
       userPrompt: 'usr',
@@ -592,12 +624,8 @@ describe('invokeClaudePWithLedger', () => {
   });
 
   it('Test 6: is_error:true with non-zero cost (Pitfall 8) → appendLedgerEntry still fires with cost_usd:0.07', async () => {
-    invokeSpy.mockResolvedValueOnce({
-      timedOut: false,
-      stdout: IS_ERROR_STDOUT,
-      stderr: '',
-      code: 0,
-    });
+    // Override the spawn stdout to return the is_error envelope.
+    spawnStdout = IS_ERROR_STDOUT;
     const result = await drv.invokeClaudePWithLedger({
       systemPrompt: 'sys',
       userPrompt: 'usr',

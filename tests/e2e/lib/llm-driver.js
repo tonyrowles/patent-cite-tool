@@ -18,6 +18,13 @@
 //   validateLlmSelection(llmText) → {ok:true, selection} | {ok:false, reason}
 //   classifyIteration({hallucinationPassed, citation, verifierStatus}) → classification string
 //
+// Phase 34 Plan 01 (D-05/D-06):
+//   invokeClaudePWithLedger({systemPrompt, userPrompt, timeoutMs, phase, source})
+//     → {ok:true, llmText, modelId, costUsd, rawJson}
+//     | {ok:false, ciGate:true}           CI gate blocked (no ledger entry)
+//     | {ok:false, capBlocked:true, ...}  spend cap blocked (no ledger entry)
+//     | {ok:false, errorReason, ...}      is_error response (ledger entry written)
+//
 // Pitfall mitigations (see 31-RESEARCH.md):
 //   - Pitfall 1: env passed to spawn explicitly sets ANTHROPIC_API_KEY = ''
 //     so any developer-set pay-per-token key cannot leak through. We also
@@ -36,6 +43,9 @@
 //     ledger records the spend.
 
 import { spawn } from 'node:child_process';
+import {
+  LEDGER_PATH, readLedger, checkSpendCap, checkPhaseSpendCap, appendLedgerEntry,
+} from './llm-ledger.js';
 
 /**
  * Hard timeout for one `claude -p` invocation. Subscription-mode round-trip is
@@ -314,4 +324,121 @@ export function classifyIteration({ hallucinationPassed, citation, verifierStatu
   if (verifierStatus === 'pass') return 'PASS';
   if (verifierStatus === 'disagree') return 'VERIFIER_DISAGREE';
   return 'WRONG_CITATION';
+}
+
+/**
+ * Ledger-wrapped entry point for all triage LLM calls. Composes
+ * `invokeClaudeP` + `parseClaudeResponse` (Phase 31 primitives) with
+ * the `readLedger` / `checkSpendCap` / `checkPhaseSpendCap` / `appendLedgerEntry`
+ * primitives from Phase 31/32 (`tests/e2e/lib/llm-ledger.js`).
+ *
+ * THIS IS THE SOLE ALLOWED ENTRY POINT for triage-classifier code into
+ * the `claude -p` subprocess. Direct `invokeClaudeP` calls from
+ * `tests/e2e/lib/triage-classifier.js` are forbidden by the ESLint D-07
+ * rule in Plan 34-05.
+ *
+ * D-05: lives alongside `invokeClaudeP` in `tests/e2e/lib/llm-driver.js`
+ * (no new module file for a single wrapper function).
+ *
+ * D-06 execution order:
+ *   1. CI gate — short-circuits if `process.env.CI === 'true'` or
+ *      `process.env.GITHUB_ACTIONS === 'true'` (subscription-local invariant,
+ *      TRIAGE-04). No ledger write, no subprocess spawn.
+ *   2. Pre-flight spend caps — reads ledger, checks monthly cap via
+ *      `checkSpendCap` and per-phase cap via `checkPhaseSpendCap`. If either
+ *      returns `status: 'block'`, returns `{ok:false, capBlocked:true}`.
+ *      No subprocess spawn.
+ *   3. Subprocess — delegates to `invokeClaudeP`.
+ *   4. Cost extraction — `parsed.costUsd ?? 0` (Pitfall 6: trust the
+ *      pre-computed `total_cost_usd` field).
+ *   5. Ledger append — UNCONDITIONAL (Pitfall 8: see comment below).
+ *   6. Return parsed result + cost.
+ *
+ * References:
+ *   - D-05/D-06 in `.planning/phases/34-hybrid-triage-classifier/34-CONTEXT.md`
+ *   - Pitfall 8 in `.planning/research/PITFALLS.md` (cost non-zero on is_error)
+ *
+ * @param {{
+ *   systemPrompt: string,
+ *   userPrompt: string,
+ *   timeoutMs?: number,
+ *   phase?: string,
+ *   source?: string,
+ * }} opts
+ * @returns {Promise<
+ *   {ok:true, llmText:string, modelId:string, costUsd:number, rawJson:object|null}
+ *   | {ok:false, ciGate:true, message:string}
+ *   | {ok:false, capBlocked:true, monthly:object, phaseCap:object}
+ *   | {ok:false, errorReason:string, llmText:null, modelId:string, costUsd:number, rawJson:object|null}
+ * >}
+ */
+export async function invokeClaudePWithLedger({
+  systemPrompt,
+  userPrompt,
+  timeoutMs = LLM_TIMEOUT_MS,
+  phase,
+  source,
+} = {}) {
+  // Step 1 — CI gate (defense-in-depth: subscription-local invariant TRIAGE-04).
+  // Returns immediately, no subprocess spawn, no ledger entry written.
+  if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+    return {
+      ok: false,
+      ciGate: true,
+      message: 'invokeClaudePWithLedger refused: subscription-local invariant (CI detected)',
+    };
+  }
+
+  // Step 2 — Pre-flight spend caps. Read ledger once, check monthly and phase
+  // caps. Either cap at 'block' prevents the subprocess from spawning.
+  const ledger = readLedger(LEDGER_PATH);
+  const monthly = checkSpendCap(ledger);
+  const phaseCap = phase ? checkPhaseSpendCap(ledger, phase) : { status: 'ok' };
+  if (monthly.status === 'block' || phaseCap.status === 'block') {
+    return {
+      ok: false,
+      capBlocked: true,
+      monthly,
+      phaseCap,
+    };
+  }
+
+  // Step 3 — Invoke the subprocess.
+  const claudeResult = await invokeClaudeP({ systemPrompt, userPrompt, timeoutMs });
+  const parsed = parseClaudeResponse(claudeResult);
+
+  // Step 4 — Extract cost and model. Pitfall 6: trust pre-computed total_cost_usd.
+  const costUsd = parsed.costUsd ?? 0;
+  const modelId = parsed.modelId ?? 'unknown';
+
+  // Step 5 — Append to ledger ALWAYS (Pitfall 8: cost may be 0 on hard
+  // failures but is still recorded for forensic reconciliation).
+  appendLedgerEntry(LEDGER_PATH, {
+    iso: new Date().toISOString(),
+    model: modelId,
+    cost_usd: costUsd,
+    tokens_in: parsed.rawJson?.usage?.input_tokens ?? 0,
+    tokens_out: parsed.rawJson?.usage?.output_tokens ?? 0,
+    phase,
+    source,
+  });
+
+  // Step 6 — Return parsed result with cost.
+  if (parsed.ok) {
+    return {
+      ok: true,
+      llmText: parsed.llmText,
+      modelId,
+      costUsd,
+      rawJson: parsed.rawJson ?? null,
+    };
+  }
+  return {
+    ok: false,
+    errorReason: parsed.errorReason,
+    llmText: null,
+    modelId,
+    costUsd,
+    rawJson: parsed.rawJson ?? null,
+  };
 }

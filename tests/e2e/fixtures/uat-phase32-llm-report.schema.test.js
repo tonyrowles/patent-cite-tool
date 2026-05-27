@@ -82,4 +82,19 @@ describe('uat-phase32-llm-report.json — schema guard (Phase 32 Wave 3)', () =>
       expect(() => appendLlmIteration(tmpReportPath, iter)).not.toThrow();
     }
   });
+
+  it.skipIf(!fs.existsSync(FIXTURE))('schema_version: 1 at top level (D-15 Phase 33)', () => {
+    const fixture = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
+    expect(fixture.schema_version).toBe(1);
+  });
+
+  it.skipIf(!fs.existsSync(FIXTURE))('every iteration has 4 capture-state keys present (RERUN-03)', () => {
+    const fixture = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
+    for (const iter of fixture.iterations) {
+      expect(iter).toHaveProperty('scroll_y');
+      expect(iter).toHaveProperty('viewport_width');
+      expect(iter).toHaveProperty('viewport_height');
+      expect(iter).toHaveProperty('selected_node_xpath');
+    }
+  });
 });

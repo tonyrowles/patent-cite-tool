@@ -289,6 +289,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
         artifacts: [], llm_raw_response: rawSnippet,
         error_reason: parsed.errorReason,
         model: modelId,
+        // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+        scroll_y: null,
+        viewport_width: null,
+        viewport_height: null,
+        selected_node_xpath: null,
       });
       return { stopAll: false };
     }
@@ -343,6 +348,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
           artifacts: [], llm_raw_response: rawSnippet,
           error_reason: `schema_validation_failed: ${validation.reason}`,
           model: modelId,
+          // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+          scroll_y: null,
+          viewport_width: null,
+          viewport_height: null,
+          selected_node_xpath: null,
         });
         return { stopAll: false };
       }
@@ -370,6 +380,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
           artifacts: [], llm_raw_response: rawSnippet,
           error_reason: `llm_picked_off_corpus_patentId: ${sel.patentId}`,
           model: modelId,
+          // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+          scroll_y: null,
+          viewport_width: null,
+          viewport_height: null,
+          selected_node_xpath: null,
         });
         return { stopAll: false };
       }
@@ -396,6 +411,11 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
         duration_ms: Date.now() - tStart,
         artifacts: [], llm_raw_response: rawSnippet,
         model: modelId,
+        // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+        scroll_y: null,
+        viewport_width: null,
+        viewport_height: null,
+        selected_node_xpath: null,
       });
       return { stopAll: false };
     }
@@ -409,6 +429,48 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
     await setTriggerMode(extInstance.context, 'auto');
     await gotoPatent(extInstance.page, sel.patentId, { timeout: 30_000 });
     await selectText({ page: extInstance.page, uniqueSubstring: sel.selectedText });
+
+    // --- D-14 Phase 33 capture block (RERUN-03) ----------------------------
+    // Captures scroll/viewport/xpath state at the moment of selection so a
+    // future Playwright-driven full-replay mode can navigate to the same
+    // observation context. The verifier-only rerun in Phase 33 does NOT
+    // consume these fields — they ship in the schema only.
+    const scroll_y = await extInstance.page.evaluate(() => window.scrollY);
+    // WR-02 (Phase 33 review): Page.viewportSize() returns null whenever the
+    // context was created with `viewport: null` (Playwright contract). The
+    // current extension-loader.js does not pass viewport, so vp is non-null
+    // today — but any future change that disables the viewport would make a
+    // bare `vp.width` throw `TypeError: Cannot read properties of null` mid-
+    // capture, AFTER selectText succeeded but BEFORE getCitation. That throw
+    // would be caught by the outer catch and misclassified as HARNESS_ERROR
+    // / LLM_API_ERROR, burning the LLM credit + harness work for the iteration
+    // and hiding the capture-block failure in error_reason. Guard explicitly:
+    // optional-chain + nullish-coalesce yields D-13's permitted null on the
+    // capture fields instead of crashing.
+    const vp = extInstance.page.viewportSize(); // { width, height } | null — synchronous
+    const viewport_width = vp?.width ?? null;
+    const viewport_height = vp?.height ?? null;
+    const selected_node_xpath = await extInstance.page.evaluate(() => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return null;
+      let node = sel.anchorNode;
+      if (!node) return null;
+      // Text nodes — walk up to the nearest element parent.
+      if (node.nodeType === 3) node = node.parentNode;
+      const parts = [];
+      while (node && node.nodeType === 1 && node.nodeName !== 'HTML') {
+        let idx = 1;
+        let sib = node.previousElementSibling;
+        while (sib) {
+          if (sib.nodeName === node.nodeName) idx += 1;
+          sib = sib.previousElementSibling;
+        }
+        parts.unshift(`${node.nodeName.toLowerCase()}[${idx}]`);
+        node = node.parentNode;
+      }
+      return parts.length ? '/html/' + parts.join('/') : null;
+    });
+    // --- end capture -------------------------------------------------------
 
     // Step 9 — Observe the citation pill.
     const obs = await getCitation(extInstance.page, { mode: 'auto', timeout: 30_000 });
@@ -441,6 +503,14 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
       artifacts: [], // future: screenshots on failure
       llm_raw_response: rawSnippet,
       model: modelId,
+      // D-14 Phase 33 — captured values (RERUN-03). WR-02: viewport_width /
+      // viewport_height are resolved above with `vp?.width ?? null` so a
+      // null vp does not crash the iteration; null flows through here per
+      // D-13 null-permitted semantics on the capture fields.
+      scroll_y,
+      viewport_width,
+      viewport_height,
+      selected_node_xpath,
     });
     return { stopAll: false };
 
@@ -466,6 +536,13 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
         artifacts: [], llm_raw_response: rawSnippet,
         error_reason: `runtime_error: ${err.message}`,
         model: modelId,
+        // D-14 Phase 33 — null on pre-browser/pre-selection failure paths (RERUN-03)
+        // capture block const declarations live inside the try, so they are not
+        // in scope here; pass null regardless of where the throw originated.
+        scroll_y: null,
+        viewport_width: null,
+        viewport_height: null,
+        selected_node_xpath: null,
       });
     } catch (writeErr) {
       // If even the report write fails, log to stderr — we cannot do more.

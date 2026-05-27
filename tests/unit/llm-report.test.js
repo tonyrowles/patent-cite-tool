@@ -85,6 +85,11 @@ function makeIteration(overrides = {}) {
     duration_ms: 28350,
     artifacts: ['screenshot.png'],
     llm_raw_response: '{"caseId":"..."}',
+    // D-13 Phase 33 — capture-state defaults (real values; tests can override with null)
+    scroll_y: 0,
+    viewport_width: 1280,
+    viewport_height: 720,
+    selected_node_xpath: '/html/body[1]/div[1]',
     ...overrides,
   };
 }
@@ -135,6 +140,32 @@ describe('tests/e2e/lib/llm-report.js — initLlmReport', () => {
     const after = readReport();
     expect(after.iterations).toHaveLength(1);
     expect(after.iterations[0].iteration_n).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // WR-03 (Phase 33 review) regression: initLlmReport must stamp
+  // `schema_version: 1` on the freshly-initialized report, matching the
+  // envelope D-15 added to the migrated UAT fixture. Without this, live
+  // `e2e:explore` runs would produce reports lacking the field even though
+  // the committed UAT fixture carries it — Phase 34's triage classifier
+  // would need a branch on field presence, silently drifting from the
+  // intent of "schema is locked".
+  // -------------------------------------------------------------------------
+  it('Test 3a (WR-03): freshly-initialized report carries schema_version: 1 as the first key', () => {
+    initLlmReport(reportPath, { run_id: RUN_ID, iterations_total: 5 });
+    const r = readReport();
+    expect(r.schema_version).toBe(1);
+    // Also assert key ORDER — first key matches the migrated UAT fixture's
+    // ordering so jq queries that read `.[0].key` style remain stable.
+    expect(Object.keys(r)[0]).toBe('schema_version');
+  });
+
+  it('Test 3b (WR-03): schema_version survives appendLlmIteration round-trip', () => {
+    initLlmReport(reportPath, { run_id: RUN_ID, iterations_total: 5 });
+    appendLlmIteration(reportPath, makeIteration({ iteration_n: 1 }));
+    const r = readReport();
+    expect(r.schema_version).toBe(1);
+    expect(r.iterations).toHaveLength(1);
   });
 });
 
@@ -298,6 +329,51 @@ describe('tests/e2e/lib/llm-report.js — llm_raw_response truncation + validati
       iso: '2026-05-18T10:00:30.000Z',
       cost_usd: 0.19,
     })).toThrow(/classification/);
+  });
+
+  it('Test 12d: rejects entries missing scroll_y (RERUN-03 schema extension)', () => {
+    const baseValid = makeIteration({ classification: 'PASS' });
+    delete baseValid.scroll_y;
+    expect(() => appendLlmIteration(reportPath, baseValid)).toThrow(/scroll_y/);
+  });
+
+  it('Test 12e: rejects entries missing viewport_width (RERUN-03 schema extension)', () => {
+    const baseValid = makeIteration({ classification: 'PASS' });
+    delete baseValid.viewport_width;
+    expect(() => appendLlmIteration(reportPath, baseValid)).toThrow(/viewport_width/);
+  });
+
+  it('Test 12f: rejects entries missing viewport_height (RERUN-03 schema extension)', () => {
+    const baseValid = makeIteration({ classification: 'PASS' });
+    delete baseValid.viewport_height;
+    expect(() => appendLlmIteration(reportPath, baseValid)).toThrow(/viewport_height/);
+  });
+
+  it('Test 12g: rejects entries missing selected_node_xpath (RERUN-03 schema extension)', () => {
+    const baseValid = makeIteration({ classification: 'PASS' });
+    delete baseValid.selected_node_xpath;
+    expect(() => appendLlmIteration(reportPath, baseValid)).toThrow(/selected_node_xpath/);
+  });
+
+  it('Test 12h: permits null on the 4 capture fields (D-13 null-allowed semantics)', () => {
+    // Pre-browser failure paths in e2e-explore.mjs supply null for all 4 keys.
+    // The schema-guard MUST require KEY presence but ALLOW null VALUE.
+    initLlmReport(reportPath, { run_id: RUN_ID, iterations_total: 1 });
+    expect(() => appendLlmIteration(reportPath, makeIteration({
+      classification: 'LLM_API_ERROR',
+      scroll_y: null,
+      viewport_width: null,
+      viewport_height: null,
+      selected_node_xpath: null,
+    }))).not.toThrow();
+  });
+
+  it('Test 12i: still rejects null on the original 3 non-null fields (D-13 preserves strictness)', () => {
+    // Option (a) split-list: iteration_n / iso / classification retain
+    // "undefined or null forbidden" semantics.
+    expect(() => appendLlmIteration(reportPath, makeIteration({
+      classification: null,
+    }))).toThrow(/classification/);
   });
 });
 

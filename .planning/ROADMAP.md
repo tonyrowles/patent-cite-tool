@@ -112,8 +112,8 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 ### v3.1 LLM-Driven Product Improvement Loop (Phases 32-37)
 
 - [x] **Phase 32: HUMAN-UAT Verification** - Live end-to-end validation of `npm run e2e:explore` with Max 5 subscription credit; confirms `llm-report.json` usability and establishes local→CI handoff helper (completed 2026-05-25)
-- [ ] **Phase 33: Re-run Validator** - Deterministic 3-replay verifier-only confirm gate; defines `rerun-report.json` schema; extends `llm-report.json` iteration schema with scroll/viewport fields
-- [ ] **Phase 34: Hybrid Triage Classifier** - Heuristic-first + LLM second-pass classification; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster pre-filter and prompt-injection defense
+- [x] **Phase 33: Re-run Validator** - Deterministic 3-replay verifier-only confirm gate; defines `rerun-report.json` schema; extends `llm-report.json` iteration schema with scroll/viewport fields (completed 2026-05-27)
+- [x] **Phase 34: Hybrid Triage Classifier** - Heuristic-first + LLM second-pass classification; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster pre-filter and prompt-injection defense (completed 2026-05-27)
 - [ ] **Phase 35: Rich Issue Filer + Quarantine Corpus** - `issue-payload-builder.js`; `quarantine-append.mjs`; `test-cases-quarantine.js`; `e2e-report-issue.mjs` `--source triage` extension; fingerprint dual-search
 - [ ] **Phase 36: Quarantine CI Integration + Pipeline Orchestrator** - `quarantine.spec.js`; `run-triage-pipeline.mjs`; `e2e-nightly.yml` wiring with `llm_run_id` input; `promote-from-quarantine.mjs`; timeout budget audit
 - [ ] **Phase 37: Weekly Analytics Digest** - `weekly-digest.mjs`; `e2e-weekly-digest.yml` Monday cron; GitHub Discussion + committed markdown; `SUMMARY_KEYS` export and validation
@@ -145,7 +145,12 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   2. Vitest test suite for `rerun-validator.js` passes with cases covering CONFIRMED, FLAKE, and edge-case (exactly 2/3) verdicts
   3. `llm-report.json` iteration schema includes `scroll_y`, `viewport_width`, `viewport_height`, `selected_node_xpath` fields; existing `appendLlmIteration` call site in `e2e-explore.mjs` writes them; Vitest schema guard test enforces presence
   4. ESLint `no-restricted-imports` guard covers the re-run validator module — running `npm run lint` on a file that imports the validator from `src/` emits a lint error
-**Plans**: TBD
+**Plans**: 5 plans
+- [x] 33-01-PLAN.md — Atomic D-13 + D-15 schema split and UAT fixture re-stamp (RERUN-03 schema side)
+- [x] 33-02-PLAN.md — rerun-validator.js module + unit tests (RERUN-01 core, RERUN-02)
+- [x] 33-03-PLAN.md — e2e-explore.mjs capture block + 6 call-site threading (RERUN-03 capture side)
+- [x] 33-04-PLAN.md — e2e-rerun-validator.mjs CLI runner + spawnSync integration tests (RERUN-01 CLI surface)
+- [x] 33-05-PLAN.md — ESLint per-file independence guard + lint smoke test (RERUN-04)
 
 ### Phase 34: Hybrid Triage Classifier
 **Goal**: Triaged findings in `triage-report.json` are classified by heuristic rules for 6 of 8 ERROR_CLASSES without any LLM invocation, with an LLM second-pass (via `invokeClaudePWithLedger`) handling only the ambiguous remainder — cost-controlled by cluster pre-filter and protected against prompt injection
@@ -157,7 +162,12 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   3. Triage classifier writes `triage-report.json` with `{severity, category, root_cause_hypothesis, confidence, rationale}` per finding; Vitest schema guard test validates all fields present
   4. PDF text injected into LLM prompt is wrapped in `<patent_data>...</patent_data>` XML tags; Vitest test asserts tag presence in the generated prompt string
   5. Developer running the triage entrypoint in a CI environment (with `CI=true`) receives an error exit and does not trigger any `claude -p` invocation; Vitest CI-guard test mirrors the existing `e2e-explore-ci-guard.test.js` pattern
-**Plans**: TBD
+**Plans**: 5 plans
+- [x] 34-01-PLAN.md — invokeClaudePWithLedger wrapper in llm-driver.js + Vitest tests (TRIAGE-04 wrapper-layer)
+- [x] 34-02-PLAN.md — triage-classifier.js heuristic core: VERIFIER_STRONG_AGREEMENT + SEVERITIES + rule chain + triage-report.json schema (TRIAGE-01, TRIAGE-02, TRIAGE-05)
+- [x] 34-03-PLAN.md — cluster pre-filter + wrapPatentData + LLM second-pass dispatch (TRIAGE-03, TRIAGE-06)
+- [x] 34-04-PLAN.md — e2e-triage-classifier.mjs CLI + spawnSync tests + npm script + CI guard (TRIAGE-04 script-layer)
+- [x] 34-05-PLAN.md — eslint.config.js D-07 per-file block + scope-extension test (TRIAGE-04 ESLint-layer)
 
 ### Phase 35: Rich Issue Filer + Quarantine Corpus
 **Goal**: Confirmed triaged findings are filed as richly-structured GitHub issues with reproducer, verifier detail, LLM rationale, and golden diff — all within character budgets — and are simultaneously appended to `test-cases-quarantine.js` for downstream CI coverage
@@ -169,7 +179,13 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   3. `findMatchingIssue` performs dual-search across v1 and v2 fingerprint formulas; Vitest tests confirm an issue with a v1 fingerprint is correctly deduplicated and not re-filed
   4. `tests/e2e/test-cases-quarantine.js` exists with schema identical to `test-cases.js`; Vitest schema-guard test in `test:src` suite passes and would fail on a deliberately introduced field mismatch
   5. Running `scripts/quarantine-append.mjs` twice with the same CONFIRMED finding produces only one entry in `test-cases-quarantine.js` (idempotent upsert); entries with `stable_runs ≥ 3` are auto-tagged `quarantine:ready-for-promotion`; `scripts/promote-from-quarantine.mjs` moves the entry to `test-cases.js` and regenerates the golden baseline for that case
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 35-00-PLAN.md — Plan-0 prerequisites: `update-golden.js --case` flag + GitHub label creation (enables QUAR-05)
+- [ ] 35-01-PLAN.md — `tests/e2e/lib/issue-payload-builder.js` pure builder + char-budget enforcement (ISSUE-01, ISSUE-04)
+- [ ] 35-02-PLAN.md — `test-cases-quarantine.js` empty seed + Vitest schema-guard (QUAR-01)
+- [ ] 35-03-PLAN.md — `e2e-report-issue.mjs --source triage` extension + dual-search + CONFIRMED filter (ISSUE-02, ISSUE-03)
+- [ ] 35-04-PLAN.md — `quarantine-append.mjs` idempotent upsert + stable_runs≥3 auto-label (QUAR-02)
+- [ ] 35-05-PLAN.md — `promote-from-quarantine.mjs` human-gated promotion + spawnSync update-golden.js (QUAR-05)
 
 ### Phase 36: Quarantine CI Integration + Pipeline Orchestrator
 **Goal**: The full triage pipeline (rerun → triage → issue-file → quarantine-append) runs end-to-end in the nightly cron when an `llm_run_id` input is provided, the quarantine corpus runs as a non-gating Playwright project, and timeout budget is documented and within job limits
@@ -230,8 +246,8 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
-| 33. Re-run Validator | v3.1 | 0/? | Not started | - |
-| 34. Hybrid Triage Classifier | v3.1 | 0/? | Not started | - |
-| 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
+| 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
+| 34. Hybrid Triage Classifier | v3.1 | 5/5 | Complete    | 2026-05-27 |
+| 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/6 | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |
 | 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |

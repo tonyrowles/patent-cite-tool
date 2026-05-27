@@ -51,8 +51,24 @@ export const LLM_REPORT_FILENAME = 'llm-report.json';
  */
 const RAW_RESPONSE_MAX_CHARS = 2000;
 
-/** Required fields on every iteration entry. */
-const REQUIRED_ENTRY_FIELDS = ['iteration_n', 'iso', 'classification'];
+/** Required fields on every iteration entry — NON-NULL (existing strictness preserved). */
+const REQUIRED_NONNULL_FIELDS = ['iteration_n', 'iso', 'classification'];
+
+/**
+ * Required fields on every iteration entry — KEY must be present, NULL value
+ * permitted. Phase 33 D-13: scroll_y / viewport_width / viewport_height /
+ * selected_node_xpath are captured between Step 8 (selectText) and Step 9
+ * (getCitation) in e2e-explore.mjs; pre-browser failure paths (LLM_API_ERROR
+ * before browser launch, HARNESS_ERROR during selectText, etc.) pass null.
+ * The schema-guard requires the KEYS to be present so silent omissions on
+ * future call sites are caught at write time (Pitfall 1).
+ */
+const REQUIRED_NULLABLE_FIELDS = [
+  'scroll_y',
+  'viewport_width',
+  'viewport_height',
+  'selected_node_xpath',
+];
 
 /**
  * Crash-safe write (WR-04). Plain fs.writeFileSync truncates the destination
@@ -148,9 +164,25 @@ function recomputeSummary(iterations) {
   return s;
 }
 
+/**
+ * WR-03 (Phase 33 review): top-level `schema_version: 1` is the same envelope
+ * marker D-15 added to the migrated UAT fixture. Stamping it here on every
+ * fresh `e2e:explore` init keeps live runs and the committed fixture
+ * symmetric — Phase 34's triage classifier (33-CONTEXT.md says it reads both
+ * llm-report.json and rerun-report.json "with the same idioms") never has to
+ * branch on the field's presence. The schema-guard test on the UAT fixture
+ * (uat-phase32-llm-report.schema.test.js:86-89) is scoped to the migrated
+ * file and would not catch a missing field on live writes; this closes that
+ * silent-drift gap. Kept as the FIRST key of the returned object to match
+ * the migrated fixture's key order exactly (jq queries that read `.[0].key`
+ * style remain stable).
+ */
+const LLM_REPORT_SCHEMA_VERSION = 1;
+
 function emptyReport(meta) {
   const now = new Date().toISOString();
   return {
+    schema_version: LLM_REPORT_SCHEMA_VERSION,
     run_id: meta?.run_id,
     started_iso: now,
     finished_iso: now,
@@ -207,15 +239,21 @@ export function initLlmReport(reportPath, meta) {
  * Append one iteration. Read-modify-write atomic file replace. Recomputes
  * summary on every call. Updates finished_iso to NOW. Truncates
  * llm_raw_response to RAW_RESPONSE_MAX_CHARS. Throws if iteration is missing
- * any of REQUIRED_ENTRY_FIELDS.
+ * any of REQUIRED_NONNULL_FIELDS (key + non-null value required) or
+ * REQUIRED_NULLABLE_FIELDS (key presence required, null value permitted).
  *
  * @param {string} reportPath
  * @param {object} iteration
  */
 export function appendLlmIteration(reportPath, iteration) {
-  for (const f of REQUIRED_ENTRY_FIELDS) {
+  for (const f of REQUIRED_NONNULL_FIELDS) {
     if (iteration?.[f] === undefined || iteration[f] === null) {
       throw new Error(`appendLlmIteration: missing required field '${f}'`);
+    }
+  }
+  for (const f of REQUIRED_NULLABLE_FIELDS) {
+    if (!(f in (iteration ?? {}))) {
+      throw new Error(`appendLlmIteration: missing required field '${f}' (null permitted)`);
     }
   }
   const entry = { ...iteration };

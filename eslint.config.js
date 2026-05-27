@@ -100,4 +100,50 @@ export default [
       }],
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // Triage Classifier wrapper-only rule — scoped to triage-classifier.js + CLI.
+  // ---------------------------------------------------------------------------
+  //
+  // D-07 (34-CONTEXT.md): Restricts the NAMED IMPORT `invokeClaudeP` from the
+  // triage code path. The wrapper-mediated invokeClaudePWithLedger is the only
+  // allowed entry. Three-layer CI defense + ledger discipline rationale at
+  // .planning/research/PITFALLS.md Pitfalls 11 + 12.
+  //
+  // KEY DIFFERENCE from the pdf-verifier and rerun-validator blocks above:
+  // those use `patterns.group` to restrict a directory TREE (src/**). This
+  // block uses `paths` with `importNames` to restrict a specific NAMED
+  // EXPORT. ESLint `no-restricted-imports` requires this form for the named-
+  // import case — `patterns` form would silently fail to catch
+  // `import { invokeClaudeP } from './llm-driver.js'`. See Pitfall 7 in
+  // .planning/phases/34-hybrid-triage-classifier/34-RESEARCH.md.
+  //
+  // Grandfathering: scripts/e2e-explore.mjs is NOT included in the files
+  // glob — Phase 32 contract preserves its direct invokeClaudeP usage.
+  {
+    files: [
+      'tests/e2e/lib/triage-classifier.js',
+      'scripts/e2e-triage-classifier.mjs',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          {
+            name: './llm-driver.js',
+            importNames: ['invokeClaudeP'],
+            message:
+              'triage-classifier.js must use invokeClaudePWithLedger (D-07) — direct invokeClaudeP ' +
+              'calls bypass the ledger and CI gate. See .planning/research/PITFALLS.md Pitfall 12.',
+          },
+          {
+            name: '../tests/e2e/lib/llm-driver.js',
+            importNames: ['invokeClaudeP'],
+            message:
+              'e2e-triage-classifier.mjs must use invokeClaudePWithLedger (D-07) — direct invokeClaudeP ' +
+              'calls bypass the ledger and CI gate. See .planning/research/PITFALLS.md Pitfall 12.',
+          },
+        ],
+      }],
+    },
+  },
 ];

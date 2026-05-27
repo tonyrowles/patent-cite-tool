@@ -294,6 +294,38 @@ This invokes `scripts/e2e-upload-llm-report.mjs`, which:
 
 ---
 
+### Re-run validator (Phase 33)
+
+After an `e2e:explore` run, replay each LLM-flagged anomaly three times via
+the verifier-only path to classify it as CONFIRMED, FLAKE, or NOT_REPLAYABLE:
+
+```bash
+npm run e2e:rerun-validator -- --input tests/e2e/artifacts/<runId>/llm-report.json
+# or, to use the newest report by mtime:
+npm run e2e:rerun-validator
+```
+
+This invokes `scripts/e2e-rerun-validator.mjs`, which:
+
+1. Resolves `--input <path>` (absolute or repo-relative). If omitted, defaults
+   to the newest `tests/e2e/artifacts/*/llm-report.json` by mtime.
+2. Reads and JSON-parses the input llm-report.
+3. Calls `runValidator` from `tests/e2e/lib/rerun-validator.js`, which replays
+   each `WRONG_CITATION` / `VERIFIER_DISAGREE` iteration exactly three times via
+   `verifyCitation` and produces a per-iteration verdict.
+4. Writes `rerun-report.json` adjacent to the source report
+   (`artifacts/{runId}/rerun-report.json`, D-11).
+
+Exit codes:
+
+| Code | Meaning                                                     |
+| ---- | ----------------------------------------------------------- |
+| 0    | Success — `rerun-report.json` written                       |
+| 1    | Input `llm-report.json` missing, unreadable, or unresolved  |
+| 2    | Bad `--input` value (equals syntax or missing trailing arg) |
+
+---
+
 ## Test-hook contract
 
 The extension exposes two `data-testid` attributes on its Shadow DOM

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "source_llm_report": "tests/e2e/fixtures/phase35-llm-report.json",
+  "source_rerun_report": "tests/e2e/fixtures/phase35-rerun-report.json",
+  "run_id": "phase35-test-run",
+  "started_iso": "2026-05-27T10:10:00.000Z",
+  "finished_iso": "2026-05-27T10:15:00.000Z",
+  "summary": {
+    "by_severity": {
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 1,
+      "info": 0
+    },
+    "by_category": {
+      "WRONG_CITATION": 2,
+      "HARNESS_ERROR": 1
+    },
+    "heuristic_count": 1,
+    "llm_pass_count": 2,
+    "cluster_pass_count": 0,
+    "total_findings": 3
+  },
+  "findings": [
+    {
+      "iteration_n": 1,
+      "severity": "high",
+      "category": "WRONG_CITATION",
+      "root_cause_hypothesis": "PDF stale or misaligned column references",
+      "confidence": 0.85,
+      "rationale": "Citation citation citation text does not match the selected window",
+      "path_taken": "heuristic"
+    },
+    {
+      "iteration_n": 2,
+      "severity": "low",
+      "category": "HARNESS_ERROR",
+      "root_cause_hypothesis": "LLM parse failed on iteration 2",
+      "confidence": 1.0,
+      "rationale": "parse error in LLM response",
+      "path_taken": "llm_single_parse_error"
+    },
+    {
+      "iteration_n": 3,
+      "severity": "critical",
+      "category": "WRONG_CITATION",
+      "root_cause_hypothesis": "Cross-column boundary mismatch in claim scope",
+      "confidence": 0.9,
+      "rationale": "Different cite text found at cross-column position",
+      "path_taken": "heuristic"
+    }
+  ]
+}

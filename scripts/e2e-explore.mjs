@@ -436,7 +436,20 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
     // observation context. The verifier-only rerun in Phase 33 does NOT
     // consume these fields — they ship in the schema only.
     const scroll_y = await extInstance.page.evaluate(() => window.scrollY);
-    const vp = extInstance.page.viewportSize(); // { width, height } — synchronous
+    // WR-02 (Phase 33 review): Page.viewportSize() returns null whenever the
+    // context was created with `viewport: null` (Playwright contract). The
+    // current extension-loader.js does not pass viewport, so vp is non-null
+    // today — but any future change that disables the viewport would make a
+    // bare `vp.width` throw `TypeError: Cannot read properties of null` mid-
+    // capture, AFTER selectText succeeded but BEFORE getCitation. That throw
+    // would be caught by the outer catch and misclassified as HARNESS_ERROR
+    // / LLM_API_ERROR, burning the LLM credit + harness work for the iteration
+    // and hiding the capture-block failure in error_reason. Guard explicitly:
+    // optional-chain + nullish-coalesce yields D-13's permitted null on the
+    // capture fields instead of crashing.
+    const vp = extInstance.page.viewportSize(); // { width, height } | null — synchronous
+    const viewport_width = vp?.width ?? null;
+    const viewport_height = vp?.height ?? null;
     const selected_node_xpath = await extInstance.page.evaluate(() => {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return null;
@@ -490,10 +503,13 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
       artifacts: [], // future: screenshots on failure
       llm_raw_response: rawSnippet,
       model: modelId,
-      // D-14 Phase 33 — captured values (RERUN-03)
+      // D-14 Phase 33 — captured values (RERUN-03). WR-02: viewport_width /
+      // viewport_height are resolved above with `vp?.width ?? null` so a
+      // null vp does not crash the iteration; null flows through here per
+      // D-13 null-permitted semantics on the capture fields.
       scroll_y,
-      viewport_width: vp.width,
-      viewport_height: vp.height,
+      viewport_width,
+      viewport_height,
       selected_node_xpath,
     });
     return { stopAll: false };

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "source_llm_report": "tests/e2e/fixtures/phase35-llm-report.json",
+  "run_id": "phase35-test-run",
+  "started_iso": "2026-05-27T10:00:00.000Z",
+  "finished_iso": "2026-05-27T10:05:00.000Z",
+  "iterations": [
+    {
+      "iteration_n": 1,
+      "case_id": "US11427642-spec-short-1",
+      "seed": 42,
+      "classification": "WRONG_CITATION",
+      "citation": "5:10-11",
+      "llm_selection": {
+        "patentId": "US11427642",
+        "selectedText": "receptor exclusively expressed on plasma cells and plasmablasts"
+      },
+      "verifier_verdict": {
+        "tier_used": "B",
+        "status": "pass",
+        "reason": "window matches cite text at col 5 line 10"
+      }
+    },
+    {
+      "iteration_n": 2,
+      "case_id": "US11427642-claims-1",
+      "seed": 43,
+      "classification": "LLM_RESPONSE_PARSE_ERROR",
+      "citation": null,
+      "llm_selection": null,
+      "verifier_verdict": null
+    },
+    {
+      "iteration_n": 3,
+      "case_id": "US11427642-cross-col",
+      "seed": 44,
+      "classification": "WRONG_CITATION",
+      "citation": "6:12-13",
+      "llm_selection": {
+        "patentId": "US11427642",
+        "selectedText": "comprising the steps of generating antibodies"
+      },
+      "verifier_verdict": {
+        "tier_used": "B",
+        "status": "pass",
+        "reason": "another mismatch found at cross-column boundary"
+      }
+    }
+  ],
+  "summary": {
+    "total_iterations": 3,
+    "classified_count": 3,
+    "error_count": 0
+  }
+}

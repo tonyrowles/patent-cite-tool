@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "source_llm_report": "tests/e2e/fixtures/phase35-llm-report.json",
+  "run_id": "phase35-test-run",
+  "started_iso": "2026-05-27T10:05:00.000Z",
+  "finished_iso": "2026-05-27T10:10:00.000Z",
+  "summary": {
+    "confirmed_count": 2,
+    "flake_count": 0,
+    "not_replayable_count": 1
+  },
+  "replays": [
+    {
+      "iteration_n": 1,
+      "original_verdict_status": "pass",
+      "runs": [
+        { "status": "pass" },
+        { "status": "pass" },
+        { "status": "pass" }
+      ],
+      "confirmed_count": 3,
+      "total_runs": 3,
+      "verdict": "CONFIRMED"
+    },
+    {
+      "iteration_n": 2,
+      "original_verdict_status": null,
+      "runs": [],
+      "confirmed_count": 0,
+      "total_runs": 0,
+      "verdict": "NOT_REPLAYABLE",
+      "reason": "LLM_RESPONSE_PARSE_ERROR is not eligible for replay"
+    },
+    {
+      "iteration_n": 3,
+      "original_verdict_status": "pass",
+      "runs": [
+        { "status": "pass" },
+        { "status": "pass" },
+        { "status": "fail" }
+      ],
+      "confirmed_count": 2,
+      "total_runs": 3,
+      "verdict": "CONFIRMED"
+    }
+  ]
+}

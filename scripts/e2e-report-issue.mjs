@@ -1,26 +1,38 @@
 // scripts/e2e-report-issue.mjs
 //
 // Phase 29 (CRON-04, CRON-05) — issue filer with fingerprint-based dedup.
+// Phase 35 (ISSUE-02, ISSUE-03) — extended with --source triage + dual-search.
 //
 // Reads tests/e2e/artifacts/${PLAYWRIGHT_RUN_ID}/report.json (RPT-01 shape)
 // and for each failed-non-FLAKE case either opens a new GitHub issue or
 // comments on an existing one matching the fingerprint.
 //
+// Phase 35 adds: --source triage + --triage-report <path> flags; exports
+// topOfStackHashFromTriage, findMatchingIssueDual, filterFindingsForFiling,
+// processTriageReport; and extends makeRealGhClient with createIssueWithLabels,
+// listOpenWithSearch, and addLabel.
+//
 // Pure functions exported for unit testing; CLI shim at bottom invokes
 // the real gh CLI via execSync.
 //
-// Threat model (T-29-02):
+// Threat model (T-29-02, T-35-03):
 //   T-29-02-1: sanitizeCaseId() validates case IDs against a regex; processReport
 //              skips cases that fail validation.
 //   T-29-02-2: verifier_verdict.reason is wrapped in a fenced code block so any
 //              markdown injection is rendered as code.
 //   T-29-02-5: gh api ... --paginate used unconditionally (no page-2 misses).
+//   T-35-03-01: WR-05 ALLOWED_INPUT_ROOTS bounds --triage-report path.
+//   T-35-03-03: listOpenWithSearch shell-escapes query via replaceAll("'", "'\\''").
+//   T-35-03-04: createIssueWithLabels shell-escapes label values via replaceAll('"', '\\"').
+//   T-35-03-05: findMatchingIssueDual runs BOTH searches unconditionally (Pitfall 3).
+//   T-35-03-06: filterFindingsForFiling excludes HARNESS_ERROR + *_parse_error (Pitfall 8).
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildIssuePayload } from '../tests/e2e/lib/issue-payload-builder.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -33,6 +45,14 @@ const NIGHTLY_LABEL = 'e2e-nightly';
 // Allows: patent case IDs like US11427642-spec-short-1, US4723129-claims-1
 // AND pre-flight synthetic IDs like PRE-FLIGHT-CAPTCHA, PRE-FLIGHT-DOM-DRIFT.
 const CASE_ID_RE = /^[A-Z]{2,}\d+[A-Z]?\d*-[a-z0-9-]+$|^PRE-FLIGHT-[A-Z-]+$/;
+
+// Phase 35 — WR-05 path-bounding for --triage-report (T-35-03-01).
+// Mirrors scripts/e2e-triage-classifier.mjs lines 30-40.
+const __scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__scriptDir, '..');
+const ARTIFACTS_ROOT = path.resolve(PROJECT_ROOT, 'tests/e2e/artifacts');
+const FIXTURES_ROOT = path.resolve(PROJECT_ROOT, 'tests/e2e/fixtures');
+const ALLOWED_INPUT_ROOTS = [ARTIFACTS_ROOT, FIXTURES_ROOT];
 
 // ---------------------------------------------------------------------------
 // Pure exported functions (testable without real gh CLI)
@@ -70,6 +90,32 @@ export function topOfStackHashFromCase(caseEntry) {
     .update(reason.slice(0, 200))
     .digest('hex')
     .substring(0, 12);
+}
+
+/**
+ * Phase 35 (D-08) — derive a stable "stack hash" from a triage finding's
+ * rationale, verifier status, and LLM classification.
+ *
+ * Inputs (3-field JSON stringify):
+ *   rationale_first_30_chars — first 30 chars of finding.rationale (stable signal)
+ *   verifier_status           — rerunEntry.original_verdict_status (pass/fail/null)
+ *   classification            — iteration.classification (WRONG_CITATION etc.)
+ *
+ * Same finding/rerun/iteration always produces the same 12-hex (deterministic).
+ * null rerunEntry is safe — substitutes null per ?? operator.
+ *
+ * @param {object} finding    — Phase 34 triage finding
+ * @param {object|null} rerunEntry — Phase 33 rerun replay entry (null = NOT_REPLAYABLE)
+ * @param {object} iteration  — Phase 33 llm-report iteration
+ * @returns {string} 12-char hex sha256 prefix
+ */
+export function topOfStackHashFromTriage(finding, rerunEntry, iteration) {
+  const input = JSON.stringify({
+    rationale_first_30_chars: (finding.rationale ?? '').slice(0, 30),
+    verifier_status: rerunEntry?.original_verdict_status ?? null,
+    classification: iteration.classification ?? null,
+  });
+  return createHash('sha256').update(input).digest('hex').substring(0, 12);
 }
 
 /**
@@ -115,6 +161,35 @@ export function filterCasesForFiling(cases) {
     // File for failed cases without an error class (catch-all for unclassified)
     if (c.status === 'failed') return true;
     return false;
+  });
+}
+
+/**
+ * Phase 35 (D-05 / Pitfall 8) — filter triage findings to the subset that
+ * should be filed as GitHub issues.
+ *
+ * CONFIRMED predicate: severity in {critical, high} OR rerun verdict === 'CONFIRMED'
+ * PITFALL 8: ALWAYS exclude HARNESS_ERROR and *_parse_error findings, even at
+ * critical severity or CONFIRMED rerun status. These are harness noise, not bugs.
+ *
+ * @param {Array<object>} findings    — triageReport.findings[]
+ * @param {Map<number,object>} rerunByIter — iteration_n → rerun replay entry
+ * @param {Map<number,object>} llmByIter  — iteration_n → llm-report iteration
+ * @returns {Array<object>} filtered findings
+ */
+export function filterFindingsForFiling(findings, rerunByIter, llmByIter) {
+  if (!Array.isArray(findings)) return [];
+  return findings.filter(f => {
+    const rerun = rerunByIter.get(f.iteration_n);
+    const iter = llmByIter.get(f.iteration_n);
+    // Reject if no matching LLM iteration found (defensive)
+    if (!iter) return false;
+    const isConfirmed = ['critical', 'high'].includes(f.severity)
+                      || rerun?.verdict === 'CONFIRMED';
+    // Pitfall 8: HARNESS_ERROR and *_parse_error are harness noise — never file
+    const isHarnessNoise = f.category === 'HARNESS_ERROR'
+                         || (f.path_taken ?? '').endsWith('_parse_error');
+    return isConfirmed && !isHarnessNoise;
   });
 }
 
@@ -214,6 +289,99 @@ export function findMatchingIssue(issues, fp) {
 }
 
 /**
+ * Phase 35 (D-07 / Pitfall 3) — dual-search across v1 and v2 fingerprint formulas.
+ *
+ * Searches GitHub issues using BOTH the v1 fingerprint marker (legacy Phase 29 format:
+ * `<!-- fingerprint: {fp} -->`) AND the v2 marker (D-02 format: `<!-- fp: {fp} -->`).
+ *
+ * CRITICAL: Both searches execute UNCONDITIONALLY — no short-circuit (Pitfall 3).
+ * The v1 search must always run so Phase 29 issues are never re-filed under Phase 35.
+ *
+ * @param {object} ghClient — { listOpenWithSearch(query): issue[] }
+ * @param {string} fpV1     — v1 fingerprint (fingerprint(caseId, errorClass, ''))
+ * @param {string} fpV2     — v2 fingerprint (fingerprint(caseId, errorClass, topOfStackHash))
+ * @returns {object|null} first matching issue or null
+ */
+export function findMatchingIssueDual(ghClient, fpV1, fpV2) {
+  const markerV1 = `<!-- fingerprint: ${fpV1} -->`;
+  const markerV2 = `<!-- fp: ${fpV2} -->`;
+  // Both calls are UNCONDITIONAL — Pitfall 3 mitigation. Do NOT short-circuit.
+  const issuesV1 = ghClient.listOpenWithSearch(markerV1) ?? [];
+  const issuesV2 = ghClient.listOpenWithSearch(markerV2) ?? [];
+  const all = [...issuesV1, ...issuesV2];
+  const match = all.find(
+    i => typeof i.body === 'string' && (i.body.includes(markerV1) || i.body.includes(markerV2))
+  );
+  return match || null;
+}
+
+/**
+ * Phase 35 (ISSUE-02) — main entrypoint for --source triage.
+ *
+ * For each CONFIRMED, non-HARNESS triage finding:
+ *   1. Build v1 + v2 fingerprints
+ *   2. Dual-search for existing issue (dedup)
+ *   3. If new: call buildIssuePayload + createIssueWithLabels
+ *
+ * @param {object} triageReport   — Phase 34 triage-report.json
+ * @param {object} rerunReport    — Phase 33 rerun-report.json
+ * @param {object} llmReport      — Phase 33 llm-report.json
+ * @param {object|null} goldenBaseline — tests/golden/baseline.json (null = not found)
+ * @param {object} opts
+ * @param {object} opts.ghClient  — { listOpenWithSearch, createIssueWithLabels }
+ * @param {string} opts.runId     — GitHub Actions run ID
+ * @param {string} opts.repo      — "owner/repo" string
+ */
+export function processTriageReport(triageReport, rerunReport, llmReport, goldenBaseline, { ghClient, runId, repo }) {
+  // Build lookup maps
+  const rerunByIter = new Map(
+    (rerunReport?.replays ?? []).map(r => [r.iteration_n, r])
+  );
+  const llmByIter = new Map(
+    (llmReport?.iterations ?? []).map(i => [i.iteration_n, i])
+  );
+
+  const filtered = filterFindingsForFiling(
+    triageReport?.findings ?? [],
+    rerunByIter,
+    llmByIter
+  );
+
+  for (const finding of filtered) {
+    const iter = llmByIter.get(finding.iteration_n);
+    const rerunEntry = rerunByIter.get(finding.iteration_n) ?? null;
+
+    const caseId = iter.case_id ?? iter.llm_selection?.patentId ?? 'UNKNOWN';
+    const fpV1 = fingerprint(caseId, finding.category, '');
+    const fpV2 = fingerprint(caseId, finding.category, topOfStackHashFromTriage(finding, rerunEntry, iter));
+
+    const existing = findMatchingIssueDual(ghClient, fpV1, fpV2);
+    if (existing) {
+      console.log(
+        `[e2e-report-issue] dedup hit #${existing.number} for case=${caseId} category=${finding.category}`
+      );
+      continue;
+    }
+
+    const goldenCitation = goldenBaseline?.[caseId]?.citation ?? null;
+    const reproducerCmd = `npm run e2e:explore -- --case ${caseId}`;
+    const { title, body, labels } = buildIssuePayload({
+      triageFinding: finding,
+      iteration: iter,
+      rerunEntry,
+      goldenCitation,
+      reproducerCmd,
+      fingerprint: fpV2,
+    });
+
+    const created = ghClient.createIssueWithLabels(title, body, labels);
+    console.log(
+      `[e2e-report-issue] triage filed #${created?.number ?? '?'} (case=${caseId}, category=${finding.category})`
+    );
+  }
+}
+
+/**
  * Main dispatch function. For each failed non-FLAKE case in the report:
  *   1. Validate and sanitize the case ID
  *   2. Compute fingerprint
@@ -299,6 +467,46 @@ function makeRealGhClient(repo) {
       const m = out.match(/\/issues\/(\d+)/);
       return { number: m ? parseInt(m[1], 10) : null };
     },
+    // Phase 35 D-06: multi-label issue create.
+    // labels is an ordered array per D-06: [category, 'e2e-nightly', 'triage'].
+    // Each label is shell-escaped (T-35-03-04).
+    createIssueWithLabels(title, body, labels) {
+      const escapedTitle = title.replaceAll('"', '\\"');
+      const labelArgs = labels
+        .map(l => `--label "${l.replaceAll('"', '\\"')}"`)
+        .join(' ');
+      const out = execSync(
+        `gh issue create --title "${escapedTitle}" ${labelArgs} --body-file -`,
+        { input: body, encoding: 'utf8' }
+      );
+      const m = out.match(/\/issues\/(\d+)/);
+      return { number: m ? parseInt(m[1], 10) : null };
+    },
+    // Phase 35 D-07: search open issues by query string.
+    // Shell-escapes query for single-quoted shell context (T-35-03-03).
+    // Returns [] on transient gh failures (defensive).
+    listOpenWithSearch(query) {
+      try {
+        const escaped = query.replaceAll("'", "'\\''");
+        const raw = execSync(
+          `gh issue list --search '${escaped}' --state open --json number,title,body,updatedAt --limit 30`,
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+        );
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err) {
+        console.warn('[e2e-report-issue] listOpenWithSearch failed:', err.message);
+        return [];
+      }
+    },
+    // Phase 35 D-12: idempotent label-add for quarantine-append.mjs (Plan 04).
+    // gh issue edit no-ops if label is already present.
+    addLabel(issueNumber, label) {
+      execSync(
+        `gh issue edit ${issueNumber} --add-label "${label.replaceAll('"', '\\"')}"`,
+        { encoding: 'utf8' }
+      );
+    },
     commentIssue(number, body) {
       execSync(`gh issue comment ${number} --body-file -`, {
         input: body,
@@ -312,11 +520,136 @@ function makeRealGhClient(repo) {
 }
 
 // ---------------------------------------------------------------------------
+// CLI argument parsing — Phase 35 strict parseArgs for --source / --triage-report
+// Mirrors scripts/e2e-triage-classifier.mjs lines 58-98 pattern.
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse --source and --triage-report flags from process.argv.
+ *
+ * Rules:
+ *   --source <regression|triage>  strict positional; default = 'regression' (Phase 29 back-compat)
+ *   --source=<value>              exit 2 (equals syntax not supported)
+ *   --source                      exit 2 (missing value)
+ *   --triage-report <path>        required when --source triage; strict positional
+ *   --triage-report=<path>        exit 2 (equals syntax not supported)
+ *
+ * @param {string[]} argv — process.argv
+ * @returns {{ source: string, triageReportPath: string|null }}
+ */
+function parseSourceArgs(argv) {
+  let source = 'regression';
+  let triageReportPath = null;
+
+  for (let i = 2; i < argv.length; i++) {
+    if (argv[i].startsWith('--source=')) {
+      process.stderr.write(
+        '[e2e-report-issue] equals syntax not supported for --source; use `--source <value>`\n'
+      );
+      process.exit(2);
+    } else if (argv[i] === '--source') {
+      const next = argv[i + 1];
+      if (next === undefined || next === null || next === '') {
+        process.stderr.write('[e2e-report-issue] missing value for --source\n');
+        process.exit(2);
+      }
+      if (next !== 'regression' && next !== 'triage') {
+        process.stderr.write(
+          `[e2e-report-issue] invalid --source value: expected 'regression' or 'triage'\n`
+        );
+        process.exit(2);
+      }
+      source = next;
+      i++;
+    } else if (argv[i].startsWith('--triage-report=')) {
+      process.stderr.write(
+        '[e2e-report-issue] equals syntax not supported for --triage-report; use `--triage-report <value>`\n'
+      );
+      process.exit(2);
+    } else if (argv[i] === '--triage-report') {
+      const next = argv[i + 1];
+      if (next === undefined || next === null || next === '') {
+        process.stderr.write('[e2e-report-issue] missing value for --triage-report\n');
+        process.exit(2);
+      }
+      triageReportPath = next;
+      i++;
+    }
+  }
+
+  if (source === 'triage' && !triageReportPath) {
+    process.stderr.write(
+      '[e2e-report-issue] --source triage requires --triage-report <path>\n'
+    );
+    process.exit(2);
+  }
+
+  return { source, triageReportPath };
+}
+
+// ---------------------------------------------------------------------------
+// Triage mode main function
+// ---------------------------------------------------------------------------
+
+async function mainTriage(triageReportPath, opts) {
+  // WR-05 path-bounding — T-35-03-01 mitigation.
+  // Mirrors scripts/e2e-triage-classifier.mjs lines 181-190 verbatim.
+  const resolvedTriagePath = path.resolve(process.cwd(), triageReportPath);
+  const insideAllowedRoot = ALLOWED_INPUT_ROOTS.some(
+    root => resolvedTriagePath === root || resolvedTriagePath.startsWith(root + path.sep)
+  );
+  if (!insideAllowedRoot) {
+    process.stderr.write(
+      '[e2e-report-issue] --triage-report must reside under tests/e2e/artifacts/ or ' +
+        'tests/e2e/fixtures/; got: ' + resolvedTriagePath + '\n'
+    );
+    process.exit(1);
+  }
+
+  if (!existsSync(resolvedTriagePath)) {
+    process.stderr.write('[e2e-report-issue] triage-report not found: ' + resolvedTriagePath + '\n');
+    process.exit(1);
+  }
+
+  const dir = path.dirname(resolvedTriagePath);
+  const llmReportPath = path.join(dir, 'llm-report.json');
+  const rerunReportPath = path.join(dir, 'rerun-report.json');
+
+  if (!existsSync(llmReportPath)) {
+    process.stderr.write('[e2e-report-issue] sibling llm-report.json not found: ' + llmReportPath + '\n');
+    process.exit(1);
+  }
+  if (!existsSync(rerunReportPath)) {
+    process.stderr.write('[e2e-report-issue] sibling rerun-report.json not found: ' + rerunReportPath + '\n');
+    process.exit(1);
+  }
+
+  const triageReport = JSON.parse(readFileSync(resolvedTriagePath, 'utf8'));
+  const llmReport = JSON.parse(readFileSync(llmReportPath, 'utf8'));
+  const rerunReport = JSON.parse(readFileSync(rerunReportPath, 'utf8'));
+
+  // Read golden baseline — soft failure is OK (baseline may not exist in all envs)
+  let goldenBaseline = {};
+  const goldenPath = path.resolve(PROJECT_ROOT, 'tests/golden/baseline.json');
+  if (existsSync(goldenPath)) {
+    try {
+      goldenBaseline = JSON.parse(readFileSync(goldenPath, 'utf8'));
+    } catch {
+      // Proceed without baseline
+    }
+  }
+
+  processTriageReport(triageReport, rerunReport, llmReport, goldenBaseline, opts);
+}
+
+// ---------------------------------------------------------------------------
 // CLI entrypoint
 // ---------------------------------------------------------------------------
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
+  const { source, triageReportPath } = parseSourceArgs(process.argv);
+
   const runId =
     process.env.PLAYWRIGHT_RUN_ID || process.env.GITHUB_RUN_ID || 'local-run';
   const repo = process.env.GITHUB_REPOSITORY || '';
@@ -328,62 +661,71 @@ if (isMain) {
 
   const gh = makeRealGhClient(repo);
 
-  // --meta-drift mode: file ONE meta-issue for "Google Patents drift suspected"
-  // instead of iterating individual case failures. Called when the pre-flight
-  // smoke probe fails (Pattern 4 in 29-RESEARCH.md).
-  if (process.argv.includes('--meta-drift')) {
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const metaFp = createHash('sha256')
-      .update(`meta-drift|${dateStr}`)
-      .digest('hex')
-      .substring(0, 12);
+  if (source === 'triage') {
+    mainTriage(triageReportPath, { ghClient: gh, runId, repo }).catch(err => {
+      console.error('[e2e-report-issue] triage error:', err.message);
+      process.exit(1);
+    });
+  } else {
+    // source === 'regression' — existing Phase 29 behavior preserved unchanged.
 
-    const openIssues = gh.listOpenNightlyIssues();
-    const match = findMatchingIssue(openIssues, metaFp);
-    const title = `[e2e-nightly] Google Patents drift suspected — full suite skipped on ${dateStr}`;
-    const body = [
-      '## Pre-flight smoke probe failed',
-      '',
-      'Google Patents DOM probe or CAPTCHA detector failed before the regression suite could run. The suite was skipped to avoid filing individual issues for the same root cause.',
-      '',
-      '| Field | Value |',
-      '|-------|-------|',
-      `| Date | ${dateStr} |`,
-      `| Run | [Run #${runId}](https://github.com/${repo}/actions/runs/${runId}) |`,
-      `| Fingerprint | \`${metaFp}\` |`,
-      '',
-      'Inspect the smoke artifact bundle for the screenshot + DOM snapshot of the failing probe.',
-      '',
-      `<!-- fingerprint: ${metaFp} -->`,
-    ].join('\n');
+    // --meta-drift mode: file ONE meta-issue for "Google Patents drift suspected"
+    // instead of iterating individual case failures. Called when the pre-flight
+    // smoke probe fails (Pattern 4 in 29-RESEARCH.md).
+    if (process.argv.includes('--meta-drift')) {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const metaFp = createHash('sha256')
+        .update(`meta-drift|${dateStr}`)
+        .digest('hex')
+        .substring(0, 12);
 
-    if (match && isRecentlyUpdated(match)) {
-      gh.commentIssue(match.number, body);
-      console.log(`[e2e-report-issue] meta-drift commented on #${match.number}`);
-    } else {
-      const created = gh.createIssue(title, body);
-      console.log(`[e2e-report-issue] meta-drift created #${created?.number}`);
+      const openIssues = gh.listOpenNightlyIssues();
+      const match = findMatchingIssue(openIssues, metaFp);
+      const title = `[e2e-nightly] Google Patents drift suspected — full suite skipped on ${dateStr}`;
+      const body = [
+        '## Pre-flight smoke probe failed',
+        '',
+        'Google Patents DOM probe or CAPTCHA detector failed before the regression suite could run. The suite was skipped to avoid filing individual issues for the same root cause.',
+        '',
+        '| Field | Value |',
+        '|-------|-------|',
+        `| Date | ${dateStr} |`,
+        `| Run | [Run #${runId}](https://github.com/${repo}/actions/runs/${runId}) |`,
+        `| Fingerprint | \`${metaFp}\` |`,
+        '',
+        'Inspect the smoke artifact bundle for the screenshot + DOM snapshot of the failing probe.',
+        '',
+        `<!-- fingerprint: ${metaFp} -->`,
+      ].join('\n');
+
+      if (match && isRecentlyUpdated(match)) {
+        gh.commentIssue(match.number, body);
+        console.log(`[e2e-report-issue] meta-drift commented on #${match.number}`);
+      } else {
+        const created = gh.createIssue(title, body);
+        console.log(`[e2e-report-issue] meta-drift created #${created?.number}`);
+      }
+      process.exit(0);
     }
-    process.exit(0);
-  }
 
-  // Default mode: read report.json and iterate failed cases.
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const reportPath = path.resolve(
-    __dirname,
-    '..',
-    'tests/e2e/artifacts',
-    runId,
-    'report.json'
-  );
-
-  if (!existsSync(reportPath)) {
-    console.log(
-      `[e2e-report-issue] no report.json at ${reportPath} — nothing to file`
+    // Default mode: read report.json and iterate failed cases.
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const reportPath = path.resolve(
+      __dirname,
+      '..',
+      'tests/e2e/artifacts',
+      runId,
+      'report.json'
     );
-    process.exit(0);
-  }
 
-  const report = JSON.parse(readFileSync(reportPath, 'utf8'));
-  processReport(report, { ghClient: gh, runId, repo });
+    if (!existsSync(reportPath)) {
+      console.log(
+        `[e2e-report-issue] no report.json at ${reportPath} — nothing to file`
+      );
+      process.exit(0);
+    }
+
+    const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+    processReport(report, { ghClient: gh, runId, repo });
+  }
 }

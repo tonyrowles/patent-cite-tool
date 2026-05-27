@@ -1,6 +1,8 @@
 // tests/unit/e2e-report-issue.test.js
 //
 // Phase 29 Plan 02 — Vitest suite for scripts/e2e-report-issue.mjs.
+// Phase 35 Plan 35-03 — Extended with dual-search, topOfStackHashFromTriage,
+//   filterFindingsForFiling, processTriageReport unit tests (ISSUE-02, ISSUE-03).
 //
 // Tests pure-function exports (no real gh CLI invocations). Uses dependency
 // injection via processReport's ghClient parameter to intercept all gh calls.
@@ -13,8 +15,13 @@
 //   - isRecentlyUpdated(): staleness window, MAX_RECENT_DAYS constant
 //   - findMatchingIssue(): fingerprint grep, null on miss
 //   - processReport(): end-to-end dispatch — 1 comment + 1 create for fixture; zero issues when no failures
+//   (Phase 35)
+//   - topOfStackHashFromTriage(): determinism, 12-hex, sensitivity/insensitivity tests
+//   - findMatchingIssueDual(): dual-search always invoked (Pitfall 3), v1/v2 dedup
+//   - filterFindingsForFiling(): CONFIRMED admits, HARNESS_ERROR rejected (Pitfall 8)
+//   - processTriageReport(): 3-label create, HARNESS_ERROR filtered, v1-dedup no re-file
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +35,10 @@ import {
   isRecentlyUpdated,
   processReport,
   MAX_RECENT_DAYS,
+  topOfStackHashFromTriage,
+  findMatchingIssueDual,
+  filterFindingsForFiling,
+  processTriageReport,
 } from '../../scripts/e2e-report-issue.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -359,5 +370,297 @@ describe('processReport() — end-to-end dispatch with mocked gh', () => {
     // Should not throw — should warn and skip
     expect(() => processReport(badIdCase, { ghClient, runId: 'r', repo: 'a/b' })).not.toThrow();
     expect(ghCalls).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 35 extensions (ISSUE-02, ISSUE-03)
+// ---------------------------------------------------------------------------
+
+describe('Phase 35 extensions (ISSUE-02, ISSUE-03)', () => {
+  // Fixture file paths for processTriageReport integration tests
+  const __dirname35 = path.dirname(fileURLToPath(import.meta.url));
+  const FIXTURE_DIR = path.resolve(__dirname35, '../e2e/fixtures');
+  const TRIAGE_FIXTURE = JSON.parse(readFileSync(path.join(FIXTURE_DIR, 'phase35-triage-report.json'), 'utf8'));
+  const LLM_FIXTURE = JSON.parse(readFileSync(path.join(FIXTURE_DIR, 'phase35-llm-report.json'), 'utf8'));
+  const RERUN_FIXTURE = JSON.parse(readFileSync(path.join(FIXTURE_DIR, 'phase35-rerun-report.json'), 'utf8'));
+
+  // Helpers for building minimal test objects
+  function makeFinding(overrides) {
+    return {
+      iteration_n: 1,
+      severity: 'high',
+      category: 'WRONG_CITATION',
+      root_cause_hypothesis: 'test hypothesis',
+      confidence: 0.8,
+      rationale: 'The cited text does not match the observed window',
+      path_taken: 'heuristic',
+      ...overrides,
+    };
+  }
+
+  function makeIteration(overrides) {
+    return {
+      iteration_n: 1,
+      case_id: 'US11427642-spec-short-1',
+      seed: 42,
+      classification: 'WRONG_CITATION',
+      citation: '5:10-11',
+      verifier_verdict: { tier_used: 'B', status: 'pass', reason: 'window matches' },
+      ...overrides,
+    };
+  }
+
+  function makeRerunEntry(overrides) {
+    return {
+      iteration_n: 1,
+      original_verdict_status: 'pass',
+      confirmed_count: 3,
+      total_runs: 3,
+      verdict: 'CONFIRMED',
+      ...overrides,
+    };
+  }
+
+  // Mock ghClient factory — reset per test via beforeEach
+  let mockGh;
+  beforeEach(() => {
+    mockGh = {
+      listOpenWithSearch: vi.fn().mockReturnValue([]),
+      createIssueWithLabels: vi.fn().mockReturnValue({ number: 1 }),
+      addLabel: vi.fn(),
+    };
+  });
+
+  // ---------------------------------------------------------------------------
+  // topOfStackHashFromTriage (A1-A6)
+  // ---------------------------------------------------------------------------
+
+  describe('topOfStackHashFromTriage()', () => {
+    it('A1: determinism — same finding/rerun/iteration produces same 12-hex', () => {
+      const finding = makeFinding();
+      const iter = makeIteration();
+      const rerun = makeRerunEntry();
+      const a = topOfStackHashFromTriage(finding, rerun, iter);
+      const b = topOfStackHashFromTriage(finding, rerun, iter);
+      expect(a).toBe(b);
+    });
+
+    it('A2: output matches /^[a-f0-9]{12}$/', () => {
+      const h = topOfStackHashFromTriage(makeFinding(), makeRerunEntry(), makeIteration());
+      expect(h).toMatch(/^[a-f0-9]{12}$/);
+    });
+
+    it('A3: sensitivity to rationale first 30 chars — different rationale head → different hash', () => {
+      const f1 = makeFinding({ rationale: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA longer tail' });
+      const f2 = makeFinding({ rationale: 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB longer tail' });
+      const iter = makeIteration();
+      const rerun = makeRerunEntry();
+      expect(topOfStackHashFromTriage(f1, rerun, iter)).not.toBe(topOfStackHashFromTriage(f2, rerun, iter));
+    });
+
+    it('A4: insensitivity to rationale tail — only first 30 chars matter', () => {
+      const prefix = 'Same first thirty chars here!!';
+      const f1 = makeFinding({ rationale: prefix + 'tail1 different content here 12345678' });
+      const f2 = makeFinding({ rationale: prefix + 'TAIL2 completely different content XYZ' });
+      const iter = makeIteration();
+      const rerun = makeRerunEntry();
+      // First 30 chars identical → same hash
+      expect(topOfStackHashFromTriage(f1, rerun, iter)).toBe(topOfStackHashFromTriage(f2, rerun, iter));
+    });
+
+    it('A5: sensitivity to verifier_status — changing original_verdict_status produces different hash', () => {
+      const finding = makeFinding();
+      const iter = makeIteration();
+      const r1 = makeRerunEntry({ original_verdict_status: 'pass' });
+      const r2 = makeRerunEntry({ original_verdict_status: 'fail' });
+      expect(topOfStackHashFromTriage(finding, r1, iter)).not.toBe(topOfStackHashFromTriage(finding, r2, iter));
+    });
+
+    it('A6: null safety — rerunEntry=null does not throw, still returns 12-hex', () => {
+      const finding = makeFinding();
+      const iter = makeIteration();
+      let result;
+      expect(() => { result = topOfStackHashFromTriage(finding, null, iter); }).not.toThrow();
+      expect(result).toMatch(/^[a-f0-9]{12}$/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // findMatchingIssueDual (B1-B4) — D-07 / Pitfall 3
+  // ---------------------------------------------------------------------------
+
+  describe('findMatchingIssueDual()', () => {
+    it('B1: invokes listOpenWithSearch exactly twice; first query contains v1 marker, second contains v2 marker (no short-circuit)', () => {
+      findMatchingIssueDual(mockGh, 'fpv1aabbcc1234', 'fpv2ddeeff5678');
+      expect(mockGh.listOpenWithSearch.mock.calls.length).toBe(2);
+      expect(mockGh.listOpenWithSearch.mock.calls[0][0]).toContain('<!-- fingerprint:');
+      expect(mockGh.listOpenWithSearch.mock.calls[1][0]).toContain('<!-- fp:');
+    });
+
+    it('B2: mock with v1 marker in issue body → dedup hit (returns that issue)', () => {
+      const fpV1 = 'fpv1aabbcc1234';
+      const fpV2 = 'fpv2ddeeff5678';
+      const v1Issue = { number: 99, body: `<!-- fingerprint: ${fpV1} -->\nold issue body` };
+      mockGh.listOpenWithSearch.mockImplementation(q =>
+        q.includes('<!-- fingerprint:') ? [v1Issue] : []
+      );
+      const result = findMatchingIssueDual(mockGh, fpV1, fpV2);
+      expect(result).not.toBeNull();
+      expect(result.number).toBe(99);
+      // Both searches still ran (no short-circuit — Pitfall 3)
+      expect(mockGh.listOpenWithSearch.mock.calls.length).toBe(2);
+    });
+
+    it('B3: mock with v2 marker only in issue body → dedup hit', () => {
+      const fpV1 = 'fpv1aabbcc1234';
+      const fpV2 = 'fpv2ddeeff5678';
+      const v2Issue = { number: 77, body: `<!-- fp: ${fpV2} -->\nnew issue body` };
+      mockGh.listOpenWithSearch.mockImplementation(q =>
+        q.includes('<!-- fp:') ? [v2Issue] : []
+      );
+      const result = findMatchingIssueDual(mockGh, fpV1, fpV2);
+      expect(result).not.toBeNull();
+      expect(result.number).toBe(77);
+    });
+
+    it('B4: no matching marker in any issue body → returns null', () => {
+      mockGh.listOpenWithSearch.mockReturnValue([
+        { number: 50, body: 'completely unrelated issue body' },
+      ]);
+      const result = findMatchingIssueDual(mockGh, 'fpv1aabbcc1234', 'fpv2ddeeff5678');
+      expect(result).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // filterFindingsForFiling (C1-C6) — D-05 / Pitfall 8
+  // ---------------------------------------------------------------------------
+
+  // filterFindingsForFiling: excludes HARNESS_ERROR and *_parse_error (Pitfall 8 exclusion tests C3+C4)
+  describe('filterFindingsForFiling() — CONFIRMED filter (Pitfall 8 — excludes HARNESS_ERROR and *_parse_error)', () => {
+    function makeMap(entries) {
+      return new Map(entries.map(e => [e.iteration_n, e]));
+    }
+
+    it('C1: severity=critical, category=WRONG_CITATION, rerun verdict=FLAKE → KEPT', () => {
+      const finding = makeFinding({ severity: 'critical', category: 'WRONG_CITATION', path_taken: 'heuristic' });
+      const iter = makeIteration({ iteration_n: 1 });
+      const rerun = makeRerunEntry({ iteration_n: 1, verdict: 'FLAKE' });
+      const result = filterFindingsForFiling([finding], makeMap([rerun]), makeMap([iter]));
+      expect(result.length).toBe(1);
+      expect(result[0].category).toBe('WRONG_CITATION');
+    });
+
+    it('C2: severity=low, rerun verdict=CONFIRMED, category=WRONG_CITATION → KEPT (rerun-CONFIRMED admits low severity)', () => {
+      const finding = makeFinding({ severity: 'low', category: 'WRONG_CITATION', path_taken: 'heuristic' });
+      const iter = makeIteration({ iteration_n: 1 });
+      const rerun = makeRerunEntry({ iteration_n: 1, verdict: 'CONFIRMED' });
+      const result = filterFindingsForFiling([finding], makeMap([rerun]), makeMap([iter]));
+      expect(result.length).toBe(1);
+    });
+
+    it('C3: severity=critical, category=HARNESS_ERROR, rerun verdict=CONFIRMED → REJECTED (Pitfall 8 — HARNESS_ERROR always excluded)', () => {
+      const finding = makeFinding({ severity: 'critical', category: 'HARNESS_ERROR', path_taken: 'heuristic' });
+      const iter = makeIteration({ iteration_n: 1 });
+      const rerun = makeRerunEntry({ iteration_n: 1, verdict: 'CONFIRMED' });
+      const result = filterFindingsForFiling([finding], makeMap([rerun]), makeMap([iter]));
+      expect(result.length).toBe(0);
+    });
+
+    it('C4: severity=critical, path_taken=llm_single_parse_error, category=WRONG_CITATION → REJECTED (Pitfall 8 — *_parse_error always excluded)', () => {
+      const finding = makeFinding({ severity: 'critical', category: 'WRONG_CITATION', path_taken: 'llm_single_parse_error' });
+      const iter = makeIteration({ iteration_n: 1 });
+      const rerun = makeRerunEntry({ iteration_n: 1, verdict: 'CONFIRMED' });
+      const result = filterFindingsForFiling([finding], makeMap([rerun]), makeMap([iter]));
+      expect(result.length).toBe(0);
+    });
+
+    it('C5: severity=medium, path_taken=heuristic, rerun verdict=FLAKE → REJECTED (neither severity nor rerun admits it)', () => {
+      const finding = makeFinding({ severity: 'medium', category: 'WRONG_CITATION', path_taken: 'heuristic' });
+      const iter = makeIteration({ iteration_n: 1 });
+      const rerun = makeRerunEntry({ iteration_n: 1, verdict: 'FLAKE' });
+      const result = filterFindingsForFiling([finding], makeMap([rerun]), makeMap([iter]));
+      expect(result.length).toBe(0);
+    });
+
+    it('C6: finding with no matching iteration in llmByIter → REJECTED (defensive)', () => {
+      const finding = makeFinding({ iteration_n: 99 });
+      const iter = makeIteration({ iteration_n: 1 }); // different iteration_n
+      const rerun = makeRerunEntry({ iteration_n: 99, verdict: 'CONFIRMED' });
+      const result = filterFindingsForFiling([finding], makeMap([rerun]), makeMap([iter]));
+      expect(result.length).toBe(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // processTriageReport integration (D1-D4) — ISSUE-02 mock-gh tests
+  // ---------------------------------------------------------------------------
+
+  describe('processTriageReport() — mock-gh integration (ISSUE-02)', () => {
+    it('D1: 2 findings (1 WRONG_CITATION-high + 1 HARNESS_ERROR-critical) → only 1 createIssueWithLabels call (HARNESS_ERROR filtered)', () => {
+      const twoFindings = {
+        findings: [
+          makeFinding({ iteration_n: 1, severity: 'high', category: 'WRONG_CITATION', path_taken: 'heuristic' }),
+          makeFinding({ iteration_n: 1, severity: 'critical', category: 'HARNESS_ERROR', path_taken: 'heuristic' }),
+        ],
+      };
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1 })] };
+      const rerunReport = { replays: [makeRerunEntry({ iteration_n: 1, verdict: 'CONFIRMED' })] };
+
+      processTriageReport(twoFindings, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      // HARNESS_ERROR filtered — only 1 issue created
+      expect(mockGh.createIssueWithLabels.mock.calls.length).toBe(1);
+    });
+
+    it('D2: the createIssueWithLabels call receives labels = [category, "e2e-nightly", "triage"] in D-06 order', () => {
+      const singleFinding = {
+        findings: [makeFinding({ iteration_n: 1, severity: 'high', category: 'WRONG_CITATION', path_taken: 'heuristic' })],
+      };
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1 })] };
+      const rerunReport = { replays: [] };
+
+      processTriageReport(singleFinding, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      expect(mockGh.createIssueWithLabels.mock.calls.length).toBe(1);
+      const [, , labelsArg] = mockGh.createIssueWithLabels.mock.calls[0];
+      expect(labelsArg).toEqual(['WRONG_CITATION', 'e2e-nightly', 'triage']);
+    });
+
+    it('D3: pre-existing issue with v1 fingerprint marker → no createIssueWithLabels call (dedup hit via v1 marker)', () => {
+      const caseId = 'US11427642-spec-short-1';
+      const category = 'WRONG_CITATION';
+      const fpV1 = fingerprint(caseId, category, '');
+
+      const v1Issue = { number: 99, body: `<!-- fingerprint: ${fpV1} -->\nold Phase 29 issue` };
+      mockGh.listOpenWithSearch.mockImplementation(q =>
+        q.includes('<!-- fingerprint:') ? [v1Issue] : []
+      );
+
+      const singleFinding = {
+        findings: [makeFinding({ iteration_n: 1, severity: 'high', category, path_taken: 'heuristic' })],
+      };
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1, case_id: caseId, classification: category })] };
+      const rerunReport = { replays: [] };
+
+      processTriageReport(singleFinding, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      // Dedup hit — no new issue filed
+      expect(mockGh.createIssueWithLabels.mock.calls.length).toBe(0);
+    });
+
+    it('D4: listOpenWithSearch called 2× per filtered finding (Pitfall 3 — no short-circuit)', () => {
+      const singleFinding = {
+        findings: [makeFinding({ iteration_n: 1, severity: 'high', category: 'WRONG_CITATION', path_taken: 'heuristic' })],
+      };
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1 })] };
+      const rerunReport = { replays: [] };
+
+      processTriageReport(singleFinding, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      // 1 filtered finding × 2 searches = 2 listOpenWithSearch calls
+      expect(mockGh.listOpenWithSearch.mock.calls.length).toBe(2);
+    });
   });
 });

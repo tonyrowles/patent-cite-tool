@@ -112,7 +112,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 ### v3.1 LLM-Driven Product Improvement Loop (Phases 32-37)
 
 - [x] **Phase 32: HUMAN-UAT Verification** - Live end-to-end validation of `npm run e2e:explore` with Max 5 subscription credit; confirms `llm-report.json` usability and establishes local→CI handoff helper (completed 2026-05-25)
-- [ ] **Phase 33: Re-run Validator** - Deterministic 3-replay verifier-only confirm gate; defines `rerun-report.json` schema; extends `llm-report.json` iteration schema with scroll/viewport fields
+- [x] **Phase 33: Re-run Validator** - Deterministic 3-replay verifier-only confirm gate; defines `rerun-report.json` schema; extends `llm-report.json` iteration schema with scroll/viewport fields (completed 2026-05-27)
 - [ ] **Phase 34: Hybrid Triage Classifier** - Heuristic-first + LLM second-pass classification; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster pre-filter and prompt-injection defense
 - [ ] **Phase 35: Rich Issue Filer + Quarantine Corpus** - `issue-payload-builder.js`; `quarantine-append.mjs`; `test-cases-quarantine.js`; `e2e-report-issue.mjs` `--source triage` extension; fingerprint dual-search
 - [ ] **Phase 36: Quarantine CI Integration + Pipeline Orchestrator** - `quarantine.spec.js`; `run-triage-pipeline.mjs`; `e2e-nightly.yml` wiring with `llm_run_id` input; `promote-from-quarantine.mjs`; timeout budget audit
@@ -149,8 +149,8 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] 33-01-PLAN.md — Atomic D-13 + D-15 schema split and UAT fixture re-stamp (RERUN-03 schema side)
 - [x] 33-02-PLAN.md — rerun-validator.js module + unit tests (RERUN-01 core, RERUN-02)
 - [x] 33-03-PLAN.md — e2e-explore.mjs capture block + 6 call-site threading (RERUN-03 capture side)
-- [ ] 33-04-PLAN.md — e2e-rerun-validator.mjs CLI runner + spawnSync integration tests (RERUN-01 CLI surface)
-- [ ] 33-05-PLAN.md — ESLint per-file independence guard + lint smoke test (RERUN-04)
+- [x] 33-04-PLAN.md — e2e-rerun-validator.mjs CLI runner + spawnSync integration tests (RERUN-01 CLI surface)
+- [x] 33-05-PLAN.md — ESLint per-file independence guard + lint smoke test (RERUN-04)
 
 ### Phase 34: Hybrid Triage Classifier
 **Goal**: Triaged findings in `triage-report.json` are classified by heuristic rules for 6 of 8 ERROR_CLASSES without any LLM invocation, with an LLM second-pass (via `invokeClaudePWithLedger`) handling only the ambiguous remainder — cost-controlled by cluster pre-filter and protected against prompt injection
@@ -235,7 +235,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
-| 33. Re-run Validator | v3.1 | 3/5 | In Progress|  |
+| 33. Re-run Validator | v3.1 | 5/5 | Complete   | 2026-05-27 |
 | 34. Hybrid Triage Classifier | v3.1 | 0/? | Not started | - |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |

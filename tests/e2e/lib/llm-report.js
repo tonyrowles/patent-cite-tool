@@ -164,9 +164,25 @@ function recomputeSummary(iterations) {
   return s;
 }
 
+/**
+ * WR-03 (Phase 33 review): top-level `schema_version: 1` is the same envelope
+ * marker D-15 added to the migrated UAT fixture. Stamping it here on every
+ * fresh `e2e:explore` init keeps live runs and the committed fixture
+ * symmetric — Phase 34's triage classifier (33-CONTEXT.md says it reads both
+ * llm-report.json and rerun-report.json "with the same idioms") never has to
+ * branch on the field's presence. The schema-guard test on the UAT fixture
+ * (uat-phase32-llm-report.schema.test.js:86-89) is scoped to the migrated
+ * file and would not catch a missing field on live writes; this closes that
+ * silent-drift gap. Kept as the FIRST key of the returned object to match
+ * the migrated fixture's key order exactly (jq queries that read `.[0].key`
+ * style remain stable).
+ */
+const LLM_REPORT_SCHEMA_VERSION = 1;
+
 function emptyReport(meta) {
   const now = new Date().toISOString();
   return {
+    schema_version: LLM_REPORT_SCHEMA_VERSION,
     run_id: meta?.run_id,
     started_iso: now,
     finished_iso: now,

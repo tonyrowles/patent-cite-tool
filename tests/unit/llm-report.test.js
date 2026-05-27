@@ -141,6 +141,32 @@ describe('tests/e2e/lib/llm-report.js — initLlmReport', () => {
     expect(after.iterations).toHaveLength(1);
     expect(after.iterations[0].iteration_n).toBe(1);
   });
+
+  // -------------------------------------------------------------------------
+  // WR-03 (Phase 33 review) regression: initLlmReport must stamp
+  // `schema_version: 1` on the freshly-initialized report, matching the
+  // envelope D-15 added to the migrated UAT fixture. Without this, live
+  // `e2e:explore` runs would produce reports lacking the field even though
+  // the committed UAT fixture carries it — Phase 34's triage classifier
+  // would need a branch on field presence, silently drifting from the
+  // intent of "schema is locked".
+  // -------------------------------------------------------------------------
+  it('Test 3a (WR-03): freshly-initialized report carries schema_version: 1 as the first key', () => {
+    initLlmReport(reportPath, { run_id: RUN_ID, iterations_total: 5 });
+    const r = readReport();
+    expect(r.schema_version).toBe(1);
+    // Also assert key ORDER — first key matches the migrated UAT fixture's
+    // ordering so jq queries that read `.[0].key` style remain stable.
+    expect(Object.keys(r)[0]).toBe('schema_version');
+  });
+
+  it('Test 3b (WR-03): schema_version survives appendLlmIteration round-trip', () => {
+    initLlmReport(reportPath, { run_id: RUN_ID, iterations_total: 5 });
+    appendLlmIteration(reportPath, makeIteration({ iteration_n: 1 }));
+    const r = readReport();
+    expect(r.schema_version).toBe(1);
+    expect(r.iterations).toHaveLength(1);
+  });
 });
 
 describe('tests/e2e/lib/llm-report.js — appendLlmIteration summary recompute', () => {

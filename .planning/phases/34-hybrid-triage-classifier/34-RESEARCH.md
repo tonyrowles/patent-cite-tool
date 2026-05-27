@@ -756,27 +756,13 @@ export async function invokeClaudePWithLedger({
 | A7 | The recommended cluster-response parser strategy on size mismatch is per-missing-`iteration_n` synthetic error finding. CONTEXT.md does not specify; this is Pitfall 6 mitigation guidance. | Pitfall 6 | Medium — planner needs explicit strategy; alternative is "fail the entire cluster and route to per-finding fallback" |
 | A8 | `source: 'triage'` ledger tag is the canonical string for this phase's call site. CONTEXT.md D-06 says `source` field tags ledger entries; this research recommends literal `'triage'`. | Wrapper code | Low — string convention; future digest caller uses `'digest'` per D-06 |
 
-## Open Questions
+## Open Questions (RESOLVED 2026-05-27)
 
-1. **Behavior when a Tier C ambiguous finding is the SOLE member of its category group (cluster size < 5).**
-   - What we know: D-11 says clustering at N≥5 triggers grouped LLM call.
-   - What's unclear: Should the lonely Tier C finding go to a single LLM call (recommended) or be batched with other categories (cross-category clustering)?
-   - Recommendation: ONE LLM call per finding when `< CLUSTER_THRESHOLD` (no cross-category mixing). Planner confirms.
-
-2. **`triage-report.json.summary.cluster_pass_count` definition: number of clusters, or number of findings resolved via cluster path?**
-   - What we know: D-09 lists `cluster_pass_count` in the summary.
-   - What's unclear: Is `cluster_pass_count` the number of *grouped LLM calls* (e.g., 1) or the number of *findings* resolved via cluster (e.g., 5)?
-   - Recommendation: number of FINDINGS resolved via cluster path (matches `heuristic_count` + `llm_pass_count` arithmetic, where total_findings = sum of all three). Planner confirms.
-
-3. **Cluster prompt response shape: single JSON array or one JSON object per finding?**
-   - What we know: D-11 says "single JSON response parsed into per-finding triage entries."
-   - What's unclear: Is it `[{iteration_n: 5, ...}, ...]` or `{"5": {...}, "6": {...}}`?
-   - Recommendation: array (`[{iteration_n, severity, ...}]`) — easier to parse, easier to validate length. Planner picks prompt template.
-
-4. **Should the wrapper accept an optional injected `ledgerPath` for unit tests, or always use the constant `LEDGER_PATH`?**
-   - What we know: `appendLedgerEntry(ledgerPath, entry)` accepts an explicit path; the constant defaults exist.
-   - What's unclear: Will Vitest tests need to swap `LEDGER_PATH` (via `E2E_LEDGER_PATH_OVERRIDE`) or inject a fake path?
-   - Recommendation: NOT inject — use the existing `E2E_LEDGER_PATH_OVERRIDE` env-var pattern in `beforeEach` (Phase 32 test pattern, verified at `llm-ledger.js:73`). Keeps wrapper signature minimal.
+1. **Tier C ambiguous finding solo (cluster size < 5). RESOLVED:** ONE LLM call per finding when `< CLUSTER_THRESHOLD`. NO cross-category mixing. Planner adopts.
+2. **`cluster_pass_count` definition. RESOLVED:** number of FINDINGS resolved via cluster path (NOT number of clusters). `total_findings === heuristic_count + llm_pass_count + cluster_pass_count`. Planner adopts.
+3. **Cluster prompt response shape. RESOLVED:** array form `[{iteration_n, severity, category, root_cause_hypothesis, confidence, rationale}, ...]`. Easier to parse, length-validatable.
+4. **Wrapper accepts injected `ledgerPath`? RESOLVED:** NO — use the existing `E2E_LEDGER_PATH_OVERRIDE` env-var pattern (Phase 32 test pattern, verified at `llm-ledger.js:73`). Wrapper signature stays minimal.
+5. **(NEW 2026-05-27, supersedes D-16) `getPdfSnippet` injected dep. RESOLVED:** REMOVED entirely. Per revised CONTEXT.md D-16, the triage classifier reads `iteration.llm_selection.selectedText` directly from the input llm-report.json. `renderPdfSnippet` returns a PNG path, not text — wrong fit for prompt injection. `selectedText` (already present, ≤300 chars per Phase 31 SELECTION_MAX_CHARS) is the natural patent_data payload. `wrapPatentData(selectedText)` flows into the LLM second-pass prompt.
 
 ## Environment Availability
 

@@ -100,14 +100,14 @@ Phase 34 delivers a hybrid triage classifier that turns Phase 33's outputs (`llm
     inputLlmReport,        // parsed object
     inputRerunReport,      // parsed object
     invokeLlm,             // injected dep (invokeClaudePWithLedger by default)
-    getPdfSnippet,         // injected dep (Phase 27 pdf-snippet.js by default)
     writeReport,           // injected dep
     now,                   // injected clock for deterministic tests
     sourcePaths            // {llm: '<path>', rerun: '<path>'} for output frontmatter
   }) → triageReport
+  // Note: no getPdfSnippet dep — per revised D-16, the classifier reads `selectedText` directly from each iteration's `llm_selection` field. selectedText is the natural patent-data content for LLM second-pass prompts (already present, ≤300 chars, untrusted-but-already-validated).
   ```
 - **D-15:** CLI runner `scripts/e2e-triage-classifier.mjs` + new `npm run e2e:triage-classifier -- --input <path>` script. `--input` resolves to an `llm-report.json` path; CLI auto-discovers the sibling `rerun-report.json` in the same `artifacts/{runId}/` directory (errors out clean if missing). Mirrors `e2e-rerun-validator.mjs` (D-06 Phase 33). `isMain` guard via `fileURLToPath` + `path.resolve` (WR-02 pattern).
-- **D-16:** PDF snippet extraction reuses `tests/e2e/lib/pdf-snippet.js` (Phase 27 module). The classifier accepts an injected `getPdfSnippet({patentId, citation})` dependency; CLI wires the real implementation. Snippet text is what gets `wrapPatentData`-wrapped before injection into LLM prompts.
+- **D-16 (REVISED 2026-05-27):** No new PDF-text extractor is built. The existing `iteration.llm_selection.selectedText` from `llm-report.json` IS the natural "patent_data" content — it is exactly the text the LLM previously selected from the patent body, and it is already attached to every iteration the triage classifier consumes. The classifier reads `selectedText` directly from each iteration (no injected `getPdfSnippet` dependency). `wrapPatentData(selectedText)` is what flows into the LLM second-pass prompt. Rationale: `tests/e2e/lib/pdf-snippet.js::renderPdfSnippet` returns a PNG path string, not text, and requires (`patentId, page, line, runId, caseId`) — none of which is the right shape for prompt-text injection. The original D-16 wording was a mistaken cross-reference. By scoping the LLM prompt to selectedText we (a) avoid a new code path; (b) preserve the prompt-injection defense via D-13's `wrapPatentData`; (c) keep snippets bounded (≤300 chars per Phase 31's SELECTION_MAX_CHARS). `verifier_verdict` (also already on the iteration) provides additional structured triage signal that the prompt builder concatenates OUTSIDE the `<patent_data>` envelope (it is trusted harness output, not untrusted patent text).
 
 ### Claude's Discretion
 - Exact LLM second-pass prompt wording — planner picks. The prompt must instruct the model to return strict JSON matching the per-finding shape and must reference the `<patent_data>` block as untrusted.
@@ -135,7 +135,7 @@ Phase 34 delivers a hybrid triage classifier that turns Phase 33's outputs (`llm
 - `tests/e2e/lib/llm-driver.js` — `invokeClaudeP` (existing), `LLM_TIMEOUT_MS`, `parseClaudeResponse`. D-05/D-06 ADD `invokeClaudePWithLedger` to this module.
 - `tests/e2e/lib/llm-ledger.js` — `appendLedgerEntry`, `readLedger`, `monthlyTotal`, `phaseTotal`, `HARD_CAP_USD`, `WARN_THRESHOLD_USD`, `PHASE_HARD_CAP_USD`. The wrapper calls these.
 - `tests/e2e/lib/error-codes.js` — `ERROR_CLASSES` (11 entries; 6 of these + 2 classifications make the "8 ERROR_CLASSES" mentioned in TRIAGE-01).
-- `tests/e2e/lib/pdf-snippet.js` — Phase 27 snippet extractor. The classifier consumes it via injected dep (D-16).
+- ~~`tests/e2e/lib/pdf-snippet.js`~~ — NOT used by Phase 34 (per revised D-16). The original CONTEXT.md draft cross-referenced this module incorrectly; the revised plan uses `iteration.llm_selection.selectedText` directly instead.
 - `tests/e2e/lib/rerun-validator.js` — Phase 33's output schema is the primary input to D-03's rule chain.
 - `tests/e2e/lib/llm-report.js` — schema reference for the input llm-report.json envelope (`schema_version`, `iterations[]`).
 - `scripts/e2e-rerun-validator.mjs` — CLI shim PATTERN for D-15 (parseArgs, isMain guard, newest-by-mtime default).

@@ -175,9 +175,14 @@ function buildClusterPrompt(category, group) {
 function parseSingleResponse(llmText, iter) {
   try {
     const parsed = JSON.parse(llmText);
+    // WR-01: clamp LLM-supplied severity to the SEVERITIES taxonomy (D-04).
+    // Untrusted LLM output may emit 'BLOCKER', 'urgent', null, etc.; the
+    // by_severity summary loop would silently add a new key, drifting the
+    // D-09 schema. Fall back to 'medium' on any out-of-taxonomy value.
+    const severity = SEVERITIES.includes(parsed.severity) ? parsed.severity : 'medium';
     return {
       iteration_n: iter.iteration_n,
-      severity: parsed.severity,
+      severity,
       category: parsed.category ?? iter.classification,
       root_cause_hypothesis: parsed.root_cause_hypothesis ?? '',
       confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
@@ -223,9 +228,12 @@ function parseClusterResponse(llmText, group) {
   for (const iter of group) {
     const p = byIterN.get(iter.iteration_n);
     if (p) {
+      // WR-01: clamp LLM-supplied severity to the SEVERITIES taxonomy (D-04)
+      // for the same schema-drift reason as parseSingleResponse above.
+      const severity = SEVERITIES.includes(p.severity) ? p.severity : 'medium';
       findings.push({
         iteration_n: iter.iteration_n,
-        severity: p.severity ?? 'medium',
+        severity,
         category: p.category ?? iter.classification,
         root_cause_hypothesis: p.root_cause_hypothesis ?? '',
         confidence: typeof p.confidence === 'number' ? p.confidence : 0,

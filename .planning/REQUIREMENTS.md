@@ -23,12 +23,12 @@ Requirements for this milestone. Each maps to roadmap phases (continued numberin
 
 ### TRIAGE — Hybrid Classifier
 
-- [ ] **TRIAGE-01**: Heuristic-first classifier resolves 6 of 8 ERROR_CLASSES without LLM invocation (LLM_HALLUCINATED_SELECTION, LLM_API_ERROR, HARNESS_ERROR, PASS, WRONG_CITATION with verifier Tier A/B, and FLAKE from rerun-validator)
-- [ ] **TRIAGE-02**: Heuristic uses named `verifier_strong_agreement` constant (status==='pass' AND tier ∈ {A,B}); Tier C agreements escalate to LLM second-pass (prevents Tier C masking)
-- [ ] **TRIAGE-03**: Cluster pre-filter routes N≥5 same-errorClass findings (e.g. GOOGLE_DOM_DRIFT) to a single grouped LLM call (cost control)
-- [ ] **TRIAGE-04**: LLM second-pass uses `invokeClaudePWithLedger` wrapper that calls `appendLedgerEntry` automatically; subscription-local-only (not API-billed); CI guard rejects accidental CI invocation
-- [ ] **TRIAGE-05**: Triage classifier writes `triage-report.json` with `{severity, category, root_cause_hypothesis, confidence, rationale}` per finding
-- [ ] **TRIAGE-06**: PDF text injected into LLM prompt is wrapped in `<patent_data>` XML tags to isolate from instructions (prompt-injection defense)
+- [x] **TRIAGE-01**: Heuristic-first classifier resolves 6 of 8 ERROR_CLASSES without LLM invocation (LLM_HALLUCINATED_SELECTION, LLM_API_ERROR, HARNESS_ERROR, PASS, WRONG_CITATION with verifier Tier A/B, and FLAKE from rerun-validator)
+- [x] **TRIAGE-02**: Heuristic uses named `verifier_strong_agreement` constant (status==='pass' AND tier ∈ {A,B}); Tier C agreements escalate to LLM second-pass (prevents Tier C masking)
+- [x] **TRIAGE-03**: Cluster pre-filter routes N≥5 same-errorClass findings (e.g. GOOGLE_DOM_DRIFT) to a single grouped LLM call (cost control)
+- [x] **TRIAGE-04**: LLM second-pass uses `invokeClaudePWithLedger` wrapper that calls `appendLedgerEntry` automatically; subscription-local-only (not API-billed); CI guard rejects accidental CI invocation
+- [x] **TRIAGE-05**: Triage classifier writes `triage-report.json` with `{severity, category, root_cause_hypothesis, confidence, rationale}` per finding
+- [x] **TRIAGE-06**: PDF text injected into LLM prompt is wrapped in `<patent_data>` XML tags to isolate from instructions (prompt-injection defense)
 
 ### ISSUE — Rich-Context Auto-Issue Filer
 
@@ -108,12 +108,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RERUN-02 | Phase 33 | Complete |
 | RERUN-03 | Phase 33 | Complete |
 | RERUN-04 | Phase 33 | Complete |
-| TRIAGE-01 | Phase 34 | Pending |
-| TRIAGE-02 | Phase 34 | Pending |
-| TRIAGE-03 | Phase 34 | Pending |
-| TRIAGE-04 | Phase 34 | Pending |
-| TRIAGE-05 | Phase 34 | Pending |
-| TRIAGE-06 | Phase 34 | Pending |
+| TRIAGE-01 | Phase 34 | Complete |
+| TRIAGE-02 | Phase 34 | Complete |
+| TRIAGE-03 | Phase 34 | Complete |
+| TRIAGE-04 | Phase 34 | Complete |
+| TRIAGE-05 | Phase 34 | Complete |
+| TRIAGE-06 | Phase 34 | Complete |
 | ISSUE-01 | Phase 35 | Pending |
 | ISSUE-02 | Phase 35 | Pending |
 | ISSUE-03 | Phase 35 | Pending |

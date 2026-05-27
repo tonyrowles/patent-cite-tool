@@ -113,7 +113,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 
 - [x] **Phase 32: HUMAN-UAT Verification** - Live end-to-end validation of `npm run e2e:explore` with Max 5 subscription credit; confirms `llm-report.json` usability and establishes local→CI handoff helper (completed 2026-05-25)
 - [x] **Phase 33: Re-run Validator** - Deterministic 3-replay verifier-only confirm gate; defines `rerun-report.json` schema; extends `llm-report.json` iteration schema with scroll/viewport fields (completed 2026-05-27)
-- [ ] **Phase 34: Hybrid Triage Classifier** - Heuristic-first + LLM second-pass classification; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster pre-filter and prompt-injection defense
+- [x] **Phase 34: Hybrid Triage Classifier** - Heuristic-first + LLM second-pass classification; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster pre-filter and prompt-injection defense (completed 2026-05-27)
 - [ ] **Phase 35: Rich Issue Filer + Quarantine Corpus** - `issue-payload-builder.js`; `quarantine-append.mjs`; `test-cases-quarantine.js`; `e2e-report-issue.mjs` `--source triage` extension; fingerprint dual-search
 - [ ] **Phase 36: Quarantine CI Integration + Pipeline Orchestrator** - `quarantine.spec.js`; `run-triage-pipeline.mjs`; `e2e-nightly.yml` wiring with `llm_run_id` input; `promote-from-quarantine.mjs`; timeout budget audit
 - [ ] **Phase 37: Weekly Analytics Digest** - `weekly-digest.mjs`; `e2e-weekly-digest.yml` Monday cron; GitHub Discussion + committed markdown; `SUMMARY_KEYS` export and validation
@@ -166,7 +166,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] 34-01-PLAN.md — invokeClaudePWithLedger wrapper in llm-driver.js + Vitest tests (TRIAGE-04 wrapper-layer)
 - [x] 34-02-PLAN.md — triage-classifier.js heuristic core: VERIFIER_STRONG_AGREEMENT + SEVERITIES + rule chain + triage-report.json schema (TRIAGE-01, TRIAGE-02, TRIAGE-05)
 - [x] 34-03-PLAN.md — cluster pre-filter + wrapPatentData + LLM second-pass dispatch (TRIAGE-03, TRIAGE-06)
-- [ ] 34-04-PLAN.md — e2e-triage-classifier.mjs CLI + spawnSync tests + npm script + CI guard (TRIAGE-04 script-layer)
+- [x] 34-04-PLAN.md — e2e-triage-classifier.mjs CLI + spawnSync tests + npm script + CI guard (TRIAGE-04 script-layer)
 - [x] 34-05-PLAN.md — eslint.config.js D-07 per-file block + scope-extension test (TRIAGE-04 ESLint-layer)
 
 ### Phase 35: Rich Issue Filer + Quarantine Corpus
@@ -241,7 +241,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
 | 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
-| 34. Hybrid Triage Classifier | v3.1 | 4/5 | In Progress|  |
+| 34. Hybrid Triage Classifier | v3.1 | 5/5 | Complete    | 2026-05-27 |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |
 | 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |

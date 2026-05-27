@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: LLM-Driven Product Improvement Loop
-status: executing
-last_updated: "2026-05-27T17:01:39.157Z"
+status: ready_to_plan
+last_updated: 2026-05-27T18:07:58.812Z
 last_activity: 2026-05-27 -- Phase 34 execution started
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 15
-  completed_plans: 10
+  completed_plans: 15
   percent: 33
+stopped_at: Phase 34 complete (5/5) — ready to discuss Phase 35
 ---
 
 # Project State
@@ -20,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-22)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 34 — Hybrid Triage Classifier
+**Current focus:** Phase 35 — rich issue filer + quarantine corpus
 
 ## Current Position
 
-Phase: 34 (Hybrid Triage Classifier) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 34
-Last activity: 2026-05-27 -- Phase 34 execution started
+Phase: 35
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-27
 
 Progress: ░░░░░░░░░░ 0% (0/6 phases complete)
 

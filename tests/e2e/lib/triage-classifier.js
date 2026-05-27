@@ -414,15 +414,23 @@ export async function runTriage({
       continue;
     }
 
-    // D-03 Rule 2: CONFIRMED + strong agreement (Tier A or B only — Pitfall 2)
+    // D-03 Rule 2: CONFIRMED + strong agreement (Tier A or B only — Pitfall 2).
+    // WR-02: explicit severity map gates the branch on classification AND
+    // assigns the D-04 severity per classification. A pathological iteration
+    // with a synthetic verifier_verdict matching VERIFIER_STRONG_AGREEMENT and
+    // classification 'LLM_HALLUCINATED_SELECTION' must NOT silently downgrade
+    // to 'medium' (D-04 maps that to 'critical') — instead it falls through
+    // to Rule 3 / Rule 4 and escalates via the LLM second-pass.
+    const RULE2_SEVERITY = { WRONG_CITATION: 'high', VERIFIER_DISAGREE: 'medium' };
     if (
       rerunEntry?.verdict === 'CONFIRMED' &&
       iter.verifier_verdict &&
-      VERIFIER_STRONG_AGREEMENT(iter.verifier_verdict)
+      VERIFIER_STRONG_AGREEMENT(iter.verifier_verdict) &&
+      iter.classification in RULE2_SEVERITY
     ) {
       report.findings.push({
         iteration_n: iter.iteration_n,
-        severity: iter.classification === 'WRONG_CITATION' ? 'high' : 'medium',
+        severity: RULE2_SEVERITY[iter.classification],
         category: iter.classification,
         root_cause_hypothesis: 'verifier confirms; non-flaky',
         confidence: 0.95,

@@ -1,11 +1,45 @@
 #!/usr/bin/env node
 // scripts/_migrate-uat-fixture.mjs
 //
-// Phase 33 D-15 — One-shot migration script that re-stamps
+// Phase 33 D-15 — One-shot migration script that re-stamped
 // tests/e2e/fixtures/uat-phase32-llm-report.json in place:
-//   1. Adds top-level `schema_version: 1` as the FIRST key
-//   2. Adds null-valued capture-state keys on every iteration entry:
+//   1. Added top-level `schema_version: 1` as the FIRST key
+//   2. Added null-valued capture-state keys on every iteration entry:
 //      scroll_y, viewport_width, viewport_height, selected_node_xpath
+//
+// ============================================================================
+// STATUS — POST-INVOCATION (read this before deciding what to do with the file)
+// ============================================================================
+//
+// This script was INVOKED ONCE during Phase 33 (Plan 33-01) and the fixture is
+// now fully migrated. The script's job is therefore done; running it again is
+// a no-op because every key-addition is gated on a presence check.
+//
+// DOCUMENTED DEVIATION FROM 33-CONTEXT.md D-15:
+//   D-15 literally said the script should be "invoked once and not committed
+//   long-term". Plan 33-01 deliberately overrode that — the file IS committed.
+//   This is a conscious tradeoff, not an oversight:
+//
+//     a) The script is fully idempotent (presence-checked key additions), so
+//        an accidental re-run is byte-safe.
+//     b) It serves as a permanent AUDIT TRAIL of how the committed fixture was
+//        re-stamped. Anyone investigating where schema_version came from in
+//        tests/e2e/fixtures/uat-phase32-llm-report.json can read this script
+//        and see the exact transformation, without spelunking git history.
+//     c) Removing it later is cheap (`git rm scripts/_migrate-uat-fixture.mjs`)
+//        if a future maintainer prefers the strict-D-15 reading.
+//
+// DO NOT RUN AUTOMATICALLY: this script is NOT wired into any npm script, CI
+// job, or test setup. It exists solely as an inert audit-trail document and a
+// re-run safety net for the unlikely case the fixture needs the same migration
+// applied again (e.g. a future fixture file that lacks schema_version).
+//
+// IF THE FIXTURE EVOLVES TO A schema_version >= 2:
+//   Do NOT modify this script. Write a NEW _migrate-uat-fixture-v2.mjs (or
+//   inline the migration into the relevant phase) so each migration's audit
+//   trail stays a self-contained, one-shot, idempotent record.
+//
+// ============================================================================
 //
 // SAFE TO RE-RUN (idempotent):
 //   Each key addition uses a presence check before writing (e.g.,

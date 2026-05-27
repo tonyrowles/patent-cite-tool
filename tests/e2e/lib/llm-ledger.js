@@ -285,6 +285,10 @@ export function checkPhaseSpendCap(ledger, phase) {
  * is written each time, so a crash mid-write leaves either the prior
  * good state or a (rare) corrupt file that readLedger() treats as empty.
  *
+ * Entry shape: only `iso`, `model`, and `cost_usd` are required. The
+ * function spreads the entry into iterations[] verbatim, so any additional
+ * fields the caller provides are preserved on disk.
+ *
  * @param {string} ledgerPath
  * @param {{
  *   iso: string,
@@ -292,14 +296,24 @@ export function checkPhaseSpendCap(ledger, phase) {
  *   cost_usd: number,
  *   tokens_in?: number,
  *   tokens_out?: number,
- *   iteration_n: number,
- *   run_id: string,
+ *   iteration_n?: number,
+ *   run_id?: string,
  *   phase?: string|null,
+ *   source?: string|null,
  * }} entry
+ *   Phase 31/32 callers (the picker-prompt invocation loop in
+ *   scripts/e2e-explore.mjs) set `iteration_n` and `run_id` so that ledger
+ *   entries can be linked back to a specific iteration within a specific
+ *   exploration run for forensic reconciliation.
+ *   Phase 34 callers (invokeClaudePWithLedger in llm-driver.js) DO NOT pass
+ *   `iteration_n` / `run_id` — triage LLM calls are aggregated per cluster
+ *   (or per ambiguous Tier-C finding) and don't have a single owning
+ *   iteration in the Phase 31 sense; instead they set `source: 'triage'`
+ *   so audit-time greps can still partition ledger entries by call site.
  *   Phase 32 (D-14) backward compatibility: the optional `phase` field is
- *   spread through to iterations[] verbatim — the function body is unchanged.
- *   Legacy callers that omit `phase` continue to produce valid entries; new
- *   callers may set `phase: '32'` (etc.) to feed phaseTotal / checkPhaseSpendCap.
+ *   spread through to iterations[] verbatim — legacy callers that omit
+ *   `phase` continue to produce valid entries; new callers may set
+ *   `phase: '32'` / `'34'` / etc. to feed phaseTotal / checkPhaseSpendCap.
  */
 export function appendLedgerEntry(ledgerPath, entry) {
   const ledger = readLedger(ledgerPath);

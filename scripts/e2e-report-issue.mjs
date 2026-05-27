@@ -441,7 +441,7 @@ export function processReport(report, { ghClient, runId, repo }) {
 // Real ghClient — uses execSync('gh ...'). Only invoked from the CLI shim.
 // ---------------------------------------------------------------------------
 
-function makeRealGhClient(repo) {
+export function makeRealGhClient(repo) {
   return {
     listOpenNightlyIssues() {
       try {

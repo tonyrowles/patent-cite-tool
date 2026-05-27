@@ -34,6 +34,14 @@
 //     22. env passed to spawn has ANTHROPIC_API_KEY === '' (Pitfall 1)
 //     23. args contain --output-format json --max-turns 1; NO --bare; NO --json-schema
 //     24. timeout fires child.kill('SIGTERM') and resolves {timedOut:true, ...}
+//
+// Phase 34 Plan 01 (TRIAGE-04) — invokeClaudePWithLedger wrapper:
+//     25. CI=true → {ok:false, ciGate:true}; invokeClaudeP and appendLedgerEntry never called
+//     26. GITHUB_ACTIONS=true → {ok:false, ciGate:true} (defense-in-depth)
+//     27. Monthly cap block → {ok:false, capBlocked:true}; invokeClaudeP never called
+//     28. Phase cap block → {ok:false, capBlocked:true}; invokeClaudeP never called
+//     29. Happy path → {ok:true, llmText, modelId, costUsd:0.01}; appendLedgerEntry called once
+//     30. is_error:true with non-zero cost (Pitfall 8) → appendLedgerEntry still fires
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
@@ -68,6 +76,12 @@ const {
   SELECTION_MIN_CHARS,
   SELECTION_MAX_CHARS,
 } = await import('../e2e/lib/llm-driver.js');
+
+// Namespace imports for invokeClaudePWithLedger spy-based tests (Phase 34 Plan 01).
+// Imported as namespaces so vi.spyOn can intercept calls at the module boundary.
+import * as drv from '../e2e/lib/llm-driver.js';
+import * as ledgerNs from '../e2e/lib/llm-ledger.js';
+import { LEDGER_PATH, PHASE_HARD_CAP_USD, HARD_CAP_USD } from '../e2e/lib/llm-ledger.js';
 
 beforeEach(() => {
   spawnCalls.length = 0;
@@ -405,5 +419,200 @@ describe('exported constants', () => {
   });
   it('SELECTION_MAX_CHARS === 300', () => {
     expect(SELECTION_MAX_CHARS).toBe(300);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// invokeClaudePWithLedger
+// Phase 34 Plan 01 — TDD block (Task 1 = RED, Task 2 = GREEN)
+// ---------------------------------------------------------------------------
+
+// Canonical happy-path stdout envelope returned by the invokeClaudeP spy
+// (the shape parseClaudeResponse expects from `claude -p --output-format json`).
+const HAPPY_STDOUT = JSON.stringify({
+  type: 'result',
+  subtype: 'success',
+  is_error: false,
+  result: '{"foo":"bar"}',
+  total_cost_usd: 0.01,
+  duration_ms: 1234,
+  // modelUsage drives modelId extraction in parseClaudeResponse.
+  modelUsage: { 'claude-3-5-haiku-20241022': { costUSD: 0.01 } },
+  // usage drives tokens_in / tokens_out in the ledger entry.
+  usage: { input_tokens: 100, output_tokens: 50 },
+});
+
+// is_error envelope for Pitfall 8 test (cost non-zero on error).
+const IS_ERROR_STDOUT = JSON.stringify({
+  type: 'result',
+  subtype: 'error_max_turns',
+  is_error: true,
+  result: '',
+  total_cost_usd: 0.07,
+  duration_ms: 1000,
+  modelUsage: { 'claude-3-5-haiku-20241022': { costUSD: 0.07 } },
+  usage: { input_tokens: 50, output_tokens: 0 },
+});
+
+// Empty ledger fixture (no spend recorded — all caps are 'ok').
+const EMPTY_LEDGER = { version: 1, months: {} };
+
+describe('invokeClaudePWithLedger', () => {
+  let invokeSpy;
+  let readLedgerSpy;
+  let appendSpy;
+
+  beforeEach(() => {
+    // Spy on invokeClaudeP in the namespace so wrapper calls are intercepted.
+    invokeSpy = vi.spyOn(drv, 'invokeClaudeP').mockResolvedValue({
+      timedOut: false,
+      stdout: HAPPY_STDOUT,
+      stderr: '',
+      code: 0,
+    });
+    // Spy on readLedger so tests don't touch the real ledger file.
+    readLedgerSpy = vi.spyOn(ledgerNs, 'readLedger').mockReturnValue(EMPTY_LEDGER);
+    // Spy on appendLedgerEntry so tests don't write real files.
+    appendSpy = vi.spyOn(ledgerNs, 'appendLedgerEntry').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('Test 1: CI=true → {ok:false, ciGate:true}; invokeClaudeP and appendLedgerEntry never called', async () => {
+    vi.stubEnv('CI', 'true');
+    vi.stubEnv('GITHUB_ACTIONS', undefined);
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '34',
+      source: 'triage',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ciGate).toBe(true);
+    expect(invokeSpy).toHaveBeenCalledTimes(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 2: GITHUB_ACTIONS=true with CI unset → {ok:false, ciGate:true} (defense-in-depth)', async () => {
+    vi.stubEnv('CI', undefined);
+    vi.stubEnv('GITHUB_ACTIONS', 'true');
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '34',
+      source: 'triage',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ciGate).toBe(true);
+    expect(invokeSpy).toHaveBeenCalledTimes(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 3: Monthly cap block → {ok:false, capBlocked:true, monthly.status=block}; invokeClaudeP never called', async () => {
+    const currentMonthKey = new Date().toISOString().slice(0, 7);
+    readLedgerSpy.mockReturnValue({
+      version: 1,
+      months: {
+        [currentMonthKey]: {
+          invocations: 10,
+          total_usd: 120,
+          last_invocation_iso: new Date().toISOString(),
+          iterations: [],
+        },
+      },
+    });
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '34',
+      source: 'triage',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.capBlocked).toBe(true);
+    expect(result.monthly).toBeDefined();
+    expect(result.monthly.status).toBe('block');
+    expect(invokeSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 4: Phase cap block → {ok:false, capBlocked:true, phaseCap.status=block}; invokeClaudeP never called', async () => {
+    const currentMonthKey = new Date().toISOString().slice(0, 7);
+    // Seed ledger with iterations whose phase='34' sum to >= PHASE_HARD_CAP_USD ($10).
+    readLedgerSpy.mockReturnValue({
+      version: 1,
+      months: {
+        [currentMonthKey]: {
+          invocations: 5,
+          total_usd: 11,
+          last_invocation_iso: new Date().toISOString(),
+          iterations: [
+            { iso: new Date().toISOString(), model: 'claude-3-5-haiku', cost_usd: 11, phase: '34' },
+          ],
+        },
+      },
+    });
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '34',
+      source: 'triage',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.capBlocked).toBe(true);
+    expect(result.phaseCap).toBeDefined();
+    expect(result.phaseCap.status).toBe('block');
+    expect(invokeSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 5: Happy path → {ok:true, llmText, modelId, costUsd:0.01} and appendLedgerEntry called once with correct args', async () => {
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '34',
+      source: 'triage',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.llmText).toBe('{"foo":"bar"}');
+    expect(result.modelId).toBe('claude-3-5-haiku-20241022');
+    expect(result.costUsd).toBe(0.01);
+    expect(result.rawJson).toBeDefined();
+
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const [calledPath, calledEntry] = appendSpy.mock.calls[0];
+    expect(calledPath).toBe(LEDGER_PATH);
+    expect(calledEntry).toMatchObject({
+      phase: '34',
+      source: 'triage',
+      cost_usd: 0.01,
+    });
+    expect(typeof calledEntry.iso).toBe('string');
+    expect(calledEntry.model).toBe('claude-3-5-haiku-20241022');
+  });
+
+  it('Test 6: is_error:true with non-zero cost (Pitfall 8) → appendLedgerEntry still fires with cost_usd:0.07', async () => {
+    invokeSpy.mockResolvedValueOnce({
+      timedOut: false,
+      stdout: IS_ERROR_STDOUT,
+      stderr: '',
+      code: 0,
+    });
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '34',
+      source: 'triage',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errorReason).toMatch(/api_error/);
+    expect(result.costUsd).toBe(0.07);
+
+    // Ledger append MUST fire even on is_error:true (Pitfall 8 invariant).
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const [, entry] = appendSpy.mock.calls[0];
+    expect(entry.cost_usd).toBe(0.07);
+    expect(entry.phase).toBe('34');
+    expect(entry.source).toBe('triage');
   });
 });

@@ -235,7 +235,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 30. Worker Fault-Injection | v3.0 | 5/5 | Complete    | 2026-05-18 |
 | 31. LLM Exploratory Mode + Docs | v3.0 | 4/4 | Complete    | 2026-05-20 |
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
-| 33. Re-run Validator | v3.1 | 5/5 | Complete   | 2026-05-27 |
+| 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
 | 34. Hybrid Triage Classifier | v3.1 | 0/? | Not started | - |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 0/? | Not started | - |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |

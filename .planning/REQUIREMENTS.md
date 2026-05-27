@@ -16,10 +16,10 @@ Requirements for this milestone. Each maps to roadmap phases (continued numberin
 
 ### RERUN — Re-run Validator
 
-- [ ] **RERUN-01**: Re-run validator deterministically replays each LLM-flagged anomaly 3 times via verifier-only path (no browser)
-- [ ] **RERUN-02**: Re-run validator writes `rerun-report.json` per anomaly with `{confirmed_count, total_runs, verdict}` schema; 2/3+ confirms → CONFIRMED, 0-1/3 → FLAKE
-- [ ] **RERUN-03**: `llm-report.json` iteration schema extended with `scroll_y`, `viewport_width`, `viewport_height`, `selected_node_xpath` (ships in same PR as validator)
-- [ ] **RERUN-04**: ESLint `no-restricted-imports src/` guard extended to cover the re-run validator module
+- [x] **RERUN-01**: Re-run validator deterministically replays each LLM-flagged anomaly 3 times via verifier-only path (no browser)
+- [x] **RERUN-02**: Re-run validator writes `rerun-report.json` per anomaly with `{confirmed_count, total_runs, verdict}` schema; 2/3+ confirms → CONFIRMED, 0-1/3 → FLAKE
+- [x] **RERUN-03**: `llm-report.json` iteration schema extended with `scroll_y`, `viewport_width`, `viewport_height`, `selected_node_xpath` (ships in same PR as validator)
+- [x] **RERUN-04**: ESLint `no-restricted-imports src/` guard extended to cover the re-run validator module
 
 ### TRIAGE — Hybrid Classifier
 
@@ -104,10 +104,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UAT-01 | Phase 32 | Complete |
 | UAT-02 | Phase 32 | Complete |
 | UAT-03 | Phase 32 | Complete |
-| RERUN-01 | Phase 33 | Pending |
-| RERUN-02 | Phase 33 | Pending |
-| RERUN-03 | Phase 33 | Pending |
-| RERUN-04 | Phase 33 | Pending |
+| RERUN-01 | Phase 33 | Complete |
+| RERUN-02 | Phase 33 | Complete |
+| RERUN-03 | Phase 33 | Complete |
+| RERUN-04 | Phase 33 | Complete |
 | TRIAGE-01 | Phase 34 | Pending |
 | TRIAGE-02 | Phase 34 | Pending |
 | TRIAGE-03 | Phase 34 | Pending |

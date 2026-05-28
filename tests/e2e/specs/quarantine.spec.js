@@ -30,7 +30,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from '@playwright/test';
-import { TEST_CASES_QUARANTINE } from '../../test-cases-quarantine.js';
+import { TEST_CASES_QUARANTINE } from '../test-cases-quarantine.js';
 import { loadExtension } from '../lib/extension-loader.js';
 import { gotoPatent } from '../lib/navigation.js';
 import { selectText } from '../lib/selection.js';

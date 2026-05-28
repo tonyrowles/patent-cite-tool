@@ -114,16 +114,24 @@ export function llmReportPathFor(runId) {
   return path.join(ARTIFACTS_ROOT, runId, LLM_REPORT_FILENAME);
 }
 
+/**
+ * Single source of truth for the seven-key summary contract (Phase 37 D-01).
+ * Order is load-bearing — it matches the prior emptySummary() object-literal
+ * order (passed → total_cost_usd) so no downstream consumer's key ordering
+ * shifts. Frozen so no caller can mutate the canonical list.
+ */
+export const SUMMARY_KEYS = Object.freeze([
+  'passed',
+  'wrong_citation',
+  'verifier_disagree',
+  'llm_hallucinated_selection',
+  'llm_api_error',
+  'harness_error',
+  'total_cost_usd',
+]);
+
 function emptySummary() {
-  return {
-    passed: 0,
-    wrong_citation: 0,
-    verifier_disagree: 0,
-    llm_hallucinated_selection: 0,
-    llm_api_error: 0,
-    harness_error: 0,
-    total_cost_usd: 0,
-  };
+  return Object.fromEntries(SUMMARY_KEYS.map((k) => [k, 0]));
 }
 
 /**

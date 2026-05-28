@@ -93,7 +93,17 @@ export function appendToGoldenCorpus(content, entry) {
   // test-cases.js entries end with `},` (trailing comma), then `\n];` closes the array.
   // Insert new entry (with trailing comma) just before `\n];`.
   const closeIdx = content.lastIndexOf('\n];');
-  if (closeIdx === -1) return content; // should not occur in practice
+  // WR-07 (Phase 35 review-fix): throw instead of silently returning unchanged
+  // content. The silent return was actively harmful: if the golden corpus was
+  // malformed (e.g. partial-write from a prior crash, mid-edit by a human),
+  // runPromote would proceed to step 4 (remove the entry from quarantine) +
+  // step 5 (call update-golden.js) leaving the user in an irrecoverable state
+  // — the entry is gone from quarantine but never made it into golden. The
+  // outer runPromote try/catch now fires BEFORE step 4's quarantine removal,
+  // preserving state on this failure mode.
+  if (closeIdx === -1) {
+    throw new Error('appendToGoldenCorpus: cannot locate "\\n];" close-marker in golden corpus (file malformed?)');
+  }
   return content.slice(0, closeIdx) + '\n' + block + ',\n];' + content.slice(closeIdx + 3);
 }
 

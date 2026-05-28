@@ -113,7 +113,12 @@ export async function runPromote(opts = {}) {
   const skipCiGuard       = opts._skipCiGuard     ?? false;
 
   // D-13: CI guard for direct-call coverage (Test P7/P8).
-  if (!skipCiGuard && (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')) {
+  // WR-05 (Phase 35 review-fix): broader regex — accept CI=true|1|yes|on
+  // (case-insensitive). The narrow CI==='true' check missed CI=1 (common in
+  // GitLab/GitHub matrix configs), CI=True (Buildkite), and CI=yes.
+  const ciFlag = (process.env.CI ?? '').toLowerCase();
+  const ciActive = ['true', '1', 'yes', 'on'].includes(ciFlag) || process.env.GITHUB_ACTIONS === 'true';
+  if (!skipCiGuard && ciActive) {
     stderr.write('[promote-from-quarantine] promotion is local-only; refusing to run in CI\n');
     return { exitCode: 1 };
   }
@@ -221,7 +226,11 @@ export async function runPromote(opts = {}) {
 
 async function main(argv = process.argv) {
   // D-13: CI guard for CLI path.
-  if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+  // WR-05 (Phase 35 review-fix): broader regex — accept CI=true|1|yes|on
+  // (case-insensitive). Matches the runPromote() guard above.
+  const ciFlag = (process.env.CI ?? '').toLowerCase();
+  const ciActive = ['true', '1', 'yes', 'on'].includes(ciFlag) || process.env.GITHUB_ACTIONS === 'true';
+  if (ciActive) {
     process.stderr.write(
       '[promote-from-quarantine] promotion is local-only; refusing to run in CI\n',
     );

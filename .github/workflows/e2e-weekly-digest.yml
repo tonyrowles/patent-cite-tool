@@ -1,0 +1,110 @@
+# .github/workflows/e2e-weekly-digest.yml
+#
+# Phase 37 (DIGEST-02, DIGEST-03) — Monday 07:00 UTC weekly analytics digest.
+#
+# Schedule: 07:00 UTC every Monday. Manual trigger via workflow_dispatch.
+# Reads the prior week's open e2e-nightly + e2e-quarantine GitHub issues,
+# aggregates five metrics (findings count, classification breakdown, top-3
+# failure categories, quarantine growth, cost vs cap), renders a ≤50-line
+# markdown digest, and publishes it as an e2e-digest-labeled Issue (active
+# path — GitHub Discussions disabled, D-05). Commits the generated
+# reports/weekly-digest-YYYY-WNN.md in-run via contents: write + [skip ci].
+#
+# Security note — issues: write is load-bearing:
+#   D-09 originally locked only contents: write + discussions: write.
+#   The ACTIVE publish path is `gh issue create`, which 403s without
+#   issues: write. This workflow adds it explicitly (RESEARCH §Security
+#   lines 494-498; PATTERNS Flagged Issue 1).
+
+name: E2E Weekly Digest
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'   # Monday 07:00 UTC — D-09
+  workflow_dispatch: {}    # Manual trigger for testing
+
+# Static concurrency group prevents schedule + workflow_dispatch from racing.
+# cancel-in-progress: false so a running digest is never killed by a new trigger.
+concurrency:
+  group: e2e-weekly-digest
+  cancel-in-progress: false
+
+permissions:
+  contents: write     # commit-in-run: git push reports/weekly-digest-*.md (D-09, D-11)
+  discussions: write  # dormant discussion path (D-09; createDiscussion when Discussions enabled)
+  issues: write       # LOAD-BEARING: gh issue create 403s without this; D-09 omitted it
+                      # because the requirement text framed the dormant discussion path as
+                      # primary, but the ACTIVE publish path is the e2e-digest issue fallback.
+
+jobs:
+  weekly-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      DIGEST_PUBLISH_MODE: issue  # D-05/D-06: force the active issue-fallback path
+
+    steps:
+      - uses: actions/checkout@v4
+        # Default persist-credentials: true lets the GITHUB_TOKEN push under
+        # contents: write — no PAT needed for commit-in-run (RESEARCH A4, Pitfall 3).
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Ensure e2e-digest label exists
+        # D-07: self-bootstrap label before the digest publish step that uses it.
+        # Color 5319e7 (purple) is distinct from e2e-nightly (0075ca) and
+        # e2e-quarantine (d93f0b). 6-char hex WITHOUT # prefix (gh CLI requirement).
+        # --force updates if label already exists; || true makes the step safe.
+        run: |
+          gh label create "e2e-digest" \
+            --color "5319e7" \
+            --description "Weekly analytics digest" \
+            --force 2>/dev/null || true
+
+      - name: Generate weekly digest
+        # D-06: DIGEST_PUBLISH_MODE=issue forces the active e2e-digest issue path.
+        # The script (weekly-digest.mjs) reads DIGEST_PUBLISH_MODE from env, inherited
+        # from the job-level env: block above — no env-var hop needed here because
+        # no user-supplied ${{ inputs.* }} values flow into this run:.
+        # The script writes reports/weekly-digest-YYYY-WNN.md and exports isoWeekLabel.
+        run: npm run e2e:weekly-digest
+
+      - name: Capture ISO-week label for commit message
+        # Compute the same week label the script uses (isoWeekLabel of now) so the
+        # commit message is deterministic. Uses the exported pure function directly.
+        # env-var hop via $GITHUB_ENV — value never interpolated into shell (CWE-94).
+        run: |
+          node -e "
+            import('./scripts/weekly-digest.mjs').then(m => {
+              const label = m.isoWeekLabel(new Date());
+              const fs = require('node:fs');
+              fs.appendFileSync(process.env.GITHUB_ENV, 'WEEK_LABEL=' + label + '\n');
+            });
+          "
+
+      - name: Commit weekly digest
+        # D-11 / DIGEST-03: commit reports/weekly-digest-*.md in-run with [skip ci].
+        # git diff --cached --quiet || git commit — idempotent: no-op if unchanged (D-11).
+        # [skip ci] is LOAD-BEARING — prevents this bot push from re-triggering ci.yml,
+        # which runs on push to the default branch. Without it, each Monday digest would
+        # queue a full CI run (RESEARCH Pitfall 3 / T-37-03-02).
+        # actions/checkout@v4 persist-credentials: true configures GITHUB_TOKEN for push.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/weekly-digest-*.md
+          git diff --cached --quiet || git commit -m "docs(weekly-digest): ${{ env.WEEK_LABEL }} [skip ci]"
+          git push

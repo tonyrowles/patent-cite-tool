@@ -127,7 +127,12 @@ async function main(argv = process.argv) {
   }
 
   // WR-05 path-bounding (T-36-02-01 mitigation — mirrors quarantine-append.mjs lines 182-193).
-  const resolvedLlmReportPath = path.resolve(process.cwd(), rawInput);
+  // WR-04: resolve relative inputs against PROJECT_ROOT (not process.cwd()) so the
+  // resolution is deterministic regardless of the invoker's working directory and
+  // consistent with the ALLOWED_INPUT_ROOTS (which are PROJECT_ROOT-anchored) and
+  // the "cwd-pinned" contract documented in the header. Absolute inputs are
+  // unaffected by path.resolve(PROJECT_ROOT, abs).
+  const resolvedLlmReportPath = path.resolve(PROJECT_ROOT, rawInput);
   const insideAllowedRoot = ALLOWED_INPUT_ROOTS.some(
     (root) => resolvedLlmReportPath === root || resolvedLlmReportPath.startsWith(root + path.sep),
   );

@@ -35,6 +35,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 const SCRIPT_PATH = path.resolve(PROJECT_ROOT, 'scripts/e2e-report-issue.mjs');
 const FIXTURE_DIR = path.resolve(PROJECT_ROOT, 'tests/e2e/fixtures');
+// WR-02 (Phase 35 review-fix): test tmpDirs go under tests/e2e/artifacts/
+// (gitignored per .gitignore line 8), NOT under tests/e2e/fixtures/ (committed).
+// Both roots satisfy WR-05 path-bounding (see scripts/e2e-report-issue.mjs
+// ALLOWED_INPUT_ROOTS = [ARTIFACTS_ROOT, FIXTURES_ROOT]); using ARTIFACTS_DIR
+// means a crashed/SIGKILL-ed test leaks into a gitignored tree rather than
+// the committed fixtures tree. Mirrors the pattern in
+// tests/e2e/scripts/e2e-quarantine-append.test.js lines 28-46.
+const ARTIFACTS_DIR = path.resolve(PROJECT_ROOT, 'tests/e2e/artifacts');
 
 // ---------------------------------------------------------------------------
 // Test state: fresh tmpDir per test (for mock-gh PATH shadowing)
@@ -50,10 +58,13 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-issue-triage-'));
   transcriptPath = path.join(tmpDir, 'gh-transcript.txt');
 
-  // 2. Create fixture run directory INSIDE FIXTURES_ROOT so WR-05 path-bounding passes.
+  // 2. Create fixture run directory INSIDE ARTIFACTS_DIR so WR-05 path-bounding passes
+  //    AND leaked dirs land in a gitignored tree (WR-02). ARTIFACTS_ROOT is one of the
+  //    ALLOWED_INPUT_ROOTS in scripts/e2e-report-issue.mjs, so path-bounding still passes.
   //    The script looks for sibling 'llm-report.json' and 'rerun-report.json' next to
   //    the --triage-report path. We copy phase35-*.json fixtures here with canonical names.
-  fixtureRunDir = fs.mkdtempSync(path.join(FIXTURE_DIR, 'phase35-run-'));
+  fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
+  fixtureRunDir = fs.mkdtempSync(path.join(ARTIFACTS_DIR, 'phase35-run-'));
   fs.copyFileSync(
     path.join(FIXTURE_DIR, 'phase35-triage-report.json'),
     path.join(fixtureRunDir, 'triage-report.json')

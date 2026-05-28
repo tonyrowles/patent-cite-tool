@@ -43,7 +43,9 @@ function parseArgs(argv) {
       process.exit(2);
     } else if (argv[i] === '--input') {
       const next = argv[i + 1];
-      if (next === undefined || next === null || next === '') {
+      // WR-04 (Phase 35 review-fix): reject `--input --help` etc. — the next
+      // token must be a value, not another flag. Mirrors update-golden.js:68.
+      if (next === undefined || next === null || next === '' || next.startsWith('--')) {
         process.stderr.write('[quarantine-append] missing value for --input\n');
         process.exit(2);
       }

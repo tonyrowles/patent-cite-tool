@@ -575,7 +575,9 @@ function parseSourceArgs(argv) {
       process.exit(2);
     } else if (argv[i] === '--source') {
       const next = argv[i + 1];
-      if (next === undefined || next === null || next === '') {
+      // WR-04 (Phase 35 review-fix): reject `--source --triage-report ...` —
+      // next token must be a value, not another flag. Mirrors update-golden.js:68.
+      if (next === undefined || next === null || next === '' || next.startsWith('--')) {
         process.stderr.write('[e2e-report-issue] missing value for --source\n');
         process.exit(2);
       }
@@ -594,7 +596,9 @@ function parseSourceArgs(argv) {
       process.exit(2);
     } else if (argv[i] === '--triage-report') {
       const next = argv[i + 1];
-      if (next === undefined || next === null || next === '') {
+      // WR-04 (Phase 35 review-fix): reject `--triage-report --source ...` —
+      // next token must be a value, not another flag. Mirrors update-golden.js:68.
+      if (next === undefined || next === null || next === '' || next.startsWith('--')) {
         process.stderr.write('[e2e-report-issue] missing value for --triage-report\n');
         process.exit(2);
       }

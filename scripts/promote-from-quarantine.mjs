@@ -35,7 +35,9 @@ function parseArgs(argv) {
       process.exit(2);
     } else if (argv[i] === '--id') {
       const next = argv[i + 1];
-      if (next === undefined || next === null || next === '') {
+      // WR-04 (Phase 35 review-fix): reject `--id --confirm` etc. — the next
+      // token must be a value, not another flag. Mirrors update-golden.js:68.
+      if (next === undefined || next === null || next === '' || next.startsWith('--')) {
         process.stderr.write('[promote-from-quarantine] missing value for --id\n');
         process.exit(2);
       }

@@ -47,7 +47,16 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../../dist/chrome');
 const RUN_ID = resolveRunId();
-const REPORT_PATH = reportPathFor(RUN_ID);
+// Phase 36 CR-01: write to a quarantine-scoped report file, NOT the shared
+// report.json. The regression + fault-injection specs key report.json off the
+// same PLAYWRIGHT_RUN_ID, so all three specs land in the same run dir. Sharing
+// report.json would let the `--source quarantine` filer (e2e-report-issue.mjs)
+// re-file every regression/fault-injection failure under the e2e-quarantine
+// label. Namespacing to quarantine-report.json keeps the suites isolated; the
+// quarantine filer reads this distinct file (must stay in sync with the
+// QUARANTINE_REPORT_FILENAME constant in scripts/e2e-report-issue.mjs).
+const QUARANTINE_REPORT_FILENAME = 'quarantine-report.json';
+const REPORT_PATH = reportPathFor(RUN_ID, QUARANTINE_REPORT_FILENAME);
 
 // 2-second throttle between cases — RESEARCH.md Pitfall D (forward-safety).
 const THROTTLE_MS = 2_000;

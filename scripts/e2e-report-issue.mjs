@@ -43,6 +43,12 @@ import { ERROR_CLASSES } from '../tests/e2e/lib/error-codes.js';
 export const MAX_RECENT_DAYS = 7;
 const NIGHTLY_LABEL = 'e2e-nightly';
 
+// Phase 36 CR-01: the quarantine spec writes its per-case report to a
+// DISTINCT file (quarantine-report.json) so the --source quarantine filer
+// never sees regression/fault-injection cases from the shared report.json.
+// Must stay in sync with QUARANTINE_REPORT_FILENAME in tests/e2e/specs/quarantine.spec.js.
+export const QUARANTINE_REPORT_FILENAME = 'quarantine-report.json';
+
 // Validation regex for case IDs (T-29-02-1 mitigation).
 // Allows: patent case IDs like US11427642-spec-short-1, US4723129-claims-1
 // AND pre-flight synthetic IDs like PRE-FLIGHT-CAPTCHA, PRE-FLIGHT-DOM-DRIFT.
@@ -763,8 +769,14 @@ if (isMain) {
     const report = JSON.parse(readFileSync(reportPath, 'utf8'));
     processReport(report, { ghClient: gh, runId, repo });
   } else {
-    // source === 'quarantine' (Phase 36, D-15) — reuses the same report.json + processReport path
-    // as regression. The gh client was constructed with 'e2e-quarantine' label above.
+    // source === 'quarantine' (Phase 36, D-15) — reuses processReport but reads
+    // a DISTINCT report file (CR-01). The gh client was constructed with the
+    // 'e2e-quarantine' label above.
+    // CR-01: the quarantine spec writes to quarantine-report.json — NOT the
+    // shared report.json that regression + fault-injection write to. Reading the
+    // shared report.json here would re-file every regression/fault-injection
+    // failure under the e2e-quarantine label (cross-label contamination), since
+    // processReport iterates ALL failed-non-FLAKE cases in the file it is given.
     // --meta-drift does NOT apply to quarantine (no DOM-drift pre-flight for quarantine suite).
     // sanitizeCaseId guard is inherited automatically through processReport.
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -773,12 +785,16 @@ if (isMain) {
       '..',
       'tests/e2e/artifacts',
       runId,
-      'report.json'
+      QUARANTINE_REPORT_FILENAME
     );
 
     if (!existsSync(reportPath)) {
+      // WR-02: name the exact file checked so a quarantine-suite crash that
+      // never produced quarantine-report.json is distinguishable in CI logs
+      // from a genuine "no quarantine cases" no-op.
       console.log(
-        `[e2e-report-issue] no report.json at ${reportPath} — nothing to file`
+        `[e2e-report-issue] no quarantine report at ${reportPath} ` +
+          `(expected ${QUARANTINE_REPORT_FILENAME} written by quarantine.spec.js) — nothing to file`
       );
       process.exit(0);
     }

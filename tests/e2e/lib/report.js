@@ -45,10 +45,17 @@ const ARTIFACTS_ROOT = path.resolve(__dirname, '../artifacts');
 
 /**
  * @param {string} runId — the per-suite run identifier (resolveRunId() output)
- * @returns {string} absolute path to that run's report.json
+ * @param {string} [filename='report.json'] — report filename within the run dir.
+ *   Phase 36 CR-01: the quarantine spec passes 'quarantine-report.json' so its
+ *   per-case output is namespaced AWAY from the shared 'report.json' that the
+ *   regression + fault-injection specs write to. This prevents the
+ *   `--source quarantine` filer from re-filing regression/fault-injection
+ *   failures under the e2e-quarantine label (shared-file cross-contamination).
+ *   Back-compat default is 'report.json' so existing callers are unaffected.
+ * @returns {string} absolute path to that run's report file
  */
-export function reportPathFor(runId) {
-  return path.join(ARTIFACTS_ROOT, runId, 'report.json');
+export function reportPathFor(runId, filename = 'report.json') {
+  return path.join(ARTIFACTS_ROOT, runId, filename);
 }
 
 function emptySummary() {

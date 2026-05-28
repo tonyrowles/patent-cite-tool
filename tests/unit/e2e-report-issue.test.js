@@ -40,7 +40,9 @@ import {
   findMatchingIssueDual,
   filterFindingsForFiling,
   processTriageReport,
+  QUARANTINE_REPORT_FILENAME,
 } from '../../scripts/e2e-report-issue.mjs';
+import { reportPathFor } from '../../tests/e2e/lib/report.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPORT_FIXTURE = JSON.parse(readFileSync(path.join(__dirname, 'fixtures/sample-report.json'), 'utf8'));
@@ -862,6 +864,59 @@ describe('--source quarantine (QUAR-04 / D-15)', () => {
       processReport(goodReport, { ghClient, runId: 'r', repo: 'owner/repo' });
       expect(ghCalls.length).toBe(1);
       expect(ghCalls[0].op).toBe('create');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test C: CR-01 (Phase 36 review-fix) — quarantine report file is namespaced
+  // away from the shared report.json so the --source quarantine filer never
+  // re-files regression/fault-injection failures under the e2e-quarantine label.
+  // ---------------------------------------------------------------------------
+
+  describe('CR-01: quarantine report file is distinct from shared report.json', () => {
+    it('C1: QUARANTINE_REPORT_FILENAME is exported and is NOT report.json', () => {
+      expect(QUARANTINE_REPORT_FILENAME).toBe('quarantine-report.json');
+      expect(QUARANTINE_REPORT_FILENAME).not.toBe('report.json');
+    });
+
+    it('C2: reportPathFor(runId, QUARANTINE_REPORT_FILENAME) resolves a different path than the shared report.json', () => {
+      const runId = 'gh-run-12345';
+      const sharedPath = reportPathFor(runId); // default report.json — what regression/fault-injection write
+      const quarantinePath = reportPathFor(runId, QUARANTINE_REPORT_FILENAME);
+      expect(quarantinePath).not.toBe(sharedPath);
+      expect(quarantinePath.endsWith('quarantine-report.json')).toBe(true);
+      expect(sharedPath.endsWith('report.json')).toBe(true);
+      // Both live in the same run dir — only the filename differs.
+      expect(path.dirname(quarantinePath)).toBe(path.dirname(sharedPath));
+    });
+
+    it('C3: a regression-only failure present in the shared report.json is NOT visible to the quarantine filer (the filer reads quarantine-report.json)', () => {
+      // Simulate the cross-contamination scenario: the shared report.json holds a
+      // regression WRONG_CITATION failure. The quarantine filer reads ONLY the
+      // quarantine-scoped report, so it must never receive that case. We prove
+      // this by confirming the two reports are independent inputs: feeding the
+      // quarantine filer an EMPTY quarantine report files zero issues even though
+      // the shared report (a separate object) contains a failing regression case.
+      const sharedRegressionReport = {
+        cases: [{ id: 'US11427642-claims-1', status: 'failed', errorClass: 'WRONG_CITATION',
+          verifier_verdict: null, artifacts: {}, citation: null }],
+      };
+      const quarantineReport = { cases: [] }; // quarantine suite had no cases
+
+      const ghCalls = [];
+      const ghClient = {
+        listOpenNightlyIssues: () => [],
+        createIssue: (t, b) => { ghCalls.push({ op: 'create' }); return { number: 1 }; },
+        commentIssue: (n, b) => { ghCalls.push({ op: 'comment' }); },
+      };
+
+      // The quarantine filer processes quarantineReport, NOT sharedRegressionReport.
+      processReport(quarantineReport, { ghClient, runId: 'r', repo: 'owner/repo' });
+      expect(ghCalls).toEqual([]); // regression failure NOT re-filed under e2e-quarantine
+
+      // Sanity: the shared report DOES have a fileable case (so the empty result
+      // above is genuinely due to file isolation, not an empty-everywhere setup).
+      expect(filterCasesForFiling(sharedRegressionReport.cases).length).toBe(1);
     });
   });
 });

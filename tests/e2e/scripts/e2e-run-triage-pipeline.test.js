@@ -56,6 +56,9 @@ beforeEach(() => {
   // 1-test failure. A distinct 'pipeline-test-' prefix + OS-guaranteed unique
   // suffix eliminates both. Kept under ARTIFACTS_DIR so the --llm-report input
   // still satisfies the WR-05 ALLOWED_INPUT_ROOTS bound.
+  // mkdtempSync requires its parent to exist; ARTIFACTS_DIR may be absent in a
+  // fresh checkout (artifacts/ holds only gitignored run output), so ensure it.
+  fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
   runDir = fs.mkdtempSync(path.join(ARTIFACTS_DIR, 'pipeline-test-'));
 
   // Copy the phase36 pipeline fixture into runDir as llm-report.json.

@@ -47,9 +47,16 @@ let transcriptPath;
 let corpusOverridePath; // QUARANTINE_CORPUS_PATH_OVERRIDE — isolates corpus writes
 
 beforeEach(() => {
-  const runId = 'test-' + Math.random().toString(36).slice(2, 10);
-  runDir = path.join(ARTIFACTS_DIR, runId);
-  fs.mkdirSync(runDir, { recursive: true });
+  // WR-03: use mkdtempSync for a guaranteed-unique run dir under the shared
+  // committed ARTIFACTS_DIR. The previous 'test-' + Math.random().slice(2,10)
+  // scheme (only 8 chars of base-36 entropy) shared its prefix and parent with
+  // e2e-quarantine-append.test.js, which Vitest runs in a PARALLEL worker. A
+  // name collision — or one file's afterEach rmSync deleting a colliding
+  // sibling created by the other — was the plausible source of the transient
+  // 1-test failure. A distinct 'pipeline-test-' prefix + OS-guaranteed unique
+  // suffix eliminates both. Kept under ARTIFACTS_DIR so the --llm-report input
+  // still satisfies the WR-05 ALLOWED_INPUT_ROOTS bound.
+  runDir = fs.mkdtempSync(path.join(ARTIFACTS_DIR, 'pipeline-test-'));
 
   // Copy the phase36 pipeline fixture into runDir as llm-report.json.
   // The chain will overwrite rerun-report.json; no need to pre-copy the rerun fixture.

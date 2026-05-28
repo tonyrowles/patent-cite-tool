@@ -255,7 +255,16 @@ async function main(argv = process.argv) {
       id: safeId,
       patentFile: './tests/fixtures/' + safeId.split('-')[0] + '.json',
       selectedText: iter.llm_selection?.selectedText ?? '',
-      category: iter.category ?? finding.category ?? iter.classification,
+      // WR-01 (Phase 35 review-fix): llm-report iteration schema has
+      // `classification` (an ERROR_CLASS), not `category` — `iter.category`
+      // was always undefined and the `iter.classification` fallback wrote
+      // ERROR_CLASS strings (e.g. 'WRONG_CITATION') into the corpus's
+      // `category` field, which Phase 36 Playwright wiring won't recognize
+      // (test categories are 'claims' | 'modern-short' | etc.). Use
+      // `finding.category` as the single source — the triage classifier
+      // already populates this with the correct ERROR_CLASS-shaped value
+      // for the quarantine corpus per CONTEXT D-10.
+      category: finding.category ?? 'UNCLASSIFIED',
       source_triage_finding_id: triageReport.run_id
         ? triageReport.run_id + '-iter-' + finding.iteration_n
         : 'manual-iter-' + finding.iteration_n,

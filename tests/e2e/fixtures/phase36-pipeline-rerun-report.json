@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "source_llm_report": "tests/e2e/fixtures/phase36-pipeline-llm-report.json",
+  "run_id": "phase36-pipeline-test",
+  "started_iso": "2026-05-28T10:01:00.000Z",
+  "finished_iso": "2026-05-28T10:01:01.000Z",
+  "summary": {
+    "confirmed_count": 0,
+    "flake_count": 0,
+    "not_replayable_count": 1
+  },
+  "replays": [
+    {
+      "iteration_n": 1,
+      "original_verdict_status": null,
+      "runs": [],
+      "confirmed_count": 0,
+      "total_runs": 0,
+      "verdict": "NOT_REPLAYABLE",
+      "reason": "classification LLM_HALLUCINATED_SELECTION is not replay-eligible"
+    }
+  ]
+}

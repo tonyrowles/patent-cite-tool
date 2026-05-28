@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "source_llm_report": "tests/e2e/fixtures/phase36-pipeline-llm-report.json",
+  "run_id": "phase36-pipeline-test",
+  "started_iso": "2026-05-28T10:00:00.000Z",
+  "finished_iso": "2026-05-28T10:01:00.000Z",
+  "iterations": [
+    {
+      "iteration_n": 1,
+      "case_id": "US11427642-spec-short-1",
+      "seed": 99,
+      "classification": "LLM_HALLUCINATED_SELECTION",
+      "citation": null,
+      "llm_selection": {
+        "patentId": "US11427642",
+        "selectedText": "receptor exclusively expressed on plasma cells"
+      },
+      "verifier_verdict": null
+    }
+  ],
+  "summary": {
+    "total_iterations": 1,
+    "classified_count": 1,
+    "error_count": 0
+  }
+}

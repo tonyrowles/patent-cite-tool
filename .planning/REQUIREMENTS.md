@@ -53,10 +53,10 @@ Requirements for this milestone. Each maps to roadmap phases (continued numberin
 
 ### DIGEST — Weekly Analytics
 
-- [ ] **DIGEST-01**: `scripts/weekly-digest.mjs` reads open GitHub issues filtered by `e2e-nightly` and `e2e-quarantine` labels via `gh` API and aggregates {findings count, classification breakdown, top 3 failure categories, quarantine growth, cost vs cap}
-- [ ] **DIGEST-02**: `.github/workflows/e2e-weekly-digest.yml` triggers Monday 07:00 UTC (after nightly); permissions `contents: write` + `discussions: write`
-- [ ] **DIGEST-03**: Digest published to GitHub Discussion via `gh api graphql createDiscussion` (Issue with `e2e-digest` label as fallback if Discussions disabled); markdown also committed to `reports/weekly-digest-YYYY-WNN.md`
-- [ ] **DIGEST-04**: `SUMMARY_KEYS` exported from `lib/llm-report.js`; digest validates all keys present (throws on missing, no silent zero); output ≤50 lines (aggregated, not per-iteration)
+- [x] **DIGEST-01**: `scripts/weekly-digest.mjs` reads open GitHub issues filtered by `e2e-nightly` and `e2e-quarantine` labels via `gh` API and aggregates {findings count, classification breakdown, top 3 failure categories, quarantine growth, cost vs cap}
+- [x] **DIGEST-02**: `.github/workflows/e2e-weekly-digest.yml` triggers Monday 07:00 UTC (after nightly); permissions `contents: write` + `discussions: write`
+- [x] **DIGEST-03**: Digest published to GitHub Discussion via `gh api graphql createDiscussion` (Issue with `e2e-digest` label as fallback if Discussions disabled); markdown also committed to `reports/weekly-digest-YYYY-WNN.md`
+- [x] **DIGEST-04**: `SUMMARY_KEYS` exported from `lib/llm-report.js`; digest validates all keys present (throws on missing, no silent zero); output ≤50 lines (aggregated, not per-iteration)
 
 ## Future Requirements
 
@@ -126,10 +126,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ORCH-01 | Phase 36 | Complete |
 | ORCH-02 | Phase 36 | Complete |
 | ORCH-03 | Phase 36 | Complete |
-| DIGEST-01 | Phase 37 | Pending |
-| DIGEST-02 | Phase 37 | Pending |
-| DIGEST-03 | Phase 37 | Pending |
-| DIGEST-04 | Phase 37 | Pending |
+| DIGEST-01 | Phase 37 | Complete |
+| DIGEST-02 | Phase 37 | Complete |
+| DIGEST-03 | Phase 37 | Complete |
+| DIGEST-04 | Phase 37 | Complete |
 
 **Coverage:**
 - v3.1 requirements: 29 total

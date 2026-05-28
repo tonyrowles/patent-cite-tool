@@ -27,6 +27,9 @@
 //   12. appendLlmIteration rejects entries missing required fields (iteration_n,
 //        iso, classification) — throws a descriptive Error
 //   13. Fixture sample-llm-report.json parses and totals are consistent
+//   14. SUMMARY_KEYS is frozen, exported, 7 keys in canonical order (Phase 37 D-01)
+//   15. SUMMARY_KEYS exact order: passed → total_cost_usd
+//   16. emptySummary() derives from SUMMARY_KEYS (single-source proof via initLlmReport)
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -39,6 +42,7 @@ import {
   initLlmReport,
   appendLlmIteration,
   finalizeLlmReport,
+  SUMMARY_KEYS,
 } from '../e2e/lib/llm-report.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -388,5 +392,44 @@ describe('tests/unit/fixtures/sample-llm-report.json — fixture consistency', (
     expect(fixture.summary.llm_api_error).toBe(1);
     expect(fixture.summary.wrong_citation).toBe(0);
     expect(fixture.summary.verifier_disagree).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 37 D-01 — SUMMARY_KEYS single-source-of-truth tests
+// ---------------------------------------------------------------------------
+
+describe('SUMMARY_KEYS export (Phase 37 D-01)', () => {
+  it('Test A: SUMMARY_KEYS is exported, frozen, and has exactly 7 keys', () => {
+    expect(SUMMARY_KEYS).toBeDefined();
+    expect(Object.isFrozen(SUMMARY_KEYS)).toBe(true);
+    expect(SUMMARY_KEYS.length).toBe(7);
+  });
+
+  it('Test B: SUMMARY_KEYS exact order matches canonical contract (passed → total_cost_usd)', () => {
+    expect(SUMMARY_KEYS).toEqual([
+      'passed',
+      'wrong_citation',
+      'verifier_disagree',
+      'llm_hallucinated_selection',
+      'llm_api_error',
+      'harness_error',
+      'total_cost_usd',
+    ]);
+  });
+
+  it('Test C: emptySummary() derives from SUMMARY_KEYS — all keys present, all values 0 (single-source proof)', () => {
+    // emptySummary() is not exported; prove derivation through the public
+    // initLlmReport surface: a freshly seeded report's summary must have
+    // exactly the keys SUMMARY_KEYS declares, in the same order, all zero.
+    initLlmReport(reportPath, { run_id: RUN_ID, iterations_total: 0 });
+    const r = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    const summaryKeys = Object.keys(r.summary);
+    // Key set and order must match SUMMARY_KEYS exactly
+    expect(summaryKeys).toEqual([...SUMMARY_KEYS]);
+    // Every value must be zero
+    for (const k of SUMMARY_KEYS) {
+      expect(r.summary[k]).toBe(0);
+    }
   });
 });

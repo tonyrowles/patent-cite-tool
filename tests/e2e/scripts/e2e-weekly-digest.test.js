@@ -10,16 +10,16 @@
 //   e2e-quarantine labels:  issues 104,105,107,109          (4)
 //   Deduped (by .number):   101,102,103,104,105,106,107,108,109  = 9 distinct
 //
-//   Category breakdown (labels[0].name across deduped set):
-//     wrong_citation:       3  (101, 103, 108)
-//     llm_api_error:        3  (102, 105, 109)
-//     harness_error:        2  (104, 107)
-//     verifier_disagree:    1  (106)
+//   Category breakdown (errorClass label by ERROR_CLASSES membership — CR-01):
+//     WRONG_CITATION:       3  (101, 103, 108)   — 103 has category at labels[2] (shuffled)
+//     LLM_API_ERROR:        3  (102, 105, 109)
+//     UI_BROKEN:            2  (104, 107)
+//     VERIFIER_DISAGREE:    1  (106)
 //
 //   Top-3 (desc, ties alphabetical):
-//     #1  llm_api_error      3  (tied with wrong_citation; "llm_api_error" < "wrong_citation" alpha)
-//     #2  wrong_citation     3
-//     #3  harness_error      2
+//     #1  LLM_API_ERROR      3  (tied with WRONG_CITATION; "LLM_API_ERROR" < "WRONG_CITATION" alpha)
+//     #2  WRONG_CITATION     3
+//     #3  UI_BROKEN          2
 //
 //   Quarantine growth (e2e-quarantine created_at in [2026-05-18, 2026-05-25]):
 //     104: 2026-05-22 IN  /  105: 2026-05-19 IN  /  107: 2026-05-10 OUT  /  109: 2026-05-24 IN
@@ -196,8 +196,8 @@ describe('five aggregations present', () => {
 
     // Check all 5 aggregations appear
     expect(md).toContain('9'); // findings count
-    expect(md).toContain('wrong_citation');
-    expect(md).toContain('llm_api_error');
+    expect(md).toContain('WRONG_CITATION');
+    expect(md).toContain('LLM_API_ERROR');
     expect(md).toContain('3'); // quarantine growth
     expect(md).toContain('cost data unavailable');
   });
@@ -222,18 +222,59 @@ describe('<=50 lines', () => {
 // 5. Top-3 + alphabetical tie
 // ---------------------------------------------------------------------------
 describe('top-3 + alphabetical tie', () => {
-  it('alphabetical tie broken correctly: llm_api_error before wrong_citation', () => {
+  it('alphabetical tie broken correctly: LLM_API_ERROR before WRONG_CITATION', () => {
     const fixture = loadFixture();
     const { nightlyIssues, quarantineIssues } = splitFixture(fixture);
     const agg = aggregate({ nightlyIssues, quarantineIssues, now: PIN_NOW() });
 
-    // Both have count=3; alphabetically "llm_api_error" < "wrong_citation"
-    expect(agg.top3[0].category).toBe('llm_api_error');
+    // Both have count=3; alphabetically "LLM_API_ERROR" < "WRONG_CITATION"
+    expect(agg.top3[0].category).toBe('LLM_API_ERROR');
     expect(agg.top3[0].count).toBe(3);
-    expect(agg.top3[1].category).toBe('wrong_citation');
+    expect(agg.top3[1].category).toBe('WRONG_CITATION');
     expect(agg.top3[1].count).toBe(3);
-    expect(agg.top3[2].category).toBe('harness_error');
+    expect(agg.top3[2].category).toBe('UI_BROKEN');
     expect(agg.top3[2].count).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. CR-01: category by ERROR_CLASSES membership, NOT labels[0] order
+// ---------------------------------------------------------------------------
+describe('CR-01: category resolved by ERROR_CLASSES membership, not label order', () => {
+  it('attributes a shuffled-label issue (category not at index 0) to its errorClass', () => {
+    const fixture = loadFixture();
+    const { nightlyIssues, quarantineIssues } = splitFixture(fixture);
+
+    // Issue 103 has labels [e2e-nightly, triage, WRONG_CITATION] — category is at
+    // index 2, NOT index 0. Under the old `labels[0].name` logic this issue would
+    // be miscounted as 'e2e-nightly', dropping WRONG_CITATION from 3 → 2 and
+    // creating a bogus 'e2e-nightly' bucket. This assertion fails under that bug.
+    const shuffled = fixture.find(i => i.number === 103);
+    expect(shuffled.labels[0].name).toBe('e2e-nightly'); // guard: fixture really is shuffled
+    expect(shuffled.labels.map(l => l.name)).toContain('WRONG_CITATION');
+
+    const agg = aggregate({ nightlyIssues, quarantineIssues, now: PIN_NOW() });
+
+    const byCategory = Object.fromEntries(agg.breakdown.map(b => [b.category, b.count]));
+    // WRONG_CITATION must include the shuffled issue 103 → count is 3, not 2
+    expect(byCategory.WRONG_CITATION).toBe(3);
+    // No structural label should ever appear as a category bucket
+    expect(byCategory['e2e-nightly']).toBeUndefined();
+    expect(byCategory.triage).toBeUndefined();
+    expect(byCategory['e2e-quarantine']).toBeUndefined();
+    // Top-3 still attributes the shuffled issue to WRONG_CITATION
+    const top3Categories = agg.top3.map(t => t.category);
+    expect(top3Categories).toContain('WRONG_CITATION');
+  });
+
+  it("buckets an issue with no errorClass label as 'UNCLASSIFIED'", () => {
+    const onlyStructural = [
+      { number: 999, created_at: '2026-05-24T00:00:00Z', labels: [{ name: 'e2e-nightly' }, { name: 'triage' }] },
+    ];
+    const agg = aggregate({ nightlyIssues: onlyStructural, quarantineIssues: [], now: PIN_NOW() });
+    const byCategory = Object.fromEntries(agg.breakdown.map(b => [b.category, b.count]));
+    expect(byCategory.UNCLASSIFIED).toBe(1);
+    expect(byCategory['e2e-nightly']).toBeUndefined();
   });
 });
 

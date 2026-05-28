@@ -26,6 +26,13 @@ import { execSync } from 'node:child_process';
 // as a descriptive throw by validateSummaryKeys, not a silent zero metric.
 import { SUMMARY_KEYS } from '../tests/e2e/lib/llm-report.js';
 
+// CR-01: closed errorClass taxonomy — the SAME list e2e-report-issue.mjs:382
+// clamps category labels to. The GitHub REST GET /issues endpoint does NOT
+// guarantee label array order, so we must pick the category by MEMBERSHIP in
+// this set (O(1) via the Set below), never by labels[0] position.
+import { ERROR_CLASSES } from '../tests/e2e/lib/error-codes.js';
+const ERROR_CLASS_SET = new Set(ERROR_CLASSES);
+
 // D-15: cost-vs-cap — LEDGER_PATH, readLedger, monthlyTotal, HARD_CAP_USD.
 // WARNING: monthlyTotal returns 0 for BOTH $0 spend and no-ledger-file.
 // Always fs.existsSync(LEDGER_PATH) FIRST; never set E2E_LEDGER_PATH_OVERRIDE.
@@ -101,12 +108,16 @@ export function aggregate({ nightlyIssues, quarantineIssues, now }) {
   // Headline findings count = distinct issues
   const findingsCount = deduped.length;
 
-  // Classification breakdown: tally labels[0].name across the deduped set.
-  // labels[0] is the category/errorClass per Phase 34/35 ordering:
-  //   [category, 'e2e-nightly', 'triage'] — e2e-report-issue.mjs:504
+  // Classification breakdown: tally the errorClass category across the deduped
+  // set. CR-01: the GitHub REST GET /issues response does NOT preserve label
+  // application order, so labels[0] is frequently 'e2e-nightly'/'triage' rather
+  // than the category. Pick the FIRST label whose name is a member of the closed
+  // ERROR_CLASSES taxonomy (same set e2e-report-issue.mjs clamps to). If none
+  // match, bucket as 'UNCLASSIFIED' (mirrors e2e-report-issue.mjs:384).
   const tally = new Map();
   for (const issue of deduped) {
-    const category = issue.labels?.[0]?.name ?? 'unknown';
+    const names = (issue.labels ?? []).map((l) => l?.name).filter(Boolean);
+    const category = names.find((n) => ERROR_CLASS_SET.has(n)) ?? 'UNCLASSIFIED';
     tally.set(category, (tally.get(category) ?? 0) + 1);
   }
   // Sort desc, ties broken alphabetically (D-16 deterministic)

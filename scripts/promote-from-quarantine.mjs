@@ -192,10 +192,15 @@ export async function runPromote(opts = {}) {
     };
 
     // Step 3: Append to tests/test-cases.js via appendToGoldenCorpus.
-    // writeFileSync (not atomicWriteJson) — mirrors update-golden.js line 65.
+    // WR-06 (Phase 35 review-fix): use atomicWriteJson (temp-write + rename)
+    // instead of fs.writeFileSync. A SIGKILL mid-write previously left
+    // tests/test-cases.js partially-written (broken JS), which then broke
+    // every subsequent `vitest run` because the file can't be imported.
+    // Step 4 below already uses atomicWriteJson; this brings step 3 in line.
+    // atomicWriteJson(destPath, content) — see tests/e2e/lib/rerun-validator.js:111.
     const goldenContent = fs.readFileSync(goldenPath, 'utf-8');
     const newGolden = appendToGoldenCorpus(goldenContent, promoted);
-    fs.writeFileSync(goldenPath, newGolden, 'utf-8');
+    atomicWriteJson(goldenPath, newGolden);
 
     // Step 4: Remove entry from quarantine corpus.
     const remaining = TEST_CASES_QUARANTINE.filter(e => e.id !== safeId);

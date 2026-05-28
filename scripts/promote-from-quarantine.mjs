@@ -192,6 +192,15 @@ export async function runPromote(opts = {}) {
   }
 
   // Step 2-5 (D-14): 5-step promotion flow with try/catch.
+  // WR-08 (Phase 35 review-fix): pre-capture both corpora as in-memory
+  // backups BEFORE any mutation. The catch block performs a best-effort
+  // rollback to restore byte-identical post-failure state — fixes the
+  // documented partial-state defect where step 5 failure left golden
+  // mutated and quarantine entry already removed (irrecoverable without
+  // `git checkout`). Backups read straight from disk so they reflect the
+  // exact bytes a successful rollback must restore.
+  const goldenBackup = fs.readFileSync(goldenPath, 'utf-8');
+  const quarantineBackup = fs.readFileSync(quarantinePath, 'utf-8');
   try {
     // Step 2: Build promoted entry (strip 3 quarantine-only metadata keys).
     const promoted = {
@@ -208,8 +217,7 @@ export async function runPromote(opts = {}) {
     // every subsequent `vitest run` because the file can't be imported.
     // Step 4 below already uses atomicWriteJson; this brings step 3 in line.
     // atomicWriteJson(destPath, content) — see tests/e2e/lib/rerun-validator.js:111.
-    const goldenContent = fs.readFileSync(goldenPath, 'utf-8');
-    const newGolden = appendToGoldenCorpus(goldenContent, promoted);
+    const newGolden = appendToGoldenCorpus(goldenBackup, promoted);
     atomicWriteJson(goldenPath, newGolden);
 
     // Step 4: Remove entry from quarantine corpus.
@@ -227,6 +235,33 @@ export async function runPromote(opts = {}) {
     return { exitCode: 0, action: 'promoted', spawnArgs };
   } catch (err) {
     stderr.write('[promote-from-quarantine] FAILED: ' + err.message + '\n');
+    // WR-08: best-effort rollback. Restore both corpora to pre-step-3 state
+    // via atomicWriteJson so partial-state defects (step 5 fails after step
+    // 3+4 already mutated disk) leave the working tree byte-identical to
+    // the pre-promotion state. If rollback itself fails, surface that
+    // separately so the user knows manual `git checkout` is needed.
+    let rollbackOk = true;
+    try {
+      atomicWriteJson(goldenPath, goldenBackup);
+    } catch (rbErr) {
+      rollbackOk = false;
+      stderr.write(
+        '[promote-from-quarantine] ROLLBACK FAILED for golden corpus: ' + rbErr.message + '\n',
+      );
+    }
+    try {
+      atomicWriteJson(quarantinePath, quarantineBackup);
+    } catch (rbErr) {
+      rollbackOk = false;
+      stderr.write(
+        '[promote-from-quarantine] ROLLBACK FAILED for quarantine corpus: ' + rbErr.message + '\n',
+      );
+    }
+    if (rollbackOk) {
+      stderr.write(
+        '[promote-from-quarantine] rolled back both corpora to pre-promotion state\n',
+      );
+    }
     stderr.write(
       '[promote-from-quarantine] Inspect partial state via \'git status\'; ' +
       'revert with \'git checkout tests/\'\n',

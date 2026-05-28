@@ -215,9 +215,13 @@ describe('P4: entry not in quarantine corpus', () => {
   });
 });
 
-describe('P5: spawn exits non-zero — partial state + revert hint in stderr', () => {
-  it('returns exitCode 1, stderr names exit code + git revert hint; corpora ARE mutated up to step 4', async () => {
+describe('P5: spawn exits non-zero — best-effort rollback restores byte-identical pre-promotion state (WR-08 review-fix)', () => {
+  it('returns exitCode 1, stderr names exit code + git revert hint + rollback success; both corpora byte-identical to pre-promotion state', async () => {
     const mockSpawn = vi.fn().mockReturnValue({ status: 2, stderr: 'mock failure' });
+
+    // WR-08 (Phase 35 review-fix): pre-capture content for byte-identical assertion.
+    const beforeGolden = fs.readFileSync(goldenPath, 'utf-8');
+    const beforeQuar = fs.readFileSync(quarantinePath, 'utf-8');
 
     const result = await runPromote(baseOpts({
       id: 'US11427642-not-in-golden-1',
@@ -229,13 +233,22 @@ describe('P5: spawn exits non-zero — partial state + revert hint in stderr', (
     expect(stderrBuf).toMatch(/update-golden\.js exited 2/);
     expect(stderrBuf).toMatch(/git status/);
     expect(stderrBuf).toMatch(/git checkout tests\//);
+    // WR-08: rollback success message must appear in stderr
+    expect(stderrBuf).toMatch(/rolled back both corpora to pre-promotion state/);
 
-    // Corpora ARE mutated up to step 4 (partial-state failure mode — documented behavior).
-    // Golden has the new entry; quarantine no longer has it.
+    // WR-08: post-failure state is byte-identical to pre-promotion state.
+    // Previously this test enshrined the data-corruption defect by asserting
+    // golden HAD the entry and quarantine DID NOT — that's exactly what the
+    // rollback now prevents.
+    expect(fs.readFileSync(goldenPath, 'utf-8')).toBe(beforeGolden);
+    expect(fs.readFileSync(quarantinePath, 'utf-8')).toBe(beforeQuar);
+
+    // Re-import to confirm the on-disk state is parse-able and the entry is
+    // STILL in quarantine, STILL absent from golden.
     const newGolden = await importCorpus(goldenPath, 'TEST_CASES');
-    expect(newGolden.find(e => e.id === 'US11427642-not-in-golden-1')).toBeDefined();
+    expect(newGolden.find(e => e.id === 'US11427642-not-in-golden-1')).toBeUndefined();
     const newQuar = await importCorpus(quarantinePath, 'TEST_CASES_QUARANTINE');
-    expect(newQuar.find(e => e.id === 'US11427642-not-in-golden-1')).toBeUndefined();
+    expect(newQuar.find(e => e.id === 'US11427642-not-in-golden-1')).toBeDefined();
   });
 });
 

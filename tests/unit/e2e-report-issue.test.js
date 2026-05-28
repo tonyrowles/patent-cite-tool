@@ -662,5 +662,63 @@ describe('Phase 35 extensions (ISSUE-02, ISSUE-03)', () => {
       // 1 filtered finding × 2 searches = 2 listOpenWithSearch calls
       expect(mockGh.listOpenWithSearch.mock.calls.length).toBe(2);
     });
+
+    // -------------------------------------------------------------------------
+    // CR-01 (Phase 35 review-fix): shell-injection defense for triage path
+    // -------------------------------------------------------------------------
+
+    it('CR-01-1: triage finding with shell-metachar case_id (backticks) is filtered out — zero createIssueWithLabels calls', () => {
+      const singleFinding = {
+        findings: [makeFinding({ iteration_n: 1, severity: 'high', category: 'WRONG_CITATION', path_taken: 'heuristic' })],
+      };
+      // Inject backticks into case_id — sanitizeCaseId must reject before any shell interpolation
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1, case_id: 'US123-`whoami`-1' })] };
+      const rerunReport = { replays: [] };
+
+      processTriageReport(singleFinding, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      expect(mockGh.createIssueWithLabels.mock.calls.length).toBe(0);
+    });
+
+    it('CR-01-2: triage finding with shell-metachar case_id ($()) is filtered out', () => {
+      const singleFinding = {
+        findings: [makeFinding({ iteration_n: 1, severity: 'high', category: 'WRONG_CITATION', path_taken: 'heuristic' })],
+      };
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1, case_id: 'US123-$(rm -rf /)-1' })] };
+      const rerunReport = { replays: [] };
+
+      processTriageReport(singleFinding, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      expect(mockGh.createIssueWithLabels.mock.calls.length).toBe(0);
+    });
+
+    it('CR-01-3: triage finding with shell-metachar case_id (;rm) is filtered out', () => {
+      const singleFinding = {
+        findings: [makeFinding({ iteration_n: 1, severity: 'high', category: 'WRONG_CITATION', path_taken: 'heuristic' })],
+      };
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1, case_id: 'US123;rm -rf /' })] };
+      const rerunReport = { replays: [] };
+
+      processTriageReport(singleFinding, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      expect(mockGh.createIssueWithLabels.mock.calls.length).toBe(0);
+    });
+
+    it('CR-01-4: triage finding with non-ERROR_CLASSES category is clamped to UNCLASSIFIED in labels', () => {
+      const singleFinding = {
+        // Category is an arbitrary string (shell metacharacters possible) — must be clamped
+        findings: [makeFinding({ iteration_n: 1, severity: 'high', category: 'BOGUS`whoami`', path_taken: 'heuristic' })],
+      };
+      const llmReport = { iterations: [makeIteration({ iteration_n: 1 })] };
+      const rerunReport = { replays: [] };
+
+      processTriageReport(singleFinding, rerunReport, llmReport, {}, { ghClient: mockGh, runId: 'r', repo: 'a/b' });
+
+      expect(mockGh.createIssueWithLabels.mock.calls.length).toBe(1);
+      const [, , labelsArg] = mockGh.createIssueWithLabels.mock.calls[0];
+      // First label is the clamped category (D-06 order: [category, e2e-nightly, triage])
+      expect(labelsArg[0]).toBe('UNCLASSIFIED');
+      expect(labelsArg[0]).not.toContain('`');
+    });
   });
 });

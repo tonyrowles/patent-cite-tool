@@ -33,6 +33,7 @@ import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildIssuePayload } from '../tests/e2e/lib/issue-payload-builder.js';
+import { ERROR_CLASSES } from '../tests/e2e/lib/error-codes.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -351,23 +352,48 @@ export function processTriageReport(triageReport, rerunReport, llmReport, golden
     const iter = llmByIter.get(finding.iteration_n);
     const rerunEntry = rerunByIter.get(finding.iteration_n) ?? null;
 
-    const caseId = iter.case_id ?? iter.llm_selection?.patentId ?? 'UNKNOWN';
-    const fpV1 = fingerprint(caseId, finding.category, '');
-    const fpV2 = fingerprint(caseId, finding.category, topOfStackHashFromTriage(finding, rerunEntry, iter));
+    // CR-01: sanitize caseId before any shell interpolation (matches Phase 29
+    // regression path's sanitizeCaseId call at processReport line 409).
+    // The triage path previously skipped this control, allowing backticks /
+    // $() in iter.case_id or iter.llm_selection?.patentId to flow into the
+    // gh execSync title string via buildIssuePayload.
+    const rawCaseId = iter.case_id ?? iter.llm_selection?.patentId ?? 'UNKNOWN';
+    let caseId;
+    try {
+      caseId = sanitizeCaseId(rawCaseId);
+    } catch (err) {
+      console.warn(
+        `[e2e-report-issue] skipping triage finding (iter=${finding.iteration_n}): invalid case_id "${rawCaseId}" — ${err.message}`
+      );
+      continue;
+    }
+
+    // CR-01: clamp category to the closed ERROR_CLASSES taxonomy. Phase 35
+    // findings may carry arbitrary strings in finding.category; clamping
+    // prevents shell metacharacters from flowing into the gh --label arg
+    // (createIssueWithLabels only escapes `"`, not backticks or $()).
+    const category = ERROR_CLASSES.includes(finding.category)
+      ? finding.category
+      : 'UNCLASSIFIED';
+
+    const fpV1 = fingerprint(caseId, category, '');
+    const fpV2 = fingerprint(caseId, category, topOfStackHashFromTriage(finding, rerunEntry, iter));
 
     const existing = findMatchingIssueDual(ghClient, fpV1, fpV2);
     if (existing) {
       console.log(
-        `[e2e-report-issue] dedup hit #${existing.number} for case=${caseId} category=${finding.category}`
+        `[e2e-report-issue] dedup hit #${existing.number} for case=${caseId} category=${category}`
       );
       continue;
     }
 
     const goldenCitation = goldenBaseline?.[caseId]?.citation ?? null;
     const reproducerCmd = `npm run e2e:explore -- --case ${caseId}`;
+    // CR-01: pass sanitized caseId + clamped category through to the builder
+    // so the title `[e2e-nightly] ${caseId}: ${category}` is injection-safe.
     const { title, body, labels } = buildIssuePayload({
-      triageFinding: finding,
-      iteration: iter,
+      triageFinding: { ...finding, category },
+      iteration: { ...iter, case_id: caseId },
       rerunEntry,
       goldenCitation,
       reproducerCmd,
@@ -376,7 +402,7 @@ export function processTriageReport(triageReport, rerunReport, llmReport, golden
 
     const created = ghClient.createIssueWithLabels(title, body, labels);
     console.log(
-      `[e2e-report-issue] triage filed #${created?.number ?? '?'} (case=${caseId}, category=${finding.category})`
+      `[e2e-report-issue] triage filed #${created?.number ?? '?'} (case=${caseId}, category=${category})`
     );
   }
 }

@@ -116,7 +116,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] **Phase 34: Hybrid Triage Classifier** - Heuristic-first + LLM second-pass classification; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster pre-filter and prompt-injection defense (completed 2026-05-27)
 - [x] **Phase 35: Rich Issue Filer + Quarantine Corpus** - `issue-payload-builder.js`; `quarantine-append.mjs`; `test-cases-quarantine.js`; `e2e-report-issue.mjs` `--source triage` extension; fingerprint dual-search (completed 2026-05-28)
 - [x] **Phase 36: Quarantine CI Integration + Pipeline Orchestrator** - `quarantine.spec.js`; `run-triage-pipeline.mjs`; `e2e-nightly.yml` wiring with `llm_run_id` input; `promote-from-quarantine.mjs`; timeout budget audit (completed 2026-05-28)
-- [ ] **Phase 37: Weekly Analytics Digest** - `weekly-digest.mjs`; `e2e-weekly-digest.yml` Monday cron; GitHub Discussion + committed markdown; `SUMMARY_KEYS` export and validation
+- [ ] **Phase 37: Weekly Analytics Digest** - `weekly-digest.mjs`; `e2e-weekly-digest.yml` Monday cron; GitHub Discussion + committed markdown; `SUMMARY_KEYS` export and validation (3 plans)
 
 ## Phase Details
 
@@ -212,7 +212,10 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   2. `SUMMARY_KEYS` is exported from `lib/llm-report.js`; `weekly-digest.mjs` validates all keys present at startup and throws with a descriptive error (not silent zero) if any key is missing; Vitest test covers the missing-key throw path
   3. `.github/workflows/e2e-weekly-digest.yml` triggers on Monday 07:00 UTC cron with `contents: write` and `discussions: write` permissions; the digest is committed to `reports/weekly-digest-YYYY-WNN.md` in the same run
   4. Digest is published to GitHub Discussion via `gh api graphql createDiscussion` if Discussions is enabled on the repo; if not enabled (verified at phase start), a GitHub issue with `e2e-digest` label is filed instead — both paths are implemented and selected by a single config flag
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 37-01-PLAN.md — Export frozen SUMMARY_KEYS from llm-report.js; rebuild emptySummary() from it (DIGEST-04)
+- [ ] 37-02-PLAN.md — weekly-digest.mjs: read+aggregate issues, ISO-week, cost-vs-cap, ≤50-line render, both publish branches (DIGEST-01/03/04)
+- [ ] 37-03-PLAN.md — e2e-weekly-digest.yml Monday cron + contents/discussions/issues:write + commit-in-run [skip ci] (DIGEST-02/03)
 
 ## Progress
 
@@ -254,4 +257,4 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 34. Hybrid Triage Classifier | v3.1 | 5/5 | Complete    | 2026-05-27 |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 6/6 | Complete    | 2026-05-28 |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 4/4 | Complete    | 2026-05-28 |
-| 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |
+| 37. Weekly Analytics Digest | v3.1 | 0/3 | Planned | - |

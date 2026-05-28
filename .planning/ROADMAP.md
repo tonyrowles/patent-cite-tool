@@ -197,7 +197,11 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
   3. `e2e-nightly.yml` dispatched with `llm_run_id` input downloads the artifact, runs the triage pipeline, and executes the quarantine spec with `continue-on-error: true`; dispatched without `llm_run_id` the triage pipeline and quarantine spec steps are skipped (existing nightly behavior unchanged)
   4. A quarantine spec failure files a GitHub issue with the `e2e-quarantine` label via the existing `e2e-report-issue.mjs` path; Vitest or YAML-level comment confirms the label is `e2e-quarantine` (not the golden-suite label)
   5. Timeout budget comment in `e2e-nightly.yml` documents the arithmetic: existing nightly runtime + (N quarantine cases × per-case estimate) fits within the configured job timeout
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 36-01-PLAN.md — quarantine.spec.js (mirrors regression, iterates TEST_CASES_QUARANTINE) + e2e:quarantine npm script (--retries=0 --pass-with-no-tests) (QUAR-03)
+- [ ] 36-02-PLAN.md — run-triage-pipeline.mjs spawnSync chain (exit-0-always, WR-05-bounded) + single-CONFIRMED-finding fixture + spawnSync integration test (ORCH-01)
+- [ ] 36-03-PLAN.md — --source quarantine branch in e2e-report-issue.mjs (label-parameterized makeRealGhClient) + mock-gh label test (QUAR-04 filer side)
+- [ ] 36-04-PLAN.md — e2e-nightly.yml wiring: relocated download + 5 gated steps (label-ensure, triage-pipeline, quarantine spec continue-on-error+timeout, failure filer) + timeout-budget comment + grep YAML test (QUAR-04, ORCH-02, ORCH-03)
 
 ### Phase 37: Weekly Analytics Digest
 **Goal**: Every Monday at 07:00 UTC a digest of the prior week's LLM-triage findings is published to GitHub Discussions (or as a labeled issue fallback) and committed as a markdown file, aggregating findings count, classification breakdown, top 3 failure categories, quarantine growth, and cost vs cap — all within 50 lines
@@ -249,5 +253,5 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
 | 34. Hybrid Triage Classifier | v3.1 | 5/5 | Complete    | 2026-05-27 |
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 6/6 | Complete    | 2026-05-28 |
-| 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |
+| 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/4 | Not started | - |
 | 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |

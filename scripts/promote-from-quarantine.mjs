@@ -77,7 +77,7 @@ function parseArgs(argv) {
 // appendToGoldenCorpus — pure helper (Open Question 2, unit-tested)
 // ---------------------------------------------------------------------------
 
-/** Insert a new 4-key entry before the final `];` that closes TEST_CASES. PURE. */
+/** Insert a new 4-key entry before the LAST `\n];` that closes TEST_CASES. PURE. */
 export function appendToGoldenCorpus(content, entry) {
   const block =
     '  {\n' +
@@ -87,12 +87,12 @@ export function appendToGoldenCorpus(content, entry) {
     '    category: ' + JSON.stringify(entry.category) + ',\n' +
     '  }';
 
-  const newContent = content.replace(
-    /([\s\S]*)\n(\];\s*)$/,
-    '$1,\n' + block + '\n$2',
-  );
-
-  return newContent;
+  // lastIndexOf handles files with trailing comments after the array close (Open Question 2).
+  // test-cases.js entries end with `},` (trailing comma), then `\n];` closes the array.
+  // Insert new entry (with trailing comma) just before `\n];`.
+  const closeIdx = content.lastIndexOf('\n];');
+  if (closeIdx === -1) return content; // should not occur in practice
+  return content.slice(0, closeIdx) + '\n' + block + ',\n];' + content.slice(closeIdx + 3);
 }
 
 // ---------------------------------------------------------------------------

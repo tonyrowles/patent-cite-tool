@@ -79,6 +79,7 @@ credit.
 | `npm run e2e:smoke`  | `@smoke`-tagged subset (fast pre-commit check)                  | < 2 min          |
 | `npm run e2e:regression` | Full 66-case live deterministic suite                       | ~7-10 min        |
 | `npm run e2e:silent` | Silent-mode (Ctrl+C → clipboard) functional test                | ~30 s            |
+| `npm run e2e:quarantine` | Non-gating quarantine corpus (Phase 36). Iterates `TEST_CASES_QUARANTINE`; empty corpus exits 0 with 0 tests (`--pass-with-no-tests`). Used in nightly CI with `continue-on-error: true`. | ~30 s (empty corpus) |
 
 All three scripts run `npm run build:chrome` first, so `dist/chrome/`
 is always rebuilt from the current `src/` state — no stale-build

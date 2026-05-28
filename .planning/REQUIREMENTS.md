@@ -32,18 +32,18 @@ Requirements for this milestone. Each maps to roadmap phases (continued numberin
 
 ### ISSUE — Rich-Context Auto-Issue Filer
 
-- [ ] **ISSUE-01**: `lib/issue-payload-builder.js` assembles issue body with reproducer command + seed, verifier disagreement detail (expected vs observed + tier + PDF snippet link), LLM classifier rationale + confidence, diff vs last-known-good golden citation
-- [ ] **ISSUE-02**: `scripts/e2e-report-issue.mjs` accepts `--source triage` flag and applies errorClass as a GitHub label (in addition to body)
-- [ ] **ISSUE-03**: Fingerprint scheme extended additively; `findMatchingIssue` performs dual-search across v1 and v2 fingerprint formulas during transition (no retroactive dedup breakage)
-- [ ] **ISSUE-04**: Per-section character budgets enforced: LLM rationale ≤800 chars, verifier windows ≤600 chars each, golden diff ≤400 chars; fingerprint comment on line 1 of body (prevents >65,536 char overflow)
+- [x] **ISSUE-01**: `lib/issue-payload-builder.js` assembles issue body with reproducer command + seed, verifier disagreement detail (expected vs observed + tier + PDF snippet link), LLM classifier rationale + confidence, diff vs last-known-good golden citation
+- [x] **ISSUE-02**: `scripts/e2e-report-issue.mjs` accepts `--source triage` flag and applies errorClass as a GitHub label (in addition to body)
+- [x] **ISSUE-03**: Fingerprint scheme extended additively; `findMatchingIssue` performs dual-search across v1 and v2 fingerprint formulas during transition (no retroactive dedup breakage)
+- [x] **ISSUE-04**: Per-section character budgets enforced: LLM rationale ≤800 chars, verifier windows ≤600 chars each, golden diff ≤400 chars; fingerprint comment on line 1 of body (prevents >65,536 char overflow)
 
 ### QUAR — Quarantine Corpus
 
-- [ ] **QUAR-01**: `tests/e2e/test-cases-quarantine.js` exists with schema identical to `test-cases.js`; vitest schema-guard test in `test:src` suite prevents drift
-- [ ] **QUAR-02**: `scripts/quarantine-append.mjs` idempotently upserts CONFIRMED triaged findings into the quarantine corpus
+- [x] **QUAR-01**: `tests/e2e/test-cases-quarantine.js` exists with schema identical to `test-cases.js`; vitest schema-guard test in `test:src` suite prevents drift
+- [x] **QUAR-02**: `scripts/quarantine-append.mjs` idempotently upserts CONFIRMED triaged findings into the quarantine corpus
 - [ ] **QUAR-03**: `tests/e2e/specs/quarantine.spec.js` Playwright project runs the quarantine corpus with `retries: 0`
 - [ ] **QUAR-04**: Quarantine spec runs in the nightly cron with `continue-on-error: true` (non-gating); failures file issues with `e2e-quarantine` label via existing `e2e-report-issue.mjs`
-- [ ] **QUAR-05**: `scripts/promote-from-quarantine.mjs` human-triggered utility moves a quarantine entry into `test-cases.js` and regenerates the golden baseline for that case; cases with `stable_runs ≥ 3` auto-tagged `quarantine:ready-for-promotion`
+- [x] **QUAR-05**: `scripts/promote-from-quarantine.mjs` human-triggered utility moves a quarantine entry into `test-cases.js` and regenerates the golden baseline for that case; cases with `stable_runs ≥ 3` auto-tagged `quarantine:ready-for-promotion`
 
 ### ORCH — Pipeline Orchestrator + CI Integration
 
@@ -114,15 +114,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRIAGE-04 | Phase 34 | Complete |
 | TRIAGE-05 | Phase 34 | Complete |
 | TRIAGE-06 | Phase 34 | Complete |
-| ISSUE-01 | Phase 35 | Pending |
-| ISSUE-02 | Phase 35 | Pending |
-| ISSUE-03 | Phase 35 | Pending |
-| ISSUE-04 | Phase 35 | Pending |
-| QUAR-01 | Phase 35 | Pending |
-| QUAR-02 | Phase 35 | Pending |
+| ISSUE-01 | Phase 35 | Complete |
+| ISSUE-02 | Phase 35 | Complete |
+| ISSUE-03 | Phase 35 | Complete |
+| ISSUE-04 | Phase 35 | Complete |
+| QUAR-01 | Phase 35 | Complete |
+| QUAR-02 | Phase 35 | Complete |
 | QUAR-03 | Phase 36 | Pending |
 | QUAR-04 | Phase 36 | Pending |
-| QUAR-05 | Phase 35 | Pending |
+| QUAR-05 | Phase 35 | Complete |
 | ORCH-01 | Phase 36 | Pending |
 | ORCH-02 | Phase 36 | Pending |
 | ORCH-03 | Phase 36 | Pending |

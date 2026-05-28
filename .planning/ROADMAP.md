@@ -248,6 +248,6 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 32. HUMAN-UAT Verification | v3.1 | 5/5 | Complete    | 2026-05-25 |
 | 33. Re-run Validator | v3.1 | 5/5 | Complete    | 2026-05-27 |
 | 34. Hybrid Triage Classifier | v3.1 | 5/5 | Complete    | 2026-05-27 |
-| 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 6/6 | Complete   | 2026-05-28 |
+| 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 6/6 | Complete    | 2026-05-28 |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 0/? | Not started | - |
 | 37. Weekly Analytics Digest | v3.1 | 0/? | Not started | - |

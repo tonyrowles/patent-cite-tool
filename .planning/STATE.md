@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: LLM-Driven Product Improvement Loop
-status: executing
-last_updated: "2026-05-27T23:17:48.750Z"
+status: ready_to_plan
+last_updated: 2026-05-28T05:46:34.099Z
 last_activity: 2026-05-27 -- Phase 35 execution started
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 21
-  completed_plans: 15
+  completed_plans: 21
   percent: 50
+stopped_at: Phase 35 complete (6/6) — ready to discuss Phase 36
 ---
 
 # Project State
@@ -20,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-22)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 35 — Rich Issue Filer + Quarantine Corpus
+**Current focus:** Phase 36 — quarantine ci integration + pipeline orchestrator
 
 ## Current Position
 
-Phase: 35 (Rich Issue Filer + Quarantine Corpus) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 35
-Last activity: 2026-05-27 -- Phase 35 execution started
+Phase: 36
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-28
 
 Progress: ░░░░░░░░░░ 0% (0/6 phases complete)
 

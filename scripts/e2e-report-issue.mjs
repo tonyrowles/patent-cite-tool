@@ -2,6 +2,7 @@
 //
 // Phase 29 (CRON-04, CRON-05) — issue filer with fingerprint-based dedup.
 // Phase 35 (ISSUE-02, ISSUE-03) — extended with --source triage + dual-search.
+// Phase 36 (QUAR-04/D-15) — --source quarantine reuses processReport with the e2e-quarantine label.
 //
 // Reads tests/e2e/artifacts/${PLAYWRIGHT_RUN_ID}/report.json (RPT-01 shape)
 // and for each failed-non-FLAKE case either opens a new GitHub issue or
@@ -467,12 +468,12 @@ export function processReport(report, { ghClient, runId, repo }) {
 // Real ghClient — uses execSync('gh ...'). Only invoked from the CLI shim.
 // ---------------------------------------------------------------------------
 
-export function makeRealGhClient(repo) {
+export function makeRealGhClient(repo, label = NIGHTLY_LABEL) {
   return {
     listOpenNightlyIssues() {
       try {
         const raw = execSync(
-          `gh api repos/${repo}/issues --method GET -f labels=${NIGHTLY_LABEL} -f state=open --paginate`,
+          `gh api repos/${repo}/issues --method GET -f labels=${label} -f state=open --paginate`,
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
         const parsed = JSON.parse(raw);
@@ -487,7 +488,7 @@ export function makeRealGhClient(repo) {
       // Title is escaped for the shell command string (T-29-02-1).
       const escapedTitle = title.replaceAll('"', '\\"');
       const out = execSync(
-        `gh issue create --title "${escapedTitle}" --label ${NIGHTLY_LABEL} --body-file -`,
+        `gh issue create --title "${escapedTitle}" --label ${label} --body-file -`,
         { input: body, encoding: 'utf8' }
       );
       const m = out.match(/\/issues\/(\d+)/);
@@ -554,11 +555,12 @@ export function makeRealGhClient(repo) {
  * Parse --source and --triage-report flags from process.argv.
  *
  * Rules:
- *   --source <regression|triage>  strict positional; default = 'regression' (Phase 29 back-compat)
+ *   --source <regression|triage|quarantine>  strict positional; default = 'regression' (Phase 29 back-compat)
  *   --source=<value>              exit 2 (equals syntax not supported)
  *   --source                      exit 2 (missing value)
  *   --triage-report <path>        required when --source triage; strict positional
  *   --triage-report=<path>        exit 2 (equals syntax not supported)
+ *   quarantine: reuses the processReport per-case report.json path, stamps e2e-quarantine label (D-15)
  *
  * @param {string[]} argv — process.argv
  * @returns {{ source: string, triageReportPath: string|null }}
@@ -581,9 +583,9 @@ function parseSourceArgs(argv) {
         process.stderr.write('[e2e-report-issue] missing value for --source\n');
         process.exit(2);
       }
-      if (next !== 'regression' && next !== 'triage') {
+      if (next !== 'regression' && next !== 'triage' && next !== 'quarantine') {
         process.stderr.write(
-          `[e2e-report-issue] invalid --source value: expected 'regression' or 'triage'\n`
+          `[e2e-report-issue] invalid --source value: expected 'regression', 'triage', or 'quarantine'\n`
         );
         process.exit(2);
       }
@@ -689,14 +691,17 @@ if (isMain) {
     process.exit(1);
   }
 
-  const gh = makeRealGhClient(repo);
+  // Phase 36 (D-15): quarantine source uses e2e-quarantine label; all other sources use e2e-nightly (default).
+  const gh = source === 'quarantine'
+    ? makeRealGhClient(repo, 'e2e-quarantine')
+    : makeRealGhClient(repo);
 
   if (source === 'triage') {
     mainTriage(triageReportPath, { ghClient: gh, runId, repo }).catch(err => {
       console.error('[e2e-report-issue] triage error:', err.message);
       process.exit(1);
     });
-  } else {
+  } else if (source === 'regression') {
     // source === 'regression' — existing Phase 29 behavior preserved unchanged.
 
     // --meta-drift mode: file ONE meta-issue for "Google Patents drift suspected"
@@ -739,6 +744,29 @@ if (isMain) {
     }
 
     // Default mode: read report.json and iterate failed cases.
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const reportPath = path.resolve(
+      __dirname,
+      '..',
+      'tests/e2e/artifacts',
+      runId,
+      'report.json'
+    );
+
+    if (!existsSync(reportPath)) {
+      console.log(
+        `[e2e-report-issue] no report.json at ${reportPath} — nothing to file`
+      );
+      process.exit(0);
+    }
+
+    const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+    processReport(report, { ghClient: gh, runId, repo });
+  } else {
+    // source === 'quarantine' (Phase 36, D-15) — reuses the same report.json + processReport path
+    // as regression. The gh client was constructed with 'e2e-quarantine' label above.
+    // --meta-drift does NOT apply to quarantine (no DOM-drift pre-flight for quarantine suite).
+    // sanitizeCaseId guard is inherited automatically through processReport.
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const reportPath = path.resolve(
       __dirname,

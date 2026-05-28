@@ -21,7 +21,7 @@
 //   - filterFindingsForFiling(): CONFIRMED admits, HARNESS_ERROR rejected (Pitfall 8)
 //   - processTriageReport(): 3-label create, HARNESS_ERROR filtered, v1-dedup no re-file
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,7 @@ import {
   findMatchingIssue,
   isRecentlyUpdated,
   processReport,
+  makeRealGhClient,
   MAX_RECENT_DAYS,
   topOfStackHashFromTriage,
   findMatchingIssueDual,
@@ -719,6 +720,148 @@ describe('Phase 35 extensions (ISSUE-02, ISSUE-03)', () => {
       // First label is the clamped category (D-06 order: [category, e2e-nightly, triage])
       expect(labelsArg[0]).toBe('UNCLASSIFIED');
       expect(labelsArg[0]).not.toContain('`');
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 36: --source quarantine (QUAR-04 / D-15)
+// ---------------------------------------------------------------------------
+
+// Capture execSync calls via vi.mock — Vitest hoists this to the top of the file.
+// The mock intercepts the node:child_process module so makeRealGhClient can be
+// called without a real gh CLI. The captured commands are inspected to assert
+// that the quarantine label is correctly threaded (SC-4).
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    execSync: vi.fn((cmd, opts) => {
+      // listOpenNightlyIssues path: return empty issues JSON array.
+      if (typeof cmd === 'string' && cmd.includes('--method GET')) return '[]';
+      // createIssue path: return a fake issue URL so the number parser can run.
+      return 'https://github.com/owner/repo/issues/42';
+    }),
+  };
+});
+
+describe('--source quarantine (QUAR-04 / D-15)', () => {
+  // ---------------------------------------------------------------------------
+  // Test A: label threading (SC-4) — assert that makeRealGhClient(repo, 'e2e-quarantine')
+  // wires the quarantine label into createIssue and listOpenNightlyIssues.
+  //
+  // Uses vi.mock('node:child_process') above (hoisted) to capture execSync calls.
+  // ---------------------------------------------------------------------------
+
+  describe('makeRealGhClient label threading (SC-4)', () => {
+    // Import the mocked execSync via a dynamic import inside the test block.
+    // vi.mock is module-scoped so we access the mock via the same import path.
+    let mockExecSync;
+
+    beforeEach(async () => {
+      const mod = await import('node:child_process');
+      mockExecSync = mod.execSync;
+      vi.mocked(mockExecSync).mockClear();
+    });
+
+    it('A1: quarantine client createIssue passes --label e2e-quarantine (NOT e2e-nightly)', async () => {
+      const client = makeRealGhClient('owner/repo', 'e2e-quarantine');
+      client.createIssue('[e2e-nightly] US11427642-claims-1: WRONG_CITATION', 'body text');
+
+      const cmd = vi.mocked(mockExecSync).mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('gh issue create'))?.[0];
+      expect(cmd).toBeDefined();
+      expect(cmd).toContain('--label e2e-quarantine');
+      expect(cmd).not.toContain('--label e2e-nightly');
+    });
+
+    it('A2: quarantine client listOpenNightlyIssues queries with labels=e2e-quarantine (NOT e2e-nightly)', async () => {
+      const client = makeRealGhClient('owner/repo', 'e2e-quarantine');
+      client.listOpenNightlyIssues();
+
+      const cmd = vi.mocked(mockExecSync).mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('labels='))?.[0];
+      expect(cmd).toBeDefined();
+      expect(cmd).toContain('labels=e2e-quarantine');
+      expect(cmd).not.toContain('labels=e2e-nightly');
+    });
+
+    it('A3: default client (no label arg) createIssue still uses --label e2e-nightly (back-compat)', async () => {
+      const client = makeRealGhClient('owner/repo');
+      client.createIssue('[e2e-nightly] US11427642-claims-1: WRONG_CITATION', 'body text');
+
+      const cmd = vi.mocked(mockExecSync).mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('gh issue create'))?.[0];
+      expect(cmd).toBeDefined();
+      expect(cmd).toContain('--label e2e-nightly');
+      expect(cmd).not.toContain('--label e2e-quarantine');
+    });
+
+    it('A4: default client (no label arg) listOpenNightlyIssues queries with labels=e2e-nightly (back-compat)', async () => {
+      const client = makeRealGhClient('owner/repo');
+      client.listOpenNightlyIssues();
+
+      const cmd = vi.mocked(mockExecSync).mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('labels='))?.[0];
+      expect(cmd).toBeDefined();
+      expect(cmd).toContain('labels=e2e-nightly');
+      expect(cmd).not.toContain('labels=e2e-quarantine');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test B: CR-01 reuse (sanitizeCaseId guard inherited through processReport)
+  //
+  // The quarantine branch routes through processReport — the exact same code path
+  // as the regression branch. This test mirrors the existing "skips invalid case
+  // IDs" test and proves the shell-injection guard is live on the quarantine path
+  // by calling processReport with a mock ghClient (label is in the client, not in
+  // processReport — so any mock client exercises the same sanitizeCaseId path).
+  // ---------------------------------------------------------------------------
+
+  describe('CR-01 guard inherited by quarantine path (sanitizeCaseId via processReport)', () => {
+    it('B1: shell-metachar case id (;rm -rf /) is skipped — zero createIssue calls', () => {
+      const badReport = {
+        cases: [{ id: 'US123;rm -rf /', status: 'failed', errorClass: 'WRONG_CITATION',
+          verifier_verdict: null, artifacts: {}, citation: null }],
+      };
+      const ghCalls = [];
+      const ghClient = {
+        listOpenNightlyIssues: () => [],
+        createIssue: (t, b) => { ghCalls.push({ op: 'create' }); return { number: 1 }; },
+        commentIssue: (n, b) => { ghCalls.push({ op: 'comment' }); },
+      };
+      // processReport is label-agnostic; calling with any mock ghClient exercises
+      // the same sanitizeCaseId guard the quarantine branch uses (D-15 / CR-01).
+      expect(() => processReport(badReport, { ghClient, runId: 'r', repo: 'owner/repo' })).not.toThrow();
+      expect(ghCalls).toEqual([]);
+    });
+
+    it('B2: shell-metachar case id ($(whoami)) is skipped — zero createIssue calls', () => {
+      const badReport = {
+        cases: [{ id: 'US123$(whoami)', status: 'failed', errorClass: 'WRONG_CITATION',
+          verifier_verdict: null, artifacts: {}, citation: null }],
+      };
+      const ghCalls = [];
+      const ghClient = {
+        listOpenNightlyIssues: () => [],
+        createIssue: (t, b) => { ghCalls.push({ op: 'create' }); return { number: 1 }; },
+        commentIssue: (n, b) => { ghCalls.push({ op: 'comment' }); },
+      };
+      expect(() => processReport(badReport, { ghClient, runId: 'r', repo: 'owner/repo' })).not.toThrow();
+      expect(ghCalls).toEqual([]);
+    });
+
+    it('B3: valid case id passes through sanitizeCaseId and reaches createIssue', () => {
+      const goodReport = {
+        cases: [{ id: 'US11427642-claims-1', status: 'failed', errorClass: 'WRONG_CITATION',
+          verifier_verdict: null, artifacts: {}, citation: null }],
+      };
+      const ghCalls = [];
+      const ghClient = {
+        listOpenNightlyIssues: () => [],
+        createIssue: (t, b) => { ghCalls.push({ op: 'create', title: t }); return { number: 1 }; },
+        commentIssue: (n, b) => { ghCalls.push({ op: 'comment' }); },
+      };
+      processReport(goodReport, { ghClient, runId: 'r', repo: 'owner/repo' });
+      expect(ghCalls.length).toBe(1);
+      expect(ghCalls[0].op).toBe('create');
     });
   });
 });

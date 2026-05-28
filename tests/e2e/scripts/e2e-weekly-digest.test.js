@@ -295,7 +295,7 @@ describe('cost data unavailable when ledger absent', () => {
     const result = renderCostLine({ ledgerPath: tmpLedger });
     expect(result).toMatch(/^\$\d+\.\d{2} \/ \$100 \(\d+%\)$/);
     expect(result).toContain('12.50');
-    expect(result).toContain('12%');
+    expect(result).toContain('13%'); // Math.round(12.5/100*100) = 13
   });
 });
 

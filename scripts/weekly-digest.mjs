@@ -224,17 +224,41 @@ function makeRealGhClient(repo) {
   const [owner, name] = (repo ?? '').split('/');
   return {
     listOpenIssuesByLabel(label) {
+      // CR-02: do NOT swallow gh failures into an empty array. A gh auth error,
+      // secondary rate-limit, or API outage that returned [] here would let
+      // runDigest publish a misleading "0 findings" silent-zero digest. Instead
+      // THROW on any hard failure (non-zero exit, JSON parse error, non-array
+      // payload) so runDigest aborts before writing/committing/filing and the
+      // workflow step fails loudly. A LEGITIMATE empty result (gh exits 0 and
+      // returns []) still flows through and publishes a real "0 findings" digest.
+      let raw;
       try {
-        const raw = execSync(
+        raw = execSync(
           `gh api repos/${repo}/issues --method GET -f labels=${label} -f state=open --paginate`,
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
       } catch (err) {
-        console.warn(`[weekly-digest] listOpenIssuesByLabel(${label}) failed:`, err.message);
-        return [];
+        throw new Error(
+          `weekly-digest: gh issue fetch failed for label '${label}' ` +
+          `(refusing to publish a silent-zero digest): ${err.message}`
+        );
       }
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        throw new Error(
+          `weekly-digest: gh returned unparseable JSON for label '${label}' ` +
+          `(refusing to publish a silent-zero digest): ${err.message}`
+        );
+      }
+      if (!Array.isArray(parsed)) {
+        throw new Error(
+          `weekly-digest: gh returned a non-array payload for label '${label}' ` +
+          `(refusing to publish a silent-zero digest)`
+        );
+      }
+      return parsed;
     },
 
     hasDiscussions() {

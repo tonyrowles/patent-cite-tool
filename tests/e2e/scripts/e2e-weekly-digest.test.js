@@ -341,6 +341,129 @@ describe('cost data unavailable when ledger absent', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 8b. CR-02: gh fetch failure must NOT publish a silent-zero digest
+// ---------------------------------------------------------------------------
+describe('CR-02: gh fetch failure throws and does not publish a silent-zero digest', () => {
+  it('runDigest rejects and writes NO digest file / files NO issue when the issue fetch fails', async () => {
+    const callLog = [];
+    const failingGhClient = {
+      // Simulate a gh auth error / outage on the issue-list call — the real
+      // makeRealGhClient.listOpenIssuesByLabel now throws on non-zero exit.
+      listOpenIssuesByLabel(label) {
+        callLog.push(`listOpenIssuesByLabel:${label}`);
+        throw new Error(`gh: HTTP 401 (Bad credentials) for label '${label}'`);
+      },
+      createDigestIssue(title) {
+        callLog.push(`createDigestIssue:${title}`);
+        return 'https://github.com/test/test/issues/1';
+      },
+      hasDiscussions() {
+        callLog.push('hasDiscussions');
+        return false;
+      },
+      createDiscussion(title) {
+        callLog.push(`createDiscussion:${title}`);
+        return 'https://github.com/test/test/discussions/1';
+      },
+    };
+
+    await expect(
+      runDigest({
+        ghClient: failingGhClient,
+        now: PIN_NOW,
+        publishMode: 'issue',
+        repo: 'test/test',
+        reportsDir: runDir,
+      })
+    ).rejects.toThrow();
+
+    // No digest file written for the week
+    const reportPath = path.join(runDir, 'weekly-digest-2026-W22.md');
+    expect(fs.existsSync(reportPath)).toBe(false);
+
+    // No publish attempt happened (fetch failed before render/write/publish)
+    expect(callLog.some(c => c.startsWith('createDigestIssue'))).toBe(false);
+    expect(callLog.some(c => c.startsWith('createDiscussion'))).toBe(false);
+  });
+
+  it('makeRealGhClient.listOpenIssuesByLabel throws when gh exits non-zero (no silent [])', () => {
+    // mock-gh that EXITS NON-ZERO on the issue-list call.
+    const failDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-digest-failgh-'));
+    const failGhBody = [
+      '#!/usr/bin/env bash',
+      'case "$1" in',
+      '  api)',
+      '    case "$2" in',
+      '      repos/*/issues) echo "gh: Bad credentials" >&2; exit 1 ;;',
+      '      *) echo "false" ;;',
+      '    esac ;;',
+      'esac',
+    ].join('\n') + '\n';
+    fs.writeFileSync(path.join(failDir, 'gh'), failGhBody, { mode: 0o755 });
+
+    // Drive the REAL client by running runDigest in a child process with the
+    // failing mock-gh on PATH; assert it exits non-zero and writes no digest.
+    const childRunDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-digest-failrun-'));
+    const result = spawnSync(process.execPath, [SCRIPT_PATH], {
+      env: {
+        ...process.env,
+        PATH: `${failDir}:${process.env.PATH}`,
+        GITHUB_REPOSITORY: 'test/test',
+        DIGEST_PUBLISH_MODE: 'issue',
+      },
+      cwd: childRunDir,
+      encoding: 'utf8',
+    });
+
+    // Process must fail loudly (exit 1 via the isMain catch handler)
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/gh issue fetch failed|silent-zero/);
+
+    // No digest file produced in the child's reports dir
+    const reportsDir = path.join(childRunDir, 'reports');
+    const wrote = fs.existsSync(reportsDir)
+      ? fs.readdirSync(reportsDir).filter(f => f.startsWith('weekly-digest-'))
+      : [];
+    expect(wrote).toEqual([]);
+
+    fs.rmSync(failDir, { recursive: true, force: true });
+    fs.rmSync(childRunDir, { recursive: true, force: true });
+  });
+
+  it('legitimate empty result (gh exits 0, returns []) still publishes a real "0 findings" digest', async () => {
+    const callLog = [];
+    const emptyGhClient = {
+      listOpenIssuesByLabel(label) {
+        callLog.push(`listOpenIssuesByLabel:${label}`);
+        return []; // gh succeeded; genuinely zero open issues this week
+      },
+      createDigestIssue(title) {
+        callLog.push(`createDigestIssue:${title}`);
+        return 'https://github.com/test/test/issues/1';
+      },
+      hasDiscussions() { return false; },
+      createDiscussion(title) {
+        callLog.push(`createDiscussion:${title}`);
+        return 'https://github.com/test/test/discussions/1';
+      },
+    };
+
+    const result = await runDigest({
+      ghClient: emptyGhClient,
+      now: PIN_NOW,
+      publishMode: 'issue',
+      repo: 'test/test',
+      reportsDir: runDir,
+    });
+
+    // A real "0 findings" digest IS published for a legitimate empty week
+    const md = fs.readFileSync(result.reportPath, 'utf8');
+    expect(md).toContain('**Total open findings:** 0');
+    expect(callLog.some(c => c.startsWith('createDigestIssue'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 9. Both publish branches
 // ---------------------------------------------------------------------------
 describe('both publish branches', () => {

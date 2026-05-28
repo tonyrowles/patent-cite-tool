@@ -48,13 +48,22 @@ describe('e2e-nightly.yml quarantine/triage wiring (Phase 36)', () => {
   });
 
   it('Y2 — QUAR-04: quarantine step block has continue-on-error: true, timeout-minutes: 15, e2e:quarantine', () => {
-    // Extract the window from "Run quarantine spec" to the next "- name:" after it
-    const startIdx = yaml.indexOf('Run quarantine spec');
+    // WR-05: key the window on the machine-stable `id: quarantine` rather than
+    // the human-readable step name ("Run quarantine spec"). A benign step
+    // rename would silently break the name-based matcher with a confusing
+    // startIdx === -1 failure; the `id:` is the stable contract the failure
+    // filer's `steps.quarantine.outcome` already depends on. Bound the window
+    // at the next step boundary (`- name:` or `id:`) so the three asserted keys
+    // are scoped to THIS step and cannot leak in from a neighbor.
+    const startIdx = yaml.indexOf('id: quarantine');
     expect(startIdx).toBeGreaterThan(-1);
 
-    const afterStart = yaml.slice(startIdx);
-    // Find the next "- name:" boundary
-    const endIdx = afterStart.indexOf('- name:', 1);
+    const afterStart = yaml.slice(startIdx + 'id: quarantine'.length);
+    // Next step boundary is whichever of `- name:` / `id:` appears first.
+    const nameBoundary = afterStart.indexOf('- name:');
+    const idBoundary = afterStart.indexOf('id:');
+    const boundaries = [nameBoundary, idBoundary].filter((i) => i !== -1);
+    const endIdx = boundaries.length ? Math.min(...boundaries) : -1;
     const stepBlock = endIdx === -1 ? afterStart : afterStart.slice(0, endIdx);
 
     expect(stepBlock).toContain('continue-on-error: true');

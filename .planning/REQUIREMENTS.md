@@ -41,15 +41,15 @@ Requirements for this milestone. Each maps to roadmap phases (continued numberin
 
 - [x] **QUAR-01**: `tests/e2e/test-cases-quarantine.js` exists with schema identical to `test-cases.js`; vitest schema-guard test in `test:src` suite prevents drift
 - [x] **QUAR-02**: `scripts/quarantine-append.mjs` idempotently upserts CONFIRMED triaged findings into the quarantine corpus
-- [ ] **QUAR-03**: `tests/e2e/specs/quarantine.spec.js` Playwright project runs the quarantine corpus with `retries: 0`
-- [ ] **QUAR-04**: Quarantine spec runs in the nightly cron with `continue-on-error: true` (non-gating); failures file issues with `e2e-quarantine` label via existing `e2e-report-issue.mjs`
+- [x] **QUAR-03**: `tests/e2e/specs/quarantine.spec.js` Playwright project runs the quarantine corpus with `retries: 0`
+- [x] **QUAR-04**: Quarantine spec runs in the nightly cron with `continue-on-error: true` (non-gating); failures file issues with `e2e-quarantine` label via existing `e2e-report-issue.mjs`
 - [x] **QUAR-05**: `scripts/promote-from-quarantine.mjs` human-triggered utility moves a quarantine entry into `test-cases.js` and regenerates the golden baseline for that case; cases with `stable_runs ≥ 3` auto-tagged `quarantine:ready-for-promotion`
 
 ### ORCH — Pipeline Orchestrator + CI Integration
 
-- [ ] **ORCH-01**: `scripts/run-triage-pipeline.mjs` chains rerun-validator → triage-classifier → issue-payload-builder → quarantine-append; exits 0 always (same philosophy as nightly)
-- [ ] **ORCH-02**: `e2e-nightly.yml` accepts `llm_run_id` workflow_dispatch input; downloads the artifact and runs the triage pipeline only when provided (regression unchanged when absent)
-- [ ] **ORCH-03**: Timeout budget audit documented in `e2e-nightly.yml` (existing nightly + quarantine N×per-case-time fits within job timeout)
+- [x] **ORCH-01**: `scripts/run-triage-pipeline.mjs` chains rerun-validator → triage-classifier → issue-payload-builder → quarantine-append; exits 0 always (same philosophy as nightly)
+- [x] **ORCH-02**: `e2e-nightly.yml` accepts `llm_run_id` workflow_dispatch input; downloads the artifact and runs the triage pipeline only when provided (regression unchanged when absent)
+- [x] **ORCH-03**: Timeout budget audit documented in `e2e-nightly.yml` (existing nightly + quarantine N×per-case-time fits within job timeout)
 
 ### DIGEST — Weekly Analytics
 
@@ -120,12 +120,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ISSUE-04 | Phase 35 | Complete |
 | QUAR-01 | Phase 35 | Complete |
 | QUAR-02 | Phase 35 | Complete |
-| QUAR-03 | Phase 36 | Pending |
-| QUAR-04 | Phase 36 | Pending |
+| QUAR-03 | Phase 36 | Complete |
+| QUAR-04 | Phase 36 | Complete |
 | QUAR-05 | Phase 35 | Complete |
-| ORCH-01 | Phase 36 | Pending |
-| ORCH-02 | Phase 36 | Pending |
-| ORCH-03 | Phase 36 | Pending |
+| ORCH-01 | Phase 36 | Complete |
+| ORCH-02 | Phase 36 | Complete |
+| ORCH-03 | Phase 36 | Complete |
 | DIGEST-01 | Phase 37 | Pending |
 | DIGEST-02 | Phase 37 | Pending |
 | DIGEST-03 | Phase 37 | Pending |

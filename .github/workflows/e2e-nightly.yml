@@ -238,6 +238,68 @@ jobs:
         # WRONG_CITATION / NO_CITATION_PRODUCED. Issue title prefix becomes
         # "[e2e-nightly] US11427642-spec-short-1: WORKER_FALLBACK_FAILED".
 
+      # TIMEOUT BUDGET (Phase 36 / ORCH-03 / D-14)
+      # Job cap: timeout-minutes: 30 (see line 50 above).
+      # Existing budget consumed:
+      #   - smoke + select + regression: ~N_daily × 90s/case (up to 66 cases on Sunday)
+      #   - fault-injection spec: ~90s (single case, retries: 0)
+      # Quarantine addition:
+      #   N_quarantine × ~90s/case (per-test timeout in playwright.config.js)
+      #   + ~60s build (npm run build:chrome is baked into e2e:quarantine)
+      # CURRENT N_quarantine = 0 (empty corpus) → 0 added minutes; full headroom.
+      # CEILING: at ~20 quarantine cases, 20×90s = 30 min would exhaust the job cap.
+      # Mitigation: the quarantine spec step has its own timeout-minutes: 15 (below)
+      # so it cannot starve the job regardless of corpus growth.
+      # >20 cases → daily --grep rotation (deferred, D-14). Flag when corpus grows.
+
+      - name: Ensure e2e-quarantine label exists
+        if: inputs.llm_run_id != ''
+        run: |
+          gh label create "e2e-quarantine" \
+            --color "d93f0b" \
+            --description "Auto-filed by nightly quarantine suite" \
+            --force 2>/dev/null || true
+        # Mirrors the e2e-nightly label step (line 97) with a distinct color (d93f0b).
+        # Color uses 6-char hex WITHOUT # prefix (gh CLI requirement).
+        # --force updates if exists; || true makes the step safe if gh rejects --force.
+        # Gated on llm_run_id per D-13 — only bootstrapped when the quarantine path runs.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run triage pipeline
+        if: inputs.llm_run_id != ''
+        run: node scripts/run-triage-pipeline.mjs --llm-report tests/e2e/artifacts/${{ github.run_id }}/llm-report.json
+        # Chains: rerun-validator → triage-classifier → issue-file (--source triage) → quarantine-append.
+        # Exits 0 always (D-06 / nightly cron philosophy); stage failures are logged, never abort the chain.
+        # The triage-classifier LLM second-pass hits the CI=true gate → returns {ciGate:true} for
+        # ambiguous findings (D-08); heuristic-resolved findings still flow to issue-file + quarantine-append.
+        # Path tests/e2e/artifacts/${{ github.run_id }}/llm-report.json satisfies WR-05
+        # ALLOWED_INPUT_ROOTS bound (artifacts/ or fixtures/ — set by relocate in Task 1).
+        # DO NOT add env: CI: '' — that defeats the triage-classifier CI gate (Pitfall 3).
+
+      - name: Run quarantine spec (non-gating)
+        id: quarantine
+        if: inputs.llm_run_id != ''
+        continue-on-error: true
+        timeout-minutes: 15
+        run: npm run e2e:quarantine
+        # continue-on-error mirrors the regression step (line 191) — a quarantine failure
+        # NEVER fails the job (QUAR-04). The filed issue is the signal, not a red-X.
+        # timeout-minutes: 15 (D-14 / Discretion A3) so quarantine cannot consume the
+        # whole 30-min job budget; see TIMEOUT BUDGET comment above.
+        # --retries=0 --pass-with-no-tests are baked into the e2e:quarantine npm script
+        # (Plan 36-01 / D-03); empty corpus exits 0 with 0 tests.
+
+      - name: File quarantine issues on failure
+        if: inputs.llm_run_id != '' && steps.quarantine.outcome == 'failure'
+        run: node scripts/e2e-report-issue.mjs --source quarantine
+        # Gated on quarantine step outcome == 'failure' — mirrors the regression filer
+        # (line 202). Reads tests/e2e/artifacts/${PLAYWRIGHT_RUN_ID}/report.json
+        # (PLAYWRIGHT_RUN_ID = github.run_id, set job-wide at line 52) and files
+        # per-case issues stamped with the e2e-quarantine label (Plan 36-03 / D-15).
+        # Reuses fingerprint-based dedup; sanitizeCaseId guard from Phase 35 CR-01
+        # applies to the quarantine source path (no shell injection surface).
+
       - name: Upload E2E artifacts
         if: always() && (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure' || steps.fault_injection.outcome == 'failure')
         uses: actions/upload-artifact@v4

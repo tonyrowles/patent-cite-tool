@@ -10,6 +10,7 @@
     "e2e:regression": "npm run build:chrome && playwright test --config tests/e2e/playwright.config.js specs/regression.spec.js",
     "e2e:silent": "npm run build:chrome && playwright test --config tests/e2e/playwright.config.js specs/silent.spec.js",
     "e2e:smoke": "npm run build:chrome && playwright test --config tests/e2e/playwright.config.js --grep @smoke",
+    "e2e:quarantine": "npm run build:chrome && playwright test --config tests/e2e/playwright.config.js specs/quarantine.spec.js --retries=0 --pass-with-no-tests",
     "e2e:explore": "node scripts/e2e-explore.mjs",
     "e2e:upload-llm-report": "node scripts/e2e-upload-llm-report.mjs",
     "e2e:rerun-validator": "node scripts/e2e-rerun-validator.mjs",

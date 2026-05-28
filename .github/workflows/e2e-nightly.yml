@@ -122,12 +122,12 @@ jobs:
               exit 1
               ;;
           esac
-          mkdir -p downloaded-llm-report
-          gh run download "$LLM_RUN_ID" -n llm-report -D downloaded-llm-report
+          mkdir -p tests/e2e/artifacts/${{ github.run_id }}
+          gh run download "$LLM_RUN_ID" -n llm-report -D tests/e2e/artifacts/${{ github.run_id }}
           node -e "
             import('./tests/e2e/lib/llm-report.js').then(({ appendLlmIteration }) => {
               const fs = require('node:fs');
-              const r = JSON.parse(fs.readFileSync('downloaded-llm-report/llm-report.json', 'utf8'));
+              const r = JSON.parse(fs.readFileSync('tests/e2e/artifacts/${{ github.run_id }}/llm-report.json', 'utf8'));
               const tmp = require('node:os').tmpdir() + '/uat-validate.json';
               fs.writeFileSync(tmp, JSON.stringify({
                 run_id: r.run_id, started_iso: r.started_iso, finished_iso: r.finished_iso,
@@ -145,6 +145,12 @@ jobs:
         # step intentionally omits the error-tolerance escape valve used by
         # the smoke / regression / fault-injection steps below.
         # Gating uses an explicit empty-string comparison per Pitfall 3.
+        # Downloaded under tests/e2e/artifacts/${{ github.run_id }}/ so
+        # run-triage-pipeline.mjs's --llm-report satisfies the WR-05
+        # ALLOWED_INPUT_ROOTS bound (Phase 36 Open-Item-1). github.run_id
+        # is GitHub-controlled (numeric) — safe to interpolate in the path;
+        # the user-controlled LLM_RUN_ID value stays behind the env hop +
+        # numeric guard and is NOT used in the artifact path.
 
       - name: Pre-flight smoke (1 case)
         id: smoke

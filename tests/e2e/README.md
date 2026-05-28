@@ -81,6 +81,7 @@ credit.
 | `npm run e2e:silent` | Silent-mode (Ctrl+C → clipboard) functional test                | ~30 s            |
 | `npm run e2e:quarantine` | Non-gating quarantine corpus (Phase 36). Iterates `TEST_CASES_QUARANTINE`; empty corpus exits 0 with 0 tests (`--pass-with-no-tests`). Used in nightly CI with `continue-on-error: true`. | ~30 s (empty corpus) |
 | `npm run e2e:triage-pipeline` | Phase 36 ORCH-01 pipeline orchestrator. Chains rerun-validator → triage-classifier → issue-file (--source triage) → quarantine-append via `spawnSync` with `cwd: PROJECT_ROOT`. Requires `--llm-report <path>` (see `scripts/run-triage-pipeline.mjs`). Exits 0 always (D-06). | varies |
+| `npm run e2e:weekly-digest` | Phase 37 weekly analytics digest. Reads open `e2e-nightly` + `e2e-quarantine` issues via `gh api`, aggregates five metrics (findings count, classification breakdown, top-3 failure categories, quarantine growth, cost vs cap), renders a ≤50-line markdown digest, writes it to `reports/weekly-digest-YYYY-WNN.md`, and publishes via `DIGEST_PUBLISH_MODE` (defaults to `issue` fallback with `e2e-digest` label). Requires `GITHUB_REPOSITORY`. | < 30 s |
 
 All three scripts run `npm run build:chrome` first, so `dist/chrome/`
 is always rebuilt from the current `src/` state — no stale-build

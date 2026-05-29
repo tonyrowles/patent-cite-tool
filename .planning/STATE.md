@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: LLM-Driven Product Improvement Loop
 status: executing
-last_updated: "2026-05-29T22:05:39.427Z"
-last_activity: 2026-05-29 -- Phase 38 planning complete
+last_updated: "2026-05-29T22:17:30.547Z"
+last_activity: 2026-05-29
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 31
-  completed_plans: 28
+  completed_plans: 29
   percent: 86
 ---
 
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-22)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Milestone complete
+**Current focus:** Phase 38 — v3-1-cleanup-integration-warnings-nyquist-human-uat
 
 ## Current Position
 
-Phase: 37
-Plan: Not started
+Phase: 38 (v3-1-cleanup-integration-warnings-nyquist-human-uat) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-05-29 -- Phase 38 planning complete
+Last activity: 2026-05-29
 
-Progress: ░░░░░░░░░░ 0% (0/6 phases complete)
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: ░░░░░░░░░░ 0% (0/6 phases complete)
 | v2.3 Post-v2.2 Hardening | 3 | 5 | 1 day |
 | v3.0 Autonomous E2E Testing Agent | 6 | 30 | ~7 days |
 | v3.1 LLM-Driven Product Improvement Loop | 6 (planned) | TBD | TBD |
+| Phase 38 P01 | 7min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ All v1.0–v2.3 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 30]: WORKER_FALLBACK_FAILED appended as index 8 in ERROR_CLASSES (Object.freeze preserved)
 - [Phase 30]: Fault-injection step placed after regression issue-filer; runs every nightly tick (not weekday-rotated); no --grep since single-case spec
 - [Phase 30]: No changes to scripts/e2e-report-issue.mjs — existing per-case loop handles WORKER_FALLBACK_FAILED via report.json standard schema
+- [Phase ?]: [Phase 38 Plan 01] All 3 v3.1 integration fragility warnings (INT-FIX-01/02/03) resolved as atomic commits (e24be0c/fa8497d/613a56d) + audit doc update (3d26dc5); 684/684 tests pass
+- [Phase ?]: [Phase 38 Plan 01] aggregateBySummaryKey helper added to weekly-digest.mjs: maps ERROR_CLASS_SET to SUMMARY_KEYS (WRONG_CITATION → wrong_citation etc); seeds passed/harness_error to 0 (synthetic classes); total_cost_usd sourced from monthlyTotalCostUsd arg (Pitfall 2 resolution)
+- [Phase ?]: [Phase 38 Plan 01] e2e-nightly.yml upload-artifact step: added id: upload-artifacts (test stability) and quarantine clause INSIDE always() && (...) parens (Pitfall 3 — && binds tighter than ||); Y6 regex /&&\s*\([^)]*steps\.quarantine\.outcome == 'failure'[^)]*\)/ enforces it
 
 ### v3.1 Pre-locked Decisions (from roadmap research)
 

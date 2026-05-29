@@ -46,7 +46,8 @@ const NIGHTLY_LABEL = 'e2e-nightly';
 // Phase 36 CR-01: the quarantine spec writes its per-case report to a
 // DISTINCT file (quarantine-report.json) so the --source quarantine filer
 // never sees regression/fault-injection cases from the shared report.json.
-// Must stay in sync with QUARANTINE_REPORT_FILENAME in tests/e2e/specs/quarantine.spec.js.
+// Phase 38 INT-FIX-01: tests/e2e/specs/quarantine.spec.js imports this
+// constant directly — single source of truth, no dual-source rename risk.
 export const QUARANTINE_REPORT_FILENAME = 'quarantine-report.json';
 
 // Validation regex for case IDs (T-29-02-1 mitigation).

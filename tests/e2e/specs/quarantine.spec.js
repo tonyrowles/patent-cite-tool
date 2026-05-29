@@ -43,6 +43,7 @@ import {
   WRONG_CITATION,
   NO_CITATION_PRODUCED,
 } from '../lib/error-codes.js';
+import { QUARANTINE_REPORT_FILENAME } from '../../../scripts/e2e-report-issue.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(__dirname, '../../../dist/chrome');
@@ -53,9 +54,8 @@ const RUN_ID = resolveRunId();
 // report.json would let the `--source quarantine` filer (e2e-report-issue.mjs)
 // re-file every regression/fault-injection failure under the e2e-quarantine
 // label. Namespacing to quarantine-report.json keeps the suites isolated; the
-// quarantine filer reads this distinct file (must stay in sync with the
-// QUARANTINE_REPORT_FILENAME constant in scripts/e2e-report-issue.mjs).
-const QUARANTINE_REPORT_FILENAME = 'quarantine-report.json';
+// quarantine filer reads this distinct file. Phase 38 INT-FIX-01: the constant
+// is now imported from scripts/e2e-report-issue.mjs (single source of truth).
 const REPORT_PATH = reportPathFor(RUN_ID, QUARANTINE_REPORT_FILENAME);
 
 // 2-second throttle between cases — RESEARCH.md Pitfall D (forward-safety).

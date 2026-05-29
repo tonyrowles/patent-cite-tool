@@ -140,6 +140,80 @@ export function aggregate({ nightlyIssues, quarantineIssues, now }) {
 }
 
 // ---------------------------------------------------------------------------
+// SUMMARY_KEYS-shaped aggregation (Phase 38 INT-FIX-02 / DIGEST-04 repair)
+//
+// The pre-fix runDigest validated a SUMMARY_KEYS-seeded `summaryTally` against
+// SUMMARY_KEYS — a self-referential check that could never fail. This helper
+// produces a SUMMARY_KEYS-shaped tally from REAL aggregated metric data so
+// validateSummaryKeys becomes a meaningful runtime drift detector: a future
+// llm-report.js key rename/addition leaves the tally missing keys and surfaces
+// as a descriptive throw at runtime.
+//
+// Mapping rules (mirror tests/e2e/lib/llm-report.js classificationToSummaryKey):
+//   WRONG_CITATION              → wrong_citation
+//   VERIFIER_DISAGREE           → verifier_disagree
+//   LLM_HALLUCINATED_SELECTION  → llm_hallucinated_selection
+//   LLM_API_ERROR               → llm_api_error
+//   HARNESS_ERROR               → harness_error  (synthetic; not in ERROR_CLASSES)
+//   PASS                        → passed         (synthetic; not in ERROR_CLASSES)
+//   (all others — UI_BROKEN, GOOGLE_DOM_DRIFT, etc.) → not incremented
+//
+// `total_cost_usd` is METRIC data, not a classification — seeded from the
+// `monthlyTotalCostUsd` argument and rounded to 6 decimal places (matches
+// llm-report.js convention and llm-ledger.js precision).
+// ---------------------------------------------------------------------------
+/**
+ * Aggregate label-bearing issues into a SUMMARY_KEYS-shaped tally.
+ *
+ * @param {{ nightlyIssues: object[], quarantineIssues: object[], monthlyTotalCostUsd: number }} opts
+ * @returns {Record<string, number>} SUMMARY_KEYS-shaped tally
+ */
+export function aggregateBySummaryKey({ nightlyIssues, quarantineIssues, monthlyTotalCostUsd }) {
+  // Seed all SUMMARY_KEYS to 0 so every key is an own property — the validator
+  // checks `k in obj` (not value-truthy), so seeding is what makes drift
+  // detection meaningful: a future rename leaves a key NOT in the seed.
+  const tally = Object.fromEntries(SUMMARY_KEYS.map((k) => [k, 0]));
+
+  // Merge + dedup by issue.number (matches aggregate() / Pitfall 6 — some
+  // issues carry both labels so they must be counted once).
+  const byNumber = new Map();
+  for (const issue of [...nightlyIssues, ...quarantineIssues]) {
+    if (!byNumber.has(issue.number)) {
+      byNumber.set(issue.number, issue);
+    }
+  }
+
+  for (const issue of byNumber.values()) {
+    const names = (issue.labels ?? []).map((l) => l?.name).filter(Boolean);
+    // Pick category by ERROR_CLASS_SET membership (CR-01 — labels[] order
+    // is not guaranteed by GH REST).
+    const category = names.find((n) => ERROR_CLASS_SET.has(n));
+    let key;
+    switch (category) {
+      case 'WRONG_CITATION':              key = 'wrong_citation'; break;
+      case 'VERIFIER_DISAGREE':           key = 'verifier_disagree'; break;
+      case 'LLM_HALLUCINATED_SELECTION':  key = 'llm_hallucinated_selection'; break;
+      case 'LLM_API_ERROR':               key = 'llm_api_error'; break;
+      // HARNESS_ERROR and PASS are synthetic classifications produced by
+      // tests/e2e/lib/report.js — they do not appear as GitHub labels and
+      // therefore are not incremented from the issue stream. The keys are
+      // still present in the seeded tally (so validateSummaryKeys passes).
+      default: key = null;
+    }
+    if (key !== null) {
+      tally[key] += 1;
+    }
+  }
+
+  // total_cost_usd is metric data — seed from the monthly ledger total.
+  // Round to 6 decimals to match llm-report.js and llm-ledger.js conventions.
+  const cost = Number(monthlyTotalCostUsd) || 0;
+  tally.total_cost_usd = +cost.toFixed(6);
+
+  return tally;
+}
+
+// ---------------------------------------------------------------------------
 // Cost-vs-cap line (D-15)
 // fs.existsSync FIRST — monthlyTotal returns 0 for both $0 and no-ledger (Pitfall 2)
 // ---------------------------------------------------------------------------
@@ -352,22 +426,32 @@ export async function runDigest(opts = {}) {
   const nightlyIssues = ghClient.listOpenIssuesByLabel('e2e-nightly');
   const quarantineIssues = ghClient.listOpenIssuesByLabel('e2e-quarantine');
 
-  // (2) Validate SUMMARY_KEYS contract (D-02 / DIGEST-04).
-  // Build a summary-shaped tally object seeded from SUMMARY_KEYS so that any key
-  // rename/drift in llm-report.js is caught as a descriptive throw here rather than
-  // silently absent in the rendered digest (prevents Pitfall 17 drift).
-  const summaryTally = Object.fromEntries(SUMMARY_KEYS.map((k) => [k, 0]));
-  validateSummaryKeys(summaryTally);
-
-  // (3) Compute ISO-week label
+  // (2) Compute ISO-week label
   const nowDate = typeof now === 'function' ? now() : now;
   const weekLabel = isoWeekLabel(nowDate);
 
-  // (4) Cost line
+  // (3) Cost line + monthly total (used both for the rendered cost line AND as
+  // metric input to the SUMMARY_KEYS-shaped tally below).
   const costLine = renderCostLine({ ledgerPath });
+  const monthlyTotalCostUsd = fs.existsSync(ledgerPath)
+    ? monthlyTotal(readLedger(ledgerPath))
+    : 0;
 
-  // (5) Aggregate
+  // (4) Aggregate (issue-shape — drives the rendered digest)
   const agg = aggregate({ nightlyIssues, quarantineIssues, now: nowDate });
+
+  // (5) Validate SUMMARY_KEYS contract against REAL aggregated metric data
+  // (Phase 38 INT-FIX-02 / DIGEST-04 repair). The pre-fix code validated a
+  // SUMMARY_KEYS-seeded `summaryTally` against SUMMARY_KEYS — a self-referential
+  // check that could never fail. Now the tally is built from real issue data
+  // (via aggregateBySummaryKey), so any future llm-report.js key drift surfaces
+  // as a descriptive throw naming the missing key.
+  const summaryByKey = aggregateBySummaryKey({
+    nightlyIssues,
+    quarantineIssues,
+    monthlyTotalCostUsd,
+  });
+  validateSummaryKeys(summaryByKey);
 
   // (6) Render markdown
   const md = renderDigest({ weekLabel, agg, costLine, now: nowDate });

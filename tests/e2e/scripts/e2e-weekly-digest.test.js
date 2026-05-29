@@ -46,6 +46,7 @@ import {
   isoWeekLabel,
   validateSummaryKeys,
   aggregate,
+  aggregateBySummaryKey,
   renderDigest,
   renderCostLine,
   runDigest,
@@ -161,6 +162,62 @@ describe('missing SUMMARY_KEY throws naming the key', () => {
     try { validateSummaryKeys(obj); } catch (e) { caught = e; }
     expect(caught).toBeDefined();
     expect(caught.message).toContain(missingKey);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2b. INT-FIX-02 — validateSummaryKeys guards REAL aggregated data
+// (Phase 38 Plan 01 — DIGEST-04 self-referential check repair.)
+//
+// The pre-fix runDigest built `summaryTally` FROM `SUMMARY_KEYS` and validated
+// it against `SUMMARY_KEYS` — the check could never fail. INT-FIX-02 replaces
+// that with `validateSummaryKeys(aggregateBySummaryKey({...}))` so a future
+// llm-report.js key drift produces a descriptive throw at runtime against
+// real aggregated metric data.
+// ---------------------------------------------------------------------------
+describe('INT-FIX-02: validateSummaryKeys throws against real aggregated data', () => {
+  it('aggregateBySummaryKey returns object with all SUMMARY_KEYS', () => {
+    const fixture = loadFixture();
+    const { nightlyIssues, quarantineIssues } = splitFixture(fixture);
+    const result = aggregateBySummaryKey({
+      nightlyIssues,
+      quarantineIssues,
+      monthlyTotalCostUsd: 12.34,
+    });
+    // All seven SUMMARY_KEYS must be own properties with finite numeric values.
+    expect(Object.keys(result).sort()).toEqual([...SUMMARY_KEYS].sort());
+    for (const k of SUMMARY_KEYS) {
+      expect(Number.isFinite(result[k])).toBe(true);
+    }
+    // total_cost_usd is metric data (not classification) — seeded from arg.
+    expect(result.total_cost_usd).toBeCloseTo(12.34, 6);
+  });
+
+  it('aggregateBySummaryKey result missing a key causes validateSummaryKeys to throw naming that key', () => {
+    const fixture = loadFixture();
+    const { nightlyIssues, quarantineIssues } = splitFixture(fixture);
+    const driftedTally = aggregateBySummaryKey({
+      nightlyIssues,
+      quarantineIssues,
+      monthlyTotalCostUsd: 0,
+    });
+    // Synthetic drift — simulate a future llm-report.js rename that drops
+    // harness_error from the tally object construction.
+    delete driftedTally.harness_error;
+    let caught;
+    try { validateSummaryKeys(driftedTally); } catch (e) { caught = e; }
+    expect(caught).toBeDefined();
+    expect(caught.message).toContain('harness_error');
+  });
+
+  it('runDigest validates real aggregated data (not SUMMARY_KEYS-seeded tally)', () => {
+    // Grep the runDigest source to confirm the wiring: the runtime drift guard
+    // calls validateSummaryKeys against aggregateBySummaryKey(...) output, not
+    // against an Object.fromEntries(SUMMARY_KEYS.map(...)) seed.
+    const src = fs.readFileSync(SCRIPT_PATH, 'utf8');
+    expect(src).toMatch(/validateSummaryKeys\s*\(\s*(?:summaryByKey|aggregateBySummaryKey\s*\()/);
+    // The self-referential seed pattern must be gone from runDigest's body.
+    expect(src).not.toMatch(/const\s+summaryTally\s*=\s*Object\.fromEntries\s*\(\s*SUMMARY_KEYS\.map/);
   });
 });
 

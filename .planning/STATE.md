@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: LLM-Driven Product Improvement Loop
-status: milestone_complete
-last_updated: 2026-05-28T21:52:32.631Z
-last_activity: 2026-05-28 -- Phase 37 planning complete
+status: executing
+last_updated: "2026-05-29T22:05:39.427Z"
+last_activity: 2026-05-29 -- Phase 38 planning complete
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
-  total_plans: 28
+  total_plans: 31
   completed_plans: 28
-  percent: 100
-stopped_at: Milestone complete (Phase 37 was final phase)
+  percent: 86
 ---
 
 # Project State
@@ -27,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-05-22)
 
 Phase: 37
 Plan: Not started
-Status: Milestone complete
-Last activity: 2026-05-28
+Status: Ready to execute
+Last activity: 2026-05-29 -- Phase 38 planning complete
 
 Progress: ░░░░░░░░░░ 0% (0/6 phases complete)
 
@@ -49,6 +48,10 @@ Progress: ░░░░░░░░░░ 0% (0/6 phases complete)
 | v3.1 LLM-Driven Product Improvement Loop | 6 (planned) | TBD | TBD |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 38 added: v3.1 cleanup: integration warnings + Nyquist + human-UAT
 
 ### Decisions
 

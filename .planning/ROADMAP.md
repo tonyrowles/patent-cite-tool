@@ -117,7 +117,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] **Phase 35: Rich Issue Filer + Quarantine Corpus** - `issue-payload-builder.js`; `quarantine-append.mjs`; `test-cases-quarantine.js`; `e2e-report-issue.mjs` `--source triage` extension; fingerprint dual-search (completed 2026-05-28)
 - [x] **Phase 36: Quarantine CI Integration + Pipeline Orchestrator** - `quarantine.spec.js`; `run-triage-pipeline.mjs`; `e2e-nightly.yml` wiring with `llm_run_id` input; `promote-from-quarantine.mjs`; timeout budget audit (completed 2026-05-28)
 - [x] **Phase 37: Weekly Analytics Digest** - `weekly-digest.mjs`; `e2e-weekly-digest.yml` Monday cron; GitHub Discussion + committed markdown; `SUMMARY_KEYS` export and validation (3 plans) (completed 2026-05-28)
-- [ ] **Phase 38: v3.1 cleanup: integration warnings + Nyquist + human-UAT** - Resolve 3 integration fragility warnings (QUARANTINE_REPORT_FILENAME import, DIGEST-04 self-referential guard, quarantine artifact upload); stamp Nyquist coverage on phases 32-35,37; close 7 outstanding live-environment human-UAT confirmations (not planned yet)
+- [x] **Phase 38: v3.1 cleanup: integration warnings + Nyquist + human-UAT** - Resolve 3 integration fragility warnings (QUARANTINE_REPORT_FILENAME import, DIGEST-04 self-referential guard, quarantine artifact upload); stamp Nyquist coverage on phases 32-35,37; close 7 outstanding live-environment human-UAT confirmations (not planned yet) (completed 2026-05-29)
 
 ## Phase Details
 
@@ -257,7 +257,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 38-03-PLAN.md — Human-UAT live confirmations (6 live UAT + 1 DONE + 1 DEFERRED + audit human_verification: closure) [Wave 2, depends on 38-01]
+- [x] 38-03-PLAN.md — Human-UAT live confirmations (6 live UAT + 1 DONE + 1 DEFERRED + audit human_verification: closure) [Wave 2, depends on 38-01]
 
 ## Progress
 
@@ -300,4 +300,4 @@ Plans:
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 6/6 | Complete    | 2026-05-28 |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 4/4 | Complete    | 2026-05-28 |
 | 37. Weekly Analytics Digest | v3.1 | 3/3 | Complete    | 2026-05-28 |
-| 38. v3.1 cleanup: integration warnings + Nyquist + human-UAT | v3.1 | 2/3 | In Progress|  |
+| 38. v3.1 cleanup: integration warnings + Nyquist + human-UAT | v3.1 | 3/3 | Complete   | 2026-05-29 |

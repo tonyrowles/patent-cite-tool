@@ -10,7 +10,7 @@
 - ✅ **v2.2 Matching Robustness** — Phases 20-22 (shipped 2026-03-05)
 - ✅ **v2.3 Post-v2.2 Hardening** — Phases 23-25 (shipped 2026-05-12)
 - ✅ **v3.0 Autonomous E2E Testing Agent** — Phases 26-31 (shipped 2026-05-20)
-- 🔄 **v3.1 LLM-Driven Product Improvement Loop** — Phases 32-37 (in progress)
+- 🔄 **v3.1 LLM-Driven Product Improvement Loop** — Phases 32-38 (in progress)
 
 ## Phases
 
@@ -109,7 +109,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 
 </details>
 
-### v3.1 LLM-Driven Product Improvement Loop (Phases 32-37)
+### v3.1 LLM-Driven Product Improvement Loop (Phases 32-38)
 
 - [x] **Phase 32: HUMAN-UAT Verification** - Live end-to-end validation of `npm run e2e:explore` with Max 5 subscription credit; confirms `llm-report.json` usability and establishes local→CI handoff helper (completed 2026-05-25)
 - [x] **Phase 33: Re-run Validator** - Deterministic 3-replay verifier-only confirm gate; defines `rerun-report.json` schema; extends `llm-report.json` iteration schema with scroll/viewport fields (completed 2026-05-27)
@@ -117,6 +117,7 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] **Phase 35: Rich Issue Filer + Quarantine Corpus** - `issue-payload-builder.js`; `quarantine-append.mjs`; `test-cases-quarantine.js`; `e2e-report-issue.mjs` `--source triage` extension; fingerprint dual-search (completed 2026-05-28)
 - [x] **Phase 36: Quarantine CI Integration + Pipeline Orchestrator** - `quarantine.spec.js`; `run-triage-pipeline.mjs`; `e2e-nightly.yml` wiring with `llm_run_id` input; `promote-from-quarantine.mjs`; timeout budget audit (completed 2026-05-28)
 - [x] **Phase 37: Weekly Analytics Digest** - `weekly-digest.mjs`; `e2e-weekly-digest.yml` Monday cron; GitHub Discussion + committed markdown; `SUMMARY_KEYS` export and validation (3 plans) (completed 2026-05-28)
+- [ ] **Phase 38: v3.1 cleanup: integration warnings + Nyquist + human-UAT** - Resolve 3 integration fragility warnings (QUARANTINE_REPORT_FILENAME import, DIGEST-04 self-referential guard, quarantine artifact upload); stamp Nyquist coverage on phases 32-35,37; close 7 outstanding live-environment human-UAT confirmations (not planned yet)
 
 ## Phase Details
 
@@ -217,6 +218,17 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 - [x] 37-02-PLAN.md — weekly-digest.mjs: read+aggregate issues, ISO-week, cost-vs-cap, ≤50-line render, both publish branches (DIGEST-01/03/04)
 - [x] 37-03-PLAN.md — e2e-weekly-digest.yml Monday cron + contents/discussions/issues:write + commit-in-run [skip ci] (DIGEST-02/03)
 
+### Phase 38: v3.1 cleanup: integration warnings + Nyquist + human-UAT
+**Goal**: Close out v3.1 `tech_debt` recorded in `.planning/v3.1-MILESTONE-AUDIT.md` along three concrete tracks — (1) resolve the 3 integration fragility warnings (QUARANTINE_REPORT_FILENAME re-declare, DIGEST-04 self-referential SUMMARY_KEYS guard, e2e-nightly.yml upload-artifact step missing quarantine outcome), (2) stamp formal Nyquist coverage on the 5 phases carrying draft VALIDATION.md (32, 33, 34, 35, 37), and (3) execute the 5 live-environment human-UAT confirmations (CR-04 phase-cap, live --source triage filer, quarantine-append ready-for-promotion, nightly workflow_dispatch, e2e:quarantine empty-corpus, weekly-digest workflow_dispatch) deferred from prior phases — with 1 historical confirmation marked DONE and 1 cron-tick marked DEFERRED per locked decision
+**Depends on**: Phase 37
+**Requirements**: QUAR-01, QUAR-03, QUAR-04, DIGEST-04 (integration fixes — Plan 01); UAT-01..03, RERUN-01..04, TRIAGE-01..06, ISSUE-01..04, QUAR-01..02, QUAR-05, DIGEST-01..04 (Nyquist retroactive — Plan 02); UAT-01..03, ISSUE-01..04, QUAR-02..05, ORCH-01..03, DIGEST-01..04 (live-confirmation portions — Plan 03)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 38-01-PLAN.md — Integration fragility fixes (3 INT-FIX-* commits + 3 regression tests + audit gaps.integration closure) [Wave 1]
+- [ ] 38-02-PLAN.md — Nyquist coverage stamping (5 Skill(gsd-validate-phase) invocations + audit nyquist: block update) [Wave 1, parallel with 38-01]
+- [ ] 38-03-PLAN.md — Human-UAT live confirmations (6 live UAT + 1 DONE + 1 DEFERRED + audit human_verification: closure) [Wave 2, depends on 38-01]
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -258,3 +270,4 @@ Full details: `.planning/milestones/v3.0-ROADMAP.md`
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 6/6 | Complete    | 2026-05-28 |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 4/4 | Complete    | 2026-05-28 |
 | 37. Weekly Analytics Digest | v3.1 | 3/3 | Complete    | 2026-05-28 |
+| 38. v3.1 cleanup: integration warnings + Nyquist + human-UAT | v3.1 | 0/3 | Not started | — |

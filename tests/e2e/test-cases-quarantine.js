@@ -1,5 +1,21 @@
-// AUTO-MANAGED by scripts/quarantine-append.mjs (Phase 35 Plan 04+) — do not hand-edit.
-// Phase 35 Plan 35-02 (QUAR-01) — empty quarantine corpus seed. Upserted on first append.
-// Schema invariant: first 4 keys IDENTICAL to tests/test-cases.js; +3 quarantine-only keys.
-// See tests/unit/test-cases-quarantine-schema.test.js for the guard.
-export const TEST_CASES_QUARANTINE = [];
+// AUTO-MANAGED by scripts/quarantine-append.mjs (Phase 35 Plan 04) - do not hand-edit.
+export const TEST_CASES_QUARANTINE = [
+  {
+    id: "US11427642-spec-short-1",
+    patentFile: "./tests/fixtures/US11427642.json",
+    selectedText: "receptor exclusively expressed on plasma cells and plasmablasts",
+    category: "WRONG_CITATION",
+    stable_runs: 3,
+    source_triage_finding_id: "phase35-test-run-iter-1",
+    added_iso: "2026-05-29T23:14:03.241Z"
+  },
+  {
+    id: "US11427642-cross-col",
+    patentFile: "./tests/fixtures/US11427642.json",
+    selectedText: "comprising the steps of generating antibodies",
+    category: "WRONG_CITATION",
+    stable_runs: 3,
+    source_triage_finding_id: "phase35-test-run-iter-3",
+    added_iso: "2026-05-29T23:14:03.649Z"
+  },
+];

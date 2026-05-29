@@ -59,11 +59,41 @@ EXIT=0
 
 ## UAT-35b — quarantine-append.mjs 3× same CONFIRMED finding → ready-for-promotion label on run 3
 
-**status:** pending
+**status:** PASS
+**verified_at:** 2026-05-29T23:17:00Z
 **requirement:** QUAR-02 (live-confirmation portion)
 **audit human_verification entry:** phase 35, "quarantine-append.mjs 3x ... ready-for-promotion label on run 3"
+**command:** `for i in 1 2 3; do GITHUB_REPOSITORY=tonyrowles/patent-cite-tool node scripts/quarantine-append.mjs --input tests/e2e/artifacts/2026-05-29T-uat-35a/triage-report.json; done`
+**run_1_exit:** 0 (2 findings inserted, stable_runs=1)
+**run_2_exit:** 0 (2 findings upserted, stable_runs=2, 0 labels added)
+**run_3_exit:** 0 (2 findings upserted, stable_runs=3, **2 labels added** — `quarantine:ready-for-promotion` on issues #3 and #4)
+**source_issues:**
+- #3 (US11427642-spec-short-1): labels = [e2e-nightly, triage, quarantine:ready-for-promotion, WRONG_CITATION] ✓
+- #4 (US11427642-cross-col): labels = [e2e-nightly, triage, quarantine:ready-for-promotion, WRONG_CITATION] ✓
+**ready_for_promotion_added:** true (label NOT present pre-run 3; present post-run 3)
+**corpus_entry_count:** 2 (one entry per finding — idempotent ✓; not 6 = 2 findings × 3 runs)
+**stable_runs:** 3 (both entries)
+**corpus_file_post:** `tests/e2e/test-cases-quarantine.js` now contains 2 quarantine entries (was 0)
 
-_(evidence captured in Task 4)_
+```log
+=== RUN 1 ===
+[quarantine-append] inserted id=US11427642-spec-short-1 stable_runs=1
+[quarantine-append] inserted id=US11427642-cross-col stable_runs=1
+[quarantine-append] processed 2 findings: 2 inserted, 0 upserted, 0 labels added
+EXIT_RUN_1=0
+=== RUN 2 ===
+[quarantine-append] upserted id=US11427642-spec-short-1 stable_runs=2
+[quarantine-append] upserted id=US11427642-cross-col stable_runs=2
+[quarantine-append] processed 2 findings: 0 inserted, 2 upserted, 0 labels added
+EXIT_RUN_2=0
+=== RUN 3 ===
+[quarantine-append] upserted id=US11427642-spec-short-1 stable_runs=3 label=added
+[quarantine-append] upserted id=US11427642-cross-col stable_runs=3 label=added
+[quarantine-append] processed 2 findings: 0 inserted, 2 upserted, 2 labels added
+EXIT_RUN_3=0
+```
+
+**side-effects:** `tests/e2e/test-cases-quarantine.js` mutated from empty → 2 entries (expected per QUAR-02 contract); committed alongside the evidence file. UAT-36b's expectation now adjusts to 2 tests (non-empty corpus).
 
 ---
 

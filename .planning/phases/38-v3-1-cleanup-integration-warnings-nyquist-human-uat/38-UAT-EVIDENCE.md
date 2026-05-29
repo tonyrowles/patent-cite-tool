@@ -197,12 +197,48 @@ EXIT=0
 
 ## UAT-37 — `gh workflow run e2e-weekly-digest.yml` → reports/weekly-digest-YYYY-WNN.md committed + e2e-digest issue (Discussions disabled)
 
-**status:** pending
+**status:** PASS
+**verified_at:** 2026-05-29T23:46:00Z
 **requirement:** DIGEST-01..04 (live-confirmation portion)
 **audit human_verification entry:** phase 37, "Live Monday-cron / manual workflow_dispatch of e2e-weekly-digest.yml → commits reports/weekly-digest-YYYY-WNN.md [skip ci] + files e2e-digest issue"
-**note:** Exercises the post-INT-FIX-02 aggregateBySummaryKey path (Plan 38-01 commit fa8497d present). Repo Discussions disabled → fallback to `e2e-digest`-labeled issue per DIGEST-03 contract.
+**command:** `gh workflow run e2e-weekly-digest.yml`
+**dispatch_exit:** 0
+**triggered_run_id:** 26667913681
+**triggered_run_url:** https://github.com/tonyrowles/patent-cite-tool/actions/runs/26667913681
+**event:** workflow_dispatch ✓
+**createdAt_within_60s:** true ✓ (Pitfall 7 verified)
+**run_conclusion:** success (13s)
+**discussions_enabled:** false (per `gh repo view --json hasDiscussionsEnabled`)
+**publish_path:** e2e-digest-issue (DIGEST-03 fallback path correctly selected)
+**published_url:** https://github.com/tonyrowles/patent-cite-tool/issues/5
+**published_title:** [e2e-digest] Weekly analytics 2026-W22
+**committed_file:** reports/weekly-digest-2026-W22.md (16 lines — well under 50-line DIGEST-01 budget)
+**commit_skip_ci:** true (`docs(weekly-digest): 2026-W22 [skip ci]` — commit 1de0197 on origin/main)
+**int_fix_02_validation_passed:** true (run completed without throwing; aggregateBySummaryKey + validateSummaryKeys exercised against real data — 2 WRONG_CITATION issues from UAT-35a aggregated correctly)
+**digest_line_count:** 16
+**aggregation_correct:** true (2 WRONG_CITATION findings reflect issues #3 + #4 created in UAT-35a; quarantine_growth: 0 reflects empty prior-7d window even though current corpus has 2 entries — both added today, not in prior 7d)
 
-_(evidence captured in Task 7)_
+```markdown
+# Weekly E2E Analytics — 2026-W22
+
+**Total open findings:** 2
+
+## Classification Breakdown
+
+| Category | Count |
+|----------|-------|
+| WRONG_CITATION | 2 |
+
+## Top-3 Failure Categories
+
+1. **WRONG_CITATION** — 2
+
+**Quarantine growth (prior 7d):** 0
+
+**Cost vs cap:** cost data unavailable
+```
+
+**post-INT-FIX-02 verification:** The digest workflow ran against real GitHub data (2 e2e-nightly-labeled issues from UAT-35a) and emitted the 16-line digest without throwing on SUMMARY_KEYS validation. This live-confirms that the `validateSummaryKeys(aggregateBySummaryKey(...))` runtime drift guard added in INT-FIX-02 (commit fa8497d) does NOT false-positive on real aggregated data shape. Cost-data-unavailable is the expected graceful path (no ledger entries in CI runner — DIGEST-04 graceful path verified).
 
 ---
 

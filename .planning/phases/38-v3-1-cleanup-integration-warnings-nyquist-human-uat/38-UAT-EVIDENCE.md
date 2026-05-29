@@ -158,14 +158,40 @@ This is **expected, correct behavior** of the schema guard (Phase 33 RERUN-03 co
 
 ---
 
-## UAT-36b — `npm run e2e:quarantine` local empty-corpus → exits 0, 0 tests
+## UAT-36b — `npm run e2e:quarantine` local non-empty-corpus → exits 0, N tests (non-gating)
 
-**status:** pending
+**status:** PASS
+**verified_at:** 2026-05-29T23:48:00Z
 **requirement:** QUAR-03, QUAR-04 (live-confirmation portion)
 **audit human_verification entry:** phase 36, "`npm run e2e:quarantine` local empty-corpus → exits 0, Playwright reports 0 tests"
-**note:** Per RESEARCH Pitfall 5, corpus may be non-empty if UAT-35b ran first (it does — Task 4 is sequenced before Task 6); adjust expectation per actual state.
+**note:** Per RESEARCH Pitfall 5, expectation was adjusted from "0 tests" to "N tests" since UAT-35b mutated the corpus from empty to 2 entries.
+**command:** `npm run e2e:quarantine`
+**exit_code:** 0 ✓ (non-gating contract holds — exit 0 even though one of two quarantine tests failed)
+**corpus_entry_count_pre:** 2 (post-UAT-35b)
+**tests_run:** 2 (matches corpus count)
+**tests_passed:** 1 (US11427642-spec-short-1)
+**tests_failed:** 1 (US11427642-cross-col — `DOM_DRIFT — needle not found in any known container after basic + deep normalize`)
+**int_fix_01_import_resolved:** true (the spec loaded via the new ESM import; no crash on import)
+**non_gating_contract_held:** true (1 failing test did NOT fail the run; `--retries=0 --pass-with-no-tests` flags + continue-on-error semantics intact)
+**runtime:** ~29s (well under the 15-min job timeout)
 
-_(evidence captured in Task 6)_
+```log
+> e2e:quarantine
+> npm run build:chrome && playwright test --config tests/e2e/playwright.config.js specs/quarantine.spec.js --retries=0 --pass-with-no-tests
+
+Running 2 tests using 1 worker
+
+  ✓  1 tests/e2e/specs/quarantine.spec.js:91:5 › Phase 36 quarantine corpus — non-gating › US11427642-spec-short-1 (13.7s)
+  ✘  2 tests/e2e/specs/quarantine.spec.js:91:5 › Phase 36 quarantine corpus — non-gating › US11427642-cross-col (14.7s)
+    Error: selectText: DOM_DRIFT — needle not found in any known container after basic + deep normalize
+
+  1 failed
+    tests/e2e/specs/quarantine.spec.js:91:5 › Phase 36 quarantine corpus — non-gating › US11427642-cross-col
+  1 passed (29.0s)
+EXIT=0
+```
+
+**finding:** The failing quarantine case (US11427642-cross-col) is a real DOM_DRIFT signal that the corpus entry's selection text no longer locates a node on Google Patents — this is exactly what the quarantine corpus is designed to surface. The spec correctly captures it (test_failed-1.png, trace.zip in test-results/), the run is non-gating per QUAR-03, and the entry remains in the corpus for human review. No follow-up issue filed here (the quarantine spec's job is to surface, not to fix; promotion path is human-gated per QUAR-05).
 
 ---
 

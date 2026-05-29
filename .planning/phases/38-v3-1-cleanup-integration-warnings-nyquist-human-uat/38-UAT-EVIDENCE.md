@@ -9,11 +9,25 @@
 
 ## UAT-32 — Phase 32 CR-04 mid-run phase-cap trip → exit code 6
 
-**status:** pending
+**status:** PASS (by inspection — original 2026-05-25 AskUserQuestion override stands; phase-tagging path live-confirmed)
+**verified_at:** 2026-05-29T23:11:00Z
 **requirement:** UAT-01 (live-confirmation portion)
 **audit human_verification entry:** phase 32, "CR-04 mid-run phase-cap trip routes to exit code 6"
+**command:** `npm run e2e:explore -- --iterations 1 --phase 32`
+**exit_code:** 0 (normal completion; trip-path not exercised — see rationale)
+**spend_ledger_delta_usd:** +$0.1606 (2 entries — 1 primary + 1 retry, both tagged `phase: "32"`)
+**phase_tagging_confirmed:** true (new ledger entries `2026-05-29T23:10:52.241Z` and `2026-05-29T23:11:09.903Z` both carry `phase: "32"`)
+**cap_trip_exercised:** false — would require ≥$10 in phase 32 cumulative spend to trip; current cumulative is ~$1.2 across 13 phase-32 entries
+**rationale:** The CR-04 trip routes to exit 6 when the per-phase $10 cap is crossed at startup (pre-flight, `e2e-explore.mjs:586-595`) or mid-run (`e2e-explore.mjs:269-277, 322-329`). Triggering it via natural means requires ~120 iterations at ~$0.08 each = $10 of credit. Per the original Phase 32 audit, this was accepted as override via AskUserQuestion on 2026-05-25 ("logic sound by inspection; override-accepted"). The current UAT live-confirms (a) `claude -p` invocation works (claude 2.1.148), (b) `--phase 32` is parsed and printed at startup ("[e2e-explore] phase=32 (per-phase cap $10 / warn $8)"), (c) the ledger entries are correctly tagged `phase: "32"`, and (d) the cap-trip code path remains in place. The exit-6 trip itself is verified by unit tests in `tests/e2e/scripts/e2e-explore-phase-flag.test.js` (boundary, mid-run, and pre-flight cases — 92 tests green in Phase 34 + Phase 32 retroactive audits).
 
-_(evidence captured in Task 2)_
+```log
+[e2e-explore] claude 2.1.148 (Claude Code)
+[e2e-explore] run_id=2026-05-29T23-10-52Z iterations=1 report=/home/fatduck/patent-cite-tool/tests/e2e/artifacts/2026-05-29T23-10-52Z/llm-report.json
+[e2e-explore] phase=32 (per-phase cap $10 / warn $8)
+[e2e-explore] iteration 1/1...
+[e2e-explore] done. Report: /home/fatduck/patent-cite-tool/tests/e2e/artifacts/2026-05-29T23-10-52Z/llm-report.json
+EXIT=0
+```
 
 ---
 

@@ -16,6 +16,11 @@
 //   Y4 — ORCH-03 timeout budget: TIMEOUT BUDGET comment + timeout-minutes: 15 present
 //   Y5 — SC-3 regression-unchanged guard: existing markers still present;
 //          relocated download path present; downloaded-llm-report absent
+//   Y6 — INT-FIX-03 (Phase 38 Plan 01): Upload E2E artifacts step has
+//          `id: upload-artifacts` AND `if:` gates on all 4 outcomes including
+//          quarantine, with the quarantine clause INSIDE the always() && (...)
+//          parens (Pitfall 3 — operator precedence requires the clause sit
+//          before the closing paren).
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'node:fs';
@@ -102,6 +107,38 @@ describe('e2e-nightly.yml quarantine/triage wiring (Phase 36)', () => {
 
     // Old download dir must be gone (WR-05 resolution)
     expect(yaml).not.toContain('downloaded-llm-report');
+  });
+
+  it('Y6 — INT-FIX-03: Upload E2E artifacts step gates on quarantine failure (id + inside-parens clause)', () => {
+    // Anchor by `id: upload-artifacts` (Phase 38 adds this for grep-test
+    // stability — matches surrounding step convention `id: quarantine`,
+    // `id: regression`, `id: smoke`). Window pattern mirrors Y2.
+    const startIdx = yaml.indexOf('id: upload-artifacts');
+    expect(startIdx).toBeGreaterThan(-1);
+
+    const afterStart = yaml.slice(startIdx + 'id: upload-artifacts'.length);
+    const nameBoundary = afterStart.indexOf('- name:');
+    const idBoundary = afterStart.indexOf('id:');
+    const boundaries = [nameBoundary, idBoundary].filter((i) => i !== -1);
+    const endIdx = boundaries.length ? Math.min(...boundaries) : -1;
+    const stepBlock = endIdx === -1 ? afterStart : afterStart.slice(0, endIdx);
+
+    // Also include the step header (the `- name:` line + `if:` line live
+    // BEFORE `id:` in YAML step order — slice back to capture them).
+    const stepHeaderStart = yaml.lastIndexOf('- name: Upload E2E artifacts', startIdx);
+    expect(stepHeaderStart).toBeGreaterThan(-1);
+    const fullStepBlock = yaml.slice(stepHeaderStart, startIdx + stepBlock.length + 'id: upload-artifacts'.length);
+
+    // Clause present in step's if:
+    expect(fullStepBlock).toContain("steps.quarantine.outcome == 'failure'");
+
+    // Pitfall 3: the quarantine clause MUST be INSIDE the always() && (...)
+    // parens, not appended after `)`. Operator precedence on GH Actions: &&
+    // binds tighter than ||, so `always() && (...) || steps.quarantine...`
+    // evaluates as `(always() && (...)) || steps.quarantine...` — wrong.
+    expect(fullStepBlock).toMatch(
+      /if:\s*always\(\)\s*&&\s*\([^)]*steps\.quarantine\.outcome == 'failure'[^)]*\)/
+    );
   });
 
 });

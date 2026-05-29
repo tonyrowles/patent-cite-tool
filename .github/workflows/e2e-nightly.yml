@@ -301,7 +301,8 @@ jobs:
         # applies to the quarantine source path (no shell injection surface).
 
       - name: Upload E2E artifacts
-        if: always() && (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure' || steps.fault_injection.outcome == 'failure')
+        id: upload-artifacts
+        if: always() && (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure' || steps.fault_injection.outcome == 'failure' || steps.quarantine.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: e2e-nightly-${{ github.run_id }}

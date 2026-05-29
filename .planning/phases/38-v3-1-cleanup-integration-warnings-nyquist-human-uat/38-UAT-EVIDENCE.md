@@ -110,12 +110,51 @@ _(no live invocation — historical confirmation)_
 
 ## UAT-36a — `gh workflow run e2e-nightly.yml -f llm_run_id=<id>` → steps 2-5 execute
 
-**status:** pending
+**status:** PARTIAL (dispatch + workflow surface confirmed; gated-step execution blocked by Phase 33 schema-evolution finding on old llm_run_id)
+**verified_at:** 2026-05-29T23:43:00Z
 **requirement:** ORCH-01, ORCH-02, ORCH-03, QUAR-03, QUAR-04 (live-confirmation portion)
 **audit human_verification entry:** phase 36, "Dispatch e2e-nightly.yml with real llm_run_id → steps 2-5 execute; cron path (no input) byte-identical regression"
-**note:** Exercises the post-INT-FIX-03 Upload E2E artifacts step (Plan 38-01 commit 613a56d present).
 
-_(evidence captured in Task 5)_
+### Setup actions taken
+1. **`git push origin main` — 188 commits pushed** (origin was at `0df373a..`, local `main` was 188 commits ahead with all v3.1 + Phase 38 work). Push exit 0; remote now at `05eaf18`.
+2. ERROR_CLASSES labels created on repo (12 labels — see UAT-35a setup).
+3. **Two dispatches** required:
+   - Run #1 (`26667004828`, 2026-05-29T23:15:29Z): Dispatched against PRE-push remote workflow (old shape, only 1 llm_run_id-gated step). Pitfall 7 confirmed dispatch fired (event=workflow_dispatch, fresh run). 9m4s completion. Step list showed pre-Phase-36 layout — 4 of 5 gated steps NOT in remote workflow.
+   - Run #2 (`26667827727`, 2026-05-29T23:41:44Z): Dispatched POST-push. Workflow run executed the post-INT-FIX-03 + Phase 36 layout — **all 5 llm_run_id-gated steps present in the step list** ("Download and validate LLM report", "Ensure e2e-quarantine label exists", "Run triage pipeline", "Run quarantine spec (non-gating)", "File quarantine issues on failure").
+
+### Pitfall 7 verification (both dispatches)
+- `gh run list --workflow=e2e-nightly.yml --limit 1 --json databaseId,status,createdAt,event` returned event=`workflow_dispatch` with createdAt within 8s of dispatch — **passed**.
+
+### Run #2 outcome (canonical UAT-36a result)
+- **dispatch_exit:** 0
+- **triggered_run_url:** https://github.com/tonyrowles/patent-cite-tool/actions/runs/26667827727
+- **event:** workflow_dispatch ✓
+- **createdAt_within_60s:** true ✓
+- **run_conclusion:** failure (job exit 1)
+- **5_gated_steps_present_in_workflow:** true (all 5 visible in step list — post-push remote workflow honors the post-INT-FIX-03 + Phase 36 changes)
+- **5_gated_steps_executed_successfully:** false — **the first gated step ("Download and validate LLM report") failed** which short-circuited the remaining 4.
+
+### Root cause (real finding — Phase 33 schema evolution)
+The `llm_run_id=26413491001` is the canonical 2026-05-25 ingest from before Phase 33 added `scroll_y` (and the other replay-state fields) to the llm-report iteration schema. The download step's validate-on-ingest call (`appendLlmIteration`) correctly rejects the old-shape report:
+
+```log
+Error: appendLlmIteration: missing required field 'scroll_y' (null permitted)
+    at appendLlmIteration (.../tests/e2e/lib/llm-report.js:264:13)
+##[error]Process completed with exit code 1.
+```
+
+This is **expected, correct behavior** of the schema guard (Phase 33 RERUN-03 contract: schema-guard throws clear error on missing keys). It is **NOT a regression of UAT-36a's underlying mechanism** — the workflow_dispatch path is sound, the 5 gated steps are present and would execute if a Phase-33-shape llm-report were ingested.
+
+### What WAS confirmed live
+- workflow_dispatch firing → Pitfall 7 verification (run created within 60s, event=workflow_dispatch)
+- post-push remote workflow has the post-INT-FIX-03 quarantine clause AND the Phase 36 5 gated steps
+- the validate-on-ingest schema guard CORRECTLY rejected an old-shape report (which is itself a positive confirmation of the Phase 33 RERUN-03 contract)
+
+### What is DEFERRED to a future UAT cycle
+- Full 5-gated-step EXECUTION against a Phase-33-shape llm-report. Requires ingesting a fresh llm-report via `npm run e2e:explore && npm run e2e:upload-llm-report` and re-dispatching with the new run_id. Not blocking per CONTEXT.md ("failure handling: do NOT block Phase 38").
+
+### Cross-cutting tech_debt surfaced
+**NEW tech_debt entry** to add to `.planning/v3.1-MILESTONE-AUDIT.md` (Task 8): "Phase 33 schema extension creates forward-compat issue with pre-Phase-33 llm-reports — the validate-on-ingest step now rejects old-shape ingests (missing `scroll_y` and other Phase 33 replay fields). Recommended fix: bump LLM_REPORT_SCHEMA_VERSION + add a migration path for v1→v2 reports, OR document that only Phase 33+ ingests are valid llm_run_id inputs going forward."
 
 ---
 

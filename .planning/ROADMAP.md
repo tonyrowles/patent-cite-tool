@@ -253,7 +253,7 @@ Plans:
 **Wave 1**
 
 - [x] 38-01-PLAN.md — Integration fragility fixes (3 INT-FIX-* commits + 3 regression tests + audit gaps.integration closure) [Wave 1]
-- [ ] 38-02-PLAN.md — Nyquist coverage stamping (5 Skill(gsd-validate-phase) invocations + audit nyquist: block update) [Wave 1, parallel with 38-01]
+- [x] 38-02-PLAN.md — Nyquist coverage stamping (5 Skill(gsd-validate-phase) invocations + audit nyquist: block update) [Wave 1, parallel with 38-01]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -300,4 +300,4 @@ Plans:
 | 35. Rich Issue Filer + Quarantine Corpus | v3.1 | 6/6 | Complete    | 2026-05-28 |
 | 36. Quarantine CI Integration + Pipeline Orchestrator | v3.1 | 4/4 | Complete    | 2026-05-28 |
 | 37. Weekly Analytics Digest | v3.1 | 3/3 | Complete    | 2026-05-28 |
-| 38. v3.1 cleanup: integration warnings + Nyquist + human-UAT | v3.1 | 1/3 | In Progress|  |
+| 38. v3.1 cleanup: integration warnings + Nyquist + human-UAT | v3.1 | 2/3 | In Progress|  |

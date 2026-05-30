@@ -1,193 +1,205 @@
-# Project Research Summary
+# Project Research Summary — v4.0 Self-Healing Test Suite
 
-**Project:** Patent Citation Tool — v3.1 LLM-Driven Product Improvement Loop
-**Domain:** LLM-triage and quarantine feedback loop layered on an existing Playwright/Vitest E2E CI pipeline
-**Researched:** 2026-05-22
-**Confidence:** HIGH
+**Project:** Patent Citation Tool — v4.0 Self-Healing Test Suite
+**Domain:** LLM-driven auto-fix PR pipeline layered on the v3.1 LLM triage feedback loop
+**Researched:** 2026-05-30
+**Confidence:** HIGH (all 4 research dimensions)
 
 ## Executive Summary
 
-v3.1 closes the feedback loop that v3.0's LLM exploratory mode opened. The pattern is well-understood and maps onto established CI flake-management practices (WPT, Playwright, Atlassian): deterministic replay confirms reproducibility, rule-based heuristics route clear cases cheaply, an LLM second-pass handles the ambiguous remainder, and a tiered corpus (quarantine to golden) gives confirmed findings a landing zone without polluting the high-trust baseline. Every required capability already exists in v3.0 primitives — the milestone adds orchestration and policy, not new infrastructure. ZERO new npm dependencies are needed; all new scripts are pure Node 22 built-ins layered on the existing `llm-driver.js`, `pdf-verifier.js`, `e2e-report-issue.mjs`, and Playwright config primitives.
+v4.0 closes the LLM feedback loop end-to-end: triaged GitHub issues from the v3.1 pipeline automatically produce *draft* PRs with proposed fixes, the affected case is re-verified on the proposed branch, and on merge the quarantine entry promotes to golden — preserving human-gated approval for every patch that ships. The architecture is purely additive on top of v3.1: `e2e-nightly.yml` needs zero modification, every new component attaches to the issue surface (label = `triage`) downstream of what v3.1 already produces. Per-ERROR_CLASS routing is the v4.0 differentiator — off-the-shelf systems (OpenHands, SWE-Agent, Copilot Coding Agent) run a single generic agent, but v3.1 already classifies, so v4.0 can route 8 classes to 5 specialized fix paths + 3 explicit skip paths (FLAKE, LLM_API_ERROR, PASS).
 
-The recommended build order is strict and dependency-justified: re-run validator -> triage classifier -> issue-payload-builder + quarantine-append -> quarantine spec + CI wiring -> weekly digest. The order cannot be swapped because each step's output schema is the next step's input. Critically, Phase 1 of v3.1 must be HUMAN-UAT (manually verifying that `npm run e2e:explore` against the live Max 5 subscription produces usable `llm-report.json` output end-to-end) — all downstream phases consume that artifact and the entire milestone is de-risked only after this live verification passes.
+The stack adds exactly two third-party dependencies: `@anthropic-ai/sdk@0.100.1` (exact-pinned — 30+ minor versions broke API surfaces twice in 2026-Q2) for the CI-side API transport, and `peter-evans/create-pull-request@v8` GitHub Action for atomic branch + commit + draft-PR creation. The cost ledger lives at a committed `tests/e2e/.llm-spend-ledger.json` (flipped from gitignored), unifying subscription-local and API spend under one `LEDGER_PATH`. Three risks dominate v4.0's design surface: (1) issue-body prompt injection into the fix-prompt builder — the load-bearing v4.0 boundary, requiring its own `<issue_body_untrusted>` envelope analogous to v3.1's `<patent_data>` defense; (2) API cost runaway in CI — subscription-local naturally caps at $100/mo via headless `claude -p` ledger but the SDK has no such structural cap, requiring per-day + per-issue + per-PR + per-month sub-caps; (3) verifier-gate gaming — LLMs trained on SWE-Bench routinely modify tests, mock verifiers, or edit golden baselines to "pass" the gate (DebugML cheating-agents corpus), requiring 6 layers of defense (runtime allow-list, diff-guard regex bank, CODEOWNERS, verifier-pinned-to-main, test-count invariants, canary case set).
 
-Four high-severity pitfalls dominate the risk surface: (1) Tier C verifier agreement silently masking real extension bugs in the triage heuristic, (2) fingerprint formula immutability — any formula change retroactively breaks dedup for all existing open issues, (3) the `ANTHROPIC_API_KEY: ''` clearing pattern in `invokeClaudeP` breaking any future API-billed triage path, and (4) the spend-ledger opt-in trap where triage LLM calls that skip `appendLedgerEntry` silently understate monthly cost. All four have clear, low-effort prevention strategies that must be embedded in acceptance criteria, not left to implementation discretion.
+Critical sequencing decision: branch protection + CODEOWNERS + `Allow auto-merge: OFF` must land FIRST, as Wave-0 prereqs folded into Phase 39, before any auto-fix PR can safely open. This is the single most important repo-level configuration in v4.0 — without it, the human-gated trust invariant that v3.1 established (via `promote-from-quarantine.mjs` being human-triggered) collapses the moment the first auto-fix PR opens. The 9-phase refined ordering (39 → 47) puts pipe-cleaner workflows first (deps-update, verifier-gate without LLM) to validate the new `v40-*.yml` conventions, then layers in the LLM auto-fix vertical slice for WRONG_CITATION only, then scales horizontally to per-class expansion. Phases 39 + 40 + 41 can run in parallel (3 agents, zero shared write surface). Total milestone scope: ~30-35 requirements across 8 categories.
+
+---
 
 ## Key Findings
 
-### Recommended Stack
+### Stack (from STACK.md)
 
-The single most important stack finding: **no new npm dependencies are required for v3.1**. Every feature reuses existing primitives. The triage classifier extends `llm-driver.js` pure functions (no LangChain, no Vercel AI SDK). The issue filer extends `e2e-report-issue.mjs` in-place (no `@octokit/rest`). The quarantine suite adds a Playwright `projects:` entry to the existing config (no new workflow file). The weekly digest uses `gh api graphql` pre-installed on `ubuntu-latest` (no npm GraphQL client). Analytics aggregation is pure Node `fs` glob (no Prometheus, no Postgres).
+- **`@anthropic-ai/sdk@0.100.1`** (published 2026-05-29, EXACT pin not caret). Sibling wrapper `tests/e2e/lib/anthropic-api.js` (or extension of `llm-driver.js`) mirrors the existing `invokeClaudePWithLedger` discipline, with the *inverse* CI gate (runs only when `CI=true` OR `--force-api`).
+- **Default model `claude-sonnet-4-6`** ($3/$15 per Mtok, 1M context, 1024 token cache minimum) for auto-fix; reserve `claude-opus-4-7` for Tier-C escalations. Prompt caching with `cache_control` on the SYSTEM block (TTL `1h`) saves ~30% per call; ~$2/mo ceiling at 60 issues vs $80 warn cap.
+- **`peter-evans/create-pull-request@v8`** (8.1.1) for draft-PR creation — idempotent, signs as `github-actions[bot]`, handles branch + commit + push atomically. Avoid `anthropics/claude-code-action@v1` (no per-call cost hook, fights explicit ledger discipline).
+- **Roll your own deps workflow** — Dependabot can't pre-gate on nightly suite; Renovate is overkill for 8 packages. Reuse `peter-evans/create-pull-request@v8` + `npm outdated --json` + matrix strategy. ~50 lines of YAML.
+- **Cost ledger persistence: git-committed `tests/e2e/.llm-spend-ledger.json`** (current path, flipped from gitignored to committed-but-versioned), with `[skip ci]` mirroring `e2e-weekly-digest.yml` lines 98-110. Add a `combinedMonthlyTotal(localLedger, ciLedger)` helper to enforce the unified $80/$100 cap. NEVER use GH cache (7-day eviction), repo variables (race condition, 48KB cap), or Cloudflare KV (extension-side concern).
+- **Verifier-on-PR: zero new primitives** — `actions/checkout@v4` with `ref: pr.head.sha` → `npm run build:chrome` → `npx playwright test --grep <caseId>` → Node script asserts Tier A/B in `report.json` → `gh pr ready` flips draft. `gh` CLI is sufficient; no `actions/github-script` needed.
 
-The sole new workflow file is `.github/workflows/e2e-weekly-digest.yml` for the Monday 07:00 UTC digest cron. The `llm-report.json` local-to-CI transfer mechanism is via GitHub Actions artifact upload (`gh workflow run` with `llm_run_id` input), not committed to the repository.
+### Features (from FEATURES.md)
 
-**Core technologies (additions only):**
-- Node 22 built-ins (`fs`, `path`, `child_process`): all new scripts — zero new runtime dependencies
-- `gh api graphql` (pre-installed on `ubuntu-latest`): `createDiscussion` mutation for weekly digest delivery
-- Playwright `projects:` array in existing config: quarantine suite isolation, non-gating CI step
+- **WRONG_CITATION is the hero path for MVP.** LLM_HALLUCINATED_SELECTION + WORKER_FALLBACK_FAILED defer to expansion-phase after validation signal; GOOGLE_DOM_DRIFT + narrow HARNESS_ERROR auto-merge defer to later iterations.
+- **Per-ERROR_CLASS routing** — 8 classes route to 5 specialized fix paths + 3 explicit skip paths:
+  | ERROR_CLASS | Strategy | Fix Surface |
+  |-------------|----------|-------------|
+  | WRONG_CITATION | Auto-fix (hero) | `src/shared/matching.js`, `src/shared/parsing.js`, `src/shared/gutter.js`, OCR/column-inference modules |
+  | LLM_HALLUCINATED_SELECTION | Auto-fix | `src/selection.js`, spec-extraction code |
+  | WORKER_FALLBACK_FAILED | Auto-fix (cross-repo aware) | Worker/USPTO fallback path |
+  | GOOGLE_DOM_DRIFT | Auto-fix | Selectors, `data-testid` attributes, `src/selection.js` |
+  | HARNESS_ERROR | Auto-fix (narrow) | `tests/e2e/specs/`, fixture loaders, Playwright config |
+  | FLAKE | **Skip — re-quarantine** | None; bump stable_runs reset; escalate after pattern repeats |
+  | LLM_API_ERROR | **Skip — retry** | None; transient |
+  | PASS | **Skip — close as false-positive** | None |
+- **Verifier-on-PR gate mechanics** lift OpenHands' Reviewer + Aider's `--test-cmd` patterns: 3× consecutive affected-case verifier check + 76-case regression + diff-size cap + no-new-deps gate. "Phantom verification" (LLM claims it tested but didn't) is the named anti-pattern to defend.
+- **Auto-promote uses follow-up-PR pattern** to preserve v3.1's "promotion stays human-gated" trust invariant — the auto-promote workflow auto-creates a SEPARATE PR adding the case to `tests/test-cases.js`, never modifies the file in the original auto-fix PR. Triple-gate assertion on the source PR (verified label + merged + triage-sourced) reconstructs the human-gate invariant.
+- **Six anti-features documented to explicitly EXCLUDE:** auto-merge of matcher changes; agentic loops without iteration cap; LLM-as-judge for verifier ties; prompt-injection-vulnerable issue parsing (live April-2026 vendor advisories cited); missing post-merge verifier re-check; batch-grind quarantine queue.
+- **Renovate over Dependabot** for dep-update auto-PRs (`minimumReleaseAge` 14d cooldown, grouped updates) — but the v4.0 milestone constraint says "minimal new deps"; Renovate isn't an npm dep (hosted bot / GH App), so satisfied. Roll-your-own is the recommended fallback if Renovate proves too much config.
 
-**Avoid:**
-- `@octokit/rest` — `gh` CLI already auth'd, existing code has unit-tested mock interface
-- LangChain / Vercel AI SDK / instructor-js — overkill for a single short classification prompt
-- Separate `e2e-quarantine.yml` workflow — creates concurrency group collision risk; quarantine is nightly-only
+### Architecture (from ARCHITECTURE.md)
 
-### Expected Features
+**5 new workflow files** (all named `v40-*.yml` for namespace clarity):
+- `v40-auto-fix.yml` — trigger: `issues.labeled('triage')`
+- `v40-verifier-gate.yml` — trigger: `pull_request.opened/synchronize` filtered to `auto-fix/*` branches
+- `v40-auto-promote.yml` — trigger: `pull_request.closed && merged && contains(labels, 'auto-fix:verified')`
+- `v40-deps-update.yml` — trigger: weekly cron `0 9 * * 1` + `workflow_dispatch`
+- `v40-cost-ledger-snapshot.yml` — trigger: daily cron + post-step in v40-auto-fix.yml
 
-The six v3.1 features form a strict pipeline; none is optional because each unlocks the next. The FEATURES.md research identifies a clear MVP boundary: the first five features must ship together (the loop is not closed without all of them), and the weekly digest is a P2 addition after the first 2-3 weeks of quarantine data accumulates.
+**4 new scripts in `scripts/`** (bare-verb naming, not `e2e-*` prefix since they don't read/write E2E artifacts):
+- `auto-fix.mjs` — core fix proposer
+- `auto-fix-promote.mjs` — invoked on merge, calls `runPromote()` with `_skipCiGuard:true` after triple-gate assertion
+- `check-deps-and-pr.mjs` — `npm outdated --json` partitioned into security/minor tiers
+- `verify-single-case.mjs` — CLI shim around existing `verifyCitation()`
 
-**Must have (table stakes — loop cannot close without these):**
-- Local + CI runtime split (handoff) — prerequisite for everything; LLM stays local, triage runs in nightly cron
-- Re-run validator — 3-replay verifier-only confirm gate; without it, false-positive rate makes triage meaningless
-- Hybrid triage classifier — rule-first (6 of 8 error classes decided without LLM), LLM second-pass for ambiguous only
-- Rich-context auto-issue filer — reproducer + seed, verifier tier + PDF snippet, LLM rationale, golden diff
-- Tiered corpus promotion — quarantine bucket (`test-cases-quarantine.js`) with non-gating CI job; human PR promotes to golden
+**Library extensions in `tests/e2e/lib/`:**
+- `llm-driver.js` — add `invokeAnthropicSdkWithLedger` (inverse CI gate; unified `LEDGER_PATH`)
+- New `lib/fix-prompt-builder.js` — pure-function per-ERROR_CLASS prompt scaffolds (analog to `issue-payload-builder.js`)
+- `llm-ledger.js` — additive only (new fields `transport`, `phase: '40-auto-fix'`); no extraction
+- `pdf-verifier.js` — no changes (CLI shim lives in `verify-single-case.mjs`)
 
-**Should have (P2, add after core loop validates):**
-- Weekly analytics digest — classification breakdown, quarantine growth trend, cost vs cap; GitHub Discussion + committed markdown
+**ESLint guards (3 new `no-restricted-imports` blocks):** `@anthropic-ai/sdk` importable only from `llm-driver.js`; auto-fix scripts forbidden from `src/`; `fix-prompt-builder.js` purity (no `node:fs`, `node:child_process`, `node:path`).
 
-**Defer to v3.2+:**
-- Quarantine promotion automation (N-consecutive-green auto-PR) — reduce human friction once promotion volume justifies it
-- Real-time Slack/PagerDuty alerts — LLM findings are hypotheses, not production failures; nightly cadence is correct
-- Automatic golden promotion without human PR — destroys the trust invariant of the golden corpus
+**The `_skipCiGuard` exemption** is the single load-bearing trust-invariant decision in v4.0. `promote-from-quarantine.mjs:131` blocks CI invocation today; the auto-promote workflow legitimately runs in CI. The exemption is gated by a triple-assertion in `auto-fix-promote.mjs`: (1) PR has `auto-fix:verified` label, (2) `event.pull_request.merged === true`, (3) source issue carried `triage` label. Collectively reconstructs "a HUMAN merged, after a VERIFIER signed off, on a TRIAGE-sourced issue."
 
-### Architecture Approach
+### Pitfalls (from PITFALLS.md)
 
-The architecture is a sequential pipeline of pure-data lib/ modules orchestrated by `scripts/run-triage-pipeline.mjs`, which runs as a CI step when a `llm_run_id` workflow_dispatch input is provided to `e2e-nightly.yml`. All new lib/ modules (rerun-validator, triage-classifier, issue-payload-builder) are pure-function modules unit-testable with mock fixtures in vitest. The quarantine suite reuses the exact regression.spec.js pattern against a different corpus file. The weekly digest reads from the GitHub Issues API (existing issues are the persistence layer) and writes a new GitHub Discussion via `gh api graphql`.
+**8 critical pitfalls** with concrete defenses:
 
-**Major components (new):**
-1. `tests/e2e/lib/rerun-validator.js` — deterministic verifier-only replay of LLM-flagged anomalies; writes `rerun-report.json`; no Playwright, no browser
-2. `tests/e2e/lib/triage-classifier.js` — heuristic-first + LLM second-pass; pure data in/out; writes `triage-report.json`
-3. `tests/e2e/lib/issue-payload-builder.js` — rich issue body assembly (reproducer, verifier detail, LLM rationale, golden diff)
-4. `scripts/quarantine-append.mjs` — idempotent upsert of confirmed anomalies into `test-cases-quarantine.js`
-5. `tests/e2e/specs/quarantine.spec.js` — non-gating Playwright project reading quarantine corpus
-6. `scripts/run-triage-pipeline.mjs` — CI orchestrator chaining steps 1-4 + issue filer
-7. `scripts/weekly-digest.mjs` — reads GitHub issues by label, files digest issue/Discussion weekly
+1. **Prompt injection from issue bodies** (LOAD-BEARING) — v3.1's `<patent_data>` defense protects against PDF injection but NOT against issue body injection (which is itself partly LLM-generated by v3.1). v4.0 needs `<issue_body_untrusted>` envelope + `FORBIDDEN_DELIMITERS` escape in `issue-payload-builder.js` (so v3.1 won't emit closing tags) + file allow/deny list in `auto-fix.mjs`.
+2. **API cost runaway in CI** — subscription-local naturally caps; SDK does not. Required sub-caps: per-day ($10), per-issue ($1), per-PR ($2), per-month ($80 warn / $100 hard). Static-grep test pinning cron schedule prevents typo'd `*/5 * * * *` patterns.
+3. **Verifier-gate gaming** — 6 layers: runtime file allow-list, diff-guard regex bank (rejects diffs touching `tests/test-cases.js`, `baseline.json`, quarantine corpus), CODEOWNERS on golden/verifier/workflows, verifier-pinned-to-`origin/main` on PR gate, test-count invariants (test count must not decrease), canary case set.
+4. **Auto-merge prevention** — `Settings → Allow auto-merge: OFF` at repo level; branch protection ruleset on `main` with `Do not allow bypassing: ON`; CODEOWNERS-required reviews; draft-by-default PRs; static-grep test pinning these settings.
+5. **FLAKE handling 5-state machine** — CONFIRMED_BUG / LIKELY_BUG / INTERMITTENT / FLAKE / FLAKE_ESCALATION with rolling 10-element rerun-outcomes ring buffer. Prevents both real-bugs-mis-classified-as-FLAKE and FLAKE-spam-loops. 30-day suppress on FLAKE_ESCALATION re-files.
+6. **Dep-update masking** — verifier and extension share `pdfjs-dist`; a dep bump can shift column numbers by 1, causing legit WRONG_CITATION issues that auto-fix would "resolve" by adjusting the extension to match the new buggy pdfjs output. Pin verifier's `pdfjs-dist` separately; verifier-frozen pre-flight check on dep-update PRs.
+7. **Concurrency races** — `v40-auto-fix-${{ event.issue.number }}` per-issue concurrency with `cancel-in-progress: false` (don't kill a partial fix mid-LLM-call); `v40-verifier-gate-${{ event.pr.number }}` with `cancel-in-progress: true` (PR sync should re-run gate from scratch); `v40-auto-promote` static (serializes corpus writes).
+8. **v3.1 surprise interactions** — `invokeClaudePWithLedger` CI guard is load-bearing; don't delete it. SDK transport is a NEW entry point with the *opposite* CI policy. Both coexist; transport tag (`auto-fix-api` vs `auto-fix`) distinguishes ledger entries for audit greps.
 
-**Key constraint: `ANTHROPIC_API_KEY: ''` clearing in `invokeClaudeP`.** The existing function deliberately clears the API key to force subscription-mode auth. Any triage second-pass LLM call must use the same path (subscription-local) or a separate wrapper that does NOT clear the key (API-billed). The design decision must be locked before the first triage LLM call is written.
-
-### Critical Pitfalls
-
-1. **Tier C verifier masking real bugs** — The heuristic rule must check `tier_used in {A, B}` before classifying as clean. Tier C (+-10-line fuzzy) agreements must escalate to LLM triage. Named constant `verifier_strong_agreement = status === 'pass' && ['A','B'].includes(tier_used)` with a vitest guard test that asserts Tier C pass does not suppress LLM escalation.
-
-2. **Fingerprint formula immutability** — The `sha256(caseId | errorClass | "")` formula is embedded in all existing open GitHub issue bodies. Any change retroactively breaks dedup (new fingerprints do not match old comments). Solution: leave the base formula unchanged; add `topOfStackHashFromCase` only for NEW v3.1 error classes; `findMatchingIssue` searches both formula variants during transition.
-
-3. **`ANTHROPIC_API_KEY: ''` clearing breaks API-billed triage** — `invokeClaudeP` clears the API key to force subscription auth. If triage second-pass is intended to run in CI via API billing, it must use a separate wrapper that does not clear the key. Design decision must be explicit in the triage classifier phase plan, not implicit.
-
-4. **Spend ledger opt-in trap** — `appendLedgerEntry` is called explicitly in `e2e-explore.mjs`, not automatically inside `invokeClaudeP`. Any new caller that skips it silently understates monthly spend. Fix: create `invokeClaudePWithLedger` wrapper; make direct `invokeClaudeP` calls ESLint-restricted outside test files.
-
-5. **DOM_DRIFT cluster saturating LLM triage budget** — Google A/B experiments can produce 20+ simultaneous `GOOGLE_DOM_DRIFT` failures. Without cluster detection (N>=5 same-errorClass in one run routes to single grouped LLM call), a single nightly run burns $0.20+ on redundant individual classifications.
-
-6. **Issue body fingerprint displacement** — Adding rich context can push the `<!-- fingerprint: {fp} -->` comment past the 65,536-character GitHub limit. Move fingerprint comment to line 1 of the issue body; enforce per-section character budgets (LLM rationale <=800 chars, verifier windows <=600 chars each, diff <=400 chars).
+---
 
 ## Implications for Roadmap
 
-Based on the combined research, the dependency graph dictates a 6-phase structure for v3.1. No phase can be moved earlier without violating input/output dependencies.
+### Phase Structure: 9 Phases (39-47)
 
-### Phase 1: HUMAN-UAT Verification (Phase 32)
-**Rationale:** Every downstream phase consumes `llm-report.json`. If the live `claude -p` exploratory session does not produce usable output (wrong schema, subscription auth failure, empty iterations), phases 33-37 cannot be tested. This is the single highest-risk de-risking step in the milestone. v3.0 Phase 31 shipped the scaffolding but deferred the live UAT.
-**Delivers:** Confirmed `llm-report.json` with real iterations from the Max 5 subscription; schema validated; CI guard verified; spend ledger functional; `npm run e2e:upload-llm-report` helper defined for the local-to-CI handoff.
-**Addresses:** Local + CI runtime split handoff (de-risks the artifact transfer design)
-**Avoids:** Pitfall 10 (stale llm-report.json consumed by CI), Pitfall 11 (claude -p accidentally running in CI), Pitfall 12 (spend ledger gap)
-**Research flag:** No additional research needed — live execution is the research.
+| Phase | Topic | Dependencies | Wave |
+|-------|-------|--------------|------|
+| **39** | SDK driver + Ledger v2 + Branch protection Wave-0 (CODEOWNERS, ruleset, auto-merge OFF, $80/$100 sub-caps, SDK driver, ESLint guard) | None | Wave 1 |
+| **40** | Pipe-cleaner: deps-update + cost-ledger-snapshot workflows | 39 (ledger schema) | Wave 1 |
+| **41** | Verifier-gate workflow + verify-single-case.mjs CLI shim | None (uses existing `verifyCitation`); 40 (workflow conventions) | Wave 1 |
+| **42** | fix-prompt-builder + WRONG_CITATION vertical slice (local; `<issue_body_untrusted>` envelope, `FORBIDDEN_DELIMITERS`, file allow/deny list, `fix_attempts` retry tracking) | 39 (driver), 41 (gate to land into) | Wave 2 |
+| **43** | v40-auto-fix.yml workflow + draft PR creation | 42 (script proven locally) | Wave 3 |
+| **44** | v40-auto-promote.yml + triple-gate `_skipCiGuard` (verified-label + merged + triage-sourced) | 43 (PRs with auto-fix:verified exist) | Wave 4 |
+| **45** | Per-ERROR_CLASS expansion (4 more classes: LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, HARNESS_ERROR) + FLAKE 5-state machine + rolling ring buffer | 44 (full loop closed) | Wave 5 |
+| **46** | `/gsd:fix-issue` local UX (npm script wrapping `auto-fix.mjs --transport subscription`) + ledger v2 dashboard + committed-ledger privacy audit | 45 (all classes wired) | Wave 6 |
+| **47** | v4.0 cleanup: integration audit, Nyquist coverage stamping, live HUMAN-UAT (mirrors v3.1 Phase 38) | 39-46 | Wave 7 |
 
-### Phase 2: Re-run Validator (Phase 33)
-**Rationale:** All triage, issue filing, and quarantine promotion depend on the `rerun-report.json` schema. This must be defined and tested before anything downstream is written. Unit-testable immediately with mock `llm-report.json` fixtures. Must also extend the llm-report.json iteration schema to add `scroll_y`, `viewport_width`, `viewport_height`, `selected_node_xpath` — these fields are needed for accurate replay and cannot be added retroactively after the re-run validator is built.
-**Delivers:** `tests/e2e/lib/rerun-validator.js`; `rerun-report.json` schema; 3-replay deterministic confirm gate; `llm-report.json` schema extended with viewport fields; ESLint `no-restricted-imports` scope extended to include re-run validator.
-**Addresses:** Re-run validator feature (table stakes)
-**Avoids:** Pitfall 1 (scroll/viewport state missing — schema extension ships in same PR), Pitfall 16 (re-run validator trips ESLint src/ guard)
-**Research flag:** Standard pattern — no additional research needed.
+**Wave-1 Parallelization:** Phases 39 + 40 + 41 can run simultaneously (3 agents, zero shared write surface — 39 adds lib + repo settings; 40 adds independent workflows; 41 adds an independent workflow + CLI shim).
 
-### Phase 3: Hybrid Triage Classifier (Phase 34)
-**Rationale:** Consumes `rerun-report.json` schema from Phase 2. Must exist before issue-payload-builder and quarantine-append, which both consume `triage-report.json`. This is the highest-complexity phase in the milestone (heuristic rules + LLM second-pass + cluster detection + prompt injection isolation).
-**Delivers:** `tests/e2e/lib/triage-classifier.js`; `triage-report.json` schema; `invokeClaudePWithLedger` wrapper; cluster-detection pre-filter for DOM_DRIFT clusters (N>=5); prompt injection isolation via `<patent_data>` XML tags; CI guard mirroring `e2e-explore-ci-guard.test.js` for triage entrypoint.
-**Addresses:** Hybrid triage classifier feature (table stakes)
-**Avoids:** Pitfall 2 (Tier C masking — `verifier_strong_agreement` named constant with guard test), Pitfall 3 (DOM_DRIFT cluster LLM budget saturation), Pitfall 4 (prompt injection from PDF content), Pitfall 11 (CI guard at triage caller level), Pitfall 12 (spend ledger wrapper — ledger total must match sum of exploratory + triage invocations)
-**Research flag:** LLM invocation path design decision (subscription-local vs API-CI) must be locked before any code is written. Architecture research resolves this as subscription-local only — document as acceptance criterion in phase plan.
+### Cross-Phase Dependency Graph
 
-### Phase 4: Rich Issue Filer + Quarantine Corpus (Phase 35)
-**Rationale:** Both components consume `triage-report.json` (Phase 3). Can be built in parallel within the phase since they share the same input but write different outputs. The fingerprint audit must precede any formula change.
-**Delivers:** `tests/e2e/lib/issue-payload-builder.js`; `scripts/quarantine-append.mjs`; `tests/e2e/test-cases-quarantine.js` (initial empty file with schema guard test); extended `e2e-report-issue.mjs` with `--source triage` flag and errorClass GitHub labels; fingerprint dual-search (v1 + v2 formula variants); per-section character budget enforcement; fingerprint-first body ordering.
-**Addresses:** Rich-context auto-issue filer (table stakes); tiered corpus promotion (table stakes — corpus file created)
-**Avoids:** Pitfall 5 (fingerprint too coarse for new error classes), Pitfall 6 (issue body exceeding 65,536 chars), Pitfall 9 (quarantine/golden schema drift — guard test in `test:src` suite), Pitfall 13 (ERROR_CLASSES modification breaks Phase 30 — guard test before any new class), Pitfall 14 (fingerprint formula change breaks Phase 29 dedup)
-**Research flag:** Standard patterns — no additional research needed.
+```
+39 (SDK driver + branch protection) ──┬──→ 42 (vertical slice) ──→ 43 (workflow) ──→ 44 (promote)
+                                       │                                                  │
+                                       └──→ 46 (local UX)                                  │
+                                                                                           ▼
+40 (deps + snapshot) ──→ 41 (verifier-gate) ──→ 42                                       45 (expansion)
+                                                │                                          │
+                                                └──────────────────────────────────────────┘
+                                                                                           ▼
+                                                                                        47 (cleanup)
+```
 
-### Phase 5: Quarantine CI Integration + Triage Pipeline Orchestrator (Phase 36)
-**Rationale:** Requires the quarantine corpus file from Phase 4. Wires all Phase 2-4 components into CI. The `run-triage-pipeline.mjs` orchestrator is the last piece before the loop can run end-to-end in the nightly cron.
-**Delivers:** `tests/e2e/specs/quarantine.spec.js`; Playwright config `quarantine` project (`retries: 0`); `scripts/run-triage-pipeline.mjs` orchestrator (exits 0 always, same philosophy as nightly); `e2e-nightly.yml` modifications (`llm_run_id` workflow_dispatch input, artifact download step, triage pipeline step, quarantine spec step with `continue-on-error: true`); `scripts/promote-from-quarantine.mjs` human-triggered utility; timeout budget audit documented in YAML comment.
-**Addresses:** Tiered corpus promotion (non-gating CI job); local + CI runtime split (full nightly cron wiring)
-**Avoids:** Pitfall 7 (quarantine bit-rot — quarantine failures file issues with `e2e-quarantine` label using same `e2e-report-issue.mjs`), Pitfall 8 (quarantine forever — weekly digest action items for `stable_runs>=3` cases; `quarantine:ready-for-promotion` label auto-applied), Pitfall 15 (concurrency group collision — quarantine added to existing nightly job, not separate workflow; timeout budget calculated and documented)
-**Research flag:** Standard pattern (mirrors existing `fault-injection.spec.js` + `continue-on-error: true` already in production). No additional research needed.
+### Requirements Categories (~30-35 across 8)
 
-### Phase 6: Weekly Analytics Digest (Phase 37)
-**Rationale:** Depends on GitHub issues having accumulated from Phase 5 wiring. Independent of Phase 2-5 local file outputs — reads GitHub Issues API directly. Can be stubbed with partial data early; full digest requires all other features running for at least one nightly cycle. Weekly cadence (Monday 07:00 UTC, after 06:00 nightly) is the correct trigger.
-**Delivers:** `scripts/weekly-digest.mjs`; `.github/workflows/e2e-weekly-digest.yml` (Monday cron, `discussions: write` + `contents: write` permissions); committed markdown to `reports/weekly-digest-YYYY-WNN.md` + GitHub Discussion via `gh api graphql createDiscussion`; `SUMMARY_KEYS` export from `llm-report.js`; digest output validation (throws on missing keys, not silent zero); output structure enforces aggregation (classification breakdown as table, <=50 lines total, no per-iteration enumeration).
-**Addresses:** Weekly analytics digest feature (P2)
-**Avoids:** Pitfall 17 (weekly digest schema drift — `SUMMARY_KEYS` export + validation), Pitfall 18 (digest drowning signal in noise — acceptance criterion: digest <=50 lines; top 3 failure categories; quarantine growth trend; no per-iteration list)
-**Research flag:** Verify GitHub Discussions is enabled on the repo before implementing `createDiscussion` GraphQL path. If not enabled, fallback is GitHub Issue with `e2e-digest` label (Architecture research notes this as the simpler alternative).
+| Category | Requirements (sample REQ-IDs) | Phase Mapping |
+|----------|-------------------------------|---------------|
+| **PROMPT** | `<issue_body_untrusted>` envelope, `FORBIDDEN_DELIMITERS`, per-ERROR_CLASS scaffolds, fix-prompt-builder purity guard | 42, 45 |
+| **LEDGER** | Ledger schema v2 (transport, phase fields), unified $80/$100 cap across transports, per-day/per-issue/per-PR sub-caps, `combinedMonthlyTotal` helper, committed ledger | 39, 40 |
+| **DEPS** | Weekly cron + watched packages, pre-flight nightly-suite gate, per-tier PR grouping (security vs minor), pinned verifier `pdfjs-dist` | 40 |
+| **VERIFIER-GATE** | 3× consecutive affected-case check, 76-case regression check, diff-size cap, no-new-deps gate, verifier-pinned-to-`origin/main`, diff-guard regex bank | 41 |
+| **AUTOFIX** | Dispatcher (parse ERROR_CLASS from labels), draft PR creation via `peter-evans/create-pull-request@v8`, branch-naming `auto-fix/<n>-<fp8>`, `git apply --check` pre-flight, fix-attempts retry tracking (max 3) | 42, 43 |
+| **PROMOTE** | Triple-gate assertion, follow-up-PR pattern (NEVER direct-to-main), source issue close on merge | 44 |
+| **FLAKE-HANDLING** | 5-state machine, rolling 10-element ring buffer, FLAKE_ESCALATION issue with 30-day suppress, `quarantine-append --escalate-stable-runs-reset 1` flag | 45 |
+| **CLEANUP** | Nyquist coverage stamping (mirrors v3.1 Phase 38), integration audit, live HUMAN-UAT, deferred-items reconciliation | 47 |
 
-### Phase Ordering Rationale
+---
 
-- HUMAN-UAT must be Phase 1 because `llm-report.json` is the shared input for every downstream component. No fixture can fully substitute for the live subscription session that produces it.
-- Re-run validator must precede triage classifier because `rerun-report.json` is the primary input to the heuristic rules. Classifying before re-run would misclassify transient flakes as real bugs.
-- Triage classifier must precede issue filer and quarantine-append because both consume `triage-report.json` output.
-- Quarantine corpus file must exist before the quarantine spec and CI wiring can be tested.
-- Weekly digest is independent of local artifacts (reads GitHub Issues API) and belongs last because it aggregates outputs that only exist after the full loop has run at least once.
-- Phases 4 and 5 have partial parallelism within the milestone: issue-payload-builder and quarantine-append (Phase 4) can begin once the triage output schema is locked, even before the CI orchestrator (Phase 5) is built.
+## Disagreements & Resolutions
 
-### Research Flags
+1. **Phase numbering & ordering.** ARCHITECTURE proposed sequential 39-47 with verifier-gate before auto-fix workflow. PITFALLS proposed a non-sequential ordering (43 → 44 → 41 → 39 → 40 → 42 → 45 → 46) that put branch protection FIRST. **Resolved:** Use ARCHITECTURE's sequential numbering 39-47 for clarity; fold PITFALLS's "branch protection FIRST" insight into Phase 39 as Wave-0 prereqs. Phase 39 becomes "SDK driver + Ledger v2 + Branch protection setup."
+2. **Phase count.** FEATURES suggested 5 phases (P1-P5 covering MVP only); ARCHITECTURE/PITFALLS suggested 8-9 phases. **Resolved:** FEATURES described capability MVP (5 of ~25 requirements — WRONG_CITATION hero path only); ARCHITECTURE's 9 is build-order decomposition including non-MVP scope (per-class expansion, FLAKE state machine, deps-update, cleanup). Use ARCHITECTURE's 9 — FEATURES's MVP scope corresponds to Phases 39-44 within the 9-phase plan.
+3. **Cost ledger persistence.** STACK and ARCHITECTURE both discuss; STACK recommended `.github/.llm-ledger.json`, ARCHITECTURE recommended `tests/e2e/.llm-spend-ledger.json` (the existing v3.1 path, flipped from gitignored). **Resolved:** Use `tests/e2e/.llm-spend-ledger.json` (ARCHITECTURE's choice) — it's the existing v3.1 path; renaming would break v3.1's local ledger continuity. Note this choice in Phase 39 plan.
 
-Phases needing explicit upfront design decisions (not external research — these are internal design locks):
-- **Phase 34 (Triage Classifier):** LLM invocation path (subscription-local vs API-CI) must be locked as an acceptance criterion before implementation begins. Architecture research resolves this as subscription-local only.
-- **Phase 36 (CI Integration):** Timeout budget audit required before adding quarantine steps. Calculate: existing nightly runtime + N_quarantine_cases x per-case-time. Document in YAML comment.
-- **Phase 37 (Weekly Digest):** Verify GitHub Discussions enabled on repo at phase start. Implement Issue fallback path if not.
-
-Phases with standard, well-documented patterns (no research-phase needed):
-- **Phase 32 (HUMAN-UAT):** Execution is the research. Run `npm run e2e:explore` live.
-- **Phase 33 (Re-run Validator):** Direct call to existing `verifyCitation`; identical to regression.spec.js invocation pattern.
-- **Phase 35 (Issue Filer + Corpus):** Extension of existing `buildIssueBody` and fingerprint scheme; fully documented in Phase 29 implementation.
-- **Phase 36 (CI Integration):** Mirrors existing `fault-injection.spec.js` + `continue-on-error: true` pattern already in production in `e2e-nightly.yml`.
+---
 
 ## Confidence Assessment
 
-| Area | Confidence | Notes |
-|------|------------|-------|
-| Stack | HIGH | Verified via npm registry, Context7, direct code inspection, GitHub docs. Zero new deps confirmed with alternatives explicitly rejected. |
-| Features | HIGH | Codebase read directly; OSS patterns (WPT, Playwright, Atlassian) verified via web sources. Dependency graph fully traced. MVP vs v3.2+ boundary is clear. |
-| Architecture | HIGH | All components derived from reading existing code contracts, not inference. Data flow validated against actual file schemas. All anti-patterns backed by specific code locations. |
-| Pitfalls | HIGH | All 18 pitfalls derived from direct code inspection of v3.0 source tree. FUZZY_LINE_TOLERANCE, fingerprint null-hash rationale, CI guard lines, ledger opt-in — all traced to specific files and line numbers. |
+| Area | Level | Reason |
+|------|-------|--------|
+| Stack (SDK + GH Actions + ledger persistence) | HIGH | npm + Anthropic docs verified within 24h; existing repo workflows read in full; pattern parity with v3.1 |
+| Features (tool survey + per-ERROR_CLASS strategy) | HIGH | OpenHands docs, SWE-agent README, claude-code-action source, DebugML cheating-agents corpus all current 2026-05-30; v3.1 issue body schema known precisely |
+| Architecture (workflows + scripts + libs + integration touchpoints) | HIGH | Direct line-number-referenced inspection of all 5 v3.1 primitives; `_skipCiGuard` exemption analyzed for completeness |
+| Pitfalls (8 categories with defenses) | HIGH | Every pitfall anchored either in v3.1 source code I inspected directly, or in a documented public failure mode of the same class of system |
+| Phase ordering & cross-phase dependencies | MEDIUM | Grounded in dependency analysis but per-phase duration estimates (2-3 days × 5 classes in Phase 45) are LLM-prompt-engineering-dependent and may stretch |
 
-**Overall confidence:** HIGH
+---
 
-### Gaps to Address
+## Research Flags
 
-- **`llm-report.json` scroll/viewport state gap:** The iteration schema does not yet include `scroll_y`, `viewport_width`, `viewport_height`, `selected_node_xpath`. These must be added in Phase 33 (re-run validator phase) by modifying the `appendLlmIteration` call site in `e2e-explore.mjs`. This is a known gap with a defined fix; it must ship in the same PR as the re-run validator, not before or after.
+### Needs phase-specific research
+- **Phase 42:** Diff-size empirical calibration. Initial cap suggested: 200 LOC src/ + 50 LOC tests. Calibrate after first 10 fixes.
+- **Phase 44:** `auto-fix:partial-verified` semantics (does verifier passing on 3/5 affected cases gate flip?). Default all-or-nothing for v4.0.
+- **Phase 45:** Per-ERROR_CLASS prompt engineering — each class needs ~2-3 days of empirical tuning against historical issues.
+- **Phase 46:** Committed ledger privacy audit (monthly spend pattern, model IDs in git history).
 
-- **GitHub Discussions enablement:** The weekly digest plan uses `gh api graphql createDiscussion`. Architecture research notes the simpler alternative is a GitHub Issue with `e2e-digest` label. Verify Discussions status at Phase 37 start and select the appropriate path. Both paths are fully designed; this is a configuration check, not a design question.
+### Standard patterns — skip research
+- Phase 39: Canonical GitHub branch protection / CODEOWNERS / ruleset patterns
+- Phase 40: Mirrors v3.1 `e2e-weekly-digest.yml` ledger-commit pattern
+- Phase 41: Reuses existing `verifyCitation` — no new mechanics
+- Phase 43: Lifts Phase 42 script into workflow — no new mechanics
+- Phase 47: v3.1 Phase 38 precedent (Nyquist stamping, integration audit, live UAT)
 
-- **`llm_run_id` artifact transfer UX:** The design requires the developer to manually trigger `gh workflow run e2e-nightly.yml -f llm_run_id={run_id}` after a local exploratory session. A `npm run e2e:upload-llm-report` helper must be defined in Phase 32 (HUMAN-UAT) to make this frictionless. Without it, the handoff is error-prone and the loop will not close reliably in practice.
+---
+
+## Gaps to Address During Execution
+
+- Auto-fix diff-size upper bound — calibrate empirically Phase 42; initial cap 200 LOC src/ + 50 LOC tests
+- Prompt-caching hit rate validation — `cache_read / (cache_read + cache_creation) ≥ 0.5` over 10 runs (Phase 39 acceptance criterion)
+- `auto-fix:partial-verified` semantics — default all-or-nothing for v4.0; revisit in a later milestone
+- Committed ledger privacy review — Phase 46 audit; consider redacting model IDs if sensitive
+- Branch protection bypass list audit — Phase 39 audit step (who has admin override?)
+- Anthropic SDK 0.100.1 stability — do NOT auto-bump via deps-update; pin via package.json exact version
+
+---
 
 ## Sources
 
-### Primary (HIGH confidence)
-- Direct code inspection: `tests/e2e/lib/pdf-verifier.js`, `lib/llm-driver.js`, `lib/llm-report.js`, `lib/llm-ledger.js`, `lib/error-codes.js`, `lib/report.js`, `scripts/e2e-report-issue.mjs`, `scripts/e2e-explore.mjs`, `.github/workflows/e2e-nightly.yml`, `tests/e2e/specs/regression.spec.js`, `eslint.config.js`
-- `.planning/PROJECT.md` — v3.1 milestone target features and v3.0 validated requirements
-- Context7 `/octokit/rest.js` — `createIssue`, `paginate`, `listForRepo` API surface (confirms `gh` CLI path is preferable)
-- Context7 `/websites/main_vitest_dev` — `projects:` array in Playwright config for multi-project runner
-- GitHub Docs `workflow-syntax-for-github-actions#permissions` — `discussions: write` GITHUB_TOKEN scope confirmed
-- GitHub Docs GraphQL Discussions API — `createDiscussion` mutation; no REST equivalent confirmed
-- `npm view @playwright/test version`, `npm view vitest version`, `npm view @octokit/rest dist-tags` — version confirmations
+### Primary (direct code/doc inspection)
+- v3.1 source files: `tests/e2e/lib/llm-driver.js` (line 375: `invokeClaudePWithLedger`, line 384: CI gate), `tests/e2e/lib/llm-ledger.js` (line 318: `appendLedgerEntry`), `tests/e2e/lib/issue-payload-builder.js` (line 180: labels), `tests/e2e/lib/pdf-verifier.js` (line 830: `verifyCitation`), `tests/e2e/lib/error-codes.js` (8 ERROR_CLASSES), `scripts/promote-from-quarantine.mjs` (line 115: `runPromote`, line 131: CI guard), `scripts/run-triage-pipeline.mjs` (4-stage spawnSync), `scripts/e2e-report-issue.mjs` (line 78: `fingerprint()`), `eslint.config.js` (existing patterns), `.github/workflows/e2e-nightly.yml`, `.github/workflows/e2e-weekly-digest.yml`
+- Anthropic docs: [Client SDKs](https://platform.claude.com/docs/en/api/client-sdks), [Prompt Caching](https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching), [Models overview](https://platform.claude.com/docs/en/docs/about-claude/models)
+- npm registry: [@anthropic-ai/sdk](https://www.npmjs.com/package/@anthropic-ai/sdk) version 0.100.1 (2026-05-29)
 
-### Secondary (MEDIUM confidence)
-- WPT expectation metadata system — quarantine/disabled pattern for tiered corpus
-- Playwright `@flaky` tag + `--grep-invert` pattern — non-gating quarantine CI precedent
-- Atlassian flaky test management at scale — hybrid rule + LLM classifier production validation
-- LLM classification accuracy on borderline cases (68% vs 82% for embeddings) — validates rule-first approach for closed taxonomy
-- Engineering leading vs lagging indicators (two-tier dashboard) — weekly digest output structure
+### Secondary (tool ecosystem)
+- [SWE-Bench Leaderboard 2026](https://awesomeagents.ai/leaderboards/swe-bench-coding-agent-leaderboard/), [SWE-agent](https://github.com/SWE-agent/SWE-agent), [OpenHands PR Review docs](https://docs.openhands.dev/sdk/guides/github-workflows/pr-review)
+- [claude-code-action](https://github.com/anthropics/claude-code-action), [security docs](https://github.com/anthropics/claude-code-action/blob/main/docs/security.md)
+- [GitHub Copilot cloud agent docs](https://docs.github.com/copilot/concepts/agents/coding-agent/about-coding-agent)
+- [peter-evans/create-pull-request](https://github.com/peter-evans/create-pull-request) v8.1.1
+- [Renovate minimumReleaseAge](https://docs.renovatebot.com/key-concepts/minimum-release-age/), [Renovate vs Dependabot 2026](https://appsecsanta.com/sca-tools/dependabot-vs-renovate)
+- [Playwright Healer Agent](https://dev.to/debs_obrien/fixing-failing-tests-automatically-with-playwrights-new-healer-agent-13ck)
 
-### Tertiary (LOW confidence — verified against primary sources)
-- WebSearch: GitHub Actions `discussions: write` permission — confirmed via official docs
-- WebSearch: cross-workflow artifact passthrough patterns — noted; simpler committed-artifact approach adopted instead
-
----
-*Research completed: 2026-05-22*
-*Ready for roadmap: yes*
+### Tertiary (pitfall references)
+- [PromptPwnd: Prompt Injection in GitHub Actions](https://www.aikido.dev/blog/promptpwnd-github-actions-ai-agents), [Comment and Control](https://www.thebreach.news/posts/comment-and-control-github-actions-prompt-injection)
+- [DebugML — Cheating Agents Corpus](https://debugml.github.io/cheating-agents/)
+- [GitHub Docs — Auto-merge](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-auto-merge-for-pull-requests-in-your-repository), [Protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+- [Anthropic SDK Discussion #1461 — 24/7 Agent Operations](https://github.com/anthropics/anthropic-sdk-python/discussions/1461)
+- [Slack — Handling Flaky Tests at Scale](https://slack.engineering/handling-flaky-tests-at-scale-auto-detection-suppression/), [Datadog Flaky Tests](https://docs.datadoghq.com/tests/flaky_management/)
+- [Chromium TestExpectations](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/testing/web_test_expectations.md)
+- [The Evidence Gate (phantom verification)](https://blakecrosley.com/blog/the-evidence-gate)

@@ -471,6 +471,14 @@ describe('invokeClaudePWithLedger', () => {
     spawnStdout = HAPPY_STDOUT;
     spawnCalls.length = 0;
 
+    // Unstub CI/GITHUB_ACTIONS by default so cap-block and happy-path tests (3-6)
+    // bypass the CI gate. Tests 1+2 explicitly re-stub these to test the gate.
+    // Without this, the test suite fails on GitHub Actions where CI=true is the
+    // default environment (a Phase 34 latent test bug — pre-existing, not caused
+    // by Phase 38).
+    vi.stubEnv('CI', undefined);
+    vi.stubEnv('GITHUB_ACTIONS', undefined);
+
     // Override the outer vi.mock so the child auto-emits stdout + close,
     // making invokeClaudeP resolve immediately in tests 5 and 6.
     // `childProcess.spawn` is already a vi.fn() from the outer vi.mock() call.

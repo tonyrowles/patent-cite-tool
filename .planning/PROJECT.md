@@ -8,6 +8,20 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
+## Current Milestone: v4.0 Self-Healing Test Suite
+
+**Goal:** Close the LLM-driven feedback loop end-to-end — triaged GitHub issues from the v3.1 pipeline automatically produce draft PRs with proposed fixes, the affected case is re-verified on the proposed branch, and on merge the quarantine entry promotes to golden — preserving human-gated approval for every patch that ships.
+
+**Target features:**
+- Auto-fix PR proposer with per-ERROR_CLASS prompt strategy (WRONG_CITATION primary; LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, HARNESS_ERROR addressed; FLAKE explicitly re-quarantined without fix attempt)
+- Verifier-on-PR gate — auto-fix PR must pass the existing PDF verifier on the proposed branch before being marked ready-for-review
+- Auto-promote-to-golden on merged auto-fix — when a verifier-gated PR merges, run `promote-from-quarantine.mjs` automatically to close the quarantine → golden loop
+- Dual LLM transport: Anthropic SDK in GitHub Actions (24/7, cost-ledgered) + subscription-local `claude -p` via `/gsd:fix-issue <n>` (free dev iteration against Max 5 credit)
+- Cost ledger v2 — tracks API spend alongside subscription spend; warn at $80, hard-cap at $100; per-issue cost stamped in PR body
+- Dependency-update auto-PRs — weekly cron checks for outdated deps (Playwright, pdfjs-dist, sharp, vitest, esbuild); opens PRs with version bumps gated by full nightly suite
+- Preserve human-gated merge — auto-fix PRs are *draft* by default; no auto-merge for citation-accuracy code; the trust invariant matches v3.1's `promote-from-quarantine` pattern
+- Zero new core extension functionality — tooling/workflow phase, like v3.0 and v3.1
+
 ## Requirements
 
 ### Validated
@@ -216,4 +230,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-30 after v3.1 milestone (LLM-Driven Product Improvement Loop) shipped*
+*Last updated: 2026-05-30 — v4.0 milestone kicked off (Self-Healing Test Suite)*

@@ -316,6 +316,59 @@
 
 ---
 
+## Milestone: v3.1 — LLM-Driven Product Improvement Loop
+
+**Shipped:** 2026-05-30
+**Phases:** 7 (32–38) | **Plans:** 31 | **Tasks:** ~50
+**Timeline:** 2026-05-20 → 2026-05-29 (~9 days, 257 commits)
+
+> *Note: v3.0 (Autonomous E2E Testing Agent, Phases 26-31) was not recorded in this retrospective; it shipped 2026-05-20 with 6 phases / 30 plans / 32 requirements. The v3.0 → v3.1 arc together established the full LLM-augmented testing pipeline.*
+
+### What Was Built
+- **HUMAN-UAT closure (Phase 32):** `npm run e2e:explore` runs end-to-end against Max 5 subscription credit with ≥10 real iterations; spend ledger tracks `claude -p` against $80/$100 monthly cap; `e2e:upload-llm-report` handles local→CI handoff via workflow_dispatch.
+- **Re-run validator (Phase 33):** pure-function 3-replay validator (verifier-only path, no browser); `rerun-report.json` with 2/3+ → CONFIRMED, 0–1/3 → FLAKE; `llm-report.json` schema extended with `scroll_y`/`viewport_*`/`selected_node_xpath` for replay fidelity.
+- **Hybrid triage classifier (Phase 34):** heuristic-first resolves 6/8 ERROR_CLASSES with zero LLM calls; named `verifier_strong_agreement` (Tier A/B only) prevents Tier C masking; cluster pre-filter on N≥5 same-errorClass findings; PDF text wrapped in `<patent_data>` XML as prompt-injection defense; subscription-local-only via `invokeClaudePWithLedger` with CI guard.
+- **Rich issue filer + quarantine corpus (Phase 35):** `lib/issue-payload-builder.js` 4-section body within per-section char budgets, fingerprint on line 1; idempotent `quarantine-append.mjs` with auto `quarantine:ready-for-promotion` label at `stable_runs ≥ 3`; human-gated `promote-from-quarantine.mjs`.
+- **Pipeline orchestrator + CI integration (Phase 36):** `run-triage-pipeline.mjs` chains rerun → triage → issue-file → quarantine-append; non-gating quarantine Playwright project (`continue-on-error: true`) runs every nightly tick.
+- **Weekly analytics digest (Phase 37):** Monday 07:00 UTC GitHub Discussion + committed markdown summary, anchored on frozen `SUMMARY_KEYS`.
+- **v3.1 cleanup (Phase 38):** 3 integration fragility fixes, Nyquist VALIDATION stamping on 5 carry-over phases, 8/8 live human-UAT confirmations.
+
+### What Worked
+- **Heuristic-first hybrid triage paid off immediately** — the 6/8 resolved-without-LLM rate plus N≥5 cluster pre-filter meant the LLM second-pass was the exception, not the default. Cost stayed within the $80/$100 cap with zero close calls during the milestone.
+- **`<patent_data>` XML wrapping** as a prompt-injection defense was cheap (one helper) and pinned by a Vitest test — a pattern worth replicating for any LLM input that includes externally-sourced text.
+- **Phase 38 as an explicit cleanup phase** was the right call. Stuffing integration fragility fixes, Nyquist stamping, and live human-UAT confirmations into one bounded phase with a written CONTEXT scope-lock prevented scope creep across phases 32-37 and gave each cleanup track a clear owner.
+- **Audit-driven phase scoping** — `.planning/v3.1-MILESTONE-AUDIT.md` listing `human_verification` items by name (with `outcome: PASS/PARTIAL/DEFERRED`) gave Phase 38 Plan 03 a verifiable checklist to execute against. Compare to v2.3's "retro-document already-shipped" pattern — Phase 38 is the same idea applied to deferred tech-debt rather than past releases.
+- **Frozen `SUMMARY_KEYS` array** as single source of truth for the digest contract caught a real self-referential bug (DIGEST-04) — Phase 38 INT-FIX-02's `aggregateBySummaryKey` helper.
+
+### What Was Inefficient
+- **VERIFICATION.md and HUMAN-UAT.md frontmatter rot** — Phase 38-03 closed 8/8 audit `human_verification` items live, but the source `*-VERIFICATION.md` / `*-HUMAN-UAT.md` files were not re-stamped to `status: passed`. The `audit-uat` query continued to surface these as `human_needed` at close time, requiring an explicit Deferred Items entry in STATE.md. A `stamp-resolved-from-audit` helper that walks the audit's `human_verification` block and PATCHes the matching files' frontmatter would close this bookkeeping gap automatically.
+- **`milestone.complete` CLI accomplishments extraction** picked the first non-frontmatter line of each SUMMARY.md, which for ~half the v3.1 summaries was a stray "One-liner:" placeholder or section header rather than the actual one-liner. Had to be replaced manually with curated 7-bullet synthesis. The CLI's `summary-extract --pick one_liner` should fall back to the next meaningful line when the first match is a placeholder.
+- **v3.0 missing from RETROSPECTIVE.md** — the prior milestone wasn't recorded here, only in `.planning/milestones/v3.0-*`. Either `complete-milestone` should hard-fail when `RETROSPECTIVE.md` exists but the most recent shipped milestone is missing, or it should auto-stub a section that prompts retro entry.
+- **Orphan quick-task slugs in `pre-close audit-open`** — three `quick_tasks` showed status `missing` because the slug references in STATE.md outlived their directories. Quick-task completion should clean up STATE.md slug references on success, or the audit should distinguish "no directory" from "no record".
+
+### Patterns Established
+- **Subscription-local-only LLM wrapper** (`invokeClaudePWithLedger`) + ESLint `no-restricted-imports` on direct `invokeClaudeP` outside test files = cost control + CI guard in one. Pattern reusable for any future LLM integration.
+- **Tier-A/B-only `verifier_strong_agreement` constant** with Vitest guard against Tier C masking. Generalizes to "named confidence threshold + escalation" for any future heuristic/LLM hybrid.
+- **Fingerprint additive evolution** (v1 immutable; v2 additive only; dual v1+v2 search during transition) — a clean pattern for evolving any deduplication scheme without retroactive breakage.
+- **Non-gating CI project for quarantine** — runs every nightly tick with `continue-on-error: true` + `e2e-quarantine` labeled issues. The "ratchet" model: failures get filed but don't block; humans promote stable entries to the gating golden suite.
+- **Auto-promotion label as a queue signal** — `quarantine:ready-for-promotion` at `stable_runs ≥ 3` surfaces candidates without auto-promoting (trust invariant preserved).
+- **Per-section char budgets in issue body** with fingerprint on line 1 — prevents both LLM context blowup and GitHub's 65,536-char overflow displacement.
+
+### Key Lessons
+1. **Heuristics first, LLM second — measured.** The discipline of writing the heuristic rules first (TRIAGE-01..02) and only escalating Tier C / cluster-of-≥5 to the LLM kept costs deterministic and the failure mode debuggable. Mixing the two paths in one classifier would have hidden the LLM cost surface.
+2. **Audit-driven cleanup phases are a legitimate phase type.** Phase 38 had a 3-track CONTEXT scope-lock and produced 8 PASS confirmations + 3 INT-FIX commits + 5 Nyquist stamps. Plan as deliberately as feature phases; don't let "cleanup" mean "unbounded".
+3. **Bookkeeping rot at milestone close is a real cost.** 11 deferred items at close were almost entirely stale frontmatter on files whose content was correct. The work was done; the metadata didn't catch up. Future milestones should treat the `audit-open` clean-pass as a hard gate at the *plan* level for cleanup phases, not just at milestone close.
+4. **CI guards belong in the wrapper, not the script.** `invokeClaudePWithLedger`'s CI check fired regardless of which caller invoked it — meaning a future script that imports the wrapper inherits the guard automatically. Scripts that hand-code their own CI check are guard-gaps waiting to happen.
+5. **Schema-evolution forward-compat is its own design surface.** The new tech_debt entry from Phase 38 (Phase 33 schema-guard correctly rejecting a pre-Phase-33 `llm-report.json`) is non-blocking but worth tracking — the reject behavior is correct per RERUN-03, but a forward-compat skip path would have prevented the operational surprise during the workflow_dispatch UAT-36a test.
+
+### Cost Observations
+- Model mix: `balanced` profile (sonnet executors, opus planner)
+- LLM triage spend: well within the $80 warning threshold (subscription-local; no API charges)
+- Sessions: ~9 days end-to-end; phases 32-37 ran with autonomous/auto-chain plans; phase 38 was a manually-scoped cleanup with explicit Wave 1 (parallel) + Wave 2 (depends) structure
+- Notable: zero new npm dependencies added across the entire milestone — `package.json` deps unchanged from v3.0. All new functionality layered on existing primitives (`llm-driver.js`, `pdf-verifier.js`, `e2e-report-issue.mjs`, Playwright config). Compare to v2.0 (esbuild + sharp + web-ext additions) — v3.1 demonstrates how much can be built on top of an already-mature primitive set.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -329,6 +382,8 @@
 | v2.1 | 15 | 2 | CI/CD automation — smallest, fastest milestone |
 | v2.2 | 25 | 3 | OCR normalization + gutter matching — accuracy hardening |
 | v2.3 | ~15 | 3 | Retro-documentation of already-shipped work — guard tests added |
+| v3.0 | ~120 | 6 | Playwright E2E + nightly cron + LLM exploratory scaffolding (not recorded here) |
+| v3.1 | 257 | 7 | LLM-driven feedback loop: rerun → triage → issue → quarantine → digest |
 
 ### Cumulative Quality
 
@@ -341,6 +396,8 @@
 | v2.1 | 338 | 100% (CI-validated) | Store submissions pending |
 | v2.2 | 461 | 100% (75-case baseline) | s→S OCR gap documented, not implemented |
 | v2.3 | 216 src (+13 guards) | 100% (76-case baseline) | All v2.3 work was retroactive capture; no new behavior |
+| v3.0 | 461 + Playwright 76-case + fault-injection | 100% (76-case baseline) | LLM exploratory live-test deferred to v3.1 HUMAN-UAT |
+| v3.1 | 684 (incl. quarantine schema + rerun-validator + triage-classifier + digest aggregator) | 100% (76-case golden + 0-case quarantine empty corpus) | Quarantine corpus empty at close (no CONFIRMED findings yet); store submissions still pending |
 
 ### Top Lessons (Verified Across Milestones)
 

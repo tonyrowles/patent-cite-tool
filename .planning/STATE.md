@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: LLM-Driven Product Improvement Loop
-status: completed
-last_updated: "2026-05-29T23:58:21.200Z"
-last_activity: 2026-05-29 -- Phase 38 marked complete
+status: Awaiting next milestone
+last_updated: "2026-05-30T02:04:44.622Z"
+last_activity: 2026-05-30 — Milestone v3.1 completed and archived
 progress:
   total_phases: 7
   completed_phases: 7
@@ -24,12 +24,10 @@ See: .planning/PROJECT.md (updated 2026-05-22)
 
 ## Current Position
 
-Phase: 38 — COMPLETE
-Plan: 3 of 3
-Status: Phase 38 complete
-Last activity: 2026-05-29 -- Phase 38 marked complete
-
-Progress: [█████████░] 94%
+Phase: Milestone v3.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-30 — Milestone v3.1 completed and archived
 
 ## Performance Metrics
 
@@ -122,8 +120,32 @@ None.
 | 2 | Fix CI: commit package-lock.json (currently gitignored but required by npm ci) | 2026-03-05 | a47dbb8 | [2-fix-ci-commit-package-lock-json-currentl](./quick/2-fix-ci-commit-package-lock-json-currentl/) |
 | 260412-fde | Fix spurious results reporting impossible page numbers like 203 for patent US10203551 | 2026-04-12 | e51ba1b | [260412-fde-fix-spurious-results-reporting-impossibl](./quick/260412-fde-fix-spurious-results-reporting-impossibl/) |
 
+## Deferred Items
+
+Items acknowledged and deferred at v3.1 milestone close on 2026-05-29:
+
+| Category | Item | Status | Notes |
+|----------|------|--------|-------|
+| uat_gap | 32-UAT-EVIDENCE.md | passed | 0 pending scenarios; stale frontmatter only |
+| uat_gap | 35-HUMAN-UAT.md | testing | 2 pending scenarios (uncommitted in-progress local edit) |
+| uat_gap | 36-HUMAN-UAT.md | partial | 0 pending scenarios; stale frontmatter |
+| uat_gap | 37-HUMAN-UAT.md | partial | 0 pending scenarios; stale frontmatter |
+| uat_gap | 38-UAT-EVIDENCE.md | unknown | 0 pending scenarios; status field not stamped |
+| verification_gap | 35-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (5 PASS); file not re-stamped |
+| verification_gap | 36-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (2 PASS); file not re-stamped |
+| verification_gap | 37-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (1 PASS); file not re-stamped |
+| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Orphan slug reference; quick task directory not present |
+| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Completed 2026-03-05 (commit a47dbb8); directory removed but reference persisted |
+| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Completed 2026-04-12 (commit e51ba1b); directory removed but reference persisted |
+
+Total: 11 items. Verification/UAT debt reflects bookkeeping lag — Phase 38-03 closed 8/8 human_verification items per `.planning/v3.1-MILESTONE-AUDIT.md` (status `tech_debt` with note that audit is substantively `passed` post Phase 38).
+
 ## Session Continuity
 
-Last activity: 2026-05-22 — v3.1 roadmap created (Phases 32-37, 29 requirements mapped)
-Status: Phase 32 not started
-Next: `/gsd:plan-phase 32` to plan HUMAN-UAT Verification
+Last activity: 2026-05-29 — Phase 38 marked complete (v3.1 LLM-Driven Product Improvement Loop)
+Status: Milestone v3.1 closing
+Next: `/gsd:new-milestone` after close completes
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

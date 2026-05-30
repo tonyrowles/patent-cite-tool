@@ -1,5 +1,28 @@
 # Milestones
 
+## v3.1 LLM-Driven Product Improvement Loop (Shipped: 2026-05-30)
+
+**Phases completed:** 7 phases (32–38), 31 plans, ~50 tasks
+**Timeline:** 2026-05-20 → 2026-05-29 (~9 days)
+**Git range:** v3.0..HEAD — 257 commits, 296 files changed (+54,125 / −8,901), 31,440 LOC across `src/`, `scripts/`, `tests/`
+**Audit status:** `tech_debt` per `.planning/milestones/v3.1-MILESTONE-AUDIT.md` (substantively `passed` after Phase 38; status field not re-stamped post-cleanup)
+
+**Delivered:** Closed the loop from v3.0's LLM exploratory testing into actionable product fixes — reproducibility-validated, hybrid-triaged findings flow into rich-context GitHub issues and a tiered quarantine→golden corpus, with a weekly analytics digest driving roadmap prioritization.
+
+**Key accomplishments:**
+
+- **HUMAN-UAT closed for v3.0 LLM exploratory mode (Phase 32)** — `npm run e2e:explore` runs against Max 5 subscription credit with ≥10 real iterations; spend ledger tracks each `claude -p` against the $80/$100 monthly cap; `e2e:upload-llm-report` triggers nightly via workflow_dispatch (local→CI handoff confirmed).
+- **Re-run validator (Phase 33)** — pure-function 3-replay validator (`rerun-validator.js`, 14 unit tests GREEN) via verifier-only path (no browser); `rerun-report.json` per anomaly with 2/3+ → CONFIRMED, 0–1/3 → FLAKE. `llm-report.json` extended with `scroll_y` / `viewport_*` / `selected_node_xpath` for replay fidelity.
+- **Hybrid triage classifier (Phase 34)** — heuristic-first resolves 6/8 ERROR_CLASSES with zero LLM calls; named `verifier_strong_agreement` (Tier A/B only) prevents Tier C masking; cluster pre-filter routes N≥5 same-errorClass findings to a single grouped LLM call. Subscription-local-only via `invokeClaudePWithLedger`; PDF text wrapped in `<patent_data>` XML tags as prompt-injection defense.
+- **Rich issue filer + quarantine corpus (Phase 35)** — `lib/issue-payload-builder.js` assembles 4-section issue body (reproducer / verifier disagreement / LLM rationale / golden diff) within per-section char budgets, fingerprint comment on line 1. Idempotent `quarantine-append.mjs` with auto `quarantine:ready-for-promotion` label at `stable_runs ≥ 3`; human-gated `promote-from-quarantine.mjs`.
+- **Quarantine CI integration + pipeline orchestrator (Phase 36)** — `scripts/run-triage-pipeline.mjs` chains rerun → triage → issue-file → quarantine-append; non-gating quarantine Playwright project runs in nightly cron with `continue-on-error: true`; timeout budget within job limits.
+- **Weekly analytics digest (Phase 37)** — Monday 07:00 UTC GitHub Discussion (or `e2e-digest` labeled issue fallback) + committed markdown file. Findings count, classification breakdown, top 3 failure categories, quarantine growth, cost vs cap — all within 50 lines, anchored on frozen `SUMMARY_KEYS` array as the 7-key summary contract.
+- **v3.1 cleanup (Phase 38)** — closed 3 integration fragility warnings (QUARANTINE_REPORT_FILENAME ESM import, DIGEST-04 self-ref guard via `aggregateBySummaryKey`, `e2e-nightly` upload-artifact quarantine clause); stamped Nyquist coverage on 5 carry-over phases; executed 8/8 live human-UAT confirmations (5 PASS, 1 PARTIAL, 1 DONE, 1 DEFERRED).
+
+**Known deferred items at close:** 11 (see `.planning/STATE.md` § Deferred Items) — predominantly stale frontmatter on VERIFICATION.md / HUMAN-UAT.md files whose human_verification items were closed live in Phase 38-03 but the source files were not re-stamped; plus 3 orphan quick-task slug references.
+
+---
+
 ## v3.0 Autonomous E2E Testing Agent (Shipped: 2026-05-20)
 
 **Phases completed:** 6 phases, 30 plans, 45 tasks

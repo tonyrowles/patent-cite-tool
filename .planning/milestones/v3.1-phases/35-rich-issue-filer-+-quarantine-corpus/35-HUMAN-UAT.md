@@ -1,14 +1,22 @@
 ---
-status: partial
+status: testing
 phase: 35-rich-issue-filer-+-quarantine-corpus
 source: [35-VERIFICATION.md]
 started: 2026-05-27
-updated: 2026-05-27
+updated: 2026-05-29
 ---
 
 ## Current Test
 
-[awaiting human testing — deferred during autonomous run, user accepted deferral]
+number: 1
+name: End-to-end issue filing via `--source triage`
+expected: |
+  Running `node scripts/e2e-report-issue.mjs --source triage --triage-report <real-report>`
+  against a real CONFIRMED finding creates a GitHub issue whose body has
+  (a) a `<!-- fp: <hex> -->` comment on line 1,
+  (b) all four `###` sections (Reproducer, Verifier Disagreement, LLM Rationale, Golden Diff), and
+  (c) labels `triage`, `e2e-nightly`, and the finding's errorClass — all visible in the GitHub UI.
+awaiting: user response
 
 ## Tests
 

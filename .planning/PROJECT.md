@@ -8,20 +8,6 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v3.1 LLM-Driven Product Improvement Loop
-
-**Goal:** Close the loop from v3.0's LLM exploratory testing into actionable product fixes — reproducibility-validated, hybrid-triaged findings flow into rich-context GitHub issues and a tiered quarantine→golden corpus, with a weekly analytics digest driving roadmap prioritization.
-
-**Target features:**
-- Close out Phase 31 HUMAN-UAT: verify `npm run e2e:explore` against the Max 5 subscription credit produces usable findings end-to-end (de-risks the rest of the milestone)
-- Re-run validator: every LLM-flagged anomaly is auto-replayed deterministically (verifier-only path) to confirm reproducibility before triage
-- Hybrid triage classifier: rule-based heuristics on existing `report.json` fields handle clear cases; second `claude -p` pass classifies only ambiguous remainder (cost-controlled)
-- Auto-issue filer with rich payload — extends Phase 29 fingerprint scheme; issues include reproducer + seed, verifier disagreement detail (expected vs observed + tier + PDF snippet), LLM classifier rationale + confidence, diff vs last known-good golden citation
-- Tiered corpus promotion: confirmed findings auto-add to `test-cases-quarantine.js`; quarantine suite runs in CI as non-gating separate report; human promotes stable entries to golden corpus via PR
-- Local + CI runtime split: LLM exploratory stays local-only (subscription budget); triage / validator / quarantine pipeline runs in the nightly GitHub Actions cron on the resulting `llm-report.json`
-- Weekly analytics digest: automated weekly summary of findings count, classification breakdown, top failure categories, quarantine growth — drives roadmap prioritization
-- Source-side changes remain minimal — no new core extension functionality; reuses v3.0 report.json schema, pdf-verifier, e2e-report-issue.mjs, fingerprint scheme
-
 ## Requirements
 
 ### Validated
@@ -87,6 +73,17 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - USPTO/Worker fallback fault-injection test (catches silent regressions in the Cloudflare Worker path) — Phase 30
 - LLM exploratory mode using headless `claude -p` (Max 5 credit pool, local-dev only, hard $100 monthly cap with warning at $80, live-test deferred to HUMAN-UAT) — Phase 31
 
+### Validated (v3.1)
+
+- ✓ **UAT-01..03**: `npm run e2e:explore` runs against the Max 5 subscription credit with ≥10 real iterations; spend ledger tracks each `claude -p` against the $80/$100 monthly cap; `e2e:upload-llm-report` helper triggers nightly workflow via workflow_dispatch — Phase 32
+- ✓ **RERUN-01..04**: Pure-function 3-replay re-run validator (`rerun-validator.js`) via verifier-only path (no browser); `rerun-report.json` per anomaly with 2/3+ → CONFIRMED, 0–1/3 → FLAKE; `llm-report.json` schema extended with `scroll_y` / `viewport_*` / `selected_node_xpath`; ESLint `no-restricted-imports src/` guard extended to cover the validator module — Phase 33
+- ✓ **TRIAGE-01..06**: Heuristic-first classifier resolves 6/8 ERROR_CLASSES without LLM; `verifier_strong_agreement` (Tier A/B only) prevents Tier C masking; cluster pre-filter routes N≥5 same-errorClass findings to a single grouped LLM call; subscription-local-only via `invokeClaudePWithLedger` with CI guard; `triage-report.json` schema; PDF text wrapped in `<patent_data>` XML tags as prompt-injection defense — Phase 34
+- ✓ **ISSUE-01..04**: `lib/issue-payload-builder.js` assembles 4-section issue body (reproducer / verifier disagreement / LLM rationale / golden diff) within per-section char budgets; `scripts/e2e-report-issue.mjs --source triage` applies errorClass label; fingerprint scheme extended additively with v1+v2 dual-search; fingerprint comment on line 1 of body — Phase 35
+- ✓ **QUAR-01..05**: `tests/e2e/test-cases-quarantine.js` with schema-guard; idempotent `quarantine-append.mjs` with `stable_runs` counter; non-gating quarantine Playwright project with `retries: 0` and `continue-on-error: true` (filings labeled `e2e-quarantine`); auto `quarantine:ready-for-promotion` label at `stable_runs ≥ 3`; human-gated `promote-from-quarantine.mjs` — Phases 35/36
+- ✓ **ORCH-01..05**: `scripts/run-triage-pipeline.mjs` chains rerun → triage → issue-file → quarantine-append (exits 0 always); nightly cron consumes `llm_run_id` workflow_dispatch input; timeout budget documented and within job limits — Phase 36
+- ✓ **DIGEST-01..04**: Monday 07:00 UTC GitHub Discussion (or `e2e-digest` labeled issue fallback) + committed markdown file with findings count, classification breakdown, top 3 failure categories, quarantine growth, cost vs cap — all within 50 lines, anchored on frozen `SUMMARY_KEYS` array — Phase 37
+- ✓ **v3.1 cleanup**: 3 integration fragility warnings resolved (QUARANTINE_REPORT_FILENAME ESM, DIGEST-04 self-ref guard, `e2e-nightly` upload-artifact quarantine clause); Nyquist VALIDATION coverage stamped on 5 carry-over phases; 8/8 live human-UAT confirmations (5 PASS, 1 PARTIAL, 1 DONE, 1 DEFERRED) — Phase 38
+
 ### Future
 
 - Chrome Web Store screenshot (1280x800) and promotional tile (440x280)
@@ -113,15 +110,19 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - webextension-polyfill — Firefox supports chrome.* natively; unnecessary dependency
 - Build-time minification — keep source readable for extension store review
 
-## Latest Milestone: v3.0 Autonomous E2E Testing Agent (Shipped 2026-05-20)
+## Latest Milestone: v3.1 LLM-Driven Product Improvement Loop (Shipped 2026-05-30)
+
+Closed the loop from v3.0's LLM exploratory testing into actionable product fixes. The nightly pipeline now: (1) replays each LLM-flagged anomaly 3× via verifier-only path to confirm reproducibility, (2) classifies findings via heuristic-first hybrid triage (6/8 ERROR_CLASSES with zero LLM, cluster pre-filter on N≥5, Tier C escalation, prompt-injection defense), (3) files richly-structured GitHub issues with reproducer + verifier disagreement + LLM rationale + golden diff (per-section char budgets, fingerprint on line 1), (4) appends CONFIRMED findings to a quarantine corpus that runs non-gating in the nightly cron and auto-tags `quarantine:ready-for-promotion` at `stable_runs ≥ 3` (human-gated promotion to golden via `promote-from-quarantine.mjs`), and (5) publishes a Monday 07:00 UTC weekly analytics digest to GitHub Discussions. 7 phases (32-38), 31 plans, 29 requirements shipped, ~9 days. Zero new npm dependencies; subscription-local LLM only (CI-guarded); no new core extension functionality.
+
+## Previous Milestone: v3.0 Autonomous E2E Testing Agent (Shipped 2026-05-20)
 
 Built a Playwright-driven testing agent that exercises the extension against real Google Patents, with independent PDF re-parse verification, nightly GitHub Actions cron with auto-issue filer, Worker fault-injection coverage, and LLM exploratory mode scaffolding (`claude -p` against Max 5 subscription; live UAT deferred to v3.1). 6 phases (26-31), 30 plans, 32 requirements shipped. Only non-functional source changes (data-testids + `X-PCT-Test-Mode` header).
 
 ## Context
 
-Shipped v2.2 with ~8,000 LOC (JavaScript/HTML/CSS/JSON/YAML) across 35 source files.
-Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest, web-ext, sharp, GitHub Actions.
-Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules in src/shared/ (constants, matching). Firefox uses background script instead of offscreen document. CI via GitHub Actions: build → 4 test suites → ZIP packaging → artifact upload.
+Shipped v3.1 with ~31,440 LOC across `src/`, `scripts/`, `tests/` (JavaScript/HTML/CSS/JSON/YAML).
+Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest, web-ext, sharp, Playwright + Chromium, headless `claude -p` (Max 5 subscription, local-dev only, $80/$100 monthly cap), GitHub Actions.
+Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules in src/shared/ (constants, matching). Firefox uses background script instead of offscreen document. CI via GitHub Actions: nightly cron runs deterministic regression (76 golden patents) + fault-injection + (when `llm_run_id` provided) triage pipeline (rerun → triage → issue-file → quarantine-append) + non-gating quarantine spec. Monday 07:00 UTC weekly digest workflow publishes to GitHub Discussions.
 
 - **Google Patents HTML vs PDF mismatch**: Handled with fuzzy matching (exact → whitespace-stripped → punctuation-agnostic → bookend → Levenshtein). Long selections (>500 chars) may fail when texts genuinely diverge.
 - **Patent PDF structure**: Cover page → preliminary material → figures → two-column specification. Bimodal x-coordinate analysis detects spec pages; dynamic gutter detection finds column boundaries.
@@ -185,6 +186,17 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | Three-state icon via chrome.action.setIcon | Tab-scoped icon transitions; gray default from manifest, no explicit reset needed | ✓ Good — clear visual feedback |
 | options_ui with open_in_tab: true | Standard Chrome extension pattern; full-page settings experience | ✓ Good — clean UX |
 | GitHub Pages docs/ folder for privacy policy | No separate service; same repo; auto-deployed on push to main | ✓ Good — zero maintenance |
+| Zero new npm deps for v3.1 pipeline | Pure Node 22 built-ins on existing primitives (llm-driver, pdf-verifier, e2e-report-issue, Playwright) | ✓ Good — supply-chain risk unchanged across milestone |
+| Subscription-local LLM only; `invokeClaudePWithLedger` wrapper required | Cost control + CI guard; direct `invokeClaudeP` calls ESLint-restricted | ✓ Good — caught accidental CI invocation in tests |
+| Fingerprint immutability + additive v2 | v1 formula immutable for v3.0 consumers; `findMatchingIssue` dual v1/v2 search during transition | ✓ Good — no retroactive dedup breakage |
+| Quarantine spec runs inside `e2e-nightly.yml` (non-gating) | Avoids concurrency group collision; `continue-on-error: true` keeps regression gates intact | ✓ Good — runs every nightly tick |
+| Automatic golden promotion blocked | Destroys trust invariant; promotion stays human-gated via `promote-from-quarantine.mjs` | ✓ Good — `quarantine:ready-for-promotion` label surfaces candidates |
+| Heuristic-first hybrid triage | 6/8 ERROR_CLASSES resolved without LLM; only ambiguous remainder routed to grouped LLM call | ✓ Good — cost-controlled by cluster pre-filter |
+| `verifier_strong_agreement` (Tier A/B only) | Tier C agreements escalate to LLM second-pass — prevents Tier C masking | ✓ Good — Vitest guard test pins behavior |
+| PDF text in `<patent_data>` XML tags | Isolates PDF body content from LLM instructions (prompt-injection defense) | ✓ Good — pinned by triage classifier tests |
+| Per-section char budgets + fingerprint on line 1 | LLM rationale ≤800, verifier windows ≤600, golden diff ≤400; fingerprint on line 1 prevents >65,536 char overflow displacement | ✓ Good — issue UI renders cleanly |
+| Weekly digest via GitHub Discussion + Issue fallback | `gh api graphql createDiscussion` primary; `e2e-digest` labeled issue if Discussions disabled | ✓ Good — verified live at Phase 37 start |
+| `aggregateBySummaryKey` helper in weekly-digest.mjs | Maps ERROR_CLASS_SET → SUMMARY_KEYS; seeds passed/harness_error to 0 (synthetic classes); resolves DIGEST-04 self-reference | ✓ Good — Phase 38 INT-FIX-02 |
 
 ## Evolution
 
@@ -204,4 +216,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-22 — v3.1 milestone kicked off (LLM-Driven Product Improvement Loop)*
+*Last updated: 2026-05-30 after v3.1 milestone (LLM-Driven Product Improvement Loop) shipped*

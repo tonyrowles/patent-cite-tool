@@ -450,5 +450,42 @@ describe.skipIf(!fs.existsSync(MODULE_PATH))('check-deps-and-pr (Phase 40-02)', 
       const min = fs.readFileSync(minorBodyPath, 'utf8');
       expect(min).toContain('@playwright/test');
     });
+
+    // -------------------------------------------------------------------
+    // 40-03 back-port (Task 2) — surface skipped[] to $GITHUB_OUTPUT so
+    // .github/workflows/v40-deps-update.yml's manual-SDK-review issue
+    // step can gate on `steps.scan.outputs.skipped_count != '0'`
+    // (X7 contract in tests/e2e/scripts/v40-deps-update-yaml.test.js).
+    // -------------------------------------------------------------------
+
+    it('E3 (40-03 back-port): emit() writes skipped_count to $GITHUB_OUTPUT', () => {
+      const partition = {
+        security: [],
+        minor: [],
+        major: [],
+        skipped: ['@anthropic-ai/sdk'],
+      };
+      const outdated = {
+        '@anthropic-ai/sdk': { current: '0.100.1', latest: '0.101.0' },
+      };
+      mod.emit({ partition, outdated, securityBodyPath, minorBodyPath });
+      const text = fs.readFileSync(outputPath, 'utf8');
+      expect(text).toMatch(/^skipped_count=1$/m);
+    });
+
+    it('E4 (40-03 back-port): emit() writes skipped_packages (comma-joined) to $GITHUB_OUTPUT', () => {
+      const partition = {
+        security: [],
+        minor: [],
+        major: [],
+        skipped: ['@anthropic-ai/sdk'],
+      };
+      const outdated = {
+        '@anthropic-ai/sdk': { current: '0.100.1', latest: '0.101.0' },
+      };
+      mod.emit({ partition, outdated, securityBodyPath, minorBodyPath });
+      const text = fs.readFileSync(outputPath, 'utf8');
+      expect(text).toMatch(/^skipped_packages=@anthropic-ai\/sdk$/m);
+    });
   });
 });

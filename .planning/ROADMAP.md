@@ -145,7 +145,7 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
 
 - [x] **Phase 39: SDK Driver + Ledger v2 + Branch Protection Wave-0** (4/4 plans) — completed 2026-05-31 — SDK transport (`invokeAnthropicSdkWithLedger`), unified ledger schema with transport/phase fields + sub-caps, committed ledger flip, ESLint guard on `@anthropic-ai/sdk`, repo-level `Allow auto-merge: OFF` + branch protection ruleset + CODEOWNERS
 - [x] **Phase 40: Deps-Update + Cost-Ledger-Snapshot Workflows** (4/4 plans) — completed 2026-05-31 — `v40-deps-update.yml` weekly cron with nightly-suite gate; `v40-cost-ledger-snapshot.yml` daily snapshot; security/minor PR partitioning; verifier `pdfjs-dist` pinned separately
-- [ ] **Phase 41: Verifier-Gate Workflow + verify-single-case.mjs** — `v40-verifier-gate.yml` on `auto-fix/*` branches; 3× affected-case + 76-case regression; diff-size cap; verifier pinned to `origin/main`; diff-guard regex bank
+- [x] **Phase 41: Verifier-Gate Workflow + verify-single-case.mjs** (4/4 plans) — completed 2026-05-31 — `v40-verifier-gate.yml` on `auto-fix/*` branches; 3× affected-case + 76-case regression; diff-size cap; verifier pinned to `origin/main`; diff-guard regex bank
 - [ ] **Phase 42: fix-prompt-builder + WRONG_CITATION Vertical Slice** — `lib/fix-prompt-builder.js` with `<issue_body_untrusted>` envelope and FORBIDDEN_DELIMITERS escape; `scripts/auto-fix.mjs` core dispatcher with `git apply --check`, branch-existence idempotency, fix_attempts retry; local end-to-end on WRONG_CITATION only
 - [ ] **Phase 43: v40-auto-fix.yml Workflow** — lift Phase 42 script into `issues.labeled('triage')` workflow via `peter-evans/create-pull-request@v8`; draft PR with `<!-- affected_cases -->` HTML comment; per-issue concurrency
 - [ ] **Phase 44: v40-auto-promote.yml + Triple-Gate `_skipCiGuard`** — on merge + `auto-fix:verified` label, follow-up PR adds case to `test-cases.js` (NEVER direct-to-main); triple-gate assertion reconstructs human-gate invariant; post-merge verifier re-check on main HEAD
@@ -291,7 +291,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 |-------|-----------|----------------|--------|-----------|
 | 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 4/4 | Complete | 2026-05-31 |
-| 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 0/4 | Not started | - |
+| 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/TBD | Not started | - |
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 0/TBD | Not started | - |
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 0/TBD | Not started | - |

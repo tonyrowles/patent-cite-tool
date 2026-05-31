@@ -985,3 +985,46 @@ describe('Phase 39 LEDGER-03: checkIssueCap and checkPrCap binary boundaries', (
     expect(prTotal({}, 999)).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 39 LEDGER-04 — committed-ledger schema + .gitignore flip guards.
+// Reads the REAL on-disk artifacts (NOT a tmpDir copy) — these are
+// integration-shaped checks that the commit landing matches the contract.
+// ---------------------------------------------------------------------------
+describe('Phase 39 LEDGER-04: committed ledger flip', () => {
+  it('Test 48: committed tests/e2e/.llm-spend-ledger.json is valid v1 with bootstrap entry', () => {
+    const REAL_LEDGER_PATH = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..',
+      'e2e',
+      '.llm-spend-ledger.json',
+    );
+    expect(fs.existsSync(REAL_LEDGER_PATH)).toBe(true);
+    const text = fs.readFileSync(REAL_LEDGER_PATH, 'utf8');
+    const j = JSON.parse(text);
+    expect(j.version).toBe(1);
+    // Exactly one bootstrap entry — fresh-start per CONTEXT seed policy.
+    const months = Object.keys(j.months);
+    expect(months.length).toBe(1);
+    const bucket = j.months[months[0]];
+    expect(bucket.invocations).toBe(1);
+    expect(bucket.total_usd).toBe(0);
+    expect(bucket.iterations.length).toBe(1);
+    const it = bucket.iterations[0];
+    expect(it.phase).toBe('39-bootstrap');
+    expect(it.transport).toBe('sdk');
+    expect(it.cost_usd).toBe(0);
+    expect(it.source).toBe('phase-39-flip');
+    expect(it.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('Test 49: .gitignore does NOT contain tests/e2e/.llm-spend-ledger.json (LEDGER-04 commitment)', () => {
+    const REPO_ROOT = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+    );
+    const gitignore = fs.readFileSync(path.join(REPO_ROOT, '.gitignore'), 'utf8');
+    expect(gitignore).not.toContain('tests/e2e/.llm-spend-ledger.json');
+  });
+});

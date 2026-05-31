@@ -34,10 +34,17 @@ describe('Phase 39: ESLint guard on @anthropic-ai/sdk imports', () => {
     expect(occurrences).toBeGreaterThanOrEqual(2);
   });
 
-  it('Test 2: ignores tests/e2e/lib/llm-driver.js exactly once', () => {
+  it('Test 2: SDK guard block ignores tests/e2e/lib/llm-driver.js (driver is the single allowed entry)', () => {
     const text = fs.readFileSync(ESLINT_CONFIG_PATH, 'utf8');
-    const matches = text.match(/ignores:\s*\[\s*'tests\/e2e\/lib\/llm-driver\.js'\s*\]/g) || [];
-    expect(matches.length).toBe(1);
+    // Post-merge fix (2026-05-31): the SDK guard block's `ignores` was expanded
+    // from `['tests/e2e/lib/llm-driver.js']` to also include per-file blocks
+    // (pdf-verifier, rerun-validator, triage-classifier x2) that had their own
+    // `no-restricted-imports` rules — the original catch-all glob silently
+    // clobbered those rules and broke 17 v3.1 tests (Pitfall 3 manifestation).
+    // The assertion now matches `ignores:` arrays that CONTAIN the driver path,
+    // not arrays that EQUAL `[driver]` exactly.
+    const ignoresBlocks = text.match(/ignores:\s*\[[^\]]*?'tests\/e2e\/lib\/llm-driver\.js'[^\]]*?\]/gs) || [];
+    expect(ignoresBlocks.length).toBe(1);
   });
 
   it('Test 3: SDK block is the LAST entry (appears in final 50 lines, per Pitfall 3 order rule)', () => {

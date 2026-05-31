@@ -51,6 +51,12 @@ export default [
     files: ['tests/e2e/lib/pdf-verifier.js'],
     rules: {
       'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@anthropic-ai/sdk',
+          message:
+            'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+            'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+        }],
         patterns: [
           {
             group: [
@@ -82,6 +88,12 @@ export default [
     files: ['tests/e2e/lib/rerun-validator.js'],
     rules: {
       'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@anthropic-ai/sdk',
+          message:
+            'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+            'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+        }],
         patterns: [
           {
             group: [
@@ -142,6 +154,12 @@ export default [
               'e2e-triage-classifier.mjs must use invokeClaudePWithLedger (D-07) — direct invokeClaudeP ' +
               'calls bypass the ledger and CI gate. See .planning/research/PITFALLS.md Pitfall 12.',
           },
+          {
+            name: '@anthropic-ai/sdk',
+            message:
+              'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+              'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+          },
         ],
       }],
     },
@@ -160,7 +178,16 @@ export default [
   // CRITICAL: this block MUST be the LAST block in the array. Per Pitfall 3
   // (39-RESEARCH.md), ESLint flat-config rules MERGE in array order with
   // LATER blocks overriding EARLIER ones for the same rule key. Appending
-  // here ensures the @anthropic-ai/sdk restriction is the final word.
+  // here ensures the @anthropic-ai/sdk restriction is the final word FOR
+  // FILES NOT ALREADY COVERED by earlier per-file blocks.
+  //
+  // The ignores list below mirrors every file with its own per-file
+  // `no-restricted-imports` block ABOVE — for those files, this catch-all
+  // would CLOBBER their existing rules. Each of those per-file blocks
+  // INLINES the @anthropic-ai/sdk restriction so the SDK guard still applies
+  // there. (Concrete instance of the "later block wins for same rule key"
+  // hazard from Pitfall 3 — discovered post-merge as 17 failing v3.1 tests
+  // when this block originally used `**/*.{js,mjs}` without ignores.)
   //
   // KEY DIFFERENCE from the pdf-verifier / rerun-validator blocks: those use
   // `patterns.group` to restrict a directory TREE (src/**). This block uses
@@ -169,7 +196,13 @@ export default [
   // block above which uses `paths` with `importNames`).
   {
     files: ['**/*.{js,mjs}'],
-    ignores: ['tests/e2e/lib/llm-driver.js'],
+    ignores: [
+      'tests/e2e/lib/llm-driver.js',
+      'tests/e2e/lib/pdf-verifier.js',
+      'tests/e2e/lib/rerun-validator.js',
+      'tests/e2e/lib/triage-classifier.js',
+      'scripts/e2e-triage-classifier.mjs',
+    ],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [{

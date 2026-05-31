@@ -166,7 +166,11 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   3. Per-day ($10), per-issue ($1), per-PR ($2) sub-caps refuse a new invocation when exceeded; Vitest covers each boundary
   4. `tests/e2e/.llm-spend-ledger.json` is flipped from gitignored to committed-but-versioned; ESLint `no-restricted-imports` block restricts `@anthropic-ai/sdk` to `llm-driver.js` only
   5. `Allow auto-merge: OFF` is set at repo level; branch protection ruleset on `main` has `Do not allow bypassing: ON` and a required-status-check slot for the verifier-gate workflow; `CODEOWNERS` pins `src/`, `tests/`, `.github/workflows/`, `tests/golden/`, `tests/e2e/test-cases-quarantine.js`
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 39-01-PLAN.md (wave 1) — Ledger v2 schema: transport/phase fields, per-day/issue/PR sub-cap helpers, combinedMonthlyTotal, claude-sonnet-4-6 pricing
+- [ ] 39-02-PLAN.md (wave 1) — CODEOWNERS + docs/v40-repo-config.md audit reference + codeowners.test.js
+- [ ] 39-03-PLAN.md (wave 2) — SDK driver invokeAnthropicSdkWithLedger + @anthropic-ai/sdk@0.100.1 install + ESLint guard (depends on 39-01)
+- [ ] 39-04-PLAN.md (wave 3) — Committed-ledger flip + bootstrap entry + branch protection UI checkpoint (depends on 39-01, 39-02, 39-03)
 
 ### Phase 40: Deps-Update + Cost-Ledger-Snapshot Workflows
 **Goal**: First `v40-*.yml` workflows ship as low-risk pipe-cleaners (no LLM); dep-update auto-PRs gated by full nightly suite
@@ -277,7 +281,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 0/TBD | Not started | - |
+| 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 0/4 | Planned | - |
 | 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 0/TBD | Not started | - |
 | 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 0/TBD | Not started | - |
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/TBD | Not started | - |

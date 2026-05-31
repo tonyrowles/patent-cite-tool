@@ -1,0 +1,394 @@
+# .github/workflows/v40-verifier-gate.yml
+#
+# Phase 41 Plan 41-03 — Verifier-gate workflow for auto-fix/* PRs.
+#
+# Implements:
+#   - VFY-GATE-01: PR-triggered on auto-fix/*, parses affected_cases from PR
+#     body, runs each case 3x consecutively via verify-single-case.mjs, only
+#     flips draft -> ready if every run is Tier A or Tier B.
+#   - VFY-GATE-02: Full 76-case regression suite on PR branch (unpinned) in
+#     a parallel job; any regression blocks the ready-flip.
+#   - VFY-GATE-03: Diff-size cap (200 LOC src/, 50 LOC tests/) enforced in
+#     diff-guard fail-fast job; oversized diffs label human-review-required
+#     + post explanatory comment + exit non-zero (PR stays draft).
+#   - VFY-GATE-04: Three-file verifier-pin to origin/main (pdf-verifier.js +
+#     baseline.json + pdf-fetch.js) + diff-guard regex bank rejecting the 6
+#     LOCKED forbidden paths + Layer 5 test-count invariant.
+#
+# Four-job structure (41-RESEARCH §Architecture Patterns diagram):
+#   diff-guard (fail-fast)
+#     -> verifier-gate + regression-suite (parallel, both needs: diff-guard)
+#       -> ready-flip (needs: [verifier-gate, regression-suite])
+#
+# Phase 47 SLOT RESERVATION: the `verifier-gate:` job NAME is the slot Phase
+# 39 reserved on the v4.0-main-protection ruleset (id 17086676). Phase 47
+# CLEANUP-04 will bind this name to required_status_checks alongside Phase
+# 40's `deps-update-gate`. Do NOT rename without coordinating Phase 47.
+#
+# Defenses paraphrased (Phase 40-03 scar — see 41-03 RED test header):
+#   - skip-ci marker:                          not used (no self-commits)
+#   - the gh pr merge auto-flag:               not used (humans merge)
+#   - the action auto-merge input:             not used (humans merge)
+#   - the Identity-token write permission:     intentionally absent
+#   - the actions-write permission:            intentionally absent
+#   - the pull-request-target trigger variant: intentionally avoided
+#
+# Permissions (Pitfall 1 step 7 minimization):
+#   - contents: read            (checkout + git operations)
+#   - pull-requests: write      (gh pr ready + gh pr comment + gh pr edit --add-label)
+#   - issues: read              (gh issue view fallback if needed)
+#   - repository-projects: read (gh pr edit --add-label dep per cli/cli #6274)
+
+name: V40 Verifier Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ['auto-fix/*']
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+  repository-projects: read
+
+# PR-scoped concurrency. Verifier is READ-ONLY w.r.t. the repo so cancellation
+# is safe (contrast Phase 42 auto-fix workflow which will use cancel-in-progress: false).
+concurrency:
+  group: v40-verifier-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: diff-guard — fail-fast on size cap + path bank + test-count invariant
+  # ---------------------------------------------------------------------------
+  diff-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      src_loc: ${{ steps.diff_size.outputs.src_loc }}
+      tests_loc: ${{ steps.diff_size.outputs.tests_loc }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUM: ${{ github.event.pull_request.number }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0   # needed for origin/main pin (Pitfall B)
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Ensure human-review-required label exists
+        # Idempotent label create (mirrors e2e-nightly.yml:97-102). The label
+        # is added by the rejection step below. --force updates if exists;
+        # || true makes the step safe if gh rejects --force. Color: gh CLI
+        # requires 6-char hex without # prefix.
+        run: |
+          gh label create "human-review-required" \
+            --color "d93f0b" \
+            --description "Auto-fix PR requires human review (size cap, diff-guard, verifier, or regression rejection)" \
+            --force 2>/dev/null || true
+
+      - name: Diff-size cap (src/ <= 200 LOC, tests/ <= 50 LOC)
+        id: diff_size
+        # 41-RESEARCH Pattern 2. parse_shortstat is defensive: missing
+        # insertions OR deletions lines are treated as zero. Renames count
+        # as both ins+del (conservative — large renames trip the cap).
+        run: |
+          git fetch origin main --depth=1 || git fetch origin main
+          parse_shortstat() {
+            local p="$1"
+            local out
+            out=$(git diff --shortstat origin/main..HEAD -- "$p" 2>/dev/null || echo "")
+            local ins del
+            ins=$(echo "$out" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+            del=$(echo "$out" | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' || echo 0)
+            ins=${ins:-0}
+            del=${del:-0}
+            echo $((ins + del))
+          }
+          SRC_LOC=$(parse_shortstat "src/")
+          TESTS_LOC=$(parse_shortstat "tests/")
+          echo "src_loc=$SRC_LOC"     >> "$GITHUB_OUTPUT"
+          echo "tests_loc=$TESTS_LOC" >> "$GITHUB_OUTPUT"
+          echo "diff size: src/ = $SRC_LOC LOC; tests/ = $TESTS_LOC LOC"
+          if [ "$SRC_LOC" -gt 200 ] || [ "$TESTS_LOC" -gt 50 ]; then
+            echo "::error::Diff exceeds caps -- src/ $SRC_LOC > 200 OR tests/ $TESTS_LOC > 50"
+            exit 1
+          fi
+
+      - name: Diff-guard regex bank (forbidden paths)
+        # Pipes git diff --name-only into Plan 41-01's pure-function helper.
+        # The helper exits 1 on any violation with violations printed to stderr.
+        run: |
+          git diff --name-only origin/main..HEAD | node scripts/check-diff-guard.mjs
+
+      - name: Test-count invariant (TEST_CASES length never decreases)
+        # Layer 5 defense (Pitfall 3 Defense 5) — defense-in-depth on top of
+        # Layer 2 (diff-guard already forbids modifying tests/test-cases.js).
+        # The path is forbidden so this should never trip, but a redundant
+        # ~10-LOC check provides cheap defense-in-depth.
+        run: |
+          git show origin/main:tests/test-cases.js > /tmp/main-test-cases.js
+          MAIN_LEN=$(node --input-type=module -e "
+            const m = await import('/tmp/main-test-cases.js');
+            console.log(m.TEST_CASES.length);
+          ")
+          PR_LEN=$(node --input-type=module -e "
+            const m = await import('${{ github.workspace }}/tests/test-cases.js');
+            console.log(m.TEST_CASES.length);
+          ")
+          echo "TEST_CASES.length: main=$MAIN_LEN, pr=$PR_LEN"
+          if [ "$PR_LEN" -lt "$MAIN_LEN" ]; then
+            echo "::error::TEST_CASES shrank from $MAIN_LEN to $PR_LEN (test-count invariant)"
+            exit 1
+          fi
+
+      - name: Label + comment on rejection
+        if: failure()
+        # env-hop pattern (Phase 40-03 CR-02): never interpolate user-controlled
+        # values directly into a run: block. PR_NUM/SRC_LOC/TESTS_LOC are all
+        # workflow-trusted but the discipline generalizes.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SRC_LOC: ${{ steps.diff_size.outputs.src_loc }}
+          TESTS_LOC: ${{ steps.diff_size.outputs.tests_loc }}
+        run: |
+          gh pr edit "$PR_NUMBER" --add-label "human-review-required" 2>&1 || true
+          gh pr comment "$PR_NUMBER" --body "Verifier-gate diff-guard rejected this PR -- src/ = ${SRC_LOC:-?} LOC (limit 200); tests/ = ${TESTS_LOC:-?} LOC (limit 50); OR a forbidden path was touched OR the TEST_CASES array shrank. PR stays in draft for human review." 2>&1 || true
+
+  # ---------------------------------------------------------------------------
+  # Job 2: verifier-gate -- 3x consecutive verifyCitation runs on affected cases
+  #
+  # NAMED EXACTLY `verifier-gate` -- Phase 47 CLEANUP-04 required-status-check
+  # slot. Do NOT rename without coordinating Phase 47.
+  # ---------------------------------------------------------------------------
+  verifier-gate:
+    needs: diff-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUM: ${{ github.event.pull_request.number }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0   # required for origin/main verifier-pin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Verify Playwright binary
+        run: npx playwright --version
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Pin verifier files to origin/main
+        # VFY-GATE-04 Layer 4 — pin AFTER PR-branch checkout but BEFORE
+        # verifyCitation invocation. THREE files (NOT four): golden-loader.js
+        # does not exist per 41-RESEARCH §Pattern 4 Assumption A8.
+        # Sanity check: if pin failed the diff would be non-zero.
+        run: |
+          git fetch origin main
+          git checkout origin/main -- tests/e2e/lib/pdf-verifier.js
+          git checkout origin/main -- tests/golden/baseline.json
+          git checkout origin/main -- tests/e2e/lib/pdf-fetch.js
+          for f in tests/e2e/lib/pdf-verifier.js tests/golden/baseline.json tests/e2e/lib/pdf-fetch.js; do
+            if [ "$(git diff origin/main -- "$f" | wc -l)" != "0" ]; then
+              echo "::error::verifier pin failed for $f"
+              exit 1
+            fi
+          done
+
+      - name: Verify affected cases 3x consecutively
+        # 41-RESEARCH Pattern 5 verbatim. PR_BODY via env-hop (CWE-94 defense)
+        # then piped via stdin to parse-affected-cases.mjs (regex-only parser).
+        # Empty CASES is a HARD FAIL per Pitfall C (would otherwise silently
+        # pass with zero verification runs).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          PR_BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body')
+          CASES=$(printf '%s' "$PR_BODY" | node scripts/parse-affected-cases.mjs)
+          if [ -z "$CASES" ]; then
+            echo "::error::PR body missing or empty <!-- affected_cases: ... --> comment (Pitfall C)"
+            gh pr comment "$PR_NUMBER" --body "Verifier-gate FAIL -- PR body missing the affected_cases HTML comment. Phase 43 auto-fix PRs must include <!-- affected_cases: id1,id2 -->. PR stays draft."
+            exit 1
+          fi
+
+          mkdir -p playwright-report
+          FAILED_CASES=""
+          for case_id in $CASES; do
+            echo "::group::Verify $case_id (3 consecutive runs)"
+            ALL_PASS=true
+            # Run all 3 unconditionally (Pitfall E -- do NOT abort on first fail;
+            # workflow must surface complete signal across all 3 attempts).
+            for i in 1 2 3; do
+              REPORT="playwright-report/single-case-${case_id}-run-${i}.json"
+              if ! node scripts/verify-single-case.mjs --case "$case_id" --output "$REPORT"; then
+                echo "::warning::run $i FAILED for $case_id (Tier C or below, or argv error)"
+                ALL_PASS=false
+              else
+                TIER=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$REPORT','utf8')).runs.at(-1).tier_used)")
+                echo "run $i tier=$TIER"
+                if [ "$TIER" != "A" ] && [ "$TIER" != "B" ]; then
+                  ALL_PASS=false
+                fi
+              fi
+            done
+            if [ "$ALL_PASS" != "true" ]; then
+              FAILED_CASES="$FAILED_CASES $case_id"
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ -n "$FAILED_CASES" ]; then
+            echo "::error::Cases failed 3x verification:$FAILED_CASES"
+            gh pr edit "$PR_NUMBER" --add-label "human-review-required" 2>&1 || true
+            gh pr comment "$PR_NUMBER" --body "Verifier-gate FAIL -- cases$FAILED_CASES did not pass 3 consecutive Tier A/B runs. PR stays draft for human review."
+            exit 1
+          fi
+
+      - name: Upload per-case verifier reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verifier-gate-reports-${{ github.run_id }}
+          path: playwright-report/single-case-*.json
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Job 3: regression-suite -- full 76-case Playwright regression
+  #
+  # Parallel with verifier-gate (both needs: diff-guard). Failure isolation:
+  # if verifier-gate's affected-case runs pass but a regression appears
+  # elsewhere, the workflow surfaces BOTH signals.
+  # ---------------------------------------------------------------------------
+  regression-suite:
+    needs: diff-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # matches e2e-nightly.yml
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUM: ${{ github.event.pull_request.number }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Verify Playwright binary
+        run: npx playwright --version
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Run 76-case regression suite
+        # Full PR-branch regression (unpinned). No --grep filter, no
+        # continue-on-error -- regression IS a blocking gate (Pitfall 8 #4).
+        run: |
+          npx playwright test \
+            --config tests/e2e/playwright.config.js \
+            specs/regression.spec.js
+
+      - name: Comment on regression failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr edit "$PR_NUMBER" --add-label "human-review-required" 2>&1 || true
+          gh pr comment "$PR_NUMBER" --body "Verifier-gate regression-suite FAIL -- 76-case Playwright suite regressed on PR branch. PR stays draft for human review."
+
+  # ---------------------------------------------------------------------------
+  # Job 4: ready-flip -- flip PR draft -> ready iff every prior gate passed
+  # ---------------------------------------------------------------------------
+  ready-flip:
+    needs: [verifier-gate, regression-suite]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUM: ${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Flip draft -> ready (idempotent)
+        # Pitfall D mitigation -- gh pr ready returns non-zero on already-ready
+        # PRs and has no --force flag. The defensive isDraft check makes
+        # workflow_dispatch re-runs safe.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          IS_DRAFT=$(gh pr view "$PR_NUMBER" --json isDraft --jq '.isDraft')
+          if [ "$IS_DRAFT" = "true" ]; then
+            gh pr ready "$PR_NUMBER"
+            gh pr comment "$PR_NUMBER" --body "Verifier-gate PASS -- all 3 affected-case runs Tier A/B + 76-case regression clean. Draft -> ready-for-review."
+          else
+            echo "PR #$PR_NUMBER already ready-for-review; skipping flip"
+          fi

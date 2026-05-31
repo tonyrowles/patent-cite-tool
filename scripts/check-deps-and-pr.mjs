@@ -324,6 +324,11 @@ export function emit({
   appendOutput(`minor_count=${partition.minor.length}`);
   appendOutput(`minor_packages=${partition.minor.join(',')}`);
   appendOutput(`minor_branch=v40-deps-update/minor`);
+  // 40-03 back-port — surface skipped[] (NEVER_AUTO_BUMP drift) to
+  // $GITHUB_OUTPUT so v40-deps-update.yml's manual-SDK-review issue step
+  // can gate on `steps.scan.outputs.skipped_count != '0'`.
+  appendOutput(`skipped_count=${partition.skipped.length}`);
+  appendOutput(`skipped_packages=${partition.skipped.join(',')}`);
   writeBody(securityBodyPath, buildSecurityBody(partition.security, outdated));
   writeBody(minorBodyPath, buildMinorBody(partition.minor, outdated));
 }

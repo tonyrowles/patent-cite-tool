@@ -1,0 +1,226 @@
+# .github/workflows/v40-deps-update.yml
+#
+# Phase 40 Plan 40-03 — Weekly dependency update workflow + nightly-suite gate.
+#
+# Implements:
+#   - DEPS-01: Monday 09:00 UTC cron + workflow_dispatch invocation of
+#     scripts/check-deps-and-pr.mjs (40-02 deliverable) against the frozen
+#     WATCHLIST.
+#   - DEPS-02: `deps-update-gate` job runs the nightly suite shape (smoke +
+#     regression). The job NAME is the slot reserved for the Phase 47
+#     required-status-checks ruleset edit (40-RESEARCH.md lines 651-665 +
+#     40-CONTEXT line 73). Phase 40 ships the gate ADVISORILY — DRAFT state
+#     + CODEOWNERS are the load-bearing defenses until Phase 47 audits.
+#   - DEPS-03: security-vs-minor partition wired into two separate
+#     peter-evans/create-pull-request@v8 invocations (partition logic itself
+#     in scripts/check-deps-and-pr.mjs).
+#
+# Defenses (Pitfall 4 — RESEARCH PITFALLS.md):
+#   - draft mode set on both PR steps so a human must flip to ready-for-review
+#   - token uses secrets.GITHUB_TOKEN (NOT a PAT) — workflow-scoped, expires per run
+#   - delete-branch enabled on both PR steps (40-CONTEXT locked decision #4 —
+#     re-runs supersede stale PRs deterministically against constant
+#     per-package branch names from the script's $GITHUB_OUTPUT)
+#   - No auto-merge surface — the gh pr merge auto-flag and the action
+#     auto-merge input are both intentionally omitted; pinned by D10/D11.
+#   - No skip-ci token — deps-update commits go to PR branches via cpr@v8,
+#     not direct pushes to main; pinned by D9. (Distinct from
+#     e2e-weekly-digest.yml which self-commits to main and DOES need the
+#     skip-ci token there.)
+#
+# Permissions (Pitfall 1 step 7 minimization):
+#   - contents: write       — peter-evans/cpr@v8 pushes branches
+#   - pull-requests: write  — create/update PRs
+#   - issues: write         — gh issue create for manual-sdk-review
+#   - Identity-token and actions-write permissions are intentionally absent;
+#     pinned by X8.
+#
+# 40-CONTEXT locked decisions referenced:
+#   - #2 cron-pin (Mon 09:00 UTC) — D1
+#   - #3 separate-frame-shift-file (40-04 owns a separate workflow file —
+#     NOT included here)
+#   - #4 constant-branch-names (v40-deps-update/<pkg>-security and
+#     v40-deps-update/minor) — X2, X3
+
+name: V40 Deps Update
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'   # Monday 09:00 UTC — 40-CONTEXT locked decision #2
+  workflow_dispatch: {}    # Manual trigger for testing
+
+# Static concurrency group prevents schedule + workflow_dispatch from racing.
+# cancel-in-progress: false so a running scan + PR open is never killed by a
+# new trigger.
+concurrency:
+  group: v40-deps-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write       # peter-evans/cpr@v8 pushes branches under v40-deps-update/*
+  pull-requests: write  # create/update PRs (security + grouped minor)
+  issues: write         # gh issue create for manual-sdk-review (when NEVER_AUTO_BUMP drifts)
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: dep-scan — discovery + PR creation
+  # ---------------------------------------------------------------------------
+  dep-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # npm ci + scan + 2 PR creates + 1 gh issue create
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22   # Literal — repo has no .nvmrc; matches e2e-nightly.yml
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Run dep scan + partition
+        id: scan
+        # The script (Phase 40-02) queries npm outdated + npm audit against
+        # the frozen WATCHLIST, partitions into security/minor/major/skipped
+        # buckets, writes $GITHUB_OUTPUT lines (security_count/packages/branch,
+        # minor_count/packages/branch, skipped_count/packages — the
+        # skipped_* keys are added by the Task 2 back-port for X7's gh issue
+        # gating), and writes /tmp/{security,minor}-pr-body.md body files
+        # for the peter-evans/cpr@v8 steps to consume via body-path.
+        run: node scripts/check-deps-and-pr.mjs
+
+      - name: Open security PR
+        if: steps.scan.outputs.security_count != '0'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.scan.outputs.security_branch }}
+          base: main
+          draft: true
+          title: "deps(security): bump ${{ steps.scan.outputs.security_packages }}"
+          body-path: /tmp/security-pr-body.md
+          labels: dependencies,security
+          commit-message: "deps(security): bump ${{ steps.scan.outputs.security_packages }}"
+          delete-branch: true
+          signoff: false
+
+      - name: Open grouped minor PR
+        if: steps.scan.outputs.minor_count != '0'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.scan.outputs.minor_branch }}
+          base: main
+          draft: true
+          title: "deps: weekly minor bumps (${{ steps.scan.outputs.minor_packages }})"
+          body-path: /tmp/minor-pr-body.md
+          labels: dependencies,minor
+          commit-message: "deps: weekly minor bumps"
+          delete-branch: true
+          signoff: false
+
+      - name: Open manual-SDK-review issue
+        # 40-RESEARCH.md line 716 — when NEVER_AUTO_BUMP packages drift,
+        # the script writes an audit note to tests/e2e/.manual-sdk-bumps.json
+        # AND emits skipped_count + skipped_packages to $GITHUB_OUTPUT.
+        # This step surfaces the drift as a discoverable issue (label-queryable).
+        # `|| true` prevents a transient gh failure from failing the workflow
+        # — the committed audit-trail file is the authoritative source.
+        if: steps.scan.outputs.skipped_count != '0'
+        env:
+          REPO: ${{ github.repository }}
+          SKIPPED: ${{ steps.scan.outputs.skipped_packages }}
+        run: |
+          gh issue create \
+            --title "Manual SDK review required: $SKIPPED" \
+            --label "manual-sdk-review" \
+            --body "Packages on NEVER_AUTO_BUMP have new versions available. See tests/e2e/.manual-sdk-bumps.json for the audit log." \
+            --repo "$REPO" \
+            2>&1 || true
+
+  # ---------------------------------------------------------------------------
+  # Job 2: deps-update-gate — nightly-suite gate
+  #
+  # NAMED EXACTLY `deps-update-gate` — this is the slot reserved for the
+  # Phase 47 required-status-checks ruleset edit (40-RESEARCH lines 651-665).
+  # In Phase 40 this job is ADVISORY (no `needs:` dependency from dep-scan,
+  # no required-status-check rule); DRAFT state + CODEOWNERS provide the
+  # load-bearing defenses.
+  #
+  # The job runs the nightly suite SHAPE (smoke + regression against the
+  # current main-branch dependency state) so Phase 47's CLEANUP-04 audit
+  # can add the ruleset rule against this job name without further changes.
+  # ---------------------------------------------------------------------------
+  deps-update-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # Nightly suite shape: smoke + regression — cap at 30
+    env:
+      PLAYWRIGHT_RUN_ID: ${{ github.run_id }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Pre-flight smoke (1 case)
+        id: smoke
+        continue-on-error: true
+        # Mirrors e2e-nightly.yml smoke probe (seed patent, single case).
+        run: |
+          npx playwright test \
+            --config tests/e2e/playwright.config.js \
+            --grep "US11427642-spec-short-1" \
+            specs/regression.spec.js
+
+      - name: Run E2E regression (deterministic daily rotation)
+        if: steps.smoke.outcome == 'success'
+        continue-on-error: true
+        # Mirrors e2e-nightly.yml regression invocation — uses the cron-case
+        # selector for the day's rotating 30-case sample. continue-on-error
+        # so the workflow exits success (filed issues are the failure signal
+        # in nightly; the gate here is ADVISORY and produces logs for human
+        # review of the candidate dep state).
+        run: |
+          CASES=$(node scripts/select-cron-cases.mjs)
+          npx playwright test \
+            --config tests/e2e/playwright.config.js \
+            --grep "$CASES" \
+            specs/regression.spec.js

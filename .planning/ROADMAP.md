@@ -183,7 +183,11 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   3. Security updates (`npm audit --json` flagged) and minor updates are partitioned into separate PRs via `peter-evans/create-pull-request@v8`; Vitest validates the partition logic
   4. Verifier's `pdfjs-dist` is pinned separately from the extension's; dep-update PRs bumping pdfjs trigger a verifier-frozen pre-flight against the OLD pdfjs to confirm fixes are real, not frame-shift artifacts
   5. `.github/workflows/v40-cost-ledger-snapshot.yml` writes a daily snapshot of the ledger and atomically commits with `[skip ci]` (mirrors `e2e-weekly-digest.yml:98-110`)
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 40-01-PLAN.md (wave 1) — `v40-cost-ledger-snapshot.yml` daily snapshot workflow + Vitest YAML guard (S1-S12: cron `0 2 * * *`, `[skip ci]` verbatim, idempotent guard, no E2E_LEDGER_PATH_OVERRIDE)
+- [ ] 40-02-PLAN.md (wave 1) — `scripts/check-deps-and-pr.mjs` partition CLI + Vitest A-E (frozen WATCHLIST, NEVER_AUTO_BUMP, spawnSync non-throw, partition logic, $GITHUB_OUTPUT emission) + committed `tests/e2e/.manual-sdk-bumps.json` bootstrap
+- [ ] 40-03-PLAN.md (wave 2) — `v40-deps-update.yml` workflow + YAML-level Vitest D1-D11 + X1-X8 (cron `0 9 * * 1`, two `peter-evans/cpr@v8` invocations both `draft: true`, `deps-update-gate` job, manual-SDK-review issue step) — depends on 40-02
+- [ ] 40-04-PLAN.md (wave 2) — `verifierDeps.pdfjs-dist` EXACT pin in `package.json` + `tests/e2e/lib/pdf-verifier.js` override-aware loader + `v40-pdfjs-frame-shift.yml` SEPARATE workflow + Vitest F1-F5 + G1-G3 + P1-P15 — depends on 40-02 (additive Group F to its test file)
 
 ### Phase 41: Verifier-Gate Workflow + verify-single-case.mjs CLI Shim
 **Goal**: Verifier-on-PR workflow exists so auto-fix PRs (Phase 43) have somewhere to land — gate must exist BEFORE auto-fix opens its first PR
@@ -282,7 +286,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 4/4 | Complete | 2026-05-31 |
-| 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 0/TBD | Not started | - |
+| 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 0/4 | Not started | - |
 | 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 0/TBD | Not started | - |
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/TBD | Not started | - |
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 0/TBD | Not started | - |

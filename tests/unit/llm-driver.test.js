@@ -66,6 +66,21 @@ vi.mock('node:child_process', () => ({
   }),
 }));
 
+// Phase 39 — mock @anthropic-ai/sdk so invokeAnthropicSdkWithLedger tests
+// never hit the network. The mocked default export is a class-like factory
+// returning an object with messages.create — the test seeds messages.create
+// via mockSdkResponse() / mockSdkError() per-test.
+const sdkCreateMock = vi.fn();
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: vi.fn(() => ({ messages: { create: sdkCreateMock } })),
+}));
+function mockSdkResponse(response) {
+  sdkCreateMock.mockResolvedValueOnce(response);
+}
+function mockSdkError(err) {
+  sdkCreateMock.mockRejectedValueOnce(err);
+}
+
 // Import AFTER vi.mock so the module receives the mocked spawn.
 const {
   invokeClaudeP,
@@ -650,5 +665,300 @@ describe('invokeClaudePWithLedger', () => {
     expect(entry.cost_usd).toBe(0.07);
     expect(entry.phase).toBe('34');
     expect(entry.source).toBe('triage');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 39 — invokeAnthropicSdkWithLedger
+//   LEDGER-03 (sub-caps) + CLEANUP-04 partial (single-entry-point invariant)
+//   Plan 03 Task 4 — cases 31-40
+// ---------------------------------------------------------------------------
+
+// Helper: build a synthetic SDK response shaped like client.messages.create
+// returns (Anthropic SDK 0.100.1: content[0].type='text', usage fields).
+function makeSdkSuccessResponse({
+  model = 'claude-sonnet-4-6',
+  text = 'hi',
+  inputTokens = 100,
+  outputTokens = 200,
+} = {}) {
+  return {
+    id: 'msg_phase39_test',
+    type: 'message',
+    role: 'assistant',
+    model,
+    content: [{ type: 'text', text }],
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+    },
+  };
+}
+
+describe('Phase 39 LEDGER-03: invokeAnthropicSdkWithLedger inverse CI gate', () => {
+  let readLedgerSpy;
+  let appendSpy;
+
+  beforeEach(() => {
+    sdkCreateMock.mockReset();
+    vi.stubEnv('CI', undefined);
+    vi.stubEnv('GITHUB_ACTIONS', undefined);
+    readLedgerSpy = vi.spyOn(ledgerNs, 'readLedger').mockReturnValue({ version: 1, months: {} });
+    appendSpy = vi.spyOn(ledgerNs, 'appendLedgerEntry').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('Test 31: not CI + forceApi:false → {ok:false, ciGate:true}; SDK + ledger untouched', async () => {
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ciGate).toBe(true);
+    expect(sdkCreateMock).toHaveBeenCalledTimes(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
+    // ciGate path short-circuits BEFORE readLedger, so the spy must not fire.
+    expect(readLedgerSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 32: CI=true → bypasses gate, reaches SDK (cap precheck ok)', async () => {
+    vi.stubEnv('CI', 'true');
+    mockSdkResponse(makeSdkSuccessResponse());
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+    });
+    expect(result.ok).toBe(true);
+    expect(sdkCreateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('Test 33: forceApi:true (not CI) → bypasses gate, reaches SDK', async () => {
+    mockSdkResponse(makeSdkSuccessResponse());
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      forceApi: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(sdkCreateMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Phase 39 LEDGER-03: invokeAnthropicSdkWithLedger sub-cap blocks', () => {
+  let readLedgerSpy;
+  let appendSpy;
+
+  beforeEach(() => {
+    sdkCreateMock.mockReset();
+    // Bypass CI gate — sub-cap tests must reach Step 2.
+    vi.stubEnv('CI', 'true');
+    appendSpy = vi.spyOn(ledgerNs, 'appendLedgerEntry').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('Test 34: day cap blocks (>= $10) → capBlocked:true with day.status=block; SDK untouched', async () => {
+    const todayPrefix = new Date().toISOString().slice(0, 10);
+    const monthKey = todayPrefix.slice(0, 7);
+    readLedgerSpy = vi.spyOn(ledgerNs, 'readLedger').mockReturnValue({
+      version: 1,
+      months: {
+        [monthKey]: {
+          invocations: 1,
+          total_usd: 10,
+          last_invocation_iso: `${todayPrefix}T10:00:00Z`,
+          iterations: [
+            { iso: `${todayPrefix}T10:00:00Z`, model: 'claude-sonnet-4-6', cost_usd: 10, transport: 'sdk' },
+          ],
+        },
+      },
+    });
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.capBlocked).toBe(true);
+    expect(result.day).toBeDefined();
+    expect(result.day.status).toBe('block');
+    expect(sdkCreateMock).toHaveBeenCalledTimes(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 35: issue cap blocks ($1 issue-99) → capBlocked:true with issue.status=block', async () => {
+    const monthKey = new Date().toISOString().slice(0, 7);
+    readLedgerSpy = vi.spyOn(ledgerNs, 'readLedger').mockReturnValue({
+      version: 1,
+      months: {
+        [monthKey]: {
+          invocations: 1,
+          total_usd: 1,
+          last_invocation_iso: new Date().toISOString(),
+          iterations: [
+            { iso: new Date().toISOString(), model: 'claude-sonnet-4-6', cost_usd: 1, issueId: 'issue-99', transport: 'sdk' },
+          ],
+        },
+      },
+    });
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      issueId: 'issue-99',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.capBlocked).toBe(true);
+    expect(result.issue).toBeDefined();
+    expect(result.issue.status).toBe('block');
+    expect(sdkCreateMock).toHaveBeenCalledTimes(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 36: PR cap blocks ($2 PR 42) → capBlocked:true with pr.status=block', async () => {
+    const monthKey = new Date().toISOString().slice(0, 7);
+    readLedgerSpy = vi.spyOn(ledgerNs, 'readLedger').mockReturnValue({
+      version: 1,
+      months: {
+        [monthKey]: {
+          invocations: 1,
+          total_usd: 2,
+          last_invocation_iso: new Date().toISOString(),
+          iterations: [
+            { iso: new Date().toISOString(), model: 'claude-sonnet-4-6', cost_usd: 2, prNumber: 42, transport: 'sdk' },
+          ],
+        },
+      },
+    });
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      prNumber: 42,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.capBlocked).toBe(true);
+    expect(result.pr).toBeDefined();
+    expect(result.pr.status).toBe('block');
+    expect(sdkCreateMock).toHaveBeenCalledTimes(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
+  });
+});
+
+describe('Phase 39 LEDGER-03: invokeAnthropicSdkWithLedger happy path + ledger append', () => {
+  let appendSpy;
+
+  beforeEach(() => {
+    sdkCreateMock.mockReset();
+    vi.stubEnv('CI', 'true');
+    vi.spyOn(ledgerNs, 'readLedger').mockReturnValue({ version: 1, months: {} });
+    appendSpy = vi.spyOn(ledgerNs, 'appendLedgerEntry').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('Test 37: success path → ok:true, llmText, modelId, costUsd via fallbackCostUsd; ledger appended with transport:sdk', async () => {
+    mockSdkResponse(makeSdkSuccessResponse({
+      model: 'claude-sonnet-4-6',
+      text: 'hi',
+      inputTokens: 100,
+      outputTokens: 200,
+    }));
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '39',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.llmText).toBe('hi');
+    expect(result.modelId).toBe('claude-sonnet-4-6');
+    // Sonnet rates: 100 input * $3/Mtok + 200 output * $15/Mtok = 0.0003 + 0.003 = 0.0033
+    expect(result.costUsd).toBeCloseTo(0.0033, 6);
+    expect(result.rawJson).toBeDefined();
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const [calledPath, calledEntry] = appendSpy.mock.calls[0];
+    expect(calledPath).toBe(LEDGER_PATH);
+    expect(calledEntry).toMatchObject({
+      model: 'claude-sonnet-4-6',
+      transport: 'sdk',
+      tokens_in: 100,
+      tokens_out: 200,
+      phase: '39',
+      source: 'auto-fix-api',
+    });
+    expect(calledEntry.cost_usd).toBeCloseTo(0.0033, 6);
+  });
+
+  it('Test 38: sdk_error path (Pitfall 8 always-append) → ok:false, errorReason:sdk_error; ledger appended with cost_usd:0 + error', async () => {
+    mockSdkError(new Error('timeout'));
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '39',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errorReason).toBe('sdk_error');
+    expect(result.errorMessage).toBe('timeout');
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const [, calledEntry] = appendSpy.mock.calls[0];
+    expect(calledEntry).toMatchObject({
+      cost_usd: 0,
+      transport: 'sdk',
+      phase: '39',
+      source: 'auto-fix-api',
+      error: 'timeout',
+    });
+  });
+});
+
+describe('Phase 39 CLEANUP-04 regression: invokeClaudePWithLedger CI gate UNCHANGED', () => {
+  let appendSpy;
+
+  beforeEach(() => {
+    spawnCalls.length = 0;
+    vi.spyOn(ledgerNs, 'readLedger').mockReturnValue({ version: 1, months: {} });
+    appendSpy = vi.spyOn(ledgerNs, 'appendLedgerEntry').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('Test 39: invokeClaudePWithLedger CI=true → {ok:false, ciGate:true} (v3.1 invariant preserved)', async () => {
+    vi.stubEnv('CI', 'true');
+    vi.stubEnv('GITHUB_ACTIONS', undefined);
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '39',
+      source: 'phase-39-regression-guard',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ciGate).toBe(true);
+    expect(spawnCalls.length).toBe(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('Test 40: invokeClaudePWithLedger GITHUB_ACTIONS=true → {ok:false, ciGate:true} (v3.1 defense-in-depth)', async () => {
+    vi.stubEnv('CI', undefined);
+    vi.stubEnv('GITHUB_ACTIONS', 'true');
+    const result = await drv.invokeClaudePWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '39',
+      source: 'phase-39-regression-guard',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ciGate).toBe(true);
+    expect(spawnCalls.length).toBe(0);
+    expect(appendSpy).toHaveBeenCalledTimes(0);
   });
 });

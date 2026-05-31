@@ -88,18 +88,43 @@ Requirements for this milestone. Each maps to roadmap phases (continued numberin
 
 ## Traceability
 
-(Filled by roadmapper)
+Coverage: 33 / 33 v4.0 requirements mapped to exactly one phase (no orphans, no duplicates). Phases 39-47 (continued numbering from v3.1).
 
 | REQ-ID | Phase | Notes |
 |--------|-------|-------|
-| PROMPT-01..04 | TBD | Phase that builds fix-prompt-builder.js |
-| LEDGER-01..04 | TBD | Phase that extends llm-ledger.js with v2 schema |
-| DEPS-01..04 | TBD | Phase that creates v40-deps-update.yml |
-| VFY-GATE-01..04 | TBD | Phase that creates v40-verifier-gate.yml |
-| AUTOFIX-01..06 | TBD | Phases that build auto-fix.mjs + v40-auto-fix.yml |
-| PROMOTE-01..04 | TBD | Phase that builds auto-fix-promote.mjs + v40-auto-promote.yml |
-| FLAKE-01..03 | TBD | Phase that extends triage-classifier with 5-state machine |
-| CLEANUP-01..04 | TBD | v4.0 cleanup phase |
+| PROMPT-01 | Phase 42 | `<issue_body_untrusted>` envelope in fix-prompt-builder |
+| PROMPT-02 | Phase 42 | FORBIDDEN_DELIMITERS escape in issue-payload-builder |
+| PROMPT-03 | Phase 42 | Frozen PROMPT_SCAFFOLDS registry (WRONG_CITATION + skip-class returns) |
+| PROMPT-04 | Phase 42 | ESLint purity guard on fix-prompt-builder |
+| LEDGER-01 | Phase 39 | Additive `transport` + `phase` fields on appendLedgerEntry |
+| LEDGER-02 | Phase 39 | combinedMonthlyTotal helper, unified $80/$100 cap |
+| LEDGER-03 | Phase 39 | Per-day/per-issue/per-PR sub-caps |
+| LEDGER-04 | Phase 39 | Committed ledger flip + atomic `[skip ci]` commit pattern |
+| DEPS-01 | Phase 40 | v40-deps-update.yml cron + watchlist |
+| DEPS-02 | Phase 40 | Nightly-suite required-status-check gate |
+| DEPS-03 | Phase 40 | Security vs minor PR partitioning |
+| DEPS-04 | Phase 40 | Verifier pdfjs-dist pinned separately + frame-shift pre-flight |
+| VFY-GATE-01 | Phase 41 | 3× affected-case verifier check |
+| VFY-GATE-02 | Phase 41 | 76-case regression check on PR branch |
+| VFY-GATE-03 | Phase 41 | Diff-size cap (200 LOC src / 50 LOC tests) |
+| VFY-GATE-04 | Phase 41 | Verifier pinned to origin/main + diff-guard regex bank |
+| AUTOFIX-01 | Phase 42 | Dispatcher routing via PROMPT_SCAFFOLDS |
+| AUTOFIX-02 | Phase 43 | v40-auto-fix.yml workflow + draft PR via peter-evans/create-pull-request@v8 |
+| AUTOFIX-03 | Phase 42 | git apply --check + diff-guard pre-apply rejection |
+| AUTOFIX-04 | Phase 42 | git ls-remote idempotency + workflow concurrency group |
+| AUTOFIX-05 | Phase 42 | fix_attempts retry tracking + human-review-required label |
+| AUTOFIX-06 | Phase 46 | npm run fix-issue subscription wrapper |
+| PROMOTE-01 | Phase 44 | Triple-gate assertion (verified-label + merged + triage-sourced) |
+| PROMOTE-02 | Phase 44 | Separate follow-up PR (NEVER direct-to-main) |
+| PROMOTE-03 | Phase 44 | gh issue close on source after follow-up PR |
+| PROMOTE-04 | Phase 44 | Post-merge verifier re-check on main HEAD |
+| FLAKE-01 | Phase 45 | 5-state classifier + 10-element ring buffer |
+| FLAKE-02 | Phase 45 | N=3 / 14-day FLAKE escalation + 30-day suppress |
+| FLAKE-03 | Phase 45 | quarantine-append --escalate-stable-runs-reset 1 flag |
+| CLEANUP-01 | Phase 47 | Integration audit across 5 v3.1→v4.0 touchpoints |
+| CLEANUP-02 | Phase 47 | Nyquist coverage stamping on carry-over phases |
+| CLEANUP-03 | Phase 47 | Live HUMAN-UAT (5 confirmations) |
+| CLEANUP-04 | Phase 47 | Branch-protection/CODEOWNERS audit (initial setup in Phase 39) |
 
 ---
 

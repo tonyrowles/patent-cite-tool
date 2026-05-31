@@ -1,0 +1,11 @@
+# .github/CODEOWNERS
+# Phase 39 (CLEANUP-04 initial setup) — single-maintainer pins for v4.0 trust invariants.
+# Phase 47 (CLEANUP-04 audit) re-verifies these are present and unchanged via gh api.
+# Last-matching-rule semantics: more specific paths MUST appear AFTER broader ones.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+/src/                                       @tonyrowles
+/tests/                                     @tonyrowles
+/.github/workflows/                         @tonyrowles
+/tests/golden/                              @tonyrowles
+/tests/e2e/test-cases-quarantine.js         @tonyrowles

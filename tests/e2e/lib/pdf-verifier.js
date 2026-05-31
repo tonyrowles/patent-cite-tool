@@ -13,6 +13,31 @@
 // See .planning/phases/28-independent-pdf-verifier/28-RESEARCH.md Pattern 4
 // for the algorithm mirror table.
 //
+// Phase 40-04 (DEPS-04 / Pitfall 6 defense): the verifier's pdfjs-dist is
+// pinned SEPARATELY from devDependencies.pdfjs-dist via the package.json
+// `verifierDeps` field. By default the loader uses the hoisted bundled
+// pdfjs at devDependencies version (no behavior change from Phase 28-29).
+// The frame-shift pre-flight workflow (.github/workflows/v40-pdfjs-frame-shift.yml)
+// sets VERIFIER_PDFJS_PATH=/tmp/old-pdfjs to redirect this module to a
+// SIBLING pdfjs install at the PREVIOUS version — letting the regression
+// suite run twice (OLD pdfjs vs NEW pdfjs) on the SAME PR branch so any
+// divergence in citation outputs surfaces as FRAME-SHIFT DETECTED.
+//
+// Empirical-verification result (Phase 40-04 Task 2a, Node 22):
+// createRequire(import.meta.url) of a `.mjs` file via the CJS-style require
+// resolver returned a module object with a callable `getDocument` named
+// export — verdict WORKS. Therefore this file uses the createRequire shape
+// from 40-RESEARCH.md lines 486-498 verbatim (no file:// fallback needed).
+// If a future Node upgrade regresses this interop, the documented fallback
+// is `await import('file://' + overridePath + '/.../pdf.mjs')`.
+//
+// VERIFIER_PDFJS_PATH empty-string handling: `if (overridePath)` (JS falsy on
+// empty string) — the workflow's "verifier on NEW pdfjs" step sets the env
+// to "" to mean "use the default bundled pdfjs", which JS treats as falsy,
+// correctly falling through to the default `import()` path. Do NOT change
+// this to `!== undefined` — that would break the workflow's deliberate
+// empty-string-means-unset contract.
+//
 // Public surface (called by Phase 28-05 calibration + regression.spec.js):
 //   - verifyCitation({ patentId, selectedText, observedCitation }) -> Verdict
 // Internals exported for unit testing:
@@ -20,17 +45,40 @@
 //   - parsePdf(pdfPath) -> ParsedPdf
 //   - inferColumnLine(pageItems, pageWidth, pageHeight) -> {lines, columns, boundary}
 //   - parseCitation(str) -> {startCol, startLine, endCol, endLine}
+//   - VERIFIER_PDFJS_VERSION (const) — read from pkg.verifierDeps['pdfjs-dist']
 
 import path from 'node:path';
 import fs from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { ensureCachedPdf } from './pdf-fetch.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+
+// ---------------------------------------------------------------------------
+// Phase 40-04 — Override-aware pdfjs loader (DEPS-04 + Pitfall 6 defense)
+// ---------------------------------------------------------------------------
+// Read the verifier's pinned pdfjs version from package.json.verifierDeps.
+// This export is grep-pinned by Phase 47 audit and Vitest G1 (asserts
+// VERIFIER_PDFJS_VERSION === pkg.verifierDeps['pdfjs-dist']).
+const PACKAGE_JSON_PATH = path.resolve(PROJECT_ROOT, 'package.json');
+const pkgManifest = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+export const VERIFIER_PDFJS_VERSION = pkgManifest.verifierDeps?.['pdfjs-dist'];
+
+// VERIFIER_PDFJS_PATH override hook for the frame-shift pre-flight workflow.
+// JS falsy on empty string is the DELIBERATE contract (see file header). The
+// workflow sets the env to "" in its "verifier on NEW pdfjs" step to mean
+// "default bundled pdfjs" — the falsy check routes through the default
+// import path. Do NOT replace with `overridePath !== undefined`.
+const overridePath = process.env.VERIFIER_PDFJS_PATH;
+const _require = createRequire(import.meta.url);
+const pdfjsLib = overridePath
+  ? _require(`${overridePath}/node_modules/pdfjs-dist/legacy/build/pdf.mjs`)
+  : await import('pdfjs-dist/legacy/build/pdf.mjs');
+const { getDocument } = pdfjsLib;
 
 // ---------------------------------------------------------------------------
 // Module-level constants (CONTEXT.md locked + RESEARCH.md mirror values)

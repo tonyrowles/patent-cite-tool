@@ -143,7 +143,7 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
 
 **Summary checklist:**
 
-- [ ] **Phase 39: SDK Driver + Ledger v2 + Branch Protection Wave-0** — SDK transport (`invokeAnthropicSdkWithLedger`), unified ledger schema with transport/phase fields + sub-caps, committed ledger flip, ESLint guard on `@anthropic-ai/sdk`, repo-level `Allow auto-merge: OFF` + branch protection ruleset + CODEOWNERS
+- [x] **Phase 39: SDK Driver + Ledger v2 + Branch Protection Wave-0** (4/4 plans) — completed 2026-05-31 — SDK transport (`invokeAnthropicSdkWithLedger`), unified ledger schema with transport/phase fields + sub-caps, committed ledger flip, ESLint guard on `@anthropic-ai/sdk`, repo-level `Allow auto-merge: OFF` + branch protection ruleset + CODEOWNERS
 - [ ] **Phase 40: Deps-Update + Cost-Ledger-Snapshot Workflows** — `v40-deps-update.yml` weekly cron with nightly-suite gate; `v40-cost-ledger-snapshot.yml` daily snapshot; security/minor PR partitioning; verifier `pdfjs-dist` pinned separately
 - [ ] **Phase 41: Verifier-Gate Workflow + verify-single-case.mjs** — `v40-verifier-gate.yml` on `auto-fix/*` branches; 3× affected-case + 76-case regression; diff-size cap; verifier pinned to `origin/main`; diff-guard regex bank
 - [ ] **Phase 42: fix-prompt-builder + WRONG_CITATION Vertical Slice** — `lib/fix-prompt-builder.js` with `<issue_body_untrusted>` envelope and FORBIDDEN_DELIMITERS escape; `scripts/auto-fix.mjs` core dispatcher with `git apply --check`, branch-existence idempotency, fix_attempts retry; local end-to-end on WRONG_CITATION only
@@ -281,7 +281,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 0/4 | Planned | - |
+| 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 0/TBD | Not started | - |
 | 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 0/TBD | Not started | - |
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/TBD | Not started | - |

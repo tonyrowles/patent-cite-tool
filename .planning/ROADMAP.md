@@ -218,7 +218,10 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   4. `scripts/auto-fix.mjs --issue <n>` routes ERROR_CLASS labels to matching scaffolds, runs `git apply --check` before applying, rejects diffs touching the v4.0 diff-guard regex bank, and checks `git ls-remote --heads origin auto-fix/<n>-<fp8>` before invoking the LLM (label-flap idempotency)
   5. `fix_attempts` per fingerprint is tracked (PR comment or ledger field); 4th attempt adds `human-review-required` label and refuses further auto-fix on that fingerprint
   6. The full local loop is demonstrated end-to-end on a real WRONG_CITATION issue — issue → prompt → diff → branch → manual PR — with the verifier-gate flipping the PR ready
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 42-01-PLAN.md (wave 1) — fix-prompt-builder.js (envelope + frozen PROMPT_SCAFFOLDS + skip-class returns) + FORBIDDEN_DELIMITERS escape in issue-payload-builder.js + countFixAttempts helper in llm-ledger.js + ESLint per-file purity guard with catch-all-ignores augmentation (Pitfall 1/345cdcb regression prevention) — PROMPT-01..04 + AUTOFIX-05 helper
+- [ ] 42-02-PLAN.md (wave 2) — scripts/auto-fix.mjs dispatcher (gh issue view → ERROR_CLASS routing → ls-remote idempotency → countFixAttempts cap → SDK call → parseFencedDiff → diff-guard → git apply --check → branch + commit + push) + invokeAnthropicSdkWithLedger systemBlocks extension (Pitfall 6 cache_control) + --dry-run + --no-push — AUTOFIX-01/03/04/05 (depends on 42-01)
+- [ ] 42-03-PLAN.md (wave 3) — docs/v40-auto-fix-manual-demo.md procedure + blocking-human checkpoint for maintainer-executed end-to-end demo on issue #3 (or fallback lowest-fingerprint WRONG_CITATION) — empirical validation of the full vertical slice (depends on 42-02)
 
 ### Phase 43: v40-auto-fix.yml Workflow + Draft PR Creation
 **Goal**: Phase 42's local script lifted into a CI workflow triggered by `issues.labeled('triage')` — first CI-driven end-to-end run
@@ -292,7 +295,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 4/4 | Complete | 2026-05-31 |
-| 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/TBD | Not started | - |
+| 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/3 | Planned | - |
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 0/TBD | Not started | - |
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 0/TBD | Not started | - |
 | 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 0/TBD | Not started | - |

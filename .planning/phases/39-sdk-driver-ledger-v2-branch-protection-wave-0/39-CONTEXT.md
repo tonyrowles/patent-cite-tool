@@ -35,7 +35,9 @@ Out of scope (later phases):
 - **Default model for auto-fix:** `claude-sonnet-4-6` ($3/$15 per Mtok). Reserve `claude-opus-4-7` for Tier-C escalation paths (Phase 45+).
 - **CI gate inversion:** `invokeClaudePWithLedger` is local-only (no CI). `invokeAnthropicSdkWithLedger` is the opposite — CI-only OR `--force-api`. Both coexist; transport tag distinguishes ledger entries.
 - **ESLint scope for SDK guard:** ONLY `tests/e2e/lib/llm-driver.js` may import `@anthropic-ai/sdk`. All other paths blocked via `no-restricted-imports`.
-- **CODEOWNERS pins:** `src/`, `tests/`, `.github/workflows/`, `tests/golden/`, `tests/e2e/test-cases-quarantine.js`. Owner is `@fatduck` (single-maintainer repo).
+- **CODEOWNERS pins:** `src/`, `tests/`, `.github/workflows/`, `tests/golden/`, `tests/e2e/test-cases-quarantine.js`. Owner is **`@tonyrowles`** — confirmed via `gh api user --jq .login` on 2026-05-30. (PITFALLS.md `@TR` references and CONTEXT's earlier `@fatduck` reference are aliases for the same maintainer but neither is a valid GitHub login; CODEOWNERS silently no-ops on invalid logins.)
+- **Branch protection bypass policy:** `Do not allow bypassing: ON` with **NO bypass list**. Confirmed friction trade-off: human-authored PRs by `@tonyrowles` touching CODEOWNED files (which lack a second maintainer to approve) will require a workaround — documented in `docs/v40-repo-config.md`. Auto-fix PRs from the bot account are unaffected because `@tonyrowles` can approve them as a distinct identity. This preserves the v4.0 load-bearing trust invariant.
+- **Committed-ledger seed policy:** Fresh start. The committed `tests/e2e/.llm-spend-ledger.json` is initialized with ONLY the `phase: '39-bootstrap'` sentinel entry — local v3.1 history stays on the dev machine and is NOT migrated. Provides a clean v2-schema baseline.
 - **Branch protection scope:** `main` only. Required-status-check SLOT created (the actual verifier-gate workflow doesn't exist until Phase 41 — empty slot reserved here so Phase 41 can populate without touching repo settings).
 
 ### Claude's Discretion

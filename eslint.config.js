@@ -146,4 +146,42 @@ export default [
       }],
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // Phase 39 (LEDGER-03 + CLEANUP-04 partial) — SDK single-entry-point rule.
+  // ---------------------------------------------------------------------------
+  //
+  // Restricts `import ... from '@anthropic-ai/sdk'` to tests/e2e/lib/llm-driver.js
+  // ONLY. Every other path must consume the SDK via invokeAnthropicSdkWithLedger
+  // — preserves the ledger/cap discipline (Pitfall 2 cost-runaway) and the
+  // single-entry-point invariant that mirrors the v3.1 invokeClaudePWithLedger
+  // wrapper.
+  //
+  // CRITICAL: this block MUST be the LAST block in the array. Per Pitfall 3
+  // (39-RESEARCH.md), ESLint flat-config rules MERGE in array order with
+  // LATER blocks overriding EARLIER ones for the same rule key. Appending
+  // here ensures the @anthropic-ai/sdk restriction is the final word.
+  //
+  // KEY DIFFERENCE from the pdf-verifier / rerun-validator blocks: those use
+  // `patterns.group` to restrict a directory TREE (src/**). This block uses
+  // `paths` to restrict a specific NAMED PACKAGE — `paths` is the correct
+  // ESLint shape for the package-name case (mirrors the triage-classifier
+  // block above which uses `paths` with `importNames`).
+  {
+    files: ['**/*.{js,mjs}'],
+    ignores: ['tests/e2e/lib/llm-driver.js'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@anthropic-ai/sdk',
+          message:
+            'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+            'Direct @anthropic-ai/sdk imports forbidden — mirrors v3.1 ' +
+            'invokeClaudePWithLedger CI-gate + ledger discipline. See ' +
+            '.planning/phases/39-sdk-driver-ledger-v2-branch-protection-wave-0/39-RESEARCH.md ' +
+            '§Pattern 4 and PITFALLS.md Pitfall 2.',
+        }],
+      }],
+    },
+  },
 ];

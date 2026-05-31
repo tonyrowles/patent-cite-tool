@@ -200,7 +200,11 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   3. `scripts/auto-fix.mjs` (or this workflow's pre-check) rejects diffs >200 LOC in `src/` or >50 LOC in `tests/`; oversized diffs stay draft with a `human-review-required` label and a PR comment explaining the rejection
   4. Verifier code (`tests/e2e/lib/pdf-verifier.js`) and golden baseline (`tests/golden/baseline.json`) are pinned to `origin/main` during the PR gate run (NOT the PR branch); a diff-guard regex bank rejects diffs touching `tests/test-cases.js`, `tests/golden/baseline.json`, `tests/e2e/test-cases-quarantine.js`, `.github/workflows/v40-*.yml`, `tests/e2e/.llm-spend-ledger.json`, `CODEOWNERS` pre-`git apply`
   5. A pushed `auto-fix/test` branch can demonstrate the gate end-to-end with no LLM involvement (manual exercise)
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 41-01-PLAN.md (wave 1) — `scripts/check-diff-guard.mjs` + `scripts/parse-affected-cases.mjs` helpers + Vitest (FORBIDDEN_PATHS regex bank + affected-cases parser; importable by Phase 42 `auto-fix.mjs`)
+- [ ] 41-02-PLAN.md (wave 1) — `scripts/verify-single-case.mjs` CLI shim + Vitest (argv contract: --case + --runs + --output; exit 0/1/2; JSON report shape; VFY-02 isolation preserved)
+- [ ] 41-03-PLAN.md (wave 2) — `.github/workflows/v40-verifier-gate.yml` 4-job workflow (diff-guard → verifier-gate + regression-suite → ready-flip) + 22-case YAML contract Vitest (V1-V12 + X1-X10) (depends on 41-01, 41-02)
+- [ ] 41-04-PLAN.md (wave 2) — `docs/v40-verifier-gate-manual-test.md` end-to-end smoke procedure + doc-structure Vitest (for Phase 47 CLEANUP-03 reuse)
 
 ### Phase 42: fix-prompt-builder + WRONG_CITATION Vertical Slice
 **Goal**: Local end-to-end auto-fix loop closed for ONE error class (WRONG_CITATION) — proves diff application, branch creation, PR-body conventions before scaling
@@ -287,7 +291,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 |-------|-----------|----------------|--------|-----------|
 | 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 4/4 | Complete | 2026-05-31 |
-| 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 0/TBD | Not started | - |
+| 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 0/4 | Not started | - |
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/TBD | Not started | - |
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 0/TBD | Not started | - |
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 0/TBD | Not started | - |

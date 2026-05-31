@@ -489,3 +489,90 @@ describe.skipIf(!fs.existsSync(MODULE_PATH))('check-deps-and-pr (Phase 40-02)', 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 40-04 additive — DO NOT remove the script-gated outer describe above.
+// Group F (verifierDeps EXACT-pin) + Group G (pdf-verifier override loader)
+// live in a SECOND top-level describe block because their assertions target
+// package.json + tests/e2e/lib/pdf-verifier.js (both ALWAYS exist on disk),
+// so they have no skipIf gate. The outer 40-02 describe stays script-gated.
+// ---------------------------------------------------------------------------
+describe('verifierDeps (Phase 40-04, file-static assertion)', () => {
+  const PACKAGE_JSON_PATH = path.resolve(PROJECT_ROOT, 'package.json');
+  const PDF_VERIFIER_PATH = path.resolve(
+    PROJECT_ROOT,
+    'tests/e2e/lib/pdf-verifier.js',
+  );
+
+  // -------------------------------------------------------------------------
+  // Group F: verifierDeps EXACT-pin (DEPS-04 — 40-RESEARCH.md lines 548-559)
+  // -------------------------------------------------------------------------
+
+  it('F1: pkg.verifierDeps is defined and is an object', () => {
+    const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+    expect(pkg.verifierDeps).toBeDefined();
+    expect(typeof pkg.verifierDeps).toBe('object');
+    expect(pkg.verifierDeps).not.toBeNull();
+  });
+
+  it('F2: pkg.verifierDeps["pdfjs-dist"] is defined', () => {
+    const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+    expect(pkg.verifierDeps['pdfjs-dist']).toBeDefined();
+  });
+
+  it('F3: pkg.verifierDeps["pdfjs-dist"] is an EXACT semver (no caret/tilde)', () => {
+    // DEPS-04 contract — verifier pdfjs is pinned EXACT so dep-update PRs
+    // bumping the extension's caret-pinned pdfjs cannot drift the verifier's
+    // reference frame (Pitfall 6 defense).
+    const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+    expect(pkg.verifierDeps['pdfjs-dist']).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('F4: pkg.devDependencies["pdfjs-dist"] still present (separation does NOT remove extension dep)', () => {
+    const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+    expect(pkg.devDependencies['pdfjs-dist']).toBeDefined();
+  });
+
+  it('F5: initial parity — verifierDeps pin equals devDependencies pin (caret stripped)', () => {
+    // When this plan ships, the two are equal at 5.5.207. Future dep-update
+    // PRs may drift them — once the first dep bump lands, this test should
+    // be relaxed in Phase 47.
+    const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+    const devClean = pkg.devDependencies['pdfjs-dist'].replace(/^[\^~]/, '');
+    expect(pkg.verifierDeps['pdfjs-dist']).toBe(devClean);
+  });
+
+  // -------------------------------------------------------------------------
+  // Group G: pdf-verifier override loader (Task 2 — populated AFTER F1-F5)
+  // -------------------------------------------------------------------------
+
+  it('G1: tests/e2e/lib/pdf-verifier.js exports VERIFIER_PDFJS_VERSION === pkg.verifierDeps["pdfjs-dist"]', async () => {
+    // Dynamic import via the file:// URL form (ESM module path).
+    const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+    const mod = await import(
+      'file://' + PDF_VERIFIER_PATH + '?vfy=' + Date.now()
+    );
+    expect(mod.VERIFIER_PDFJS_VERSION).toBe(pkg.verifierDeps['pdfjs-dist']);
+  });
+
+  it('G2: pdf-verifier.js source contains VERIFIER_PDFJS_PATH + createRequire-or-file:// override shape', () => {
+    const src = fs.readFileSync(PDF_VERIFIER_PATH, 'utf8');
+    expect(src).toContain('VERIFIER_PDFJS_PATH');
+    // The empirical-verification step in Task 2 selects one of the two shapes;
+    // either is acceptable here.
+    expect(src).toMatch(/createRequire|file:\/\//);
+  });
+
+  it('G3: VFY-02 independence preserved — no src/ imports in pdf-verifier.js', () => {
+    // VFY-02 contract (pdf-verifier.js header lines 7-14). The override
+    // mechanism resolves a SIBLING pdfjs-dist install; it MUST NOT reach
+    // into src/.
+    const src = fs.readFileSync(PDF_VERIFIER_PATH, 'utf8');
+    const importLines = src
+      .split('\n')
+      .filter((l) => l.trimStart().startsWith('import '));
+    for (const line of importLines) {
+      expect(line).not.toMatch(/['"][^'"]*\/src\//);
+    }
+  });
+});

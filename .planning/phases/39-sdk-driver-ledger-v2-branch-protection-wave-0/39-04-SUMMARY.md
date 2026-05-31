@@ -83,27 +83,78 @@ Per spawn-time directive: this executor ran **ONLY Tasks 1 and 2** (the autonomo
 | ---- | --------------------- | --------- | -------------------------------------------------------------------- |
 | 1    | Done                  | `f3bea6d` | .gitignore lines 18-19 deleted; bootstrap entry seeded via appendLedgerEntry; tracked OK |
 | 2    | Done                  | `ec00f05` | Tests 48 + 49 added to tests/unit/llm-ledger.test.js; 54/54 passing  |
-| 3    | **pending: handled by orchestrator after this run** | n/a       | GitHub UI clicks (Allow auto-merge OFF + branch protection ruleset on main) — maintainer-only action per `gate="blocking-human"` |
+| 3    | Done (maintainer-applied 2026-05-31) | n/a (Settings UI) | Allow auto-merge OFF + ruleset `v4.0-main-protection` (id 17086676) active on `main`; `bypass_actors: []`; required-status-checks intentionally absent (slot reserved for Phase 41 `verifier-gate`) — captures recorded below |
 
-## Task 3 — Pending Status (deferred to orchestrator + maintainer)
+## Task 3 — Maintainer-Applied 2026-05-31 (captures recorded)
 
-The Task 3 `checkpoint:human-verify` requires maintainer-only browser access to:
+Maintainer `@tonyrowles` applied the Settings UI changes and captured `gh api` outputs via the orchestrator on 2026-05-31. Maintainer explicitly accepted the no-bypass single-maintainer friction trade-off per CONTEXT lock.
 
-1. Set `Settings → Pull Requests → Allow auto-merge = OFF` and capture `gh api GET /repos/tonyrowles/patent-cite-tool --jq '.allow_auto_merge'` → expected `false`.
-2. Create branch-protection ruleset on `main` with:
-   - Enforcement: `active`
-   - Target branches: `main`
-   - Bypass list: **empty** (NO bypass per CONTEXT lock)
-   - Required pull request before merging (1 approval, require Code Owners, dismiss stale approvals)
-   - Required status checks: **list empty** (slot reserved for Phase 41 `verifier-gate`)
-   - Block force pushes, restrict deletions, require linear history
-3. Capture `gh api` audit snapshots 1-3 (per `docs/v40-repo-config.md` §2 verification protocol) into the orchestrator's resume-signal.
+### Capture 1 — Allow auto-merge OFF
 
-The orchestrator will:
-- Surface the Task 3 checkpoint to the maintainer with the verification steps from PLAN.md `<how-to-verify>`.
-- After the maintainer applies the UI changes and pastes the `gh api` captures, the orchestrator records them, updates STATE.md and ROADMAP.md, and closes the phase.
+```
+$ gh api /repos/tonyrowles/patent-cite-tool --jq '.allow_auto_merge'
+false
+```
 
-This executor MUST NOT mark the plan or phase complete — that is the orchestrator's responsibility after Task 3 clears.
+✓ Matches expected value (`false`).
+
+### Capture 2 — Ruleset list
+
+```
+$ gh api /repos/tonyrowles/patent-cite-tool/rulesets --jq '[.[] | select(.target == "branch") | {id, name, enforcement}]'
+[{"enforcement":"active","id":17086676,"name":"v4.0-main-protection"}]
+```
+
+✓ Exactly one branch ruleset named `v4.0-main-protection` (id 17086676), enforcement active.
+
+### Capture 3 — Ruleset details
+
+```
+$ gh api /repos/tonyrowles/patent-cite-tool/rulesets/17086676 --jq '{enforcement, bypass_actors, conditions, rules}'
+{
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "exclude": [],
+      "include": ["~DEFAULT_BRANCH"]
+    }
+  },
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {"type": "required_linear_history"},
+    {
+      "type": "pull_request",
+      "parameters": {
+        "allowed_merge_methods": ["merge", "squash", "rebase"],
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": true,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 1,
+        "required_review_thread_resolution": false,
+        "required_reviewers": []
+      }
+    }
+  ]
+}
+```
+
+✓ All required attributes present:
+- `enforcement: active` ✓
+- `bypass_actors: []` ✓ (NO bypass — single-maintainer friction accepted per CONTEXT)
+- `conditions.ref_name.include: ["~DEFAULT_BRANCH"]` ✓ (covers `main` as default branch)
+- `rules` includes `deletion`, `non_fast_forward`, `required_linear_history`, and `pull_request` with `require_code_owner_review: true`, `required_approving_review_count: 1`, `dismiss_stale_reviews_on_push: true` ✓
+
+**Required status checks: intentionally absent** — no `required_status_checks` rule in the ruleset. This matches the plan's instruction to RESERVE the slot for Phase 41 (`verifier-gate` doesn't exist yet; naming a non-existent check now would block every PR). Phase 41 will add the `required_status_checks` rule with `verifier-gate` populated.
+
+### Maintainer's Acceptance
+
+Maintainer confirmed via `/gsd-autonomous` checkpoint UI: "I'll apply the settings now and paste captures (Recommended)" → applied → captures pasted → no concerns raised. The operational trade-off is acknowledged: maintainer can no longer push directly to `main` or self-approve PRs touching CODEOWNED paths (`src/`, `tests/`, `.github/workflows/`, `tests/golden/`, `tests/e2e/test-cases-quarantine.js`) — workarounds (second account, --admin, or bypass-list revisit in future phase) are accepted as the cost of the v4.0 trust invariant.
+
+### Phase 47 Cross-Check Baseline
+
+These three captures are the baseline for Phase 47's CLEANUP-04 re-audit. Phase 47 should re-run the same `gh api` commands and confirm the values still match.
 
 ## Files Created / Modified
 
@@ -221,7 +272,7 @@ None. Tests 48 and 49 are fully wired; the committed ledger file is fully popula
 | LEDGER-02   | Shipped                             | Plan 01 (Tests 38-41: combinedMonthlyTotal + by-transport) |
 | LEDGER-03   | Shipped                             | Plan 01 (Tests 42-47: sub-cap boundaries) + Plan 03 (Tests 34-36: SDK driver enforces sub-caps) |
 | LEDGER-04   | Shipped (in-repo work)              | Plan 04 (this plan — `.gitignore` flip + bootstrap entry + Tests 48-49) |
-| CLEANUP-04  | Partial — code/config shipped; repo Settings pending | Plan 02 (CODEOWNERS + audit doc), Plan 03 (ESLint guard + EXACT pin), Plan 04 Task 3 (GitHub UI — **pending orchestrator + maintainer**) |
+| CLEANUP-04  | Shipped (initial setup; re-audited in Phase 47) | Plan 02 (CODEOWNERS + audit doc), Plan 03 (ESLint guard + EXACT pin), Plan 04 Task 3 (maintainer-applied 2026-05-31: Allow auto-merge OFF + ruleset `v4.0-main-protection` active on `main` with `bypass_actors: []`; required-status-checks slot reserved for Phase 41) |
 
 ## Self-Check: PASSED
 

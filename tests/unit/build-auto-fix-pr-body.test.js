@@ -131,4 +131,31 @@ describe('buildAutoFixPrBody (Phase 43)', () => {
     expect(stdout).toBe(expected);
   });
 
+  // ---------------------------------------------------------------------------
+  // B7 — Phase 44 Plan 44-01 extension: <!-- source_issue: N --> on line 2.
+  // The new HTML comment must appear on line index 1, between the
+  // affected_cases comment on line index 0 and the existing blank-line
+  // separator on line index 2. Phase 44's v40-auto-promote.yml parse step
+  // greps the body for /<!--\s*source_issue:\s*(\d+)\s*-->/ to recover the
+  // source-issue id without a separate CLI argument or env-var dance. The
+  // line-position contract is load-bearing — moving the comment elsewhere
+  // would silently break the parse step.
+  // ---------------------------------------------------------------------------
+
+  it('B7 — <!-- source_issue: N --> appears on line 2 (Phase 44 extension)', () => {
+    const out = buildAutoFixPrBody({
+      issue: 42,
+      branch: 'auto-fix/42-deadbeef',
+      errorClass: 'WRONG_CITATION',
+      caseIds: ['x'],
+    });
+    const lines = out.split('\n');
+    // line index 0 — preserve B1 invariant: affected_cases comment is FIRST.
+    expect(lines[0]).toBe('<!-- affected_cases: x -->');
+    // line index 1 — NEW: source_issue comment for v40-auto-promote.yml parse.
+    expect(lines[1]).toBe('<!-- source_issue: 42 -->');
+    // line index 2 — preserve blank-line separator before the prose heading.
+    expect(lines[2]).toBe('');
+  });
+
 });

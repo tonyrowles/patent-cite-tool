@@ -12,12 +12,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import {
   upsertQuarantineEntry,
   formatEntry,
   stringifyCorpus,
 } from '../../scripts/quarantine-append.mjs';
+
+// Phase 45-03: resolve repo root for spawnSync invocations of the script
+const __TEST_FILE = fileURLToPath(import.meta.url);
+const __REPO_ROOT = path.resolve(path.dirname(__TEST_FILE), '..', '..');
+const __SCRIPT_PATH = path.resolve(__REPO_ROOT, 'scripts/quarantine-append.mjs');
 
 // ---------------------------------------------------------------------------
 // tmpDir setup (each test gets a fresh corpus)
@@ -246,5 +252,151 @@ describe('stringifyCorpus — round-trip (S1-S2)', () => {
     fs.writeFileSync(outPath, content);
     const mod = await reimport(outPath);
     expect(mod.TEST_CASES_QUARANTINE).toEqual(entries);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Q1-Q9: --escalate-stable-runs-reset 1 --case <id> (Phase 45-03 FLAKE-03)
+// ---------------------------------------------------------------------------
+
+/**
+ * Spawn the quarantine-append CLI synchronously.
+ * Returns { status, stdout, stderr } — never throws on non-zero exit.
+ */
+function runCli(args, env = {}) {
+  return spawnSync('node', [__SCRIPT_PATH, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  });
+}
+
+/**
+ * Write a one-entry corpus seed under tmpDir and return the absolute path.
+ * Used as QUARANTINE_CORPUS_PATH_OVERRIDE for happy-path / case-not-found tests.
+ */
+function writeCorpusSeed(localTmpDir, entries) {
+  const corpus = path.join(localTmpDir, 'test-cases-quarantine-q.js');
+  fs.writeFileSync(corpus, stringifyCorpus(entries));
+  return corpus;
+}
+
+describe('--escalate-stable-runs-reset 1 --case <id> (Phase 45-03 FLAKE-03)', () => {
+  it('Q1: missing value rejected (exit 2 + stderr substring)', () => {
+    const corpus = writeCorpusSeed(tmpDir, []);
+    const r = runCli(['--escalate-stable-runs-reset'], { QUARANTINE_CORPUS_PATH_OVERRIDE: corpus });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('missing value for --escalate-stable-runs-reset');
+  });
+
+  it('Q2: equals syntax rejected (exit 2 + stderr substring)', () => {
+    const corpus = writeCorpusSeed(tmpDir, []);
+    const r = runCli(['--escalate-stable-runs-reset=1', '--case', 'foo'], {
+      QUARANTINE_CORPUS_PATH_OVERRIDE: corpus,
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('equals syntax not supported');
+  });
+
+  it('Q3: non-1 value rejected (exit 2 + stderr substring)', () => {
+    const corpus = writeCorpusSeed(tmpDir, []);
+    const r = runCli(['--escalate-stable-runs-reset', '2', '--case', 'foo'], {
+      QUARANTINE_CORPUS_PATH_OVERRIDE: corpus,
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('only accepts value 1');
+  });
+
+  it('Q4: missing --case rejected (exit 2 + stderr substring)', () => {
+    const corpus = writeCorpusSeed(tmpDir, []);
+    const r = runCli(['--escalate-stable-runs-reset', '1'], {
+      QUARANTINE_CORPUS_PATH_OVERRIDE: corpus,
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('--case <id> is required');
+  });
+
+  it('Q5: mutual exclusion with --input (exit 2 + stderr substring)', () => {
+    const corpus = writeCorpusSeed(tmpDir, []);
+    const r = runCli(
+      ['--input', 'tests/e2e/fixtures/anything.json', '--escalate-stable-runs-reset', '1', '--case', 'foo'],
+      { QUARANTINE_CORPUS_PATH_OVERRIDE: corpus },
+    );
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('mutually exclusive');
+  });
+
+  it('Q6: case-id not found in corpus (exit 1 + stderr substring)', () => {
+    const corpus = writeCorpusSeed(tmpDir, []);
+    const r = runCli(['--escalate-stable-runs-reset', '1', '--case', 'missing-id'], {
+      QUARANTINE_CORPUS_PATH_OVERRIDE: corpus,
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('case-id missing-id not found in corpus');
+  });
+
+  it('Q7: happy path — stable_runs reset to 1; added_iso preserved verbatim; stdout substring', async () => {
+    const seedEntry = {
+      id: 'foo',
+      patentFile: './tests/fixtures/foo.json',
+      selectedText: 'bar',
+      category: 'claims',
+      stable_runs: 5,
+      source_triage_finding_id: 'src-1',
+      added_iso: '2026-01-01T00:00:00.000Z',
+    };
+    const corpus = writeCorpusSeed(tmpDir, [seedEntry]);
+    const r = runCli(['--escalate-stable-runs-reset', '1', '--case', 'foo'], {
+      QUARANTINE_CORPUS_PATH_OVERRIDE: corpus,
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('reset stable_runs=1 for foo');
+    const mod = await reimport(corpus);
+    expect(mod.TEST_CASES_QUARANTINE).toHaveLength(1);
+    expect(mod.TEST_CASES_QUARANTINE[0].stable_runs).toBe(1);
+    expect(mod.TEST_CASES_QUARANTINE[0].added_iso).toBe('2026-01-01T00:00:00.000Z');
+    // Other fields preserved verbatim
+    expect(mod.TEST_CASES_QUARANTINE[0].patentFile).toBe('./tests/fixtures/foo.json');
+    expect(mod.TEST_CASES_QUARANTINE[0].selectedText).toBe('bar');
+    expect(mod.TEST_CASES_QUARANTINE[0].category).toBe('claims');
+    expect(mod.TEST_CASES_QUARANTINE[0].source_triage_finding_id).toBe('src-1');
+  });
+
+  it('Q8: case-id with special chars (kebab + digits) passes through verbatim', async () => {
+    const caseId = 'US11427642-spec-short-1';
+    const seedEntry = {
+      id: caseId,
+      patentFile: './tests/fixtures/US11427642.json',
+      selectedText: 'sample',
+      category: 'claims',
+      stable_runs: 3,
+      source_triage_finding_id: 'src-2',
+      added_iso: '2026-02-15T08:00:00.000Z',
+    };
+    const corpus = writeCorpusSeed(tmpDir, [seedEntry]);
+    const r = runCli(['--escalate-stable-runs-reset', '1', '--case', caseId], {
+      QUARANTINE_CORPUS_PATH_OVERRIDE: corpus,
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain(`reset stable_runs=1 for ${caseId}`);
+    const mod = await reimport(corpus);
+    expect(mod.TEST_CASES_QUARANTINE[0].id).toBe(caseId);
+    expect(mod.TEST_CASES_QUARANTINE[0].stable_runs).toBe(1);
+  });
+
+  it('Q9: existing --input mode unchanged (regression guard — does NOT enter new branch)', () => {
+    const corpus = writeCorpusSeed(tmpDir, []);
+    // --input alone (no reset/case flags) should hit the existing Phase 35 path.
+    // We point at a non-existent path under fixtures so the script exits 1 with
+    // the Phase 35 "input file not found" error — proving we did NOT divert to
+    // the new branch (which would have exit 2 "missing --input" or similar).
+    const r = runCli(
+      ['--input', 'tests/e2e/fixtures/nonexistent-triage-report.json'],
+      { QUARANTINE_CORPUS_PATH_OVERRIDE: corpus },
+    );
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('input file not found');
+    // Critically: stderr must NOT mention the new flag — that would mean the
+    // new branch was entered.
+    expect(r.stderr).not.toContain('escalate-stable-runs-reset');
   });
 });

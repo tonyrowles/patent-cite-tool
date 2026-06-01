@@ -65,6 +65,19 @@ vi.mock('../e2e/lib/llm-ledger.js', () => ({
   LEDGER_PATH: '/tmp/test-ledger.json',
 }));
 
+// Phase 45-03 — mock the triage-classifier sibling exports consumed by the
+// new dispatchFlakeState helper in auto-fix.mjs. Default classifyRerunOutcomes
+// returns the FLAKE state (matches an "outcomes:[], flakeHistory:[]" classification)
+// so the legacy FLAKE-label Phase 42 tests can override per-test as needed.
+vi.mock('../e2e/lib/triage-classifier.js', () => ({
+  classifyRerunOutcomes: vi.fn(() => ({ state: 'FLAKE', action: 're-quarantine' })),
+  readRingBufferOrInit: vi.fn(() => ({ version: 1, cases: {} })),
+  readSuppressionsOrInit: vi.fn(() => ({ version: 1, suppressions: {} })),
+  atomicWriteJson: vi.fn(),
+  buildFlakeInvestigationBody: vi.fn(() => '## Flake investigation body\n'),
+  FLAKE_SUPPRESSION_DAYS: 30,
+}));
+
 // scripts/check-diff-guard.mjs — keep real checkDiffGuard so the regex bank
 // is exercised end-to-end. (vi.mock omitted intentionally.)
 
@@ -79,6 +92,12 @@ import {
   appendLedgerEntry,
   countFixAttempts,
 } from '../e2e/lib/llm-ledger.js';
+import {
+  classifyRerunOutcomes,
+  readRingBufferOrInit,
+  readSuppressionsOrInit,
+  atomicWriteJson,
+} from '../e2e/lib/triage-classifier.js';
 
 // runDispatcher is the named export the dispatcher MUST provide (per
 // Plan 42-02 Task 2). Failure to load = RED.
@@ -206,6 +225,19 @@ beforeEach(() => {
   vi.mocked(readLedger).mockReset().mockReturnValue({ version: 1, months: {} });
   vi.mocked(appendLedgerEntry).mockReset();
   vi.mocked(countFixAttempts).mockReset().mockReturnValue(0);
+  // Phase 45-03 — triage-classifier mocks default to FLAKE state with empty
+  // bootstraps so the Phase 42 FLAKE-label test (#2) routes through the new
+  // dispatchFlakeState helper without hitting real fs reads.
+  vi.mocked(classifyRerunOutcomes)
+    .mockReset()
+    .mockReturnValue({ state: 'FLAKE', action: 're-quarantine' });
+  vi.mocked(readRingBufferOrInit)
+    .mockReset()
+    .mockReturnValue({ version: 1, cases: {} });
+  vi.mocked(readSuppressionsOrInit)
+    .mockReset()
+    .mockReturnValue({ version: 1, suppressions: {} });
+  vi.mocked(atomicWriteJson).mockReset();
 });
 
 afterEach(() => {
@@ -242,7 +274,12 @@ describe('AUTOFIX-01: ERROR_CLASS routing', () => {
     expect(callArgs.issueId).toBe(`issue-${ISSUE}`);
   });
 
-  it('2: FLAKE → no SDK; ledger escalate:re-quarantine; exit 0', async () => {
+  it('2: FLAKE → no SDK; dispatchFlakeState routes via classifyRerunOutcomes (state=FLAKE default); ledger entry written; exit 0', async () => {
+    // Phase 45-03: FLAKE-labeled issues now route through dispatchFlakeState
+    // BEFORE the legacy Phase 42 ledger path. With the default beforeEach mock
+    // (state=FLAKE, action=re-quarantine + empty ring buffer + empty
+    // suppressions), the helper invokes quarantine-append via execFileSync and
+    // writes a `source: 'flake-dispatched'` ledger entry.
     setupExecFileSyncRouter([
       ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
       lsRemoteEmptyRule(),
@@ -251,10 +288,23 @@ describe('AUTOFIX-01: ERROR_CLASS routing', () => {
     expect(exit).toBe(0);
     expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
     expect(appendLedgerEntry).toHaveBeenCalled();
-    const [, entry] = vi.mocked(appendLedgerEntry).mock.calls[0];
-    expect(entry.escalate).toBe('re-quarantine');
-    expect(entry.cost_usd).toBe(0);
-    expect(entry.phase).toBe('42-auto-fix');
+    // Ledger entry must come from the new helper (source: 'flake-dispatched')
+    // and carry the classifyRerunOutcomes decision.
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    const flakeEntry = ledgerEntries.find((e) => e.source === 'flake-dispatched');
+    expect(flakeEntry).toBeDefined();
+    expect(flakeEntry.flakeState).toBe('FLAKE');
+    expect(flakeEntry.cost_usd).toBe(0);
+    expect(flakeEntry.phase).toBe('42-auto-fix');
+    // FLAKE state ALSO calls quarantine-append via execFileSync (the reset path).
+    const quarantineAppendCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'node' && Array.isArray(args) && args[0] === 'scripts/quarantine-append.mjs',
+    );
+    expect(quarantineAppendCalls.length).toBeGreaterThanOrEqual(1);
+    expect(quarantineAppendCalls[0][1]).toContain('--escalate-stable-runs-reset');
+    expect(quarantineAppendCalls[0][1]).toContain('1');
+    expect(quarantineAppendCalls[0][1]).toContain('--case');
   });
 
   it('3: LLM_API_ERROR → no SDK; ledger escalate:retry; exit 0', async () => {
@@ -626,5 +676,317 @@ describe('contract errors', () => {
     const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
     expect(exit).toBe(2);
     expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+  });
+});
+
+// =======================================================================
+// Phase 45-03 G1-G3: flake-investigation label guard (Step 4a — Pitfall 5)
+// =======================================================================
+
+describe('Phase 45-03 G1-G3: flake-investigation label guard (Step 4a Pitfall 5)', () => {
+  it('G1: label present with triage + FLAKE → exit 0 WITHOUT invoking SDK; stderr message', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE', 'flake-investigation'] }),
+    ]);
+    const stderrChunks = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk) => { stderrChunks.push(String(chunk)); return true; });
+    let exit;
+    try {
+      exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    } finally {
+      process.stderr.write = origWrite;
+    }
+    expect(exit).toBe(0);
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+    // The guard runs BEFORE Step 5 (countFixAttempts) and Step 6 (ls-remote),
+    // so neither should be reached.
+    expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'ls-remote')).toBe(0);
+    expect(stderrChunks.join('')).toContain('flake-investigation issues are human-only — auto-fix skipped');
+  });
+
+  it('G2: label absent (only triage + FLAKE) → guard does NOT short-circuit; falls through to FLAKE dispatch', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    // ls-remote was reached → guard did not short-circuit.
+    expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'ls-remote')).toBeGreaterThanOrEqual(1);
+    // Ledger entry exists from dispatchFlakeState
+    expect(appendLedgerEntry).toHaveBeenCalled();
+  });
+
+  it('G3: flake-investigation label alone (no ERROR_CLASS) → exit 0 (guard runs BEFORE Step 4 ERROR_CLASS extraction)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['flake-investigation'] }),
+    ]);
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    // Crucially: not exit 2. The guard fires before "no ERROR_CLASS" path.
+    expect(exit).toBe(0);
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+  });
+});
+
+// =======================================================================
+// Phase 45-03 D1-D6: FLAKE dispatch 5-state machine (Step 7 dispatchFlakeState)
+// =======================================================================
+
+describe('Phase 45-03 D1-D6: FLAKE dispatch 5-state machine (Step 7)', () => {
+  it('D1: state=FLAKE → quarantine-append invoked with arg ARRAY; ledger source:flake-dispatched; NO gh issue create', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({ state: 'FLAKE', action: 're-quarantine' });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    // quarantine-append invoked with arg ARRAY (CWE-94)
+    const quarantineCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'node' && Array.isArray(args) && args[0] === 'scripts/quarantine-append.mjs',
+    );
+    expect(quarantineCalls.length).toBe(1);
+    expect(quarantineCalls[0][1]).toEqual([
+      'scripts/quarantine-append.mjs',
+      '--escalate-stable-runs-reset', '1',
+      '--case', 'US11427642-spec-short-1',
+    ]);
+    // Ledger entry written with source:flake-dispatched and flakeState:FLAKE
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    const flakeEntry = ledgerEntries.find((e) => e.source === 'flake-dispatched');
+    expect(flakeEntry).toBeDefined();
+    expect(flakeEntry.flakeState).toBe('FLAKE');
+    // No gh issue create
+    expect(countCalls((cmd, args) => cmd === 'gh' && args[0] === 'issue' && args[1] === 'create')).toBe(0);
+  });
+
+  it('D2: state=INTERMITTENT → quarantine-append NOT called (per CONTEXT lock); ledger entry written; NO gh issue create', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({ state: 'INTERMITTENT', action: 're-quarantine' });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    // INTERMITTENT is NO-OP on corpus per 45-CONTEXT lock
+    const quarantineCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'node' && Array.isArray(args) && args[0] === 'scripts/quarantine-append.mjs',
+    );
+    expect(quarantineCalls.length).toBe(0);
+    // No gh issue create
+    expect(countCalls((cmd, args) => cmd === 'gh' && args[0] === 'issue' && args[1] === 'create')).toBe(0);
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    const intermittentEntry = ledgerEntries.find((e) => e.flakeState === 'INTERMITTENT');
+    expect(intermittentEntry).toBeDefined();
+    expect(intermittentEntry.source).toBe('flake-dispatched');
+  });
+
+  it('D3: state=FLAKE_ESCALATION → gh label create --force; gh issue create with flake-investigation label; atomicWriteJson writes suppression; quarantine-append ALSO invoked', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({
+      state: 'FLAKE_ESCALATION',
+      action: 'open-flake-investigation',
+      until: '2026-06-30T12:00:00.000Z',
+    });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    // gh label create --force for the flake-investigation label
+    const labelCreateCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'gh' && Array.isArray(args) &&
+        args[0] === 'label' && args[1] === 'create' &&
+        args.includes('flake-investigation') && args.includes('--force'),
+    );
+    expect(labelCreateCalls.length).toBeGreaterThanOrEqual(1);
+    // gh issue create with flake-investigation + fingerprint-prefix labels
+    const issueCreateCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'gh' && Array.isArray(args) &&
+        args[0] === 'issue' && args[1] === 'create',
+    );
+    expect(issueCreateCalls.length).toBe(1);
+    const issueArgs = issueCreateCalls[0][1];
+    expect(issueArgs).toContain('--label');
+    expect(issueArgs).toContain('flake-investigation');
+    expect(issueArgs).toContain(FP8);
+    expect(issueArgs).toContain('--title');
+    expect(issueArgs).toContain('--body');
+    // Suppression file written via atomicWriteJson
+    expect(atomicWriteJson).toHaveBeenCalled();
+    const [, suppressionContent] = vi.mocked(atomicWriteJson).mock.calls[0];
+    expect(suppressionContent).toContain(FP);
+    expect(suppressionContent).toContain('FLAKE_ESCALATION');
+    // Quarantine-append ALSO invoked (FLAKE_ESCALATION inherits FLAKE reset semantics)
+    const quarantineCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'node' && Array.isArray(args) && args[0] === 'scripts/quarantine-append.mjs',
+    );
+    expect(quarantineCalls.length).toBe(1);
+  });
+
+  it('D4: state=FLAKE_SUPPRESSED → no gh issue create, no suppression update, no quarantine-append; ledger source:flake-suppressed; exit 0', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({
+      state: 'FLAKE_SUPPRESSED',
+      action: 'skip',
+      until: '2026-06-15T00:00:00.000Z',
+    });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    // No gh issue create
+    expect(countCalls((cmd, args) => cmd === 'gh' && args[0] === 'issue' && args[1] === 'create')).toBe(0);
+    // No atomicWriteJson (no suppression update)
+    expect(atomicWriteJson).not.toHaveBeenCalled();
+    // No quarantine-append invocation
+    const quarantineCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'node' && Array.isArray(args) && args[0] === 'scripts/quarantine-append.mjs',
+    );
+    expect(quarantineCalls.length).toBe(0);
+    // Ledger entry has source:flake-suppressed
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    const suppressedEntry = ledgerEntries.find((e) => e.source === 'flake-suppressed');
+    expect(suppressedEntry).toBeDefined();
+    expect(suppressedEntry.flakeState).toBe('FLAKE_SUPPRESSED');
+    expect(suppressedEntry.suppressedUntil).toBe('2026-06-15T00:00:00.000Z');
+  });
+
+  it('D5: non-FLAKE skip class (LLM_API_ERROR) → Phase 42 ledger escalate:retry preserved byte-identical; ring buffer NOT read; quarantine-append NOT called', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'LLM_API_ERROR'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+    // Ring buffer NOT read (non-FLAKE never enters dispatchFlakeState)
+    expect(readRingBufferOrInit).not.toHaveBeenCalled();
+    // Quarantine-append NOT called
+    const quarantineCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === 'node' && Array.isArray(args) && args[0] === 'scripts/quarantine-append.mjs',
+    );
+    expect(quarantineCalls.length).toBe(0);
+    // Phase 42 ledger entry preserved byte-identical
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    const phase42Entry = ledgerEntries.find((e) => e.escalate === 'retry');
+    expect(phase42Entry).toBeDefined();
+    expect(phase42Entry.source).toBe('auto-fix-api');
+  });
+
+  it('D6: non-FLAKE skip class (PASS) → Phase 42 ledger escalate:close-as-pass preserved byte-identical', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'PASS'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    expect(readRingBufferOrInit).not.toHaveBeenCalled();
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    const phase42Entry = ledgerEntries.find((e) => e.escalate === 'close-as-pass');
+    expect(phase42Entry).toBeDefined();
+    expect(phase42Entry.source).toBe('auto-fix-api');
+  });
+});
+
+// =======================================================================
+// Phase 45-03 I1-I3: idempotency + CWE-94 hygiene
+// =======================================================================
+
+describe('Phase 45-03 I1-I3: idempotency + CWE-94 hygiene', () => {
+  it('I1: FLAKE_ESCALATION gh issue create includes a second --label arg equal to the 8-hex fingerprint prefix', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({
+      state: 'FLAKE_ESCALATION',
+      action: 'open-flake-investigation',
+      until: '2026-06-30T12:00:00.000Z',
+    });
+    await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    const issueCreateCall = vi.mocked(execFileSync).mock.calls.find(
+      ([cmd, args]) =>
+        cmd === 'gh' && Array.isArray(args) &&
+        args[0] === 'issue' && args[1] === 'create',
+    );
+    expect(issueCreateCall).toBeDefined();
+    const args = issueCreateCall[1];
+    // Count occurrences of '--label' — must be at least 2 (flake-investigation + fp8)
+    const labelIndices = args
+      .map((a, i) => (a === '--label' ? i : -1))
+      .filter((i) => i >= 0);
+    expect(labelIndices.length).toBeGreaterThanOrEqual(2);
+    const labelValues = labelIndices.map((i) => args[i + 1]);
+    expect(labelValues).toContain('flake-investigation');
+    expect(labelValues).toContain(FP8);
+  });
+
+  it('I2: FLAKE_ESCALATION calls gh label create --force BEFORE the issue create call', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({
+      state: 'FLAKE_ESCALATION',
+      action: 'open-flake-investigation',
+      until: '2026-06-30T12:00:00.000Z',
+    });
+    await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    const calls = vi.mocked(execFileSync).mock.calls;
+    const labelCreateIdx = calls.findIndex(
+      ([cmd, args]) =>
+        cmd === 'gh' && Array.isArray(args) &&
+        args[0] === 'label' && args[1] === 'create' &&
+        args.includes('flake-investigation') && args.includes('--force'),
+    );
+    const issueCreateIdx = calls.findIndex(
+      ([cmd, args]) =>
+        cmd === 'gh' && Array.isArray(args) &&
+        args[0] === 'issue' && args[1] === 'create',
+    );
+    expect(labelCreateIdx).toBeGreaterThanOrEqual(0);
+    expect(issueCreateIdx).toBeGreaterThanOrEqual(0);
+    expect(labelCreateIdx).toBeLessThan(issueCreateIdx);
+  });
+
+  it('I3: every execFileSync invocation from the new code uses an arg ARRAY (CWE-94)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({
+      state: 'FLAKE_ESCALATION',
+      action: 'open-flake-investigation',
+      until: '2026-06-30T12:00:00.000Z',
+    });
+    await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    // Every execFileSync call must have an array as the second argument.
+    // None may have a single shell-string argument.
+    for (const [cmd, args] of vi.mocked(execFileSync).mock.calls) {
+      expect(typeof cmd).toBe('string');
+      // Args must always be an array — never a single string concatenated with the command.
+      expect(Array.isArray(args)).toBe(true);
+    }
+    // Specifically: the quarantine-append invocation must pass caseId as a
+    // discrete array element, never concatenated into a shell string.
+    const quarantineCall = vi.mocked(execFileSync).mock.calls.find(
+      ([cmd, args]) =>
+        cmd === 'node' && Array.isArray(args) && args[0] === 'scripts/quarantine-append.mjs',
+    );
+    expect(quarantineCall).toBeDefined();
+    // The caseId is its own positional after --case
+    const caseIdx = quarantineCall[1].indexOf('--case');
+    expect(caseIdx).toBeGreaterThan(0);
+    expect(quarantineCall[1][caseIdx + 1]).toBe('US11427642-spec-short-1');
   });
 });

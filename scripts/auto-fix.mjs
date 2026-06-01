@@ -47,6 +47,8 @@
 
 import { parseArgs } from 'node:util';
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   buildFixPrompt,
@@ -62,12 +64,35 @@ import {
 } from '../tests/e2e/lib/llm-ledger.js';
 import { checkDiffGuard } from './check-diff-guard.mjs';
 import { ERROR_CLASSES } from '../tests/e2e/lib/error-codes.js';
+// Phase 45-03 — consume the 5-state classifier + ring buffer / suppression
+// IO helpers shipped in Plan 45-02. dispatchFlakeState wires Step 7's FLAKE
+// branch into the per-fingerprint state machine + flake-investigation issue
+// creation pipeline.
+import {
+  classifyRerunOutcomes,
+  readRingBufferOrInit,
+  readSuppressionsOrInit,
+  atomicWriteJson,
+  buildFlakeInvestigationBody,
+  FLAKE_SUPPRESSION_DAYS,
+} from '../tests/e2e/lib/triage-classifier.js';
 
 const PHASE = '42-auto-fix';
 const TRANSPORT = 'sdk';
 const MODEL = 'claude-sonnet-4-6';
 const FIX_ATTEMPT_CAP = 3;
 const HUMAN_REVIEW_LABEL = 'human-review-required';
+// Phase 45-03 — flake-investigation Step-4a dispatcher guard + Step-7
+// FLAKE_ESCALATION issue label. The label name is shared between the Step-4a
+// guard (refuses to auto-fix issues that already carry it) and the
+// dispatchFlakeState helper (creates it idempotently via `gh label create
+// --force` before opening a new flake-investigation issue).
+const FLAKE_INVESTIGATION_LABEL = 'flake-investigation';
+const __FILE_45_03 = fileURLToPath(import.meta.url);
+const __DIR_45_03 = path.dirname(__FILE_45_03);
+const __REPO_ROOT_45_03 = path.resolve(__DIR_45_03, '..');
+const RING_BUFFER_PATH = path.resolve(__REPO_ROOT_45_03, 'tests/e2e/.rerun-ring-buffer.json');
+const SUPPRESSION_PATH = path.resolve(__REPO_ROOT_45_03, 'tests/e2e/.flake-suppression.json');
 // Dispatcher recognizes the full ERROR_CLASSES taxonomy PLUS 'PASS' — PASS is
 // a status, not an error class, so it lives outside the closed RPT-02 enum,
 // but the dispatcher must short-circuit it via buildFixPrompt's
@@ -177,6 +202,176 @@ export function changedPathsFromDiff(diff) {
 }
 
 // ---------------------------------------------------------------------------
+// dispatchFlakeState — Phase 45-03 Plan 03 Task 2 (FLAKE-02)
+// ---------------------------------------------------------------------------
+
+/**
+ * Route a FLAKE-labeled issue through the 5-state classifier shipped in
+ * Plan 45-02. Returns the exit code (0 on every successful classification;
+ * null only on unexpected state-read failure — the caller falls back to the
+ * Phase 42 ledger entry for audit).
+ *
+ * Branch matrix (per 45-CONTEXT D-04 / Plan 45-03 lock):
+ *   FLAKE_SUPPRESSED  → ledger source:'flake-suppressed'; NO side effects;
+ *                       respects the existing 30-day suppression (Pitfall 2 RESEARCH).
+ *   FLAKE_ESCALATION  → idempotent `gh label create flake-investigation --force`,
+ *                       `gh issue create` with flake-investigation + fp8 labels,
+ *                       atomicWriteJson of suppression entry (until = now+30d),
+ *                       and THEN falls through to the quarantine-append reset.
+ *   FLAKE             → quarantine-append --escalate-stable-runs-reset 1 --case <id>
+ *                       (corpus reset) + ledger entry.
+ *   INTERMITTENT      → ledger entry only — corpus reset SKIPPED per CONTEXT lock
+ *                       (INTERMITTENT is no-op on corpus).
+ *   CONFIRMED_BUG / LIKELY_BUG → unreachable from a FLAKE label in practice;
+ *                       defensive stderr audit log + ledger entry.
+ *
+ * Every gh and node invocation uses execFileSync(cmd, [arg, ...]) with an
+ * arg array — CWE-94 hygiene; caseId is the only attacker-influenced value
+ * and it is sanitized upstream by sanitizeCaseId in Phase 35.
+ *
+ * @param {{caseId: string|null, fingerprint: string, issueNumber: number, now?: () => Date}} opts
+ * @returns {Promise<number|null>}
+ */
+export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, now = () => new Date() }) {
+  let ringBuffer;
+  let suppressionsFile;
+  try {
+    ringBuffer = readRingBufferOrInit(RING_BUFFER_PATH);
+    suppressionsFile = readSuppressionsOrInit(SUPPRESSION_PATH);
+  } catch (err) {
+    process.stderr.write(`[auto-fix] FLAKE dispatch state read failed: ${err.message}\n`);
+    return null;
+  }
+
+  const caseEntry =
+    (caseId && ringBuffer.cases && ringBuffer.cases[caseId]) || { outcomes: [], flakeHistory: [] };
+  const decision = classifyRerunOutcomes({
+    outcomes: caseEntry.outcomes,
+    fingerprint,
+    suppressions: suppressionsFile.suppressions,
+    flakeHistory: caseEntry.flakeHistory,
+    now,
+  });
+
+  // FLAKE_SUPPRESSED — respect the existing suppression; no side effects
+  if (decision.state === 'FLAKE_SUPPRESSED') {
+    appendLedgerEntry(LEDGER_PATH, {
+      iso: now().toISOString(),
+      model: MODEL,
+      cost_usd: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+      phase: PHASE,
+      transport: TRANSPORT,
+      issueId: `issue-${issueNumber}`,
+      fingerprint,
+      source: 'flake-suppressed',
+      flakeState: 'FLAKE_SUPPRESSED',
+      suppressedUntil: decision.until,
+    });
+    process.stdout.write(
+      `[auto-fix] FLAKE_SUPPRESSED for fingerprint ${fingerprint} (until ${decision.until}); exit 0\n`,
+    );
+    return 0;
+  }
+
+  // FLAKE_ESCALATION — create issue + write suppression; THEN fall through to
+  // the corpus reset below (FLAKE_ESCALATION inherits FLAKE's reset semantics).
+  if (decision.state === 'FLAKE_ESCALATION') {
+    const fp8Local = (fingerprint ?? '').slice(0, 8);
+    // Idempotent label create (mirrors Phase 42 HUMAN_REVIEW_LABEL pattern)
+    try {
+      execFileSync('gh', ['label', 'create', FLAKE_INVESTIGATION_LABEL, '--force'], {
+        encoding: 'utf8',
+      });
+    } catch (_) {
+      // Label may already exist — `--force` keeps it idempotent. Swallow.
+    }
+    try {
+      const body = buildFlakeInvestigationBody({
+        caseId: caseId ?? '<unknown-case>',
+        fingerprint,
+        outcomes: caseEntry.outcomes,
+        flakeHistory: caseEntry.flakeHistory,
+      });
+      execFileSync(
+        'gh',
+        [
+          'issue', 'create',
+          '--title', `[flake-investigation] ${caseId ?? `issue-${issueNumber}`} fingerprint ${fp8Local}`,
+          '--label', FLAKE_INVESTIGATION_LABEL,
+          '--label', fp8Local,
+          '--body', body,
+        ],
+        { encoding: 'utf8' },
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[auto-fix] gh issue create (flake-investigation) failed (non-fatal): ${err.message}\n`,
+      );
+    }
+    // Suppression entry — 30-day cooldown (Pitfall 2 RESEARCH defense)
+    suppressionsFile.suppressions[fingerprint] = {
+      until: new Date(now().getTime() + FLAKE_SUPPRESSION_DAYS * 86400_000).toISOString(),
+      reason: 'FLAKE_ESCALATION',
+    };
+    try {
+      atomicWriteJson(SUPPRESSION_PATH, JSON.stringify(suppressionsFile, null, 2) + '\n');
+    } catch (err) {
+      process.stderr.write(`[auto-fix] suppression file write failed: ${err.message}\n`);
+    }
+  }
+
+  // FLAKE or FLAKE_ESCALATION → invoke quarantine-append --escalate-stable-runs-reset 1 --case <id>.
+  // INTERMITTENT → no-op on corpus per 45-CONTEXT lock.
+  if ((decision.state === 'FLAKE' || decision.state === 'FLAKE_ESCALATION') && caseId) {
+    try {
+      execFileSync(
+        'node',
+        [
+          'scripts/quarantine-append.mjs',
+          '--escalate-stable-runs-reset', '1',
+          '--case', caseId,
+        ],
+        { encoding: 'utf8' },
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[auto-fix] quarantine-append reset failed (non-fatal): ${err.message}\n`,
+      );
+    }
+  }
+
+  // Defensive audit log for unreachable-from-FLAKE-label states
+  if (decision.state === 'CONFIRMED_BUG' || decision.state === 'LIKELY_BUG') {
+    process.stderr.write(
+      `[auto-fix] FLAKE label but classifyRerunOutcomes returned ${decision.state} ` +
+        `for fingerprint ${fingerprint} — producer/consumer mismatch; logging for audit\n`,
+    );
+  }
+
+  // Ledger entry summarizing the dispatch decision
+  appendLedgerEntry(LEDGER_PATH, {
+    iso: now().toISOString(),
+    model: MODEL,
+    cost_usd: 0,
+    tokens_in: 0,
+    tokens_out: 0,
+    phase: PHASE,
+    transport: TRANSPORT,
+    issueId: `issue-${issueNumber}`,
+    fingerprint,
+    source: 'flake-dispatched',
+    flakeState: decision.state,
+    flakeAction: decision.action,
+  });
+  process.stdout.write(
+    `[auto-fix] FLAKE dispatch for issue #${issueNumber} state=${decision.state} action=${decision.action}; exit 0\n`,
+  );
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // runDispatcher — the 18-step pipeline (Plan 42-02 Task 2)
 // ---------------------------------------------------------------------------
 
@@ -237,6 +432,22 @@ export async function runDispatcher({
   const fp8 = fingerprint.slice(0, 8);
   const branchName = `auto-fix/${issue}-${fp8}`;
   const caseId = extractCaseId(issueBody);
+
+  // ─── Step 4a (Phase 45-03 Pitfall 5) — flake-investigation guard ───────
+  // Refuse to auto-fix any issue that already carries the flake-investigation
+  // label, BEFORE the ERROR_CLASS extraction in Step 4. Without this guard,
+  // an operator-misclick that adds `triage` to a flake-investigation issue
+  // would loop auto-fix on the investigation issue itself (Pitfall 5).
+  const labelNames45_03 = (issueJson.labels ?? [])
+    .map((l) => (typeof l === 'string' ? l : l?.name))
+    .filter(Boolean);
+  if (labelNames45_03.includes(FLAKE_INVESTIGATION_LABEL)) {
+    process.stderr.write(
+      `[auto-fix] issue #${issue} carries the '${FLAKE_INVESTIGATION_LABEL}' label — ` +
+        `flake-investigation issues are human-only — auto-fix skipped\n`,
+    );
+    return 0;
+  }
 
   // ─── Step 4 — ERROR_CLASS extraction ──────────────────────────────────
   const errorClass = extractErrorClass(issueJson.labels);
@@ -318,6 +529,19 @@ export async function runDispatcher({
   // ─── Step 7 — buildFixPrompt + skip-class short-circuit ───────────────
   const built = buildFixPrompt({ errorClass, issueBody });
   if (!built.ok) {
+    // Phase 45-03 — FLAKE label dispatches through the 5-state classifier.
+    // Non-FLAKE skip classes (LLM_API_ERROR, PASS) preserve the Phase 42
+    // ledger entry byte-identical.
+    if (errorClass === 'FLAKE') {
+      const exitCode = await dispatchFlakeState({
+        caseId,
+        fingerprint,
+        issueNumber: issue,
+      });
+      if (exitCode !== null) return exitCode;
+      // Defensive fall-through: helper returned null only on unexpected
+      // state-read failure — preserve Phase 42 ledger entry below for audit.
+    }
     appendLedgerEntry(LEDGER_PATH, {
       iso: new Date().toISOString(),
       model: MODEL,

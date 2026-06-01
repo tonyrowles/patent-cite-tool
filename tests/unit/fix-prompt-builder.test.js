@@ -94,10 +94,21 @@ describe('Phase 42 PROMPT-03: PROMPT_SCAFFOLDS registry shape', () => {
     expect(Object.isFrozen(PROMPT_SCAFFOLDS)).toBe(true);
   });
 
-  it('has EXACTLY 1 key in Phase 42 (WRONG_CITATION); Phase 45 will add the other 4', () => {
+  // Phase 42 originally asserted EXACTLY 1 key (WRONG_CITATION). Phase 45 Plan
+  // 01 extended the registry to 5 keys. The 5-key shape regression guard
+  // lives in the new `describe('Phase 45 PROMPT-03 extension: ...')` block
+  // below. We keep this case as a documentation marker that the count is now
+  // load-bearing at 5.
+  it('has EXACTLY 5 keys after Phase 45 expansion (WRONG_CITATION + 4 additions)', () => {
     const keys = Object.keys(PROMPT_SCAFFOLDS);
-    expect(keys.length).toBe(1);
-    expect(keys).toEqual(['WRONG_CITATION']);
+    expect(keys.length).toBe(5);
+    expect(keys.sort()).toEqual([
+      'GOOGLE_DOM_DRIFT',
+      'HARNESS_ERROR',
+      'LLM_HALLUCINATED_SELECTION',
+      'WORKER_FALLBACK_FAILED',
+      'WRONG_CITATION',
+    ]);
   });
 
   it('PROMPT_SCAFFOLDS.WRONG_CITATION is callable and returns a non-empty string', () => {
@@ -128,12 +139,16 @@ describe('Phase 42 PROMPT-03: skip-class returns are exact escalation shapes', (
     expect(r).toEqual({ ok: false, escalate: 'close-as-pass' });
   });
 
-  it('unsupported errorClass (e.g. GOOGLE_DOM_DRIFT — Phase 45 adds it) → unsupported-class:<name>', () => {
-    const r = buildFixPrompt({ errorClass: 'GOOGLE_DOM_DRIFT', issueBody: 'x' });
+  // Phase 42 used GOOGLE_DOM_DRIFT as the canonical "unsupported, Phase 45
+  // will add it" exemplar. Phase 45 Plan 01 promoted it into PROMPT_SCAFFOLDS,
+  // so the unsupported-class exemplar changes to a synthesized class name
+  // that lives in NEITHER PROMPT_SCAFFOLDS NOR SKIP_CLASS_ESCALATIONS.
+  it('unsupported errorClass (synthesized BOGUS_CLASS) → unsupported-class:<name>', () => {
+    const r = buildFixPrompt({ errorClass: 'BOGUS_CLASS_NOT_IN_RPT02', issueBody: 'x' });
     expect(r.ok).toBe(false);
     expect(typeof r.escalate).toBe('string');
     expect(r.escalate.startsWith('unsupported-class:')).toBe(true);
-    expect(r.escalate).toContain('GOOGLE_DOM_DRIFT');
+    expect(r.escalate).toContain('BOGUS_CLASS_NOT_IN_RPT02');
   });
 });
 
@@ -271,5 +286,119 @@ describe('Phase 45 PROMPT-03 extension: buildScaffoldSystemPrompt helper', () =>
     const out = PROMPT_SCAFFOLDS.WRONG_CITATION();
     expect(out).toContain('cite-by-position');
     expect(out).toContain('col:line');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 45 PROMPT-03 extension: PROMPT_SCAFFOLDS shape (5 keys, all frozen)
+// ---------------------------------------------------------------------------
+
+describe('Phase 45 PROMPT-03 extension: 4 new ERROR_CLASS scaffolds', () => {
+  const FORBIDDEN_PATH_LITERALS = [
+    'tests/test-cases.js',
+    'tests/golden/baseline.json',
+    'tests/e2e/test-cases-quarantine.js',
+    '.github/workflows/v40-',
+    'tests/e2e/.llm-spend-ledger.json',
+    '.github/CODEOWNERS',
+  ];
+
+  // Per-class surface fingerprint — each class names ≥1 unique fix-surface
+  // path so the registry routing cannot accidentally re-use WRONG_CITATION's
+  // contract for another class.
+  const CLASS_SURFACE_FINGERPRINTS = {
+    LLM_HALLUCINATED_SELECTION: ['tests/e2e/lib/select-text.js'],
+    WORKER_FALLBACK_FAILED: ['src/cf-worker/index.js', 'src/shared/uspto-fallback.js'],
+    GOOGLE_DOM_DRIFT: ['tests/e2e/lib/google-patents-page.js', 'data-testid'],
+    HARNESS_ERROR: ['tests/e2e/specs/', 'Playwright config'],
+  };
+
+  it('PROMPT_SCAFFOLDS exports exactly 5 keys (WRONG_CITATION + 4 Phase 45 additions)', () => {
+    const keys = Object.keys(PROMPT_SCAFFOLDS).sort();
+    expect(keys).toEqual([
+      'GOOGLE_DOM_DRIFT',
+      'HARNESS_ERROR',
+      'LLM_HALLUCINATED_SELECTION',
+      'WORKER_FALLBACK_FAILED',
+      'WRONG_CITATION',
+    ]);
+  });
+
+  it('PROMPT_SCAFFOLDS remains Object.frozen after extension', () => {
+    expect(Object.isFrozen(PROMPT_SCAFFOLDS)).toBe(true);
+  });
+
+  it('mutation attempt on PROMPT_SCAFFOLDS throws TypeError in strict mode', () => {
+    'use strict';
+    expect(() => {
+      PROMPT_SCAFFOLDS.NEW_KEY = () => 'x';
+    }).toThrow(TypeError);
+  });
+
+  it('every PROMPT_SCAFFOLDS value is a thunk returning a non-empty string', () => {
+    for (const k of Object.keys(PROMPT_SCAFFOLDS)) {
+      expect(typeof PROMPT_SCAFFOLDS[k]).toBe('function');
+      const out = PROMPT_SCAFFOLDS[k]();
+      expect(typeof out).toBe('string');
+      expect(out.length).toBeGreaterThan(200);
+    }
+  });
+
+  // Per-class assertion battery (envelope + class-in-prompt + 6 forbidden +
+  // fence-by-value + class-specific surface fingerprints).
+  for (const className of Object.keys(CLASS_SURFACE_FINGERPRINTS)) {
+    it(`${className}: buildFixPrompt returns ok:true envelope-wrapped result with class-specific fix surface`, () => {
+      const issueBody = `<!-- fp: 0123456789ab -->\ncase-id: sample-1\nrationale text`;
+      const r = buildFixPrompt({ errorClass: className, issueBody });
+
+      // (a) ok:true
+      expect(r.ok).toBe(true);
+
+      // (b) userPrompt LITERAL: ENVELOPE_OPEN\n<body>\nENVELOPE_CLOSE
+      expect(r.userPrompt).toBe(`${ENVELOPE_OPEN}\n${issueBody}\n${ENVELOPE_CLOSE}`);
+
+      // (c) systemPrompt contains the class name
+      expect(r.systemPrompt).toContain(className);
+
+      // (d) systemPrompt contains the class-specific surface paths
+      for (const surface of CLASS_SURFACE_FINGERPRINTS[className]) {
+        expect(r.systemPrompt).toContain(surface);
+      }
+
+      // (e) systemPrompt enumerates all 6 forbidden paths verbatim
+      for (const p of FORBIDDEN_PATH_LITERALS) {
+        expect(r.systemPrompt).toContain(p);
+      }
+
+      // (f) systemPrompt contains the diff-fence values
+      expect(r.systemPrompt).toContain(DIFF_FENCE_START);
+      expect(r.systemPrompt).toContain(DIFF_FENCE_END);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Phase 45 PROMPT-03 extension: skip-class returns UNCHANGED
+// ---------------------------------------------------------------------------
+//
+// Regression guard against accidentally promoting FLAKE / LLM_API_ERROR / PASS
+// out of SKIP_CLASS_ESCALATIONS into PROMPT_SCAFFOLDS. The new dispatcher
+// side effects (FLAKE quarantine-append reset, flake-investigation issue
+// creation) live in scripts/auto-fix.mjs Step 7 (Phase 45-03), NOT here.
+
+describe('Phase 45 PROMPT-03 extension: skip-class returns unchanged', () => {
+  it('FLAKE STILL returns {ok:false, escalate:"re-quarantine"}', () => {
+    const r = buildFixPrompt({ errorClass: 'FLAKE', issueBody: 'irrelevant' });
+    expect(r).toEqual({ ok: false, escalate: 're-quarantine' });
+  });
+
+  it('LLM_API_ERROR STILL returns {ok:false, escalate:"retry"}', () => {
+    const r = buildFixPrompt({ errorClass: 'LLM_API_ERROR', issueBody: 'irrelevant' });
+    expect(r).toEqual({ ok: false, escalate: 'retry' });
+  });
+
+  it('PASS STILL returns {ok:false, escalate:"close-as-pass"}', () => {
+    const r = buildFixPrompt({ errorClass: 'PASS', issueBody: 'irrelevant' });
+    expect(r).toEqual({ ok: false, escalate: 'close-as-pass' });
   });
 });

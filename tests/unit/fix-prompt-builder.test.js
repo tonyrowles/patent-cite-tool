@@ -38,6 +38,7 @@ import {
   ENVELOPE_CLOSE,
   DIFF_FENCE_START,
   DIFF_FENCE_END,
+  buildScaffoldSystemPrompt,
 } from '../../tests/e2e/lib/fix-prompt-builder.js';
 
 // ---------------------------------------------------------------------------
@@ -163,5 +164,112 @@ describe('Phase 42 PROMPT-01: WRONG_CITATION systemPrompt content', () => {
     for (const p of FORBIDDEN_PATH_LITERALS) {
       expect(r.systemPrompt).toContain(p);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 45 PROMPT-03 extension: buildScaffoldSystemPrompt helper
+// ---------------------------------------------------------------------------
+//
+// The Phase 45 plan extracts the 5-section system-prompt boilerplate
+// (trust-boundary, fix-surface-contract, forbidden-paths, diff-size-cap,
+// output-format) into a single pure helper so the 4 new ERROR_CLASS scaffolds
+// share a single source of truth with the existing WRONG_CITATION_SYSTEM.
+//
+// The helper takes { className, fixSurfaceContract } and returns the assembled
+// system-prompt string. Existing Phase 42 tests above keep proving the
+// composed WRONG_CITATION output is byte-stable on the load-bearing substrings
+// (envelope wrapping, forbidden paths, diff-fence values).
+
+describe('Phase 45 PROMPT-03 extension: buildScaffoldSystemPrompt helper', () => {
+  it('is exported as a function', () => {
+    expect(typeof buildScaffoldSystemPrompt).toBe('function');
+  });
+
+  it('returns a string interpolating the className into the opening sentence', () => {
+    const out = buildScaffoldSystemPrompt({
+      className: 'LLM_HALLUCINATED_SELECTION',
+      fixSurfaceContract: 'edit foo.js',
+    });
+    expect(typeof out).toBe('string');
+    expect(out).toContain('LLM_HALLUCINATED_SELECTION');
+    expect(out).toContain('senior TypeScript/JavaScript engineer');
+  });
+
+  it('contains the literal Trust boundary section referencing ENVELOPE_OPEN/CLOSE by value', () => {
+    const out = buildScaffoldSystemPrompt({
+      className: 'WORKER_FALLBACK_FAILED',
+      fixSurfaceContract: 'irrelevant',
+    });
+    expect(out).toContain('## Trust boundary');
+    expect(out).toContain(ENVELOPE_OPEN);
+    expect(out).toContain(ENVELOPE_CLOSE);
+    expect(out).toMatch(/UNTRUSTED DATA/);
+  });
+
+  it('splices the fixSurfaceContract argument into a ## Fix surface contract section', () => {
+    const contract = 'EDIT: src/foo.js\nDO NOT: widen the selector\nBLAH BLAH';
+    const out = buildScaffoldSystemPrompt({
+      className: 'GOOGLE_DOM_DRIFT',
+      fixSurfaceContract: contract,
+    });
+    expect(out).toContain('## Fix surface contract');
+    expect(out).toContain('EDIT: src/foo.js');
+    expect(out).toContain('DO NOT: widen the selector');
+  });
+
+  it('enumerates all 6 LOCKED forbidden paths verbatim regardless of className', () => {
+    const out = buildScaffoldSystemPrompt({
+      className: 'HARNESS_ERROR',
+      fixSurfaceContract: 'noop',
+    });
+    const FORBIDDEN_PATH_LITERALS = [
+      'tests/test-cases.js',
+      'tests/golden/baseline.json',
+      'tests/e2e/test-cases-quarantine.js',
+      '.github/workflows/v40-',
+      'tests/e2e/.llm-spend-ledger.json',
+      '.github/CODEOWNERS',
+    ];
+    expect(out).toContain('## Forbidden paths');
+    for (const p of FORBIDDEN_PATH_LITERALS) {
+      expect(out).toContain(p);
+    }
+  });
+
+  it('contains the diff-size-cap section with ≤200 / ≤50 line thresholds', () => {
+    const out = buildScaffoldSystemPrompt({
+      className: 'WRONG_CITATION',
+      fixSurfaceContract: 'noop',
+    });
+    expect(out).toContain('## Diff size cap');
+    expect(out).toContain('≤200 lines');
+    expect(out).toContain('≤50 lines');
+    expect(out).toContain('TODO(human-review)');
+  });
+
+  it('contains the output-format section with DIFF_FENCE_START/END values', () => {
+    const out = buildScaffoldSystemPrompt({
+      className: 'WRONG_CITATION',
+      fixSurfaceContract: 'noop',
+    });
+    expect(out).toContain('## Output format');
+    expect(out).toContain(DIFF_FENCE_START);
+    expect(out).toContain(DIFF_FENCE_END);
+    expect(out).toContain('===DIFF_START===');
+    expect(out).toContain('===DIFF_END===');
+  });
+
+  it('is pure — same inputs produce byte-identical output across calls', () => {
+    const inputs = { className: 'HARNESS_ERROR', fixSurfaceContract: 'foo\nbar\nbaz' };
+    const a = buildScaffoldSystemPrompt(inputs);
+    const b = buildScaffoldSystemPrompt(inputs);
+    expect(a).toBe(b);
+  });
+
+  it('refactored WRONG_CITATION_SYSTEM still preserves cite-by-position contract substring', () => {
+    const out = PROMPT_SCAFFOLDS.WRONG_CITATION();
+    expect(out).toContain('cite-by-position');
+    expect(out).toContain('col:line');
   });
 });

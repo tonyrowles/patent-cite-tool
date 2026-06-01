@@ -56,6 +56,7 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('../e2e/lib/llm-driver.js', () => ({
   invokeAnthropicSdkWithLedger: vi.fn(),
+  invokeClaudePWithLedger: vi.fn(),
 }));
 
 vi.mock('../e2e/lib/llm-ledger.js', () => ({
@@ -86,7 +87,7 @@ vi.mock('../e2e/lib/triage-classifier.js', () => ({
 // -----------------------------------------------------------------------
 
 import { execFileSync } from 'node:child_process';
-import { invokeAnthropicSdkWithLedger } from '../e2e/lib/llm-driver.js';
+import { invokeAnthropicSdkWithLedger, invokeClaudePWithLedger } from '../e2e/lib/llm-driver.js';
 import {
   readLedger,
   appendLedgerEntry,
@@ -222,6 +223,7 @@ function countCalls(predicate) {
 beforeEach(() => {
   vi.mocked(execFileSync).mockReset();
   vi.mocked(invokeAnthropicSdkWithLedger).mockReset();
+  vi.mocked(invokeClaudePWithLedger).mockReset();
   vi.mocked(readLedger).mockReset().mockReturnValue({ version: 1, months: {} });
   vi.mocked(appendLedgerEntry).mockReset();
   vi.mocked(countFixAttempts).mockReset().mockReturnValue(0);
@@ -988,5 +990,258 @@ describe('Phase 45-03 I1-I3: idempotency + CWE-94 hygiene', () => {
     const caseIdx = quarantineCall[1].indexOf('--case');
     expect(caseIdx).toBeGreaterThan(0);
     expect(quarantineCall[1][caseIdx + 1]).toBe('US11427642-spec-short-1');
+  });
+});
+
+// =======================================================================
+// Phase 46 — subscription transport routing + --push
+// =======================================================================
+
+describe('Phase 46 — subscription transport routing + --push', () => {
+  it('46.1: transport=subscription routes to invokeClaudePWithLedger (NOT SDK); passes phase=46-fix-issue + source=fix-issue-cli', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckOkRule(),
+      applyOkRule(),
+      checkoutOkRule(),
+      commitOkRule(),
+    ]);
+    vi.mocked(invokeClaudePWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0,
+      rawJson: {},
+    });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'subscription' });
+    expect(exit).toBe(0);
+    expect(invokeClaudePWithLedger).toHaveBeenCalledTimes(1);
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+    const callArgs = vi.mocked(invokeClaudePWithLedger).mock.calls[0][0];
+    expect(typeof callArgs.systemPrompt).toBe('string');
+    expect(callArgs.systemPrompt.length).toBeGreaterThan(0);
+    expect(typeof callArgs.userPrompt).toBe('string');
+    expect(callArgs.phase).toBe('46-fix-issue');
+    expect(callArgs.source).toBe('fix-issue-cli');
+    // Subscription wrapper takes systemPrompt (string), NOT systemBlocks
+    expect(callArgs.systemBlocks).toBeUndefined();
+  });
+
+  it('46.2: transport=sdk invokes invokeAnthropicSdkWithLedger byte-identically to Phase 42 (regression guard)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckOkRule(),
+      applyOkRule(),
+      checkoutOkRule(),
+      commitOkRule(),
+      pushOkRule(),
+    ]);
+    vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0.05,
+      rawJson: {},
+    });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    expect(invokeAnthropicSdkWithLedger).toHaveBeenCalledTimes(1);
+    expect(invokeClaudePWithLedger).not.toHaveBeenCalled();
+    const callArgs = vi.mocked(invokeAnthropicSdkWithLedger).mock.calls[0][0];
+    // Pitfall 6: systemBlocks array form with cache_control preserved
+    expect(Array.isArray(callArgs.systemBlocks)).toBe(true);
+    expect(callArgs.systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
+    expect(callArgs.model).toBe('claude-sonnet-4-6');
+    expect(callArgs.phase).toBe('42-auto-fix');
+    expect(callArgs.issueId).toBe(`issue-${ISSUE}`);
+    expect(callArgs.forceApi).toBe(true);
+  });
+
+  it('46.3: transport=subscription, push=false, noPush=false → NO `git push`; stdout hint with "--push"', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckOkRule(),
+      applyOkRule(),
+      checkoutOkRule(),
+      commitOkRule(),
+    ]);
+    vi.mocked(invokeClaudePWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0,
+      rawJson: {},
+    });
+    const stdoutChunks = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk) => { stdoutChunks.push(String(chunk)); return true; });
+    let exit;
+    try {
+      exit = await runDispatcher({ issue: ISSUE, transport: 'subscription' });
+    } finally {
+      process.stdout.write = origWrite;
+    }
+    expect(exit).toBe(0);
+    expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'push')).toBe(0);
+    expect(stdoutChunks.join('')).toMatch(/--push/);
+  });
+
+  it('46.4: transport=subscription, push=true → DOES `git push -u origin <branch>`', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckOkRule(),
+      applyOkRule(),
+      checkoutOkRule(),
+      commitOkRule(),
+      pushOkRule(),
+    ]);
+    vi.mocked(invokeClaudePWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0,
+      rawJson: {},
+    });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'subscription', push: true });
+    expect(exit).toBe(0);
+    const pushCalls = vi.mocked(execFileSync).mock.calls.filter(
+      ([cmd, args]) => cmd === 'git' && args[0] === 'push',
+    );
+    expect(pushCalls.length).toBe(1);
+    expect(pushCalls[0][1]).toEqual(['push', '-u', 'origin', BRANCH]);
+  });
+
+  it('46.5: transport=subscription, push=true, noPush=true → NO push (--no-push wins)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckOkRule(),
+      applyOkRule(),
+      checkoutOkRule(),
+      commitOkRule(),
+    ]);
+    vi.mocked(invokeClaudePWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0,
+      rawJson: {},
+    });
+    const exit = await runDispatcher({
+      issue: ISSUE,
+      transport: 'subscription',
+      push: true,
+      noPush: true,
+    });
+    expect(exit).toBe(0);
+    expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'push')).toBe(0);
+  });
+
+  it('46.6: transport=sdk, push=true, noPush=true → NO push (--no-push wins under sdk too)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckOkRule(),
+      applyOkRule(),
+      checkoutOkRule(),
+      commitOkRule(),
+    ]);
+    vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0.05,
+      rawJson: {},
+    });
+    const exit = await runDispatcher({
+      issue: ISSUE,
+      transport: 'sdk',
+      forceApi: true,
+      push: true,
+      noPush: true,
+    });
+    expect(exit).toBe(0);
+    expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'push')).toBe(0);
+  });
+
+  it('46.7: transport=sdk, push=false, noPush=false → DOES push (Phase 42 default — regression guard)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckOkRule(),
+      applyOkRule(),
+      checkoutOkRule(),
+      commitOkRule(),
+      pushOkRule(),
+    ]);
+    vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0.05,
+      rawJson: {},
+    });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'push')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('46.8: unrecognized --transport returns exit 2 with allow-list in stderr', async () => {
+    const stderrChunks = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk) => { stderrChunks.push(String(chunk)); return true; });
+    let exit;
+    try {
+      exit = await runDispatcher({ issue: ISSUE, transport: 'banana' });
+    } finally {
+      process.stderr.write = origWrite;
+    }
+    expect(exit).toBe(2);
+    expect(execFileSync).not.toHaveBeenCalled();
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+    expect(invokeClaudePWithLedger).not.toHaveBeenCalled();
+    const stderr = stderrChunks.join('');
+    expect(stderr).toMatch(/unrecognized .*--transport.*'banana'/);
+    expect(stderr).toMatch(/expected one of: sdk, subscription/);
+  });
+
+  it('46.9: invokeClaudePWithLedger ledger entry carries transport: "subscription" (driver patch verification)', async () => {
+    // This test exercises the one-line driver patch indirectly by inspecting
+    // a fresh dynamic import of the real llm-driver.js — vi.mock at the top of
+    // this file replaces the named import, but we need to read the *real*
+    // appendLedgerEntry call site, so we use a sandboxed setup: mock
+    // invokeClaudeP at the module level, then call invokeClaudePWithLedger
+    // and inspect the ledger writer. Because vi.mock replaces the driver
+    // module in this file's scope, we assert the patch at the source-text
+    // level instead: read tests/e2e/lib/llm-driver.js and assert the
+    // appendLedgerEntry call inside invokeClaudePWithLedger includes
+    // `transport: 'subscription'`. This is a static guard — the runtime
+    // assertion lives in the integration-test surface (Phase 47 HUMAN-UAT).
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const url = await import('node:url');
+    const __dirname46 = path.dirname(url.fileURLToPath(import.meta.url));
+    const driverPath = path.resolve(__dirname46, '..', 'e2e', 'lib', 'llm-driver.js');
+    const driverSrc = fs.readFileSync(driverPath, 'utf8');
+    // Locate the invokeClaudePWithLedger function body
+    const fnIdx = driverSrc.indexOf('export async function invokeClaudePWithLedger');
+    expect(fnIdx).toBeGreaterThan(-1);
+    // Slice from function start until next top-level export (defensive bound)
+    const sliceEnd = driverSrc.indexOf('\nexport ', fnIdx + 1);
+    const fnBody = driverSrc.slice(fnIdx, sliceEnd > -1 ? sliceEnd : undefined);
+    // The appendLedgerEntry call inside this body must include
+    // transport: 'subscription'
+    const appendIdx = fnBody.indexOf('appendLedgerEntry(LEDGER_PATH');
+    expect(appendIdx).toBeGreaterThan(-1);
+    // Look at the next ~400 chars after the appendLedgerEntry start
+    const appendBlock = fnBody.slice(appendIdx, appendIdx + 400);
+    expect(appendBlock).toMatch(/transport:\s*['"]subscription['"]/);
+    // And the CI guard at the top of the function is preserved
+    expect(fnBody).toContain("process.env.CI === 'true'");
+    expect(fnBody).toContain('subscription-local invariant (CI detected)');
   });
 });

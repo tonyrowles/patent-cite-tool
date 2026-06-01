@@ -85,6 +85,10 @@ import {
   checkPrCap,
   combinedMonthlyTotal,
   combinedMonthlyTotalByTransport,
+  // Phase 42 AUTOFIX-05 — count of Phase 42 auto-fix iterations for a given
+  // fingerprint. Sibling of phaseTotal; consumed by Plan 42-02 dispatcher to
+  // cap retries at 3 before adding the `human-review-required` label.
+  countFixAttempts,
 } from '../e2e/lib/llm-ledger.js';
 
 let tmpDir;
@@ -1026,5 +1030,177 @@ describe('Phase 39 LEDGER-04: committed ledger flip', () => {
     );
     const gitignore = fs.readFileSync(path.join(REPO_ROOT, '.gitignore'), 'utf8');
     expect(gitignore).not.toContain('tests/e2e/.llm-spend-ledger.json');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 42 AUTOFIX-05 — countFixAttempts(ledger, fingerprint) helper
+//
+// Sibling of phaseTotal — same defensive-filter shape, same cross-month
+// iteration. Filters iterations where:
+//   it.phase === '42-auto-fix'  AND  it.fingerprint === fingerprint
+// and returns the COUNT (not the cost sum — that's phaseTotal's job).
+//
+// Plan 42-02's scripts/auto-fix.mjs dispatcher imports this to cap
+// auto-fix retries at 3 per fingerprint before adding the
+// `human-review-required` label and refusing further auto-fix on that
+// fingerprint (per CONTEXT D-AUTOFIX-05).
+//
+// Defensive: returns 0 on null/undefined ledger; on non-string or empty
+// fingerprint; on missing months object. Mirrors phaseTotal's null-guard
+// pattern exactly.
+// ---------------------------------------------------------------------------
+
+describe('Phase 42 AUTOFIX-05: countFixAttempts(ledger, fingerprint)', () => {
+  const FP = 'deadbeef1234';
+  const OTHER_FP = 'cafebabe5678';
+
+  it('Test 50: empty/missing ledger → returns 0', () => {
+    expect(countFixAttempts({}, FP)).toBe(0);
+    expect(countFixAttempts({ months: {} }, FP)).toBe(0);
+    expect(countFixAttempts(null, FP)).toBe(0);
+    expect(countFixAttempts(undefined, FP)).toBe(0);
+  });
+
+  it('Test 51: ledger with no phase=42-auto-fix entries → returns 0', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1,
+          total_usd: 0.5,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            // Phase 32 entry, NOT 42-auto-fix → ignored.
+            { iso: '2026-05-18T00:00:00.000Z', cost_usd: 0.5, phase: '32', fingerprint: FP },
+            // Phase 39 entry → ignored.
+            { iso: '2026-05-19T00:00:00.000Z', cost_usd: 0.1, phase: '39', fingerprint: FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(0);
+  });
+
+  it('Test 52: 3 matching entries in a single month → returns 3', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 3,
+          total_usd: 0.30,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            { iso: 'a', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'b', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'c', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(3);
+  });
+
+  it('Test 53: matches across MULTIPLE months (2 in month A + 1 in month B) → returns 3', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-04': {
+          invocations: 2,
+          total_usd: 0.20,
+          last_invocation_iso: '2026-04-29T00:00:00.000Z',
+          iterations: [
+            { iso: '2026-04-28T00:00:00.000Z', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: '2026-04-29T00:00:00.000Z', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+          ],
+        },
+        '2026-05': {
+          invocations: 1,
+          total_usd: 0.10,
+          last_invocation_iso: '2026-05-02T00:00:00.000Z',
+          iterations: [
+            { iso: '2026-05-02T00:00:00.000Z', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(3);
+  });
+
+  it('Test 54: mixed — 5 phase=42-auto-fix entries but only 2 match the requested fingerprint → returns 2', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 5,
+          total_usd: 0.50,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            { iso: 'a', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'b', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: OTHER_FP },
+            { iso: 'c', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: OTHER_FP },
+            { iso: 'd', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'e', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: OTHER_FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(2);
+    expect(countFixAttempts(ledger, OTHER_FP)).toBe(3);
+  });
+
+  it('Test 55: defensive — non-string/empty fingerprint → returns 0; missing fingerprint field → ignored', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 2,
+          total_usd: 0.20,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            { iso: 'a', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            // Entry with NO fingerprint field — must NOT count even when caller
+            // passes undefined (otherwise `undefined === undefined` collapses).
+            { iso: 'b', cost_usd: 0.10, phase: '42-auto-fix' },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, null)).toBe(0);
+    expect(countFixAttempts(ledger, undefined)).toBe(0);
+    expect(countFixAttempts(ledger, '')).toBe(0);
+    expect(countFixAttempts(ledger, 12345)).toBe(0);
+    expect(countFixAttempts(ledger, {})).toBe(0);
+    // Sanity: with a valid fingerprint the legitimate entry is found.
+    expect(countFixAttempts(ledger, FP)).toBe(1);
+  });
+
+  it('Test 56: round-trip with appendLedgerEntry — write 3 entries, read back, count = 3', () => {
+    // Exercises the canonical write path (Plan 42-02 dispatcher will use the
+    // same appendLedgerEntry call) and proves countFixAttempts reads them
+    // correctly. tmpDir-per-test pattern keeps the real on-disk ledger pristine.
+    appendLedgerEntry(ledgerPath, makeEntry({
+      cost_usd: 0.05,
+      phase: '42-auto-fix',
+      fingerprint: FP,
+      iteration_n: 1,
+    }));
+    appendLedgerEntry(ledgerPath, makeEntry({
+      cost_usd: 0.05,
+      phase: '42-auto-fix',
+      fingerprint: FP,
+      iteration_n: 2,
+    }));
+    appendLedgerEntry(ledgerPath, makeEntry({
+      cost_usd: 0.05,
+      phase: '42-auto-fix',
+      fingerprint: FP,
+      iteration_n: 3,
+    }));
+
+    const written = readLedger(ledgerPath);
+    expect(countFixAttempts(written, FP)).toBe(3);
+    // Cross-fingerprint isolation.
+    expect(countFixAttempts(written, OTHER_FP)).toBe(0);
   });
 });

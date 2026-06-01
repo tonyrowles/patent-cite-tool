@@ -416,6 +416,8 @@ export async function invokeClaudePWithLedger({
 
   // Step 5 — Append to ledger ALWAYS (Pitfall 8: cost may be 0 on hard
   // failures but is still recorded for forensic reconciliation).
+  // Phase 46-01 (AUTOFIX-06): self-tag transport so forensic greps over the
+  // committed ledger don't have to infer subscription-vs-sdk by absence.
   appendLedgerEntry(LEDGER_PATH, {
     iso: new Date().toISOString(),
     model: modelId,
@@ -423,6 +425,7 @@ export async function invokeClaudePWithLedger({
     tokens_in: parsed.rawJson?.usage?.input_tokens ?? 0,
     tokens_out: parsed.rawJson?.usage?.output_tokens ?? 0,
     phase,
+    transport: 'subscription',
     source,
   });
 

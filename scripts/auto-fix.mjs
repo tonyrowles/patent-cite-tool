@@ -23,12 +23,19 @@
 //
 // CLI:
 //   node scripts/auto-fix.mjs --issue <n> [--transport sdk|subscription=sdk]
-//                              [--force-api] [--dry-run] [--no-push]
+//                              [--force-api] [--dry-run] [--push] [--no-push]
+//
+// Phase 46-01 (AUTOFIX-06): --transport subscription routes to
+// invokeClaudePWithLedger; default push semantics are INVERTED for
+// subscription (no-push unless --push) so local iteration never accidentally
+// touches origin. --no-push always wins. sdk transport behavior is
+// byte-identical to Phase 42 (pushes by default).
 //
 // Exit codes:
 //   0 — diff applied + branch pushed; OR --dry-run printed; OR skip-class
-//       short-circuit; OR --no-push staged the branch; OR idempotent skip
-//       (branch already exists on origin).
+//       short-circuit; OR --no-push staged the branch; OR subscription branch
+//       staged locally (--push not set); OR idempotent skip (branch already
+//       exists on origin).
 //   1 — rejected (apply-check fail, diff-guard violation, malformed-diff,
 //       sdk_error).
 //   2 — argv / contract error (missing --issue; missing fingerprint line;
@@ -55,7 +62,10 @@ import {
   DIFF_FENCE_START,
   DIFF_FENCE_END,
 } from '../tests/e2e/lib/fix-prompt-builder.js';
-import { invokeAnthropicSdkWithLedger } from '../tests/e2e/lib/llm-driver.js';
+import {
+  invokeAnthropicSdkWithLedger,
+  invokeClaudePWithLedger,
+} from '../tests/e2e/lib/llm-driver.js';
 import {
   readLedger,
   appendLedgerEntry,
@@ -80,6 +90,13 @@ import {
 const PHASE = '42-auto-fix';
 const TRANSPORT = 'sdk';
 const MODEL = 'claude-sonnet-4-6';
+// Phase 46-01 (AUTOFIX-06) — subscription-transport routing constants.
+// PHASE_46 tags ledger entries written by invokeClaudePWithLedger; SOURCE_FIX_ISSUE
+// distinguishes the local-iteration `npm run fix-issue` call site from the
+// nightly auto-fix-api path.
+const PHASE_46 = '46-fix-issue';
+const SOURCE_FIX_ISSUE = 'fix-issue-cli';
+const VALID_TRANSPORTS = new Set(['sdk', 'subscription']);
 const FIX_ATTEMPT_CAP = 3;
 const HUMAN_REVIEW_LABEL = 'human-review-required';
 // Phase 45-03 — flake-investigation Step-4a dispatcher guard + Step-7
@@ -381,10 +398,11 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, now
  *
  * @param {object} opts
  * @param {number} opts.issue            — required; GH issue number
- * @param {string} [opts.transport='sdk'] — 'sdk' (Phase 42); 'subscription' deferred to Phase 46
- * @param {boolean} [opts.forceApi=false] — bypass the INVERSE CI gate
+ * @param {string} [opts.transport='sdk'] — 'sdk' (Phase 42 SDK) or 'subscription' (Phase 46 — routes to invokeClaudePWithLedger)
+ * @param {boolean} [opts.forceApi=false] — bypass the INVERSE CI gate (sdk only)
  * @param {boolean} [opts.dryRun=false]   — print prompt; no SDK, no apply, no push, no ledger
- * @param {boolean} [opts.noPush=false]   — commit locally; skip the final `git push`
+ * @param {boolean} [opts.push=false]     — Phase 46 opt-in push for subscription. For sdk transport this is a no-op (sdk pushes by default; --no-push overrides both).
+ * @param {boolean} [opts.noPush=false]   — commit locally; skip the final `git push` (wins over --push under both transports)
  * @returns {Promise<number>} exit code
  */
 export async function runDispatcher({
@@ -392,6 +410,7 @@ export async function runDispatcher({
   transport = TRANSPORT,
   forceApi = false,
   dryRun = false,
+  push = false,
   noPush = false,
 } = {}) {
   // ─── Step 1 — argv / contract guard ────────────────────────────────────
@@ -399,10 +418,13 @@ export async function runDispatcher({
     process.stderr.write('[auto-fix] missing required --issue <n>\n');
     return 2;
   }
-  if (transport !== 'sdk') {
+  // Phase 46-01 (AUTOFIX-06): allow-list guard — accepts 'sdk' and
+  // 'subscription'. Unknown transports exit 2 with the canonical list so
+  // typos surface immediately.
+  if (!VALID_TRANSPORTS.has(transport)) {
     process.stderr.write(
-      `[auto-fix] transport '${transport}' not supported in Phase 42 ` +
-        '(subscription is Phase 46); use --transport sdk\n',
+      `[auto-fix] unrecognized --transport '${transport}'; ` +
+        `expected one of: ${[...VALID_TRANSPORTS].join(', ')}\n`,
     );
     return 2;
   }
@@ -583,15 +605,32 @@ export async function runDispatcher({
     },
   ];
 
-  // ─── Step 10 — invokeAnthropicSdkWithLedger ───────────────────────────
-  const sdkResult = await invokeAnthropicSdkWithLedger({
-    systemBlocks,
-    userPrompt,
-    model: MODEL,
-    phase: PHASE,
-    issueId: `issue-${issue}`,
-    forceApi,
-  });
+  // ─── Step 10 — LLM dispatch (transport-branched, Phase 46-01) ─────────
+  // Subscription transport flows through invokeClaudePWithLedger — a v3.1
+  // local-only wrapper with a CI-refusal guard (Pitfall 8 in PITFALLS.md;
+  // see tests/e2e/lib/llm-driver.js:387-393). The wrapper takes systemPrompt
+  // (string) — NOT systemBlocks — and does NOT honor cache_control (no SDK
+  // surface for it), so we use the plain prompt here. The result shape
+  // (ok/ciGate/capBlocked/errorReason) is contract-identical to
+  // invokeAnthropicSdkWithLedger, so the error mapper below works for both.
+  let sdkResult;
+  if (transport === 'subscription') {
+    sdkResult = await invokeClaudePWithLedger({
+      systemPrompt,
+      userPrompt,
+      phase: PHASE_46,
+      source: SOURCE_FIX_ISSUE,
+    });
+  } else {
+    sdkResult = await invokeAnthropicSdkWithLedger({
+      systemBlocks,
+      userPrompt,
+      model: MODEL,
+      phase: PHASE,
+      issueId: `issue-${issue}`,
+      forceApi,
+    });
+  }
 
   if (!sdkResult.ok) {
     if (sdkResult.ciGate) {
@@ -726,10 +765,20 @@ export async function runDispatcher({
     return 1;
   }
 
-  // ─── Step 17 — git push (unless --no-push) ────────────────────────────
-  if (noPush) {
+  // ─── Step 17 — git push (truth table; Phase 46-01) ────────────────────
+  // Truth table (locked in 46-PLAN <interfaces>):
+  //   transport=sdk          → push by default; --no-push overrides
+  //   transport=subscription → NO-push by default; --push opts in;
+  //                            --no-push wins over --push under both
+  const shouldPush = (() => {
+    if (noPush) return false;
+    if (push) return true;
+    return transport === 'sdk';
+  })();
+  if (!shouldPush) {
     process.stdout.write(
-      `[auto-fix] branch staged locally; push manually with: git push -u origin ${branchName}\n`,
+      `[auto-fix] branch staged locally; push manually with: ` +
+        `git push -u origin ${branchName} (or rerun with --push)\n`,
     );
   } else {
     try {
@@ -770,6 +819,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         transport: { type: 'string', default: 'sdk' },
         'force-api': { type: 'boolean', default: false },
         'dry-run': { type: 'boolean', default: false },
+        push: { type: 'boolean', default: false },
         'no-push': { type: 'boolean', default: false },
         help: { type: 'boolean', default: false },
       },
@@ -783,14 +833,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   if (parsed.values.help) {
     process.stdout.write(
-      'Usage: node scripts/auto-fix.mjs --issue <n> [--transport sdk] [--force-api] [--dry-run] [--no-push]\n' +
+      'Usage: node scripts/auto-fix.mjs --issue <n> [--transport sdk|subscription] [--force-api] [--dry-run] [--push] [--no-push]\n' +
         '\n' +
-        'Dispatcher for the Phase 42 WRONG_CITATION vertical-slice auto-fix loop.\n' +
-        'Reads `gh issue view <n>`, routes ERROR_CLASS labels through PROMPT_SCAFFOLDS,\n' +
-        'invokes the Anthropic SDK with cache_control, validates the response diff\n' +
-        '(diff-guard + `git apply --check`), and creates a branch on success.\n' +
+        'Dispatcher for the WRONG_CITATION auto-fix loop. Reads `gh issue view <n>`,\n' +
+        'routes ERROR_CLASS labels through PROMPT_SCAFFOLDS, invokes the LLM (SDK or\n' +
+        'subscription `claude -p`), validates the response diff (diff-guard +\n' +
+        '`git apply --check`), and creates a branch on success.\n' +
         '\n' +
-        'Exit codes: 0=applied/dry-run/skip; 1=rejected; 2=arg/contract error; 3=cap.\n',
+        '--transport sdk (default) pushes the branch by default; --no-push overrides.\n' +
+        '--transport subscription routes to the local `claude -p` ledgered wrapper\n' +
+        '(CI-refused) and does NOT push unless --push is set. --no-push wins under\n' +
+        'both transports.\n' +
+        '\n' +
+        'Exit codes: 0=applied/dry-run/skip/staged-locally; 1=rejected; 2=arg/contract error; 3=cap.\n',
     );
     process.exit(0);
   }
@@ -811,6 +866,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     transport: parsed.values.transport,
     forceApi: parsed.values['force-api'],
     dryRun: parsed.values['dry-run'],
+    push: parsed.values.push,
     noPush: parsed.values['no-push'],
   }).then(
     (code) => process.exit(code),

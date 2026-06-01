@@ -65,6 +65,7 @@ Out of scope (later phases):
 - **Test fixture for the manual demo:** pick a real v3.1 quarantine entry per the locked decision above; the executor commits the recorded transcript (issue URL + SDK call ledger ID + workflow-run URL) as evidence in the SUMMARY.
 - **PR creation for the demo:** MANUAL via `gh pr create --draft --base main --head auto-fix/<n>-<fp8>` from CLI. Phase 43 automates this with `peter-evans/create-pull-request@v8`.
 - **Whether to support `--dry-run` in Phase 42:** YES — without it, every test run is a real SDK call costing dollars. Dry-run is the way to test the dispatcher logic in CI without burning budget.
+- **Test-time ledger routing (locked 2026-05-31):** Vitest unit tests for `auto-fix.mjs` MUST route ledger writes to a tmpdir via the v3.1 `E2E_LEDGER_PATH_OVERRIDE` env var (which throws under CI per Phase 32 D-15; locally it routes to the override path). This keeps `tests/e2e/.llm-spend-ledger.json` byte-stable across `npm test` runs — only REAL CLI invocations (dry-run AND live) write to the committed ledger. The dispatcher reads `LEDGER_PATH` (which resolves via the v3.1 fallback chain — override wins locally, default elsewhere) and passes it through to `appendLedgerEntry`. No code change needed in the driver/ledger; the test setUp blocks set + tearDown blocks unset the env var.
 
 </decisions>
 

@@ -4,14 +4,14 @@ milestone: v4.0
 milestone_name: Self-Healing Test Suite
 status: completed
 stopped_at: ROADMAP.md + STATE.md + REQUIREMENTS.md traceability written; ready to plan Phase 39
-last_updated: "2026-05-31T18:35:36.896Z"
-last_activity: 2026-05-31 -- Phase 41 marked complete
+last_updated: "2026-06-01T01:58:19.851Z"
+last_activity: 2026-06-01 -- Phase 42 marked complete
 progress:
   total_phases: 9
-  completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
-  percent: 33
+  completed_phases: 4
+  total_plans: 15
+  completed_plans: 15
+  percent: 44
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 41 — Verifier-Gate Workflow + verify-single-case.mjs CLI Shim
+**Current focus:** Phase 42 — fix-prompt-builder + WRONG_CITATION Vertical Slice
 
 ## Current Position
 
-Phase: 41 — COMPLETE
-Plan: 1 of 4
-Status: Phase 41 complete
-Last activity: 2026-05-31 -- Phase 41 marked complete
+Phase: 42 — COMPLETE
+Plan: 1 of 3
+Status: Phase 42 complete
+Last activity: 2026-06-01 -- Phase 42 marked complete
 
 Progress: [░░░░░░░░░░] 0%
 

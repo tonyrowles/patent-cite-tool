@@ -146,7 +146,7 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
 - [x] **Phase 39: SDK Driver + Ledger v2 + Branch Protection Wave-0** (4/4 plans) — completed 2026-05-31 — SDK transport (`invokeAnthropicSdkWithLedger`), unified ledger schema with transport/phase fields + sub-caps, committed ledger flip, ESLint guard on `@anthropic-ai/sdk`, repo-level `Allow auto-merge: OFF` + branch protection ruleset + CODEOWNERS
 - [x] **Phase 40: Deps-Update + Cost-Ledger-Snapshot Workflows** (4/4 plans) — completed 2026-05-31 — `v40-deps-update.yml` weekly cron with nightly-suite gate; `v40-cost-ledger-snapshot.yml` daily snapshot; security/minor PR partitioning; verifier `pdfjs-dist` pinned separately
 - [x] **Phase 41: Verifier-Gate Workflow + verify-single-case.mjs** (4/4 plans) — completed 2026-05-31 — `v40-verifier-gate.yml` on `auto-fix/*` branches; 3× affected-case + 76-case regression; diff-size cap; verifier pinned to `origin/main`; diff-guard regex bank
-- [ ] **Phase 42: fix-prompt-builder + WRONG_CITATION Vertical Slice** — `lib/fix-prompt-builder.js` with `<issue_body_untrusted>` envelope and FORBIDDEN_DELIMITERS escape; `scripts/auto-fix.mjs` core dispatcher with `git apply --check`, branch-existence idempotency, fix_attempts retry; local end-to-end on WRONG_CITATION only
+- [x] **Phase 42: fix-prompt-builder + WRONG_CITATION Vertical Slice** (3/3 plans, code-side; live demo deferred to Phase 47 CLEANUP-03 HUMAN-UAT (a)) — completed 2026-05-31 — `lib/fix-prompt-builder.js` with `<issue_body_untrusted>` envelope and FORBIDDEN_DELIMITERS escape; `scripts/auto-fix.mjs` core dispatcher with `git apply --check`, branch-existence idempotency, fix_attempts retry; local end-to-end on WRONG_CITATION only
 - [ ] **Phase 43: v40-auto-fix.yml Workflow** — lift Phase 42 script into `issues.labeled('triage')` workflow via `peter-evans/create-pull-request@v8`; draft PR with `<!-- affected_cases -->` HTML comment; per-issue concurrency
 - [ ] **Phase 44: v40-auto-promote.yml + Triple-Gate `_skipCiGuard`** — on merge + `auto-fix:verified` label, follow-up PR adds case to `test-cases.js` (NEVER direct-to-main); triple-gate assertion reconstructs human-gate invariant; post-merge verifier re-check on main HEAD
 - [ ] **Phase 45: Per-ERROR_CLASS Expansion + FLAKE 5-State Machine** — 4 more classes (LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, HARNESS_ERROR); 5-state classifier with rolling 10-element ring buffer; FLAKE_ESCALATION after N=3 re-files with 30-day suppress
@@ -295,7 +295,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | 39. SDK Driver + Ledger v2 + Branch Protection | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 4/4 | Complete | 2026-05-31 |
-| 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 0/3 | Planned | - |
+| 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 3/3 | Complete (demo deferred) | 2026-05-31 |
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 0/TBD | Not started | - |
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 0/TBD | Not started | - |
 | 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 0/TBD | Not started | - |

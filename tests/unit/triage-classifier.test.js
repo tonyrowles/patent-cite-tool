@@ -47,6 +47,12 @@ import {
   atomicWriteJson,
   wrapPatentData,
   CLUSTER_THRESHOLD,
+  // Phase 45-02 (FLAKE-01 + FLAKE-02) sibling exports — 5-state classifier
+  classifyRerunOutcomes,
+  FLAKE_ESCALATION_N,
+  FLAKE_ESCALATION_WINDOW_DAYS,
+  FLAKE_SUPPRESSION_DAYS,
+  RING_BUFFER_SIZE,
 } from '../e2e/lib/triage-classifier.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1405,4 +1411,270 @@ describe('schema invariant — mixed run (TRIAGE-05 extended)', () => {
       .toBe(report.summary.total_findings);
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// Phase 45-02 (FLAKE-01 + FLAKE-02) — 5-state classifier sibling exports
+//
+// Truth table for classifyRerunOutcomes (LOCKED per 45-CONTEXT D-04):
+//   FLAKE_SUPPRESSED  — suppressions[fingerprint].until > now (precedence over all outcomes analysis)
+//   CONFIRMED_BUG     — last 10 outcomes all 'fail' (zero pass) AND last 3 all 'fail'
+//   LIKELY_BUG        — failures >= 7 in last 10 outcomes
+//   INTERMITTENT      — failures in {4,5,6} in last 10 outcomes
+//   FLAKE_ESCALATION  — failures <= 3 AND (recentFlakes within 14d + 1) >= 3
+//   FLAKE             — failures <= 3 AND (recentFlakes within 14d + 1) < 3
+//
+// runTriage tests above are PRESERVED BYTE-IDENTICAL — these are sibling tests
+// for the NEW pure function. Pitfall 1 in 45-RESEARCH: this is a different
+// signal source (rolling outcomes array) than runTriage's per-iteration verdicts.
+// ---------------------------------------------------------------------------
+
+const NOW_FIXED = () => new Date('2026-05-31T00:00:00Z');
+const NOW_FIXED_MS = new Date('2026-05-31T00:00:00Z').getTime();
+
+function fillOutcomes(count, value) {
+  return new Array(count).fill(value);
+}
+
+describe('classifyRerunOutcomes (Phase 45-02 FLAKE-01 + FLAKE-02)', () => {
+  describe('FLAKE_SUPPRESSED branch (takes precedence over outcomes)', () => {
+    // T1
+    it('T1: FLAKE_SUPPRESSED takes precedence — suppression covers future even when outcomes are all-fail', () => {
+      const fingerprint = 'abc123def456';
+      const result = classifyRerunOutcomes({
+        outcomes: fillOutcomes(10, 'fail'),
+        fingerprint,
+        suppressions: { [fingerprint]: { until: '2099-01-01T00:00:00Z', reason: 'FLAKE_ESCALATION' } },
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('FLAKE_SUPPRESSED');
+      expect(result.action).toBe('skip');
+      expect(result.until).toBe('2099-01-01T00:00:00Z');
+    });
+
+    // T1b
+    it('T1b: expired suppression falls through to normal classification (10 fails → CONFIRMED_BUG)', () => {
+      const fingerprint = 'abc123def456';
+      const result = classifyRerunOutcomes({
+        outcomes: fillOutcomes(10, 'fail'),
+        fingerprint,
+        suppressions: { [fingerprint]: { until: '2020-01-01T00:00:00Z', reason: 'FLAKE_ESCALATION' } },
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('CONFIRMED_BUG');
+      expect(result.action).toBe('auto-fix');
+    });
+  });
+
+  describe('CONFIRMED_BUG branch', () => {
+    // T2
+    it('T2: 10 fails (zero pass) → CONFIRMED_BUG / auto-fix', () => {
+      const result = classifyRerunOutcomes({
+        outcomes: fillOutcomes(10, 'fail'),
+        fingerprint: 'aaa111bbb222',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('CONFIRMED_BUG');
+      expect(result.action).toBe('auto-fix');
+    });
+
+    // T2b — boundary: even 1 pass forfeits CONFIRMED_BUG → falls to LIKELY_BUG
+    it('T2b: 9 fails + 1 trailing pass → NOT CONFIRMED_BUG, falls to LIKELY_BUG (9 failures ≥ 7)', () => {
+      const outcomes = [...fillOutcomes(9, 'fail'), 'pass'];
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'aaa111bbb222',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('LIKELY_BUG');
+      expect(result.action).toBe('auto-fix');
+    });
+  });
+
+  describe('LIKELY_BUG branch', () => {
+    // T3
+    it('T3: 7 fails + 3 pass → LIKELY_BUG / auto-fix', () => {
+      const outcomes = [...fillOutcomes(7, 'fail'), 'pass', 'pass', 'pass'];
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'ccc333ddd444',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('LIKELY_BUG');
+      expect(result.action).toBe('auto-fix');
+    });
+
+    // T3b — failures>=7 with last 3 being fail still NOT CONFIRMED_BUG (a pass exists in window)
+    it('T3b: 7 fails + 3 pass with last 3 = fail → LIKELY_BUG (not CONFIRMED_BUG: pass present in window)', () => {
+      const outcomes = ['pass', 'pass', 'pass', 'fail', 'fail', 'fail', 'fail', 'fail', 'fail', 'fail'];
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'ccc333ddd444',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('LIKELY_BUG');
+      expect(result.action).toBe('auto-fix');
+    });
+  });
+
+  describe('INTERMITTENT branch', () => {
+    // T4 — failures = 4
+    it('T4: 4 fails + 6 pass → INTERMITTENT / re-quarantine', () => {
+      const outcomes = [...fillOutcomes(4, 'fail'), ...fillOutcomes(6, 'pass')];
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'eee555fff666',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('INTERMITTENT');
+      expect(result.action).toBe('re-quarantine');
+    });
+
+    // T4b — failures = 6 still INTERMITTENT (NOT LIKELY_BUG — 6 < 7)
+    it('T4b: 6 fails + 4 pass → INTERMITTENT (upper bound; 6 < 7 escapes LIKELY_BUG)', () => {
+      const outcomes = [...fillOutcomes(6, 'fail'), ...fillOutcomes(4, 'pass')];
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'eee555fff666',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('INTERMITTENT');
+      expect(result.action).toBe('re-quarantine');
+    });
+  });
+
+  describe('FLAKE branch', () => {
+    // T5 — failures = 3, no recent flake history
+    it('T5: 3 fails + 7 pass, empty flakeHistory → FLAKE / re-quarantine (no `until` field)', () => {
+      const outcomes = [...fillOutcomes(3, 'fail'), ...fillOutcomes(7, 'pass')];
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'ggg777hhh888',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('FLAKE');
+      expect(result.action).toBe('re-quarantine');
+      expect(result.until).toBeUndefined();
+    });
+  });
+
+  describe('FLAKE_ESCALATION branch', () => {
+    // T6 — recentFlakes=2 within 14d window; 2+1=3 reaches FLAKE_ESCALATION_N=3
+    it('T6: 2 fails + 8 pass, flakeHistory has 2 entries within 14d → FLAKE_ESCALATION + 30d `until`', () => {
+      const outcomes = [...fillOutcomes(2, 'fail'), ...fillOutcomes(8, 'pass')];
+      const fiveDaysAgo = new Date(NOW_FIXED_MS - 5 * 86400_000).toISOString();
+      const tenDaysAgo = new Date(NOW_FIXED_MS - 10 * 86400_000).toISOString();
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'iii999jjj000',
+        suppressions: {},
+        flakeHistory: [{ classifiedAtIso: fiveDaysAgo }, { classifiedAtIso: tenDaysAgo }],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('FLAKE_ESCALATION');
+      expect(result.action).toBe('open-flake-investigation');
+      // until = now + 30d
+      const expectedUntil = new Date(NOW_FIXED_MS + 30 * 86400_000).toISOString();
+      expect(result.until).toBe(expectedUntil);
+    });
+
+    // T6b — both flake history entries OUTSIDE 14d window → recentFlakes=0; 0+1=1 < 3 → stays FLAKE
+    it('T6b: flakeHistory entries OUTSIDE 14d window do not count → stays FLAKE (not FLAKE_ESCALATION)', () => {
+      const outcomes = [...fillOutcomes(2, 'fail'), ...fillOutcomes(8, 'pass')];
+      const twentyDaysAgo = new Date(NOW_FIXED_MS - 20 * 86400_000).toISOString();
+      const twentyFiveDaysAgo = new Date(NOW_FIXED_MS - 25 * 86400_000).toISOString();
+      const result = classifyRerunOutcomes({
+        outcomes,
+        fingerprint: 'iii999jjj000',
+        suppressions: {},
+        flakeHistory: [{ classifiedAtIso: twentyDaysAgo }, { classifiedAtIso: twentyFiveDaysAgo }],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('FLAKE');
+      expect(result.action).toBe('re-quarantine');
+    });
+  });
+
+  describe('Degenerate / edge inputs', () => {
+    // T7 — empty outcomes does not throw
+    it('T7: empty outcomes, no suppression → FLAKE (failures=0 ≤ 3, recentFlakes+1=1 < 3); does not throw', () => {
+      const result = classifyRerunOutcomes({
+        outcomes: [],
+        fingerprint: 'kkk111lll222',
+        suppressions: {},
+        flakeHistory: [],
+        now: NOW_FIXED,
+      });
+      expect(result.state).toBe('FLAKE');
+      expect(result.action).toBe('re-quarantine');
+    });
+
+    it('Defensive: no args → does not throw (all defaults)', () => {
+      const result = classifyRerunOutcomes();
+      expect(result.state).toBe('FLAKE');
+    });
+
+    it('Defensive: undefined optional fields → does not throw', () => {
+      const result = classifyRerunOutcomes({
+        outcomes: undefined,
+        fingerprint: undefined,
+        suppressions: undefined,
+        flakeHistory: undefined,
+        now: undefined,
+      });
+      expect(result.state).toBe('FLAKE');
+    });
+  });
+
+  describe('T8: constants pinned (FLAKE-02 static-grep guarantee)', () => {
+    it('T8a: 4 exported constants equal the LOCKED literal values (3, 14, 30, 10)', () => {
+      expect(FLAKE_ESCALATION_N).toBe(3);
+      expect(FLAKE_ESCALATION_WINDOW_DAYS).toBe(14);
+      expect(FLAKE_SUPPRESSION_DAYS).toBe(30);
+      expect(RING_BUFFER_SIZE).toBe(10);
+    });
+
+    it('T8b: source file statically pins the 4 constants on their own lines (grep-gate hygiene)', () => {
+      // Strip comment-only lines so a header docstring discussing the constants
+      // cannot self-invalidate the grep pin. The plan locks: 3, 14, 30, 10.
+      const srcPath = path.resolve(__dirname, '..', 'e2e', 'lib', 'triage-classifier.js');
+      const src = fs.readFileSync(srcPath, 'utf8')
+        .split('\n')
+        .filter((l) => !l.trim().startsWith('//'))
+        .join('\n');
+      expect(src).toMatch(/^export const FLAKE_ESCALATION_N = 3;?$/m);
+      expect(src).toMatch(/^export const FLAKE_ESCALATION_WINDOW_DAYS = 14;?$/m);
+      expect(src).toMatch(/^export const FLAKE_SUPPRESSION_DAYS = 30;?$/m);
+      expect(src).toMatch(/^export const RING_BUFFER_SIZE = 10;?$/m);
+    });
+  });
+
+  describe('T9: sibling-export non-regression (runTriage et al. still exported)', () => {
+    it('T9: Phase 34 v3.1 surface still exported and same shape', () => {
+      expect(typeof runTriage).toBe('function');
+      expect(typeof wrapPatentData).toBe('function');
+      expect(typeof VERIFIER_STRONG_AGREEMENT).toBe('function');
+      expect(Array.isArray(SEVERITIES)).toBe(true);
+      expect(SEVERITIES.length).toBe(5);
+      expect(CLUSTER_THRESHOLD).toBe(5);
+      expect(typeof atomicWriteJson).toBe('function');
+      expect(typeof emptyTriageReport).toBe('function');
+    });
+  });
 });

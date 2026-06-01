@@ -26,6 +26,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // D-02: VERIFIER_STRONG_AGREEMENT named gate (Pitfall 2 mitigation)
@@ -712,6 +713,207 @@ export function classifyRerunOutcomes({
   }
 
   return { state: 'FLAKE', action: 're-quarantine' };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 45-02 — ring-buffer + suppression IO helpers
+// ---------------------------------------------------------------------------
+//
+// The committed JSON state files live at:
+//   tests/e2e/.rerun-ring-buffer.json   — {version:1, cases:{<caseId>: {outcomes, flakeHistory, updatedAt}}}
+//   tests/e2e/.flake-suppression.json   — {version:1, suppressions:{<fingerprint>: {until, reason}}}
+//
+// Read helpers fail loudly on corruption (wrong-version OR JSON.parse error)
+// to avoid silently re-bootstrapping over committed history. Bootstrap is the
+// EXPLICIT decision to commit a v1 sentinel; transparent re-bootstrap on a
+// corrupt file would mask data loss (Pitfall 3 in 45-RESEARCH).
+
+const __TRIAGE_CLASSIFIER_FILE = fileURLToPath(import.meta.url);
+const __TRIAGE_CLASSIFIER_DIR = path.dirname(__TRIAGE_CLASSIFIER_FILE);
+// tests/e2e/lib/triage-classifier.js → ../../../ is repo root → tests/e2e/<file>.
+const DEFAULT_RING_BUFFER_PATH = path.resolve(
+  __TRIAGE_CLASSIFIER_DIR,
+  '..',
+  '.rerun-ring-buffer.json',
+);
+const DEFAULT_SUPPRESSION_PATH = path.resolve(
+  __TRIAGE_CLASSIFIER_DIR,
+  '..',
+  '.flake-suppression.json',
+);
+
+/**
+ * Reads the rerun ring buffer file. Bootstraps to {version:1, cases:{}} if the
+ * file does not exist. Throws on corruption (wrong version, malformed JSON,
+ * wrong shape) so callers learn IMMEDIATELY that committed state was damaged
+ * rather than silently re-bootstrapping over real history.
+ *
+ * @param {string} filePath
+ * @returns {{version:1, cases: Object<string, {outcomes:string[], flakeHistory:Array, updatedAt:string}>}}
+ */
+export function readRingBufferOrInit(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return { version: 1, cases: {} };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (err) {
+    throw new Error(
+      `rerun ring buffer at ${filePath} is corrupt or wrong version: ${err.message}`,
+    );
+  }
+  if (
+    !parsed ||
+    parsed.version !== 1 ||
+    typeof parsed.cases !== 'object' ||
+    parsed.cases === null
+  ) {
+    throw new Error(
+      `rerun ring buffer at ${filePath} is corrupt or wrong version: expected {version:1, cases:{...}}`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * Reads the flake-suppression file. Bootstraps to {version:1, suppressions:{}}
+ * if absent. Same fail-loud corruption-rejection semantics as readRingBufferOrInit.
+ *
+ * @param {string} filePath
+ * @returns {{version:1, suppressions: Object<string, {until:string, reason:string}>}}
+ */
+export function readSuppressionsOrInit(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return { version: 1, suppressions: {} };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (err) {
+    throw new Error(
+      `flake suppression file at ${filePath} is corrupt or wrong version: ${err.message}`,
+    );
+  }
+  if (
+    !parsed ||
+    parsed.version !== 1 ||
+    typeof parsed.suppressions !== 'object' ||
+    parsed.suppressions === null
+  ) {
+    throw new Error(
+      `flake suppression file at ${filePath} is corrupt or wrong version: expected {version:1, suppressions:{...}}`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * Append a single rerun outcome to the per-case ring buffer. Reads (or
+ * bootstraps) the file via readRingBufferOrInit, appends with slice(-10) to
+ * enforce the rolling-window invariant, prunes flakeHistory entries older
+ * than FLAKE_ESCALATION_WINDOW_DAYS at write time, and persists atomically.
+ *
+ * Race semantics (Pitfall 3): atomic POSIX rename + EXDEV fallback (via
+ * atomicWriteJson) makes neither write corrupt the file. Concurrent writers
+ * may have a last-write-wins outcome — acceptable for a 10-element rolling
+ * window (one lost append shifts state by ≤1 cycle).
+ *
+ * @param {string} caseId         — non-empty string
+ * @param {'pass'|'fail'} outcome
+ * @param {{ringBufferPath?: string, now?: () => Date}} [opts]
+ * @returns {{outcomes:string[], flakeHistory:Array, updatedAt:string}} the updated per-case entry
+ */
+export function appendRerunOutcome(caseId, outcome, opts = {}) {
+  if (typeof caseId !== 'string' || caseId.length === 0) {
+    throw new TypeError('appendRerunOutcome: caseId must be a non-empty string');
+  }
+  if (outcome !== 'pass' && outcome !== 'fail') {
+    throw new TypeError('appendRerunOutcome: outcome must be "pass" or "fail"');
+  }
+  const ringBufferPath = opts.ringBufferPath ?? DEFAULT_RING_BUFFER_PATH;
+  const now = opts.now ?? (() => new Date());
+  const nowDate = now();
+  const nowIso = nowDate.toISOString();
+
+  const buffer = readRingBufferOrInit(ringBufferPath);
+  if (!buffer.cases[caseId]) {
+    buffer.cases[caseId] = { outcomes: [], flakeHistory: [], updatedAt: nowIso };
+  }
+  const entry = buffer.cases[caseId];
+  // Defensive: ensure fields are arrays even if a hand-edited buffer omits them
+  if (!Array.isArray(entry.outcomes)) entry.outcomes = [];
+  if (!Array.isArray(entry.flakeHistory)) entry.flakeHistory = [];
+
+  // Append with slice(-10) — rolling window invariant
+  entry.outcomes = [...entry.outcomes, outcome].slice(-RING_BUFFER_SIZE);
+
+  // Prune flakeHistory older than FLAKE_ESCALATION_WINDOW_DAYS at write time
+  const cutoffMs = nowDate.getTime() - FLAKE_ESCALATION_WINDOW_DAYS * 86400_000;
+  entry.flakeHistory = entry.flakeHistory.filter((h) => {
+    if (!h || !h.classifiedAtIso) return false;
+    return new Date(h.classifiedAtIso).getTime() > cutoffMs;
+  });
+
+  entry.updatedAt = nowIso;
+
+  atomicWriteJson(ringBufferPath, JSON.stringify(buffer, null, 2) + '\n');
+  return entry;
+}
+
+/**
+ * Pure markdown body builder for `flake-investigation` GitHub issues.
+ * Deterministic for fixed inputs — no Date.now(), no env reads, no IO.
+ * The fingerprint is presented BOTH full (12-hex) and prefix (8-hex) so the
+ * issue title and label can use the prefix while the body retains the full
+ * value for audit.
+ *
+ * @param {{caseId:string, fingerprint:string, outcomes:string[], flakeHistory:{classifiedAtIso:string}[]}} input
+ * @returns {string}
+ */
+export function buildFlakeInvestigationBody({ caseId, fingerprint, outcomes, flakeHistory } = {}) {
+  const fp = String(fingerprint ?? '');
+  const fpPrefix = fp.length >= 8 ? fp.slice(0, 8) : fp;
+  const outcomesArr = Array.isArray(outcomes) ? outcomes : [];
+  const historyArr = Array.isArray(flakeHistory) ? flakeHistory : [];
+
+  const lines = [];
+  lines.push(`# Flake investigation: ${caseId ?? '<unknown>'}`);
+  lines.push('');
+  lines.push('## Fingerprint');
+  lines.push('');
+  lines.push(`- Full (12-hex): \`${fp}\``);
+  lines.push(`- Prefix (8-hex, used in issue label): \`${fpPrefix}\``);
+  lines.push('');
+  lines.push('## Rolling outcomes (last 10 reruns)');
+  lines.push('');
+  lines.push('| # | outcome |');
+  lines.push('|---|---------|');
+  for (let i = 0; i < outcomesArr.length; i++) {
+    lines.push(`| ${i + 1} | ${outcomesArr[i]} |`);
+  }
+  lines.push('');
+  lines.push('## FLAKE classification history (within 14-day window)');
+  lines.push('');
+  if (historyArr.length === 0) {
+    lines.push('- (no prior FLAKE classifications)');
+  } else {
+    for (const h of historyArr) {
+      lines.push(`- ${h.classifiedAtIso ?? '<missing-timestamp>'}`);
+    }
+  }
+  lines.push('');
+  lines.push('## Next steps');
+  lines.push('');
+  lines.push(
+    'This issue was opened automatically because the same fingerprint was ' +
+      'classified as FLAKE N=3 times in the past 14 days. The case is now ' +
+      'suppressed from auto-classification for 30 days. Human review needed ' +
+      'to determine if the test is genuinely flaky, or if the failure pattern ' +
+      'indicates a real bug that the FLAKE heuristic is misclassifying.',
+  );
+
+  return lines.join('\n');
 }
 
 // END triage-classifier.js — TRIAGE-01/TRIAGE-02/TRIAGE-03/TRIAGE-05/TRIAGE-06 Phase 34 Plan 02+03

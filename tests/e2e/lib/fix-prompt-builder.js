@@ -326,13 +326,24 @@ const HARNESS_ERROR_SYSTEM = buildScaffoldSystemPrompt({
 // Object.freeze invariant preserved: runtime mutation throws in strict mode
 // (pinned by tests/unit/fix-prompt-builder.test.js Phase 45 mutation guard).
 
-// NOTE Phase 45 Task 1 (GREEN): the registry stays at 1 key here. Task 2
-// extends the freeze literal to 5 keys in the same plan; the constants above
-// are already defined and the 4 new thunks land in the next commit. This
-// keeps Task 1 a refactor (single source of truth) and Task 2 the actual
-// registry-shape change.
+// Phase 45 Plan 01 Task 2 (GREEN): registry extended from 1 → 5 keys. The
+// 4 new thunks each resolve a module-scope SYSTEM constant produced by the
+// shared buildScaffoldSystemPrompt helper (single source of truth for the
+// envelope + forbidden-paths + diff-size + output-format sections — only the
+// fix-surface contract varies per class). Object.freeze is preserved on the
+// extended literal: strict-mode mutation throws TypeError (pinned by the
+// Phase 45 mutation guard in tests/unit/fix-prompt-builder.test.js).
+//
+// Per 45-RESEARCH Pattern 1: do NOT refactor to a `register(key, builder)`
+// factory — preserve the literal Object.freeze spread. The lookup at
+// buildFixPrompt's line ~`PROMPT_SCAFFOLDS[errorClass]` accepts the new keys
+// without dispatcher changes (the function body is UNCHANGED).
 export const PROMPT_SCAFFOLDS = Object.freeze({
   WRONG_CITATION: () => WRONG_CITATION_SYSTEM,
+  LLM_HALLUCINATED_SELECTION: () => LLM_HALLUCINATED_SELECTION_SYSTEM,
+  WORKER_FALLBACK_FAILED: () => WORKER_FALLBACK_FAILED_SYSTEM,
+  GOOGLE_DOM_DRIFT: () => GOOGLE_DOM_DRIFT_SYSTEM,
+  HARNESS_ERROR: () => HARNESS_ERROR_SYSTEM,
 });
 
 // ---------------------------------------------------------------------------

@@ -15,13 +15,16 @@
 // The only side effects are CLI guard stdin/stderr/exit when invoked
 // directly. Same purity discipline as scripts/issue-payload-builder.js.
 //
-// LOCKED forbidden paths (per 41-CONTEXT decisions and PITFALLS Pitfall 3):
+// LOCKED forbidden paths (per 41-CONTEXT decisions, PITFALLS Pitfall 3,
+// AND Phase 45-02 extension for FLAKE-01/FLAKE-02 state file integrity):
 //   1. tests/test-cases.js                       — 76-case golden trigger
 //   2. tests/golden/baseline.json                — golden baseline
 //   3. tests/e2e/test-cases-quarantine.js        — quarantine corpus
 //   4. .github/workflows/v40-*.yml               — v40 workflow namespace
 //   5. tests/e2e/.llm-spend-ledger.json          — LLM cost ledger
 //   6. .github/CODEOWNERS                        — CODEOWNERS itself
+//   7. tests/e2e/.rerun-ring-buffer.json         — FLAKE 5-state ring buffer (Phase 45-02)
+//   8. tests/e2e/.flake-suppression.json         — FLAKE_ESCALATION suppression file (Phase 45-02)
 //
 // CLI contract:
 //   stdin:  one path per line (typically `git diff --name-only origin/main..HEAD`)
@@ -50,6 +53,8 @@ export const FORBIDDEN_PATHS = Object.freeze([
   /^\.github\/workflows\/v40-[^/]*\.yml$/,
   /^tests\/e2e\/\.llm-spend-ledger\.json$/,
   /^\.github\/CODEOWNERS$/,
+  /^tests\/e2e\/\.rerun-ring-buffer\.json$/,    // Phase 45-02 — FLAKE-01 ring buffer state
+  /^tests\/e2e\/\.flake-suppression\.json$/,    // Phase 45-02 — FLAKE-02 suppression state
 ]);
 
 /**

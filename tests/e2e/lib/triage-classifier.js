@@ -585,4 +585,134 @@ export async function runTriage({
   return report;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 45-02 (FLAKE-01 + FLAKE-02) — 5-state classifier sibling exports
+// ---------------------------------------------------------------------------
+//
+// classifyRerunOutcomes is a NEW pure function consumed by scripts/auto-fix.mjs
+// Step 7 (Plan 45-03). It operates on a ROLLING 10-element ring buffer of
+// rerun pass/fail outcomes — a DIFFERENT signal from runTriage's per-iteration
+// FLAKE/CONFIRMED/NOT_REPLAYABLE verdicts. Do NOT inline this logic into
+// runTriage; do NOT modify Rule 1's FLAKE short-circuit. v3.1 callers
+// (e2e-triage-classifier.mjs, tests/unit/triage-classifier.test.js Phase 34
+// describe blocks) depend on runTriage's existing shape.
+//
+// 5-state truth table (LOCKED per 45-CONTEXT D-04 + FLAKE-01):
+//   FLAKE_SUPPRESSED  — suppressions[fingerprint] exists AND .until > now()
+//                       → action: 'skip' (FIRST branch — precedes outcomes analysis)
+//   CONFIRMED_BUG     — last 10 outcomes all 'fail' (zero pass) AND last 3 all 'fail'
+//                       → action: 'auto-fix'
+//   LIKELY_BUG        — failures >= 7 in last 10 outcomes
+//                       → action: 'auto-fix'
+//   INTERMITTENT      — failures in {4,5,6} in last 10 outcomes
+//                       → action: 're-quarantine'
+//   FLAKE_ESCALATION  — failures <= 3 AND (recentFlakes within 14d + 1) >= N
+//                       → action: 'open-flake-investigation', includes until = now+30d
+//   FLAKE             — failures <= 3 AND (recentFlakes within 14d + 1) < N
+//                       → action: 're-quarantine'
+
+// FLAKE-02 static-grep pinned constants — keep on their own lines, do not
+// inline. Tests/unit/triage-classifier.test.js T8b asserts these literal
+// declarations via regex against the source file (with comment-only lines
+// stripped). Any value change MUST update the test pin in the same commit.
+export const FLAKE_ESCALATION_N = 3;
+export const FLAKE_ESCALATION_WINDOW_DAYS = 14;
+export const FLAKE_SUPPRESSION_DAYS = 30;
+export const RING_BUFFER_SIZE = 10;
+
+/**
+ * Pure 5-state classifier (FLAKE-01). Operates on parsed objects only — NO IO,
+ * NO env reads, NO file reads. Caller (scripts/auto-fix.mjs Step 7 in Plan
+ * 45-03) reads the ring buffer + suppression files and passes parsed objects.
+ *
+ * Branch ordering is load-bearing (Pitfall 2 in 45-RESEARCH): suppression
+ * check runs FIRST so an active suppression returns FLAKE_SUPPRESSED regardless
+ * of how the rolling outcomes look. Without this ordering, a freshly-escalated
+ * case could re-trigger auto-fix on its next rerun (FLAKE_ESCALATION → 30d
+ * suppression is the whole point of the 6th informational state).
+ *
+ * @param {{
+ *   outcomes?: ('pass'|'fail')[],            — rolling rerun outcomes (oldest first)
+ *   fingerprint?: string,                    — 12-hex suppression lookup key
+ *   suppressions?: Object<string, {until: string}>,  — fingerprint → suppression entry
+ *   flakeHistory?: {classifiedAtIso: string}[],      — historical FLAKE classifications
+ *   now?: () => Date                         — injectable clock for deterministic tests
+ * }} [opts]
+ * @returns {{state: string, action: string, until?: string}}
+ */
+export function classifyRerunOutcomes({
+  outcomes = [],
+  fingerprint,
+  suppressions = {},
+  flakeHistory = [],
+  now = () => new Date(),
+} = {}) {
+  const nowDate = now();
+
+  // BRANCH 1 (FIRST — Pitfall 2): FLAKE_SUPPRESSED
+  // Active suppression short-circuits all outcomes analysis. Even 10 consecutive
+  // failures during an active suppression window return 'skip' — that is the
+  // intended behavior of FLAKE_ESCALATION's 30-day cooldown.
+  if (fingerprint && suppressions && typeof suppressions === 'object') {
+    const supp = suppressions[fingerprint];
+    if (supp && supp.until && new Date(supp.until) > nowDate) {
+      return { state: 'FLAKE_SUPPRESSED', action: 'skip', until: supp.until };
+    }
+  }
+
+  // Normalize the outcomes window: last RING_BUFFER_SIZE entries.
+  const window = Array.isArray(outcomes) ? outcomes.slice(-RING_BUFFER_SIZE) : [];
+  const failures = window.filter((o) => o === 'fail').length;
+
+  // BRANCH 2: CONFIRMED_BUG — zero pass AND last 3 all fail.
+  // The "last 3 all fail" guard prevents a freshly-emptied buffer (only 1-2
+  // entries, all fail) from premature CONFIRMED_BUG classification — at minimum
+  // 3 consecutive failures are required to claim "consistent bug".
+  if (window.length >= 3) {
+    const last3 = window.slice(-3);
+    const zeroPass = window.every((o) => o === 'fail');
+    const last3AllFail = last3.every((o) => o === 'fail');
+    if (zeroPass && last3AllFail) {
+      return { state: 'CONFIRMED_BUG', action: 'auto-fix' };
+    }
+  }
+
+  // BRANCH 3: LIKELY_BUG — failures >= 7 in last 10
+  if (failures >= 7) {
+    return { state: 'LIKELY_BUG', action: 'auto-fix' };
+  }
+
+  // BRANCH 4: INTERMITTENT — failures in {4,5,6}
+  if (failures >= 4) {
+    return { state: 'INTERMITTENT', action: 're-quarantine' };
+  }
+
+  // BRANCH 5/6: FLAKE / FLAKE_ESCALATION — failures <= 3
+  // recentFlakes counts FLAKE classifications strictly within the
+  // FLAKE_ESCALATION_WINDOW_DAYS window (default 14 days). The +1 accounts for
+  // THIS classification being a (prospective) new FLAKE — if including it the
+  // count meets N=3, escalate; else stay FLAKE.
+  const cutoffMs = nowDate.getTime() - FLAKE_ESCALATION_WINDOW_DAYS * 86400_000;
+  const recentFlakes = Array.isArray(flakeHistory)
+    ? flakeHistory.filter((h) => {
+        if (!h || !h.classifiedAtIso) return false;
+        return new Date(h.classifiedAtIso).getTime() > cutoffMs;
+      }).length
+    : 0;
+
+  if (recentFlakes + 1 >= FLAKE_ESCALATION_N) {
+    const untilIso = new Date(
+      nowDate.getTime() + FLAKE_SUPPRESSION_DAYS * 86400_000,
+    ).toISOString();
+    return {
+      state: 'FLAKE_ESCALATION',
+      action: 'open-flake-investigation',
+      until: untilIso,
+    };
+  }
+
+  return { state: 'FLAKE', action: 're-quarantine' };
+}
+
 // END triage-classifier.js — TRIAGE-01/TRIAGE-02/TRIAGE-03/TRIAGE-05/TRIAGE-06 Phase 34 Plan 02+03
+//                            + Phase 45-02 (FLAKE-01 + FLAKE-02) sibling exports

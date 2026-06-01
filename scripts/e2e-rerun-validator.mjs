@@ -23,6 +23,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runValidator, atomicWriteJson } from '../tests/e2e/lib/rerun-validator.js';
 import { verifyCitation } from '../tests/e2e/lib/pdf-verifier.js';
+import { appendRerunOutcome } from '../tests/e2e/lib/triage-classifier.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -169,8 +170,9 @@ async function main() {
   // (Pitfall 5 mitigation: print resolved path before running)
   process.stdout.write('[e2e-rerun-validator] input: ' + resolvedInputPath + '\n');
 
+  let report;
   try {
-    await runValidator({
+    report = await runValidator({
       inputLlmReport: parsed,
       sourceLlmReportPath: resolvedInputPath,
       outputPath,
@@ -181,6 +183,36 @@ async function main() {
   } catch (e) {
     process.stderr.write('[e2e-rerun-validator] runValidator failed: ' + e.message + '\n');
     process.exit(1);
+  }
+
+  // Phase 45-02 — append per-replay rerun outcomes to the FLAKE 5-state
+  // classifier ring buffer. CONFIRMED → 'fail' (bug confirmed by replay);
+  // FLAKE → 'pass' (replay did NOT confirm the bug — could be flake OR a real
+  // bug that escaped this rerun); NOT_REPLAYABLE entries are skipped (no
+  // signal to record). The ring buffer is consumed by classifyRerunOutcomes
+  // in scripts/auto-fix.mjs Step 7 (Plan 45-03).
+  //
+  // CASE ID DERIVATION: composed as `${runId}#${iteration_n}` so the rolling
+  // window stays per-iteration-across-runs; without the runId prefix every
+  // iteration_n=1 in every run would collide. Plan 45-03 may refine the case
+  // ID scheme if a stable per-test ID becomes available — for now the
+  // run-scoped iteration id matches what triage-classifier downstream sees.
+  //
+  // WRAPPED IN TRY/CATCH — appendRerunOutcome MUST NOT abort the rerun
+  // pipeline. The pipeline's primary job is producing rerun-report.json; the
+  // ring buffer is an additive signal.
+  const runId = parsed.run_id ?? 'unknown-run';
+  for (const replay of report?.replays ?? []) {
+    if (replay.verdict !== 'CONFIRMED' && replay.verdict !== 'FLAKE') continue;
+    const caseId = `${runId}#${replay.iteration_n}`;
+    const outcome = replay.verdict === 'CONFIRMED' ? 'fail' : 'pass';
+    try {
+      appendRerunOutcome(caseId, outcome);
+    } catch (err) {
+      process.stderr.write(
+        `[e2e-rerun-validator] appendRerunOutcome failed for ${caseId}: ${err.message}\n`,
+      );
+    }
   }
 
   process.stdout.write('[e2e-rerun-validator] wrote ' + outputPath + '\n');

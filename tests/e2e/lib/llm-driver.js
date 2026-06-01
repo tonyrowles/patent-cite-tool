@@ -473,7 +473,16 @@ export async function invokeClaudePWithLedger({
  *   6. Return parsed result
  *
  * @param {{
- *   systemPrompt: string,
+ *   systemPrompt?: string,     string-form system prompt; Phase 39 default path.
+ *                              Mutually-or with systemBlocks (one of the two
+ *                              MUST be provided).
+ *   systemBlocks?: Array<{type:'text', text:string, cache_control?:{type:'ephemeral', ttl:'5m'|'1h'}}>,
+ *                              Phase 42 Pitfall 6 fix — array-form system field
+ *                              that lets cache_control take effect. When
+ *                              supplied, takes precedence over systemPrompt.
+ *                              The Anthropic SDK silently drops cache_control
+ *                              from the string form, killing prompt-cache
+ *                              savings; the array form is the structural fix.
  *   userPrompt: string,
  *   model?: string,            default 'claude-sonnet-4-6' (CONTEXT lock)
  *   maxTokens?: number,        default 4096
@@ -488,10 +497,12 @@ export async function invokeClaudePWithLedger({
  *   | {ok:false, ciGate:true, message:string}
  *   | {ok:false, capBlocked:true, monthly, day, issue, pr, phaseCap}
  *   | {ok:false, errorReason:'sdk_error', errorMessage:string}
+ *   | {ok:false, errorReason:'contract-error', errorMessage:string}
  * >}
  */
 export async function invokeAnthropicSdkWithLedger({
   systemPrompt,
+  systemBlocks,
   userPrompt,
   model = 'claude-sonnet-4-6',
   maxTokens = 4096,
@@ -501,6 +512,23 @@ export async function invokeAnthropicSdkWithLedger({
   prNumber,
   forceApi = false,
 } = {}) {
+  // Step 0 — Contract guard (Phase 42 Plan 02 — Pitfall 6 driver extension).
+  // At least one of {systemPrompt, systemBlocks} MUST be supplied. We check
+  // BEFORE the CI gate so the contract violation is unambiguous in unit tests
+  // that run without CI=true. systemBlocks takes precedence when both are
+  // supplied (the array-form is the cache_control-enabled path).
+  const hasSystemPrompt = typeof systemPrompt === 'string' && systemPrompt.length > 0;
+  const hasSystemBlocks = Array.isArray(systemBlocks) && systemBlocks.length > 0;
+  if (!hasSystemPrompt && !hasSystemBlocks) {
+    return {
+      ok: false,
+      errorReason: 'contract-error',
+      errorMessage:
+        'invokeAnthropicSdkWithLedger requires one of systemBlocks (array form, ' +
+        'enables cache_control) or systemPrompt (back-compat string form).',
+    };
+  }
+
   const inCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
   // Step 1 — INVERSE CI gate
@@ -536,7 +564,10 @@ export async function invokeAnthropicSdkWithLedger({
     response = await client.messages.create({
       model,
       max_tokens: maxTokens,
-      system: systemPrompt,
+      // Pitfall 6: array-form systemBlocks (when supplied) carries
+      // cache_control through to the SDK. String-form systemPrompt is the
+      // Phase 39 back-compat path.
+      system: hasSystemBlocks ? systemBlocks : systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     });
   } catch (err) {

@@ -1,0 +1,267 @@
+# .github/workflows/v40-auto-promote.yml
+#
+# Phase 44 Plan 44-01 — Closes the v4.0 merge -> quarantine -> golden loop.
+# Triggered by the pull_request closed event on auto-fix PRs carrying the
+# auto-fix:verified label, this workflow asserts a TRIPLE-GATE BEFORE
+# invoking the already-existing runPromote({_skipCiGuard:true}) from Phase
+# 35 (scripts/promote-from-quarantine.mjs line 123 — DO NOT MODIFY there).
+#
+# The triple-gate reconstructs the human-gate invariant the _skipCiGuard
+# exemption would otherwise undo:
+#   Leg 1 — PR carries auto-fix:verified  (Phase 41 verifier-gate label)
+#   Leg 2 — pull_request.merged === true  (NOT close-without-merge)
+#   Leg 3 — source-issue carries triage   (Phase 34 triage-classifier label)
+#
+# On success the workflow opens a SEPARATE follow-up PR via the pinned
+# peter-evans cpr action (v8) with the auto-promote/ branch prefix (NEVER
+# direct-to-main; the CODEOWNER review is the human gate for the
+# tests/test-cases.js mutation). The auto-promote/* prefix is load-bearing
+# for routing around Phase 41 verifier-gate, which is scoped to auto-fix/*
+# branches only.
+#
+# Defenses paraphrased (Phase 40-03 / 41-03 / 43-01 scar — see Plan 44-01
+# Pitfall 8 + Audit 2; literal tokens MUST NOT appear in this comment block
+# nor anywhere else in the file except inside test-side .not.toContain()
+# arguments, which live in tests/e2e/scripts/v40-auto-promote-yaml.test.js):
+#   - the gh pr merge auto-flag:               not used (humans merge / X3)
+#   - the action auto-merge input:             not used (humans merge / X3)
+#   - the Identity-token write permission:     intentionally absent (X4 / T-44-09)
+#   - the pull-request-target trigger variant: intentionally avoided (X4 / T-44-09)
+#
+# Permissions (Pitfall 1 step 7 minimization):
+#   - contents: write       — cpr@v8 pushes the auto-promote/* branch
+#   - pull-requests: write  — cpr@v8 opens the follow-up PR + adds labels
+#   - issues: write         — gh issue close on the source issue + gh issue
+#                             create for the post-merge regression issue
+#
+# Phase 47 readiness: live end-to-end execution against a real merged auto-
+# fix PR is DEFERRED to Phase 47 CLEANUP-03 (a) HUMAN-UAT (the full chain
+# is Phase 43 auto-fix PR -> Phase 41 verifier-gate -> human merge ->
+# Phase 44 auto-promote -> human merges the follow-up PR).
+
+name: V40 Auto Promote
+
+on:
+  pull_request:
+    types: [closed]
+
+# Per-PR serialization (T-44-06). cancel-in-progress: false because mid-
+# flight cancellation could leave runPromote half-applied; rollback covers
+# most cases but the safest behavior is "let it finish."
+concurrency:
+  group: v40-auto-promote-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write       # cpr@v8 pushes the auto-promote/* branch
+  pull-requests: write  # cpr@v8 opens the follow-up PR + adds labels
+  issues: write         # gh issue close source issue + gh issue create regression
+
+jobs:
+  auto-promote:
+    # Job-level gate — fires ONLY when the closed PR was actually merged
+    # AND carried the auto-fix:verified label (Phase 41 verifier-gate
+    # verdict). The script-level triple-gate re-asserts these in pure JS so
+    # the script is also Vitest-mockable; the workflow-level filter saves
+    # runner minutes on the no-op path (unverified closes, draft closes).
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'auto-fix:verified')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for runPromote + verifier re-check
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Parse PR body + labels + source issue
+        id: parse
+        # Resolves four outputs the dispatcher script needs:
+        #   - pr_labels (csv)
+        #   - case_ids (csv from <!-- affected_cases: id1,id2 --> on line 1)
+        #   - pr_body_path (file path holding the raw PR body; written via
+        #     env: + heredoc to keep ${{ }} away from issue-body-derived
+        #     content, per Pitfall 1 step 5 / T-44-02 injection defense)
+        #   - source_issue_raw (integer; either from the source_issue HTML
+        #     comment on line 2, OR — fallback — from Fix #N in the squash-
+        #     merge commit message currently on origin/main HEAD)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json body,labels,number)
+          BODY=$(echo "$PR_JSON" | jq -r '.body')
+          LABELS_CSV=$(echo "$PR_JSON" | jq -r '[.labels[].name] | join(",")')
+          CASE_IDS_CSV=$(echo "$BODY" | grep -oE '<!-- affected_cases: [^ ]+ -->' \
+            | head -1 \
+            | sed -E 's/<!-- affected_cases: ([^ ]+) -->/\1/')
+          if [ -z "$CASE_IDS_CSV" ]; then
+            echo "no affected_cases comment found on PR #$PR_NUMBER body" >&2
+            exit 1
+          fi
+          # Squash-merge commit message lives on origin/main HEAD now.
+          git fetch origin main --depth=1
+          COMMIT_MSG=$(git log -1 --format=%B origin/main)
+          # Write the raw body + commit message to /tmp via env to avoid
+          # ${{ }} interpolation of attacker-controllable content.
+          printf '%s' "$BODY" > /tmp/pr-body.txt
+          printf '%s' "$COMMIT_MSG" > /tmp/pr-commit-message.txt
+          # Source-issue id: prefer the HTML comment, fallback to Fix #N.
+          SOURCE_ISSUE_RAW=$(echo "$BODY" | grep -oE '<!-- source_issue: [0-9]+ -->' \
+            | head -1 \
+            | sed -E 's/<!-- source_issue: ([0-9]+) -->/\1/')
+          if [ -z "$SOURCE_ISSUE_RAW" ]; then
+            SOURCE_ISSUE_RAW=$(echo "$COMMIT_MSG" \
+              | grep -oE '(Fix|Fixes) #[0-9]+' \
+              | head -1 \
+              | sed -E 's/.*#([0-9]+)/\1/')
+          fi
+          if [ -z "$SOURCE_ISSUE_RAW" ]; then
+            echo "cannot identify source issue from PR body or commit message" >&2
+            exit 1
+          fi
+          {
+            echo "pr_labels=$LABELS_CSV"
+            echo "case_ids=$CASE_IDS_CSV"
+            echo "source_issue=$SOURCE_ISSUE_RAW"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve source-issue labels
+        id: source
+        env:
+          SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
+        run: |
+          SOURCE_LABELS_CSV=$(gh issue view "$SOURCE_ISSUE" \
+            --json labels \
+            --jq '[.labels[].name] | join(",")')
+          echo "source_issue_labels=$SOURCE_LABELS_CSV" >> "$GITHUB_OUTPUT"
+
+      - name: Triple-gate + runPromote (per affected case)
+        id: promote
+        # Loop runPromote once per case-id (Open Question 3 lock — research
+        # §Architecture Decision 3). Any single failure aborts the whole
+        # loop; no partial promotion.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_LABELS: ${{ steps.parse.outputs.pr_labels }}
+          SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
+          SOURCE_ISSUE_LABELS: ${{ steps.source.outputs.source_issue_labels }}
+          CASE_IDS: ${{ steps.parse.outputs.case_ids }}
+        run: |
+          PR_COMMIT_MSG=$(cat /tmp/pr-commit-message.txt)
+          for CASE_ID in ${CASE_IDS//,/ }; do
+            node scripts/auto-fix-promote.mjs \
+              --pr "$PR_NUMBER" \
+              --pr-labels "$PR_LABELS" \
+              --pr-merged true \
+              --pr-body /tmp/pr-body.txt \
+              --pr-commit-message "$PR_COMMIT_MSG" \
+              --source-issue "$SOURCE_ISSUE" \
+              --source-issue-labels "$SOURCE_ISSUE_LABELS" \
+              --case-id "$CASE_ID"
+          done
+
+      - name: Build auto-promote PR body
+        id: body
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
+          CASE_IDS: ${{ steps.parse.outputs.case_ids }}
+        run: |
+          {
+            echo "Auto-promote follow-up PR for merged auto-fix PR #$PR_NUMBER."
+            echo ""
+            echo "Source issue: #$SOURCE_ISSUE"
+            echo "Affected case(s): $CASE_IDS"
+            echo ""
+            echo "## What this PR does"
+            echo ""
+            echo "- Mutates \`tests/test-cases.js\` to promote the affected case(s)"
+            echo "  from the quarantine corpus to the golden corpus."
+            echo "- Generated by scripts/auto-fix-promote.mjs after the triple-gate"
+            echo "  asserted PR label + merged-state + source-issue triage."
+            echo ""
+            echo "## What you must do"
+            echo ""
+            echo "- Review the diff to tests/test-cases.js."
+            echo "- Merge manually (humans are the gate; auto-merge is not enabled)."
+          } > /tmp/auto-promote-pr-body.md
+
+      - name: Open auto-promote PR
+        id: cpr
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: auto-promote/${{ steps.parse.outputs.source_issue }}-${{ github.event.pull_request.number }}
+          base: main
+          draft: false
+          delete-branch: true
+          title: "auto-promote: add cases from PR #${{ github.event.pull_request.number }} to test-cases.js"
+          body-path: /tmp/auto-promote-pr-body.md
+          commit-message: "auto-promote: add cases from PR #${{ github.event.pull_request.number }}"
+          labels: |
+            auto-promote
+          signoff: false
+
+      - name: Close source issue
+        # Pitfall 5 gate — only close the source issue if cpr@v8 actually
+        # produced a PR URL. A runPromote rollback can leave a clean working
+        # tree, in which case cpr@v8 has nothing to commit and emits no
+        # pull-request-url output. Without this gate the source issue could
+        # close while no auto-promote PR exists.
+        if: steps.cpr.outputs.pull-request-url != ''
+        env:
+          SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
+          AUTO_FIX_PR: ${{ github.event.pull_request.number }}
+          AUTO_PROMOTE_URL: ${{ steps.cpr.outputs.pull-request-url }}
+        run: |
+          gh issue close "$SOURCE_ISSUE" \
+            --reason completed \
+            --comment "Fixed in PR #$AUTO_FIX_PR (auto-promote PR $AUTO_PROMOTE_URL)"
+
+      - name: Re-check on main HEAD (post-merge verifier)
+        id: postmerge
+        # Pitfall 2 — re-run the verifier against origin/main HEAD (NEVER
+        # against the merge-commit-SHA field from the pull_request payload;
+        # that SHA may not exist on main if the repo uses rebase-and-merge).
+        # continue-on-error so the next step can branch on the outcome.
+        if: steps.cpr.outputs.pull-request-url != ''
+        continue-on-error: true
+        env:
+          CASE_IDS: ${{ steps.parse.outputs.case_ids }}
+        run: |
+          git fetch origin main
+          git checkout origin/main
+          for CASE_ID in ${CASE_IDS//,/ }; do
+            node scripts/verify-single-case.mjs --case "$CASE_ID" --runs 1 || exit 1
+          done
+
+      - name: File regression issue on verifier failure
+        # PROMOTE-04 — squash-merge content drift between merge time and
+        # re-check time produces a "verifier failed on main HEAD after PR
+        # merged with auto-fix:verified" regression. Open an issue with the
+        # three diagnostic labels the nightly suite uses.
+        if: steps.postmerge.outcome == 'failure'
+        env:
+          REPO: ${{ github.repository }}
+          CASE_IDS: ${{ steps.parse.outputs.case_ids }}
+          AUTO_FIX_PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh issue create \
+            --repo "$REPO" \
+            --title "post-merge regression: $CASE_IDS" \
+            --label e2e-nightly \
+            --label WRONG_CITATION \
+            --label post-merge-regression \
+            --body "Auto-fix PR #$AUTO_FIX_PR merged with auto-fix:verified but the verifier on main HEAD fails on case(s) $CASE_IDS. Investigate squash-merge content drift or post-merge changes between merge and re-check time."

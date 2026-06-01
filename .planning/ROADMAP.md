@@ -276,7 +276,9 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   2. Subscription mode refuses to push without an explicit `--push` flag (dev review default); a dry-run produces a unified diff and prompt-and-cost summary printed to stdout
   3. A ledger v2 dashboard (committed markdown or weekly-digest extension) surfaces per-transport, per-day, per-phase spend against the unified $80/$100 caps
   4. Committed-ledger privacy audit confirms no API keys, model IDs (if deemed sensitive), or PII land in git history; redaction policy documented if anything is filtered
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 46-01-PLAN.md (wave 1) — Dispatcher patch (lines 402-408 reject → allow-list) + subscription routing to invokeClaudePWithLedger + --push flag (inverted default for subscription) + invokeClaudePWithLedger transport-tag patch + npm run fix-issue scripts entry + Vitest extensions (AUTOFIX-06 wrapper half)
+- [ ] 46-02-PLAN.md (wave 1) — scripts/build-ledger-dashboard.mjs (deterministic markdown; Generated: derived from ledger max iso) + bootstrap docs/v40-ledger-dashboard.md + docs/v40-ledger-privacy-audit.md (6 regex patterns, zero-hit PASS verdict) + Phase 40 workflow extension (regen step before [skip ci] commit) + new build-ledger-dashboard.test.js + extended v40-cost-ledger-snapshot-yaml.test.js (AUTOFIX-06 dashboard half)
 
 ### Phase 47: v4.0 Cleanup
 **Goal**: Integration audit + Nyquist coverage stamping + live HUMAN-UAT + branch-protection re-audit (mirrors v3.1 Phase 38 shape)
@@ -304,7 +306,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 1/1 | Complete (demo deferred) | 2026-05-31 |
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 1/1 | Complete | 2026-05-31 |
 | 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 3/3 | Complete | 2026-05-31 |
-| 46. /gsd:fix-issue Local UX + Ledger v2 Dashboard | v4.0 | 0/TBD | Not started | - |
+| 46. /gsd:fix-issue Local UX + Ledger v2 Dashboard | v4.0 | 0/2 | Planned | - |
 | 47. v4.0 Cleanup | v4.0 | 0/TBD | Not started | - |
 
 ## Next Milestone

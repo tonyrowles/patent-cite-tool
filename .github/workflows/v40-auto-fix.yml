@@ -1,0 +1,225 @@
+# .github/workflows/v40-auto-fix.yml
+#
+# Phase 43 Plan 43-01 — Lifts Phase 42's scripts/auto-fix.mjs dispatcher into
+# a GitHub Actions workflow triggered by issues.labeled('triage'). The single
+# non-obvious architectural decision is the TWO-COMMIT SPLIT — the dispatcher's
+# ledger write commits DIRECTLY to main (with the skip-ci marker) BEFORE
+# peter-evans/cpr@v8 snapshots the working tree, so the auto-fix PR diff
+# contains only the source-code fix and is clean against Phase 41's diff-guard
+# regex bank (which rejects PRs touching tests/e2e/.llm-spend-ledger.json).
+# See 43-01-PLAN.md must_haves §5 + 43-CONTEXT.md "specifics" + 43-RESEARCH
+# Pattern 1 / Pitfall 1.
+#
+# Concurrency: per-issue serialization with the cancel-in-progress flag set
+# to false — in-flight LLM calls are NEVER killed mid-flight by label-flap
+# (T-43-05 / Pitfall 7 cost protection). This is the OPPOSITE of Phase 41
+# verifier-gate, which is read-only and enables mid-flight cancellation.
+#
+# Defenses paraphrased (Phase 40-03 / 41-03 scar — see 43-01-PLAN narrative):
+#   - skip-ci marker:                          appears EXACTLY ONCE — the
+#                                              ledger commit message ONLY
+#                                              (L2 test enforces the count)
+#   - the gh pr merge auto-flag:               not used (humans merge / X1)
+#   - the action auto-merge input:             not used (humans merge / X2)
+#   - the Identity-token write permission:     intentionally absent (X3 / T-43-04)
+#   - the actions-write permission:            intentionally absent (X4 / T-43-04)
+#   - the pull-request-target trigger variant: intentionally avoided (X5 / T-43-03)
+#
+# Permissions (Pitfall 1 step 7 minimization):
+#   - contents: write       — cpr@v8 pushes the auto-fix branch + the ledger
+#                             commit pushes to main directly
+#   - pull-requests: write  — cpr@v8 opens the draft PR + adds labels
+#   - issues: write         — gh issue comment + gh label create + gh issue edit
+#
+# Phase 47 readiness: live end-to-end execution against a real triage-labeled
+# issue is DEFERRED to Phase 47 CLEANUP-03 (a) HUMAN-UAT (carried over from
+# Phase 42 demo deferral; this is by design and not a Phase 43 gap).
+#
+# Phase 44 readiness: delete-branch: false preserves the auto-fix branch tip
+# for Phase 44 auto-promote consumption (T-43-08 mitigation).
+
+name: V40 Auto Fix
+
+on:
+  issues:
+    types: [labeled]
+
+# Per-issue serialization; cancel-in-progress: false protects in-flight LLM
+# cost (Pitfall 7). Opposite of Phase 41 verifier-gate.
+concurrency:
+  group: v40-auto-fix-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write       # cpr@v8 pushes the auto-fix branch + ledger commits to main
+  pull-requests: write  # cpr@v8 opens the draft PR + adds labels
+  issues: write         # gh issue comment + gh label create + gh issue edit
+
+jobs:
+  auto-fix:
+    # Job-level filter — the ONLY label-name narrowing point per Pitfall 2.
+    # The on.issues.types: [labeled] event fires for ALL label adds.
+    if: github.event.label.name == 'triage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10   # SDK ~30-60s + checkout + npm ci + cpr@v8 + cross-link
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+
+      - name: Assert ANTHROPIC_API_KEY present
+        # Fail-fast if the repo secret is missing; cleaner error than letting
+        # the dispatcher fail later with an SDK auth error.
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            gh issue comment ${{ github.event.issue.number }} \
+              --body "v40-auto-fix workflow aborted: ANTHROPIC_API_KEY repo secret is missing. Configure under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Pre-check ERROR_CLASS label
+        id: precheck
+        # Reads the issue's labels. If no recognized ERROR_CLASS label is
+        # present (RPT-02 taxonomy + PASS), exports error_class='' so the
+        # subsequent steps skip cleanly (saves SDK budget on bare triage adds).
+        run: |
+          LABELS=$(gh issue view ${{ github.event.issue.number }} --json labels --jq '[.labels[].name] | join(" ")')
+          FOUND=""
+          for cls in FLAKE LLM_API_ERROR WRONG_CITATION LLM_HALLUCINATED_SELECTION WORKER_FALLBACK_FAILED GOOGLE_DOM_DRIFT HARNESS_ERROR PASS; do
+            if echo " $LABELS " | grep -q " $cls "; then
+              FOUND="$cls"
+              break
+            fi
+          done
+          echo "error_class=$FOUND" >> "$GITHUB_OUTPUT"
+          if [ -z "$FOUND" ]; then
+            gh issue comment ${{ github.event.issue.number }} \
+              --body "v40-auto-fix workflow skipped: no recognized ERROR_CLASS label (one of FLAKE/LLM_API_ERROR/WRONG_CITATION/LLM_HALLUCINATED_SELECTION/WORKER_FALLBACK_FAILED/GOOGLE_DOM_DRIFT/HARNESS_ERROR/PASS) found on the issue."
+          fi
+
+      - name: Checkout
+        if: steps.precheck.outputs.error_class != ''
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for git apply --check
+
+      - name: Setup Node
+        if: steps.precheck.outputs.error_class != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install dependencies
+        if: steps.precheck.outputs.error_class != ''
+        run: npm ci --no-audit --no-fund
+
+      - name: Run auto-fix dispatcher
+        id: dispatch
+        if: steps.precheck.outputs.error_class != ''
+        # --no-push leaves HEAD on the auto-fix branch + writes the ledger to
+        # the working tree (Phase 42 contract). continue-on-error: true so the
+        # subsequent steps can branch on the exit code (1/2 = fail, 3 = cap).
+        continue-on-error: true
+        run: |
+          node scripts/auto-fix.mjs --issue ${{ github.event.issue.number }} --force-api --no-push
+          EXIT=$?
+          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+          if [ "$EXIT" = "0" ]; then
+            BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: Handle dispatcher failure (exit 1 or 2)
+        if: steps.dispatch.outputs.exit_code == '1' || steps.dispatch.outputs.exit_code == '2'
+        run: |
+          gh issue comment ${{ github.event.issue.number }} \
+            --body "v40-auto-fix dispatcher failed (exit ${{ steps.dispatch.outputs.exit_code }}). See workflow logs for details."
+          exit 1
+
+      - name: Exit cleanly on dispatcher cap reached (exit 3)
+        if: steps.dispatch.outputs.exit_code == '3'
+        # Dispatcher already added the human-review-required label + posted
+        # the cap-reached comment (Phase 42 AUTOFIX-05 contract). Pitfall 7.
+        run: exit 0
+
+      - name: Commit ledger update to main
+        if: steps.dispatch.outputs.exit_code == '0'
+        # THE LOAD-BEARING TWO-COMMIT SPLIT (Pitfall 1 / T-43-07). The
+        # dispatcher wrote a ledger entry into the working tree. We commit
+        # that entry DIRECTLY to main with a skip-ci-marker-prefixed message
+        # (so this push does NOT re-trigger ci.yml), then rebase the auto-fix
+        # branch onto the updated main so the cpr@v8 step snapshots a
+        # ledger-CLEAN working tree. Phase 41 diff-guard requires this
+        # isolation. The literal skip-ci marker token appears ONLY in the
+        # commit-message string below — pinned by L2 test.
+        # Pattern copied from v40-cost-ledger-snapshot.yml lines 70-82.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          AUTO_FIX_BRANCH="${{ steps.dispatch.outputs.branch }}"
+          git checkout main
+          git pull --ff-only origin main
+          git add tests/e2e/.llm-spend-ledger.json
+          if ! git diff --cached --quiet; then
+            git commit -m "[skip ci] ledger: auto-fix issue-${{ github.event.issue.number }}"
+            git push origin main
+          fi
+          git checkout "$AUTO_FIX_BRANCH"
+          git rebase main
+
+      - name: Build PR body
+        id: body
+        if: steps.dispatch.outputs.exit_code == '0'
+        # Pure-function helper writes the load-bearing affected_cases HTML
+        # comment Phase 41 verifier-gate parses. Output via file (body-path:)
+        # not inline body: to avoid CWE-94 risk of ${{ }} interpolating
+        # issue-body-derived content.
+        run: |
+          node scripts/build-auto-fix-pr-body.mjs \
+            --issue ${{ github.event.issue.number }} \
+            --branch ${{ steps.dispatch.outputs.branch }} \
+            --error-class ${{ steps.precheck.outputs.error_class }} \
+            > /tmp/pr-body.md
+
+      - name: Ensure auto-fix:opened label exists
+        if: steps.dispatch.outputs.exit_code == '0'
+        # Idempotent label create (mirrors e2e-nightly.yml:97-102 pattern).
+        # cpr@v8 step below adds this label to the new PR; the create step
+        # is a no-op if the label already exists.
+        run: |
+          gh label create auto-fix:opened \
+            --color 0E8A16 \
+            --description "Auto-fix workflow opened a draft PR for this issue" \
+            --force 2>/dev/null || true
+
+      - name: Create draft auto-fix PR
+        id: cpr
+        if: steps.dispatch.outputs.exit_code == '0'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.dispatch.outputs.branch }}
+          base: main
+          draft: true
+          # delete-branch: false — Phase 44 auto-promote needs the branch tip
+          # for follow-up promote PR composition (T-43-08 mitigation).
+          delete-branch: false
+          title: "auto-fix: ${{ steps.precheck.outputs.error_class }} for issue #${{ github.event.issue.number }}"
+          body-path: /tmp/pr-body.md
+          commit-message: "Fix #${{ github.event.issue.number }}: ${{ steps.precheck.outputs.error_class }}"
+          labels: |
+            auto-fix:opened
+            triage
+            ${{ steps.precheck.outputs.error_class }}
+          signoff: false
+
+      - name: Cross-link draft PR on source issue
+        if: steps.dispatch.outputs.exit_code == '0' && steps.cpr.outputs.pull-request-url
+        run: |
+          gh issue comment ${{ github.event.issue.number }} \
+            --body "Auto-fix PR opened: ${{ steps.cpr.outputs.pull-request-url }}"

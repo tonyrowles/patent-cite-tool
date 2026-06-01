@@ -248,7 +248,8 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   3. After the follow-up PR is created, the workflow runs `gh issue close <source> --reason completed --comment "Fixed in PR #X (auto-promote PR #Y)"`
   4. A post-merge verifier re-check runs against `main` HEAD (NOT the merged commit) on the affected case; failure files a regression issue with `e2e-nightly` + `WRONG_CITATION` + `post-merge-regression` labels
   5. The triple-gate's per-leg rejection paths are exercised by Vitest mocks (label missing / not-merged / triage-missing all fail with explicit error messages)
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 44-01-PLAN.md (wave 1) — `.github/workflows/v40-auto-promote.yml` (pull_request:[closed] → triple-gate → runPromote → follow-up PR → close source issue → post-merge verifier re-check) + `scripts/auto-fix-promote.mjs` CLI shim (assertTripleGate + parseSourceIssue + runPromote caller; imports ONLY node:* + ./promote-from-quarantine.mjs) + `tests/unit/auto-fix-promote-gate.test.js` Vitest (T1-T4 + M1-M4; 7 cases) + `tests/e2e/scripts/v40-auto-promote-yaml.test.js` YAML contract (A1-A18 + X1-X4; 22 cases) + Phase 43 helper extension (add `<!-- source_issue: N -->` line + B7 test case) — PROMOTE-01/02/03/04
 
 ### Phase 45: Per-ERROR_CLASS Expansion + FLAKE 5-State Machine
 **Goal**: Scale auto-fix from WRONG_CITATION to 5 classes; introduce 5-state FLAKE classifier to prevent both real-bugs-mis-classified-as-FLAKE and FLAKE-spam loops
@@ -298,7 +299,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 3/3 | Complete (demo deferred) | 2026-05-31 |
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 1/1 | Complete (demo deferred) | 2026-05-31 |
-| 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 0/TBD | Not started | - |
+| 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 0/1 | Planned | - |
 | 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 0/TBD | Not started | - |
 | 46. /gsd:fix-issue Local UX + Ledger v2 Dashboard | v4.0 | 0/TBD | Not started | - |
 | 47. v4.0 Cleanup | v4.0 | 0/TBD | Not started | - |

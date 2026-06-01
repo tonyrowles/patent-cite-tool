@@ -127,6 +127,51 @@ describe('v40-cost-ledger-snapshot.yml contract (Phase 40-01)', () => {
     expect(yaml).not.toContain('auto-merge: true');
   });
 
+  // ---------------------------------------------------------------------
+  // Phase 46 Plan 02 additions (S13a-S17): dashboard regen step.
+  // Numbered S13a/S14/S15/S16/S17 — S13a is sequenced before the legacy S13
+  // verbatim-parity test so the original block stays the last assertion in
+  // the file. (Phase 40's S13 is a defense-in-depth grep — Phase 46 narrows
+  // its tolerance via the new S15/S17 fine-grained pins; see below.)
+  // ---------------------------------------------------------------------
+
+  it('S13a — workflow contains a "Regenerate ledger dashboard" step running build-ledger-dashboard.mjs', () => {
+    // Phase 46 Plan 02 — the workflow must regenerate the dashboard from the
+    // just-snapshotted ledger so both files commit atomically in the next step.
+    expect(yaml).toMatch(/name:\s*Regenerate ledger dashboard/i);
+    expect(yaml).toMatch(/node scripts\/build-ledger-dashboard\.mjs/);
+  });
+
+  it('S14 — regen step appears BEFORE the "Commit daily ledger snapshot" step', () => {
+    const idxRegen = yaml.search(/name:\s*Regenerate ledger dashboard/i);
+    const idxCommit = yaml.search(/name:\s*Commit daily ledger snapshot/i);
+    expect(idxRegen).toBeGreaterThan(-1);
+    expect(idxCommit).toBeGreaterThan(-1);
+    expect(idxRegen).toBeLessThan(idxCommit);
+  });
+
+  it('S15 — git add line includes BOTH tests/e2e/.llm-spend-ledger.json AND docs/v40-ledger-dashboard.md', () => {
+    // Atomic commit: ledger + dashboard land in the same [skip ci] commit so
+    // re-derivation never drifts from the recorded snapshot.
+    expect(yaml).toContain('git add tests/e2e/.llm-spend-ledger.json docs/v40-ledger-dashboard.md');
+  });
+
+  it('S16 — [skip ci] commit message UNCHANGED (Pitfall — message format pinned per RESEARCH Open Q2)', () => {
+    // Format: '[skip ci] ledger snapshot ${{ env.SNAPSHOT_DATE }}: ...'
+    expect(yaml).toMatch(/\[skip ci\] ledger snapshot \$\{\{ env\.SNAPSHOT_DATE \}\}/);
+  });
+
+  it('S17 — permissions block still contains ONLY contents: write (no expansion to issues/pull-requests)', () => {
+    // T-46-02-05 / T-40-01-05 — least-privilege regression guard. Mirrors S3
+    // but stricter: no other permission tokens allowed in the permissions block.
+    expect(yaml).toContain('contents: write');
+    expect(yaml).not.toMatch(/^\s*issues:\s*/m);
+    expect(yaml).not.toMatch(/^\s*pull-requests:\s*/m);
+    expect(yaml).not.toMatch(/^\s*discussions:\s*/m);
+    expect(yaml).not.toMatch(/^\s*packages:\s*/m);
+    expect(yaml).not.toMatch(/^\s*id-token:\s*/m);
+  });
+
   it('S13 — verbatim-block parity with e2e-weekly-digest.yml (modulo git add path + commit message)', () => {
     // Promotes must_haves.truth#3 from documentation to an automated gate
     // (plan-checker WARNING). Use sed to extract the `git config user.name`

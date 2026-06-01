@@ -31,6 +31,9 @@
 // initial RED. Once the module exists (Task 2 GREEN) the assertions take over.
 
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   buildFixPrompt,
   PROMPT_SCAFFOLDS,
@@ -40,6 +43,13 @@ import {
   DIFF_FENCE_END,
   buildScaffoldSystemPrompt,
 } from '../../tests/e2e/lib/fix-prompt-builder.js';
+
+// __dirname shim for ES modules — needed by the Phase 45 historical-replay
+// describe block below to read fixture files. The test file is permitted
+// node:fs / node:path imports; only the PURE library (fix-prompt-builder.js)
+// is purity-guarded by PROMPT-04.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ---------------------------------------------------------------------------
 // PROMPT-01: envelope wrapping is literal and complete
@@ -401,4 +411,75 @@ describe('Phase 45 PROMPT-03 extension: skip-class returns unchanged', () => {
     const r = buildFixPrompt({ errorClass: 'PASS', issueBody: 'irrelevant' });
     expect(r).toEqual({ ok: false, escalate: 'close-as-pass' });
   });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 45 PROMPT-03 extension: historical-replay fixtures (no SDK mocked)
+// ---------------------------------------------------------------------------
+//
+// This block reads 4 synthesized issue-body fixtures from disk and replays
+// each through buildFixPrompt to verify the integration shape (envelope wrap
+// + fingerprint preservation + class-specific surface mention) under
+// realistic v3.1-shape body data.
+//
+// IMPORTANT — fixture reuse: these 4 fixture files are DELIBERATELY designed
+// to be reused by Plan 45-03's tests/unit/auto-fix.test.js extensions, which
+// will mock invokeAnthropicSdkWithLedger (per Phase 42 vi.mock pattern) and
+// replay the same fixtures through runDispatcher() to assert end-to-end
+// diff-application. Do NOT inline-edit fixture body shape here without
+// updating 45-03's expectations too — fixtures are a load-bearing test
+// surface shared across plans.
+
+describe('Phase 45 PROMPT-03 extension: historical-replay fixtures (no SDK mocked)', () => {
+  // class → { fixtureSlug, expectedFingerprint, expectedSurfaceSubstring }
+  const FIXTURE_TABLE = {
+    LLM_HALLUCINATED_SELECTION: {
+      slug: 'llm-hallucinated-selection',
+      fingerprint: 'a1b2c3d4e5f6',
+      surface: 'tests/e2e/lib/select-text.js',
+    },
+    WORKER_FALLBACK_FAILED: {
+      slug: 'worker-fallback-failed',
+      fingerprint: 'b2c3d4e5f6a1',
+      surface: 'src/cf-worker/index.js',
+    },
+    GOOGLE_DOM_DRIFT: {
+      slug: 'google-dom-drift',
+      fingerprint: 'c3d4e5f6a1b2',
+      surface: 'tests/e2e/lib/google-patents-page.js',
+    },
+    HARNESS_ERROR: {
+      slug: 'harness-error',
+      fingerprint: 'd4e5f6a1b2c3',
+      surface: 'tests/e2e/specs/',
+    },
+  };
+
+  for (const className of Object.keys(FIXTURE_TABLE)) {
+    const { slug, fingerprint, surface } = FIXTURE_TABLE[className];
+    it(`${className}: replays fixture body through buildFixPrompt and preserves envelope + fingerprint`, () => {
+      const fixturePath = path.join(__dirname, 'fixtures', `${slug}-issue.md`);
+      const fixtureBody = fs.readFileSync(fixturePath, 'utf8');
+
+      // Fingerprint must be present in the raw fixture (extractFingerprint
+      // regex contract from scripts/auto-fix.mjs:90-93).
+      expect(fixtureBody).toContain(`<!-- fp: ${fingerprint} -->`);
+
+      const r = buildFixPrompt({ errorClass: className, issueBody: fixtureBody });
+      expect(r.ok).toBe(true);
+
+      // Envelope wrap shape — first/last lines of userPrompt.
+      expect(r.userPrompt.startsWith(`${ENVELOPE_OPEN}\n`)).toBe(true);
+      expect(r.userPrompt.endsWith(`\n${ENVELOPE_CLOSE}`)).toBe(true);
+
+      // Fingerprint line is preserved verbatim inside the envelope.
+      expect(r.userPrompt).toContain(`<!-- fp: ${fingerprint} -->`);
+
+      // systemPrompt mentions the class name and at least one class-specific
+      // surface path (subset of Task 2's per-class battery; this test focuses
+      // on integration with realistic body content).
+      expect(r.systemPrompt).toContain(className);
+      expect(r.systemPrompt).toContain(surface);
+    });
+  }
 });

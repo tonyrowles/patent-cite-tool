@@ -149,7 +149,7 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
 - [x] **Phase 42: fix-prompt-builder + WRONG_CITATION Vertical Slice** (3/3 plans, code-side; live demo deferred to Phase 47 CLEANUP-03 HUMAN-UAT (a)) — completed 2026-05-31 — `lib/fix-prompt-builder.js` with `<issue_body_untrusted>` envelope and FORBIDDEN_DELIMITERS escape; `scripts/auto-fix.mjs` core dispatcher with `git apply --check`, branch-existence idempotency, fix_attempts retry; local end-to-end on WRONG_CITATION only
 - [x] **Phase 43: v40-auto-fix.yml Workflow** (1/1 plan) — completed 2026-05-31 — lift Phase 42 script into `issues.labeled('triage')` workflow via `peter-evans/create-pull-request@v8`; draft PR with `<!-- affected_cases -->` HTML comment; per-issue concurrency; two-commit ledger split (live demo deferred to Phase 47)
 - [x] **Phase 44: v40-auto-promote.yml + Triple-Gate `_skipCiGuard`** (1/1 plan) — completed 2026-05-31 — on merge + `auto-fix:verified` label, follow-up PR adds case to `test-cases.js` (NEVER direct-to-main); triple-gate assertion reconstructs human-gate invariant; post-merge verifier re-check on main HEAD
-- [ ] **Phase 45: Per-ERROR_CLASS Expansion + FLAKE 5-State Machine** — 4 more classes (LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, HARNESS_ERROR); 5-state classifier with rolling 10-element ring buffer; FLAKE_ESCALATION after N=3 re-files with 30-day suppress
+- [ ] **Phase 45: Per-ERROR_CLASS Expansion + FLAKE 5-State Machine** (3 plans) — 4 more classes (LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, HARNESS_ERROR); 5-state classifier with rolling 10-element ring buffer; FLAKE_ESCALATION after N=3 re-files with 30-day suppress; diff-guard FORBIDDEN_PATHS extended 6→8
 - [ ] **Phase 46: /gsd:fix-issue Local UX + Ledger v2 Dashboard** — `npm run fix-issue <n>` wraps `auto-fix.mjs --transport subscription` for free Max-5 iteration; subscription mode refuses push without `--push`; committed-ledger privacy audit
 - [ ] **Phase 47: v4.0 Cleanup** — integration audit across 5 v3.1→v4.0 touchpoints; Nyquist coverage stamping on carry-over phases; live HUMAN-UAT (auto-fix flow, dep-PR gate, FLAKE escalation, ledger snapshot, diff-guard); branch-protection/CODEOWNERS audit
 
@@ -255,13 +255,16 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
 **Goal**: Scale auto-fix from WRONG_CITATION to 5 classes; introduce 5-state FLAKE classifier to prevent both real-bugs-mis-classified-as-FLAKE and FLAKE-spam loops
 **Wave**: 5
 **Depends on**: Phase 44 (full loop proven on one class)
-**Requirements**: FLAKE-01, FLAKE-02, FLAKE-03
+**Requirements**: FLAKE-01, FLAKE-02, FLAKE-03, PROMPT-03 (extension of Phase 42's frozen registry)
 **Success Criteria** (what must be TRUE):
   1. `PROMPT_SCAFFOLDS` covers LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, and HARNESS_ERROR in addition to WRONG_CITATION; each scaffold has at least one historical-issue replay test demonstrating a non-empty diff
   2. `tests/e2e/lib/triage-classifier.js` replaces v3.1 binary CONFIRMED/FLAKE with a 5-state machine (CONFIRMED_BUG / LIKELY_BUG / INTERMITTENT / FLAKE / FLAKE_ESCALATION); a per-case rolling 10-element rerun-outcomes ring buffer drives state transitions; Vitest exercises each transition
   3. After N=3 FLAKE re-files within 14 days for the same fingerprint, the classifier opens a `flake-investigation` issue (no auto-fix attempt); the same fingerprint is suppressed from re-filing for 30 days; static-grep test pins N and suppression-window values
   4. `scripts/quarantine-append.mjs --escalate-stable-runs-reset 1` is wired into the FLAKE dispatch path of `auto-fix.mjs` — resets `stable_runs` to bump the case back to fresh state instead of opening a PR
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 45-01-PLAN.md (wave 1) — PROMPT_SCAFFOLDS expansion: 4 new builders (LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, HARNESS_ERROR) + buildScaffoldSystemPrompt helper + 4 historical-replay tests (PROMPT-03 extension)
+- [ ] 45-02-PLAN.md (wave 1) — 5-state machine sibling export (classifyRerunOutcomes) + ring-buffer/suppression bootstrap files + appendRerunOutcome + e2e-rerun-validator wiring + diff-guard FORBIDDEN_PATHS 6→8 path extension (FLAKE-01, FLAKE-02 security gap closure)
+- [ ] 45-03-PLAN.md (wave 2) — auto-fix.mjs Step 4 flake-investigation label guard + Step 7 FLAKE 5-state dispatch + quarantine-append --escalate-stable-runs-reset 1 --case flag + flake-investigation issue creation (FLAKE-02, FLAKE-03; depends on 45-01 + 45-02)
 
 ### Phase 46: /gsd:fix-issue Local UX + Ledger v2 Dashboard
 **Goal**: Free local iteration against Max 5 credit + committed-ledger privacy audit + dashboard surfacing combined transport spend
@@ -300,7 +303,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 3/3 | Complete (demo deferred) | 2026-05-31 |
 | 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 1/1 | Complete (demo deferred) | 2026-05-31 |
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 1/1 | Complete | 2026-05-31 |
-| 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 0/TBD | Not started | - |
+| 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 0/3 | Not started | - |
 | 46. /gsd:fix-issue Local UX + Ledger v2 Dashboard | v4.0 | 0/TBD | Not started | - |
 | 47. v4.0 Cleanup | v4.0 | 0/TBD | Not started | - |
 

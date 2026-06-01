@@ -121,8 +121,10 @@ describe('build-ledger-dashboard', () => {
         },
       };
       const md = buildDashboardMarkdown(ledger, { month: '2026-05' });
-      const idx29 = md.indexOf('2026-05-29');
-      const idx30 = md.indexOf('2026-05-30');
+      // Anchor on the row form `| YYYY-MM-DD |` to avoid matching the
+      // Generated: iso prefix earlier in the document.
+      const idx29 = md.search(/\|\s*2026-05-29\s*\|/);
+      const idx30 = md.search(/\|\s*2026-05-30\s*\|/);
       expect(idx29).toBeGreaterThan(-1);
       expect(idx30).toBeGreaterThan(-1);
       expect(idx29).toBeLessThan(idx30);

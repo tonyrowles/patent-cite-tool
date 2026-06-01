@@ -8,3 +8,5 @@
 **Verified pre-existing:** YES — reproduces on `HEAD` BEFORE the Phase 45 edits (verified via working-tree revert and isolated test run on the Phase 44-final tree).
 **Cause hypothesis:** Time-sensitive — the test writes a ledger entry for a specific month and the digest only sums the current month; the hardcoded `'2026-05'` seed in the test rolled over when the clock advanced to `2026-06-01`. First flagged in Phase 42-01 deferred-items.md.
 **Action:** Out of scope for Phase 45. Logged here per scope-boundary rule. Phase 47 cleanup will pick this up (or a follow-up plan in v4.1).
+
+**Re-confirmed during Plan 45-03 (2026-05-31):** Full vitest sweep after Task 2 GREEN reproduces the same `'$0.00 / $100 (0%)'` vs expected `'12.50'` mismatch. The 45-03 patch touches scripts/auto-fix.mjs + scripts/quarantine-append.mjs + their unit tests — no path to tests/e2e/scripts/e2e-weekly-digest.test.js. Still pre-existing, still out of scope.

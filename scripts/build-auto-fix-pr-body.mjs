@@ -20,6 +20,7 @@ export function buildAutoFixPrBody({
   const iso = ledgerIso || 'unknown';
   return [
     `<!-- affected_cases: ${casesCsv} -->`,
+    `<!-- source_issue: ${issue} -->`,
     '',
     `Auto-fix draft PR for issue #${issue} (\`${branch}\`).`,
     '',

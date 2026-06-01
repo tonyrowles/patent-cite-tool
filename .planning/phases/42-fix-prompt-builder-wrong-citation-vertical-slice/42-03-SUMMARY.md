@@ -69,28 +69,27 @@ A 10-section procedure document covering the full Phase 42 demo path:
 
 ## Task 2 Status
 
-**pending: handled by orchestrator after this run.**
+**Deferred to Phase 47 CLEANUP-03 HUMAN-UAT (a) — maintainer decision 2026-05-31.**
 
-Task 2 (`checkpoint:human-verify gate="blocking-human"` — the maintainer executes the demo procedure end-to-end and pastes the 5 evidence captures) is OUT OF SCOPE for the parallel worktree executor that authored this summary. The orchestrator (which has access to the maintainer's live shell, `ANTHROPIC_API_KEY`, and the public repo) will:
+The Phase 42 vertical-slice code is empirically validated via 122 unit tests across `tests/unit/fix-prompt-builder.test.js`, `tests/unit/auto-fix.test.js`, `tests/unit/issue-payload-builder.test.js`, `tests/unit/eslint-fix-prompt-builder-guard.test.js`, `tests/unit/llm-driver-sdk-cache-control.test.js`, and `tests/unit/llm-ledger.test.js`. Task 2 (the live billable end-to-end demo against GitHub issue #3) was DEFERRED to Phase 47 CLEANUP-03 HUMAN-UAT (a) for the following reasons:
 
-1. Merge the `worktree-agent-a27bcfe535810bc6a` branch carrying this commit (`affc309 — docs(42-03): manual demo procedure...`) and this SUMMARY into `main`.
-2. Dispatch the Task 2 checkpoint to the maintainer with the resume-signal contract from `42-03-PLAN.md`.
-3. After the maintainer types `approved` + pastes the 5 evidence captures, commit those captures into this SUMMARY under the placeholder section below.
+**Bootstrap dependency:** The verifier-gate workflow (`v40-verifier-gate.yml` shipped in Phase 41) must exist on the GitHub Actions side for the demo to trigger it. As of Phase 42 close, all ~50 v4.0 commits (including the workflow file) are local-only on `main`. With the v4.0-main-protection ruleset now ACTIVE (`Do not allow bypassing: ON`, `pull_request` rule requiring 1 approval + Code Owner review on CODEOWNED paths per Phase 39 LEDGER-04 + CLEANUP-04), direct pushes to `main` are blocked. Pushing requires a feature-branch PR through the ruleset — itself a multi-step operational process the maintainer wants to plan separately.
 
-### Placeholder for Task 2 Evidence (orchestrator to fill after maintainer resume-signal)
+**Cost discipline:** Running the demo today would burn $0.05-$0.15 of SDK budget on a call whose verifier-gate cannot actually run (workflow doesn't exist on GitHub yet), making the result an incomplete signal.
 
-> The orchestrator will append the 5 capture blocks the plan's `<how-to-verify>` enumerates here:
-> 1. Prereq check captures (gh auth status, ANTHROPIC_API_KEY presence proof, clean-tree confirmation)
-> 2. Target confirmation (issue #3 state/labels/title/fingerprint OR fallback target identifier)
-> 3. Dry-run evidence (last 20 lines of `--dry-run` output)
-> 4. Real-invocation evidence (last 10 lines, exit code, appended ledger entry JSON)
-> 5. Branch URL, PR URL, verifier-gate workflow-run URL, final PR state with isDraft + labels + check conclusions
->
-> Plus the load-bearing post-demo synthesis:
-> - SDK cost figure (`cost_usd` from the ledger entry)
-> - Pitfall 4 caveat block: "dispatcher exit 0 ≠ gate pass; the gate's verdict is the load-bearing signal; this demo's gate verdict was <PASS|FAIL>"
-> - Concurrent-invocation acceptance note (single-terminal-only for Phase 42)
-> - Phase 43 readiness statement: green or red, with the next-steps recommendation
+**Phase 47 redundancy:** CLEANUP-03 already requires a live HUMAN-UAT for "(a) end-to-end auto-fix flow against a real triage-labeled fork issue" — exactly this demo. Folding 42-03 Task 2 into 47-CLEANUP-03 (a) eliminates duplicate effort.
+
+**Phase 42 close criteria are satisfied without Task 2:**
+- All 8 phase requirement IDs (PROMPT-01..04, AUTOFIX-01/03/04/05) implemented and unit-tested
+- All 6 ROADMAP success criteria deliverable from the shipped code; #6 ("local end-to-end demo") deferred to Phase 47's HUMAN-UAT (a)
+- `docs/v40-auto-fix-manual-demo.md` is in place for Phase 47's executor to follow
+
+**Phase 47 will:**
+1. Push the v4.0 commits to GitHub via whatever PR strategy the maintainer adopts (likely a single `v4.0-integration` feature branch + PR + self-merge with bypass-list workaround OR a temporary ruleset relaxation).
+2. Run the procedure in `docs/v40-auto-fix-manual-demo.md` end-to-end on the live (now-existing) verifier-gate workflow.
+3. Capture all 5 evidence blocks (prereqs, target, dry-run, real invocation, branch+PR+gate) into the Phase 47 HUMAN-UAT report.
+
+If the Phase 47 demo PASSES: v4.0 ships. If it FAILS: the failure is the iteration signal — Phase 47 surfaces a follow-up plan to address whatever primitive broke (dispatcher, prompt template, gate, etc.). Both outcomes are Phase 47 work, not Phase 42 work.
 
 ## Deviations from Plan
 

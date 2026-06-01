@@ -25,6 +25,34 @@ export const BUDGET_GOLDEN_DIFF = 400;
 /** Canonical truncation suffix (tests check body.includes(TRUNCATION_SUFFIX.trim())). */
 export const TRUNCATION_SUFFIX = '\n…[truncated, full content in artifacts]';
 
+/**
+ * Phase 42 PROMPT-02 — the two envelope literals that Phase 42's
+ * fix-prompt-builder.js wraps the issue body in:
+ *   <issue_body_untrusted>\n<body>\n</issue_body_untrusted>
+ *
+ * The body itself is the OUTPUT of buildIssuePayload() here. If an attacker
+ * (or a benign-but-pathological cite) puts either of these literals inside
+ * the LLM Rationale, Verifier Disagreement reason, or Golden Diff section,
+ * the envelope POPS — the LLM would then read whatever followed the closing
+ * tag as INSTRUCTIONS, not data.
+ *
+ * Mitigation: BEFORE truncate() runs on each LLM-derived input, we splice
+ * the marker `-DELIMITER-ESCAPED-PHASE-42` between the second-to-last and
+ * last characters of each forbidden literal. The closing `>` is moved past
+ * the marker; the literal token is broken; the surrounding human-readable
+ * text is preserved.
+ *
+ * Frozen so callers cannot mutate the list at runtime — any future change
+ * MUST be a coordinated edit here AND in fix-prompt-builder.js's
+ * ENVELOPE_OPEN/ENVELOPE_CLOSE constants.
+ *
+ * @type {readonly string[]}
+ */
+export const FORBIDDEN_DELIMITERS = Object.freeze([
+  '<issue_body_untrusted>',
+  '</issue_body_untrusted>',
+]);
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
@@ -52,6 +80,42 @@ function formatGoldenDiff(observed, golden) {
   if (golden == null) return '(no golden baseline available)';
   if (observed === golden) return '(observed matches golden — should not happen for a CONFIRMED finding)';
   return ['- ' + golden, '+ ' + observed].join('\n');
+}
+
+/**
+ * Phase 42 PROMPT-02 — neutralize FORBIDDEN_DELIMITERS in LLM-derived text.
+ *
+ * For each forbidden literal (e.g. `</issue_body_untrusted>`), splice the
+ * marker `-DELIMITER-ESCAPED-PHASE-42` between the second-to-last and last
+ * characters: `</issue_body_untrusted>` →
+ * `</issue_body_untrusted-DELIMITER-ESCAPED-PHASE-42>`. The trailing `>` is
+ * moved past the marker; the literal envelope token is broken; the
+ * surrounding human-readable text is preserved without redaction.
+ *
+ * Order of operations matters: the LONGER literal MUST be replaced first.
+ * `</issue_body_untrusted>` is a superstring of `<issue_body_untrusted>` —
+ * if we replaced the short form first we would mangle the closing tag mid-
+ * replacement and the second pass would miss it. FORBIDDEN_DELIMITERS lists
+ * the opening tag at [0] and the closing tag at [1]; this function iterates
+ * in REVERSE so the closing (longer) form is always escaped first.
+ *
+ * Pure: returns '' for non-string input. No I/O. No env reads.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function escapeForbiddenDelimiters(text) {
+  if (typeof text !== 'string' || text.length === 0) return text === '' ? '' : '';
+  let out = text;
+  // Iterate longest-first to avoid superstring-mangling.
+  for (let i = FORBIDDEN_DELIMITERS.length - 1; i >= 0; i -= 1) {
+    const d = FORBIDDEN_DELIMITERS[i];
+    if (out.indexOf(d) === -1) continue;
+    const escaped = d.slice(0, -1) + '-DELIMITER-ESCAPED-PHASE-42' + d.slice(-1);
+    // split/join replaces ALL occurrences, no regex special-char hazards.
+    out = out.split(d).join(escaped);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,16 +190,26 @@ export function buildIssuePayload({
   // Section: Verifier Disagreement
   // Window 2 (observed + reason): fence content = \n{reason}\n → length = reason.length + 2.
   // Budget reason at BUDGET_VERIFIER_WINDOW - 2 so fenced window fits within 600.
-  const truncatedReason = truncate(reason, BUDGET_VERIFIER_WINDOW - 2);
+  // Phase 42 PROMPT-02: escape FORBIDDEN_DELIMITERS BEFORE truncate() so the
+  // v4.0 fix-prompt-builder envelope cannot be popped by a crafted reason.
+  const truncatedReason = truncate(escapeForbiddenDelimiters(reason), BUDGET_VERIFIER_WINDOW - 2);
   const rerunLine = rerunEntry
     ? `Rerun verdict: ${rerunEntry.verdict} (${rerunEntry.confirmed_count}/${rerunEntry.total_runs})`
     : 'Rerun verdict: not replayable';
 
+  // Phase 42 PROMPT-02: the observed citation AND the golden citation flow
+  // into the Verifier Disagreement section verbatim (rendered between
+  // backticks). Both are user/extension-derived strings — a crafted citation
+  // value containing the literal envelope tag would pop the envelope just
+  // like a crafted rationale/reason would. Escape both before interpolation.
+  const safeGolden  = goldenCitation == null ? null : escapeForbiddenDelimiters(goldenCitation);
+  const safeCitation = escapeForbiddenDelimiters(citation);
+
   const verifierSection = [
     '### Verifier Disagreement',
     '',
-    `Expected citation (golden): \`${goldenCitation ?? 'n/a'}\``,
-    `Observed citation: \`${citation}\``,
+    `Expected citation (golden): \`${safeGolden ?? 'n/a'}\``,
+    `Observed citation: \`${safeCitation}\``,
     fenceCode(truncatedReason),
     `Verifier tier: ${tierUsed}`,
     rerunLine,
@@ -143,7 +217,11 @@ export function buildIssuePayload({
 
   // Section: LLM Rationale (section text ≤ BUDGET_LLM_RATIONALE)
   // Envelope overhead ~40 chars (fence + confidence line), leaving 760 for rationale.
-  const truncatedRationale = truncate(rationale, BUDGET_LLM_RATIONALE - OVERHEAD_LLM_SECTION);
+  // Phase 42 PROMPT-02: escape FORBIDDEN_DELIMITERS BEFORE truncate() — the LLM
+  // rationale is the most likely vector for an envelope-pop attack (the model is
+  // explicitly asked to explain a citation; nothing prevents it from echoing
+  // user-controlled cite text containing the literal envelope tag).
+  const truncatedRationale = truncate(escapeForbiddenDelimiters(rationale), BUDGET_LLM_RATIONALE - OVERHEAD_LLM_SECTION);
 
   const llmSection = [
     '### LLM Rationale',
@@ -154,8 +232,11 @@ export function buildIssuePayload({
 
   // Section: Golden Diff (section text ≤ BUDGET_GOLDEN_DIFF)
   // Envelope overhead ~5 chars (\n\n prefix), leaving 395 for diff content.
+  // Phase 42 PROMPT-02: escape FORBIDDEN_DELIMITERS BEFORE truncate() — golden
+  // citations are user-supplied via the baseline JSON; a crafted golden value
+  // would otherwise flow into the prompt verbatim.
   const rawDiff        = formatGoldenDiff(citation, goldenCitation);
-  const truncatedDiff  = truncate(rawDiff, BUDGET_GOLDEN_DIFF - OVERHEAD_GOLDEN_SECTION);
+  const truncatedDiff  = truncate(escapeForbiddenDelimiters(rawDiff), BUDGET_GOLDEN_DIFF - OVERHEAD_GOLDEN_SECTION);
 
   const goldenSection = [
     '### Golden Diff',

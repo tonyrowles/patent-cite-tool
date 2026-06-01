@@ -7,13 +7,15 @@
 // All fixtures are inline path arrays — no new fixture files.
 //
 // LOCKED forbidden-paths bank (per 41-CONTEXT.md + PITFALLS Pitfall 3
-// Defense 2):
+// Defense 2, extended in Phase 45-02 for FLAKE-01/FLAKE-02 state-file integrity):
 //   1. tests/test-cases.js                       (76-case golden trigger)
 //   2. tests/golden/baseline.json                (golden baseline)
 //   3. tests/e2e/test-cases-quarantine.js        (quarantine corpus)
 //   4. .github/workflows/v40-*.yml               (v40 workflow namespace)
 //   5. tests/e2e/.llm-spend-ledger.json          (LLM cost ledger)
 //   6. .github/CODEOWNERS                        (CODEOWNERS file itself)
+//   7. tests/e2e/.rerun-ring-buffer.json         (FLAKE 5-state ring buffer — Phase 45-02)
+//   8. tests/e2e/.flake-suppression.json         (FLAKE_ESCALATION suppression — Phase 45-02)
 //
 // RED gate (Task 1): this file imports scripts/check-diff-guard.mjs which
 // does NOT yet exist on disk. Vitest emits "Error: Failed to load url
@@ -29,9 +31,9 @@ import {
 
 describe('check-diff-guard (Phase 41-01, VFY-GATE-04)', () => {
   describe('FORBIDDEN_PATHS bank', () => {
-    it('exports exactly 6 regex patterns (LOCKED per Pitfall 3 Defense 2)', () => {
+    it('exports exactly 8 regex patterns (6 Phase 41 + 2 Phase 45-02 extensions)', () => {
       expect(Array.isArray(FORBIDDEN_PATHS)).toBe(true);
-      expect(FORBIDDEN_PATHS).toHaveLength(6);
+      expect(FORBIDDEN_PATHS).toHaveLength(8);
       for (const re of FORBIDDEN_PATHS) {
         expect(re).toBeInstanceOf(RegExp);
       }
@@ -87,6 +89,20 @@ describe('check-diff-guard (Phase 41-01, VFY-GATE-04)', () => {
       expect(result.ok).toBe(false);
       expect(result.violations).toContain('.github/CODEOWNERS');
     });
+
+    // F13 — Phase 45-02 FLAKE ring buffer state file
+    it('F13: rejects tests/e2e/.rerun-ring-buffer.json (Phase 45-02 FLAKE-01 state)', () => {
+      const result = checkDiffGuard(['tests/e2e/.rerun-ring-buffer.json']);
+      expect(result.ok).toBe(false);
+      expect(result.violations).toContain('tests/e2e/.rerun-ring-buffer.json');
+    });
+
+    // F14 — Phase 45-02 FLAKE suppression file
+    it('F14: rejects tests/e2e/.flake-suppression.json (Phase 45-02 FLAKE-02 state)', () => {
+      const result = checkDiffGuard(['tests/e2e/.flake-suppression.json']);
+      expect(result.ok).toBe(false);
+      expect(result.violations).toContain('tests/e2e/.flake-suppression.json');
+    });
   });
 
   describe('checkDiffGuard() accepts legitimate paths', () => {
@@ -113,20 +129,24 @@ describe('check-diff-guard (Phase 41-01, VFY-GATE-04)', () => {
       expect(result.violations).toEqual([]);
     });
 
-    // F11 — multi-violation input
+    // F11 — multi-violation input (extended in Phase 45-02 to cover the 2 new paths)
     it('F11: returns {ok:false} listing EVERY violator when input has 2+ forbidden paths', () => {
       const result = checkDiffGuard([
         'tests/test-cases.js',
         'src/shared/matching.js', // legitimate, should NOT appear in violations
         '.github/CODEOWNERS',
         'tests/golden/baseline.json',
+        'tests/e2e/.rerun-ring-buffer.json',  // Phase 45-02
+        'tests/e2e/.flake-suppression.json',  // Phase 45-02
       ]);
       expect(result.ok).toBe(false);
       expect(result.violations).toContain('tests/test-cases.js');
       expect(result.violations).toContain('.github/CODEOWNERS');
       expect(result.violations).toContain('tests/golden/baseline.json');
+      expect(result.violations).toContain('tests/e2e/.rerun-ring-buffer.json');
+      expect(result.violations).toContain('tests/e2e/.flake-suppression.json');
       expect(result.violations).not.toContain('src/shared/matching.js');
-      expect(result.violations).toHaveLength(3);
+      expect(result.violations).toHaveLength(5);
     });
 
     // F12 — over-broad glob guard: v40-* must NOT match non-v40 workflows

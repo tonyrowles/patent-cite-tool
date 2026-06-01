@@ -234,7 +234,8 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   3. The PR body includes the `<!-- affected_cases: id1,id2 -->` HTML comment for downstream parsers (verifier-gate, auto-promote)
   4. Concurrency group `v40-auto-fix-${{ event.issue.number }}` with `cancel-in-progress: false` provides workflow-level idempotency for label-flapping
   5. A real triage-labeled issue in CI produces a draft PR whose verifier-gate (Phase 41) can run to completion against the proposed branch
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 43-01-PLAN.md (wave 1) — `.github/workflows/v40-auto-fix.yml` (issues.labeled('triage') → cpr@v8 draft PR with two-commit ledger split) + `scripts/build-auto-fix-pr-body.mjs` PR-body helper (load-bearing `<!-- affected_cases -->` comment) + 22-case Vitest YAML contract (A1-A12 + L1-L2 + X1-X8) + 6-case Vitest helper contract (B1-B6) — AUTOFIX-02
 
 ### Phase 44: v40-auto-promote.yml + Triple-Gate `_skipCiGuard`
 **Goal**: Merge → quarantine→golden promotion loop closed without breaking the human-gated trust invariant
@@ -296,7 +297,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | 40. Deps-Update + Cost-Ledger-Snapshot Workflows | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 41. Verifier-Gate Workflow + verify-single-case.mjs | v4.0 | 4/4 | Complete | 2026-05-31 |
 | 42. fix-prompt-builder + WRONG_CITATION Vertical Slice | v4.0 | 3/3 | Complete (demo deferred) | 2026-05-31 |
-| 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 0/TBD | Not started | - |
+| 43. v40-auto-fix.yml Workflow + Draft PR | v4.0 | 0/1 | Planned | - |
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 0/TBD | Not started | - |
 | 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 0/TBD | Not started | - |
 | 46. /gsd:fix-issue Local UX + Ledger v2 Dashboard | v4.0 | 0/TBD | Not started | - |

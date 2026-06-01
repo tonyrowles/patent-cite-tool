@@ -1,0 +1,1 @@
+tests/e2e/scripts/e2e-weekly-digest.test.js — "cost data unavailable when ledger absent > returns $X.XX / $100 (Y%) format when ledger present" failing on baseline before plan 45-02. Pre-existing failure, unrelated to triage-classifier or check-diff-guard. Logged here, not fixed.

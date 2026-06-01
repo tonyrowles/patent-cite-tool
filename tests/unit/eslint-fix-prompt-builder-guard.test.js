@@ -46,12 +46,18 @@ describe('Phase 42 PROMPT-04: ESLint guard on tests/e2e/lib/fix-prompt-builder.j
   });
 
   it('Static: per-file block lists node:fs, node:child_process, node:path as restricted', () => {
+    // NOTE: this is a static sanity grep — the programmatic ESLint API tests
+    // below (Tests 1-4) are the source of truth for rule behavior. We do NOT
+    // strip JS comments here because eslint.config.js contains glob patterns
+    // like `'tests/e2e/**/*.js'` that include `/**/` substrings; a naive
+    // `/\*[\s\S]*?\*\//g` strip matches them as block comments and eats
+    // ~50% of the config file (including the per-file block we want to test).
+    // The grep below requires `name: '<module>'` exactly — comment text like
+    // `// e.g. node:fs` does not satisfy it.
     const text = fs.readFileSync(ESLINT_CONFIG_PATH, 'utf8');
-    // Strip JS comments before scanning so a comment-only mention does not pass.
-    const code = text.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(code).toMatch(/['"]node:fs['"]/);
-    expect(code).toMatch(/['"]node:child_process['"]/);
-    expect(code).toMatch(/['"]node:path['"]/);
+    expect(text).toMatch(/name:\s*['"]node:fs['"]/);
+    expect(text).toMatch(/name:\s*['"]node:child_process['"]/);
+    expect(text).toMatch(/name:\s*['"]node:path['"]/);
   });
 
   it('ESLint API Test 1: node:fs import fires no-restricted-imports', async () => {

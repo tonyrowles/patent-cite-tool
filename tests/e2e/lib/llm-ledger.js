@@ -17,6 +17,7 @@
 //   checkSpendCap(ledger, month?)          { status, monthly_total_usd, month, message }
 //   phaseTotal(ledger, phase)              cross-month sum of cost_usd for entries with .phase===phase
 //   checkPhaseSpendCap(ledger, phase)      { status, phase_total_usd, phase, message }
+//   countFixAttempts(ledger, fingerprint)  count of Phase 42 auto-fix iterations for a given fingerprint
 //   appendLedgerEntry(ledgerPath, entry)   entry may carry an optional `phase` field (D-14 back-compat)
 //
 // Design notes:
@@ -230,6 +231,54 @@ export function phaseTotal(ledger, phase) {
     }
   }
   return +sum.toFixed(6);
+}
+
+/**
+ * Phase 42 AUTOFIX-05 — count of Phase 42 auto-fix iterations recorded against
+ * a specific issue fingerprint. Sibling of phaseTotal; same defensive-filter
+ * shape, same cross-month iteration, but returns a COUNT rather than a cost
+ * sum.
+ *
+ * Predicate: an iteration entry is counted iff
+ *   it.phase === '42-auto-fix'   AND   it.fingerprint === fingerprint
+ *
+ * Plan 42-02's scripts/auto-fix.mjs dispatcher uses this to cap auto-fix
+ * retries at 3 per fingerprint before adding the `human-review-required`
+ * label and refusing further auto-fix on that fingerprint (per 42-CONTEXT.md
+ * AUTOFIX-05 / fix_attempts decision).
+ *
+ * Defensive returns (mirror phaseTotal's null-guard pattern):
+ *   - null / undefined ledger                  → 0
+ *   - missing or non-object ledger.months      → 0
+ *   - non-string fingerprint                   → 0
+ *   - empty-string fingerprint                 → 0
+ *
+ * The non-string / empty-string fingerprint guard matters: pre-Phase-42
+ * ledger entries do NOT carry a `fingerprint` field at all. If the caller
+ * passed undefined and we did NOT guard, `entry.fingerprint === undefined`
+ * would be TRUE for every legacy entry — silently counting every Phase 31/32/34
+ * call as an auto-fix attempt and triggering the human-review escalation on
+ * the first real auto-fix.
+ *
+ * @param {object} ledger
+ * @param {string} fingerprint  e.g. 'deadbeef1234' (first 12 hex of v3.1 fp)
+ * @returns {number}  count of matching iterations across all month buckets
+ */
+export function countFixAttempts(ledger, fingerprint) {
+  if (typeof fingerprint !== 'string' || fingerprint.length === 0) return 0;
+  const months = ledger?.months;
+  if (!months || typeof months !== 'object') return 0;
+  let n = 0;
+  for (const bucket of Object.values(months)) {
+    const iterations = bucket?.iterations;
+    if (!Array.isArray(iterations)) continue;
+    for (const it of iterations) {
+      if (it && it.phase === '42-auto-fix' && it.fingerprint === fingerprint) {
+        n += 1;
+      }
+    }
+  }
+  return n;
 }
 
 /**

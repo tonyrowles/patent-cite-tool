@@ -53,6 +53,11 @@ import {
   FLAKE_ESCALATION_WINDOW_DAYS,
   FLAKE_SUPPRESSION_DAYS,
   RING_BUFFER_SIZE,
+  // Phase 45-02 (FLAKE-01 + FLAKE-02) helpers
+  readRingBufferOrInit,
+  readSuppressionsOrInit,
+  appendRerunOutcome,
+  buildFlakeInvestigationBody,
 } from '../e2e/lib/triage-classifier.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1676,5 +1681,251 @@ describe('classifyRerunOutcomes (Phase 45-02 FLAKE-01 + FLAKE-02)', () => {
       expect(typeof atomicWriteJson).toBe('function');
       expect(typeof emptyTriageReport).toBe('function');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 45-02 Task 2 — helper functions + bootstrap state files
+// ---------------------------------------------------------------------------
+
+describe('readRingBufferOrInit (Phase 45-02)', () => {
+  let tmp;
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-rbf-test-'));
+  });
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  // R1
+  it('R1: missing file → returns {version:1, cases:{}} bootstrap; does NOT write to disk', () => {
+    const filePath = path.join(tmp, 'never-existed.json');
+    const result = readRingBufferOrInit(filePath);
+    expect(result).toEqual({ version: 1, cases: {} });
+    expect(fs.existsSync(filePath)).toBe(false);
+  });
+
+  // R2
+  it('R2: existing file with valid contents → returns parsed object verbatim', () => {
+    const filePath = path.join(tmp, 'existing.json');
+    const initial = {
+      version: 1,
+      cases: { foo: { outcomes: ['pass'], updatedAt: '2026-01-01T00:00:00Z', flakeHistory: [] } },
+    };
+    fs.writeFileSync(filePath, JSON.stringify(initial));
+    const result = readRingBufferOrInit(filePath);
+    expect(result).toEqual(initial);
+  });
+
+  it('R2-corrupt: wrong version throws (fail-loud — do NOT silently re-bootstrap)', () => {
+    const filePath = path.join(tmp, 'wrong-version.json');
+    fs.writeFileSync(filePath, JSON.stringify({ version: 99, cases: {} }));
+    expect(() => readRingBufferOrInit(filePath)).toThrow(/corrupt|wrong version/i);
+  });
+
+  it('R2-malformed: invalid JSON throws (fail-loud)', () => {
+    const filePath = path.join(tmp, 'malformed.json');
+    fs.writeFileSync(filePath, '{not valid json');
+    expect(() => readRingBufferOrInit(filePath)).toThrow(/corrupt|wrong version/i);
+  });
+});
+
+describe('readSuppressionsOrInit (Phase 45-02)', () => {
+  let tmp;
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-sup-test-'));
+  });
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  // R3
+  it('R3: missing file → returns {version:1, suppressions:{}} bootstrap; does NOT write to disk', () => {
+    const filePath = path.join(tmp, 'never.json');
+    const result = readSuppressionsOrInit(filePath);
+    expect(result).toEqual({ version: 1, suppressions: {} });
+    expect(fs.existsSync(filePath)).toBe(false);
+  });
+
+  it('R3-existing: existing file with valid suppressions → returns parsed object verbatim', () => {
+    const filePath = path.join(tmp, 'existing.json');
+    const initial = {
+      version: 1,
+      suppressions: { abc123def456: { until: '2099-01-01T00:00:00Z', reason: 'FLAKE_ESCALATION' } },
+    };
+    fs.writeFileSync(filePath, JSON.stringify(initial));
+    const result = readSuppressionsOrInit(filePath);
+    expect(result).toEqual(initial);
+  });
+
+  it('R3-wrong-version: throws on corrupt version', () => {
+    const filePath = path.join(tmp, 'wrong.json');
+    fs.writeFileSync(filePath, JSON.stringify({ version: 5, suppressions: {} }));
+    expect(() => readSuppressionsOrInit(filePath)).toThrow(/corrupt|wrong version/i);
+  });
+});
+
+describe('appendRerunOutcome (Phase 45-02)', () => {
+  let tmp;
+  let ringPath;
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-append-test-'));
+    ringPath = path.join(tmp, 'rerun-ring-buffer.json');
+  });
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  // R4 — slice(-10) at the rolling boundary
+  it('R4: slice(-10) — once buffer has 10 entries, the next append drops the oldest', () => {
+    const initial = {
+      version: 1,
+      cases: {
+        'case-1': {
+          outcomes: ['pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass'],
+          flakeHistory: [],
+          updatedAt: '2026-01-01T00:00:00Z',
+        },
+      },
+    };
+    fs.writeFileSync(ringPath, JSON.stringify(initial));
+
+    appendRerunOutcome('case-1', 'fail', { ringBufferPath: ringPath });
+    let post = JSON.parse(fs.readFileSync(ringPath, 'utf8'));
+    expect(post.cases['case-1'].outcomes).toHaveLength(10);
+    expect(post.cases['case-1'].outcomes[9]).toBe('fail');
+    expect(post.cases['case-1'].outcomes.slice(0, 9)).toEqual(new Array(9).fill('pass'));
+
+    // Append again — oldest pass drops, new fail at tail
+    appendRerunOutcome('case-1', 'fail', { ringBufferPath: ringPath });
+    post = JSON.parse(fs.readFileSync(ringPath, 'utf8'));
+    expect(post.cases['case-1'].outcomes).toHaveLength(10);
+    expect(post.cases['case-1'].outcomes.slice(-2)).toEqual(['fail', 'fail']);
+    expect(post.cases['case-1'].outcomes.slice(0, 8)).toEqual(new Array(8).fill('pass'));
+  });
+
+  // R5 — bootstraps missing file
+  it('R5: bootstraps the file when it does not exist; writes the new case', () => {
+    expect(fs.existsSync(ringPath)).toBe(false);
+    appendRerunOutcome('new-case', 'fail', { ringBufferPath: ringPath });
+    expect(fs.existsSync(ringPath)).toBe(true);
+    const post = JSON.parse(fs.readFileSync(ringPath, 'utf8'));
+    expect(post.version).toBe(1);
+    expect(post.cases['new-case']).toBeDefined();
+    expect(post.cases['new-case'].outcomes).toEqual(['fail']);
+    expect(post.cases['new-case'].flakeHistory).toEqual([]);
+    expect(typeof post.cases['new-case'].updatedAt).toBe('string');
+  });
+
+  // R6 — prune flakeHistory older than 14d at write time
+  it('R6: prunes flakeHistory entries older than FLAKE_ESCALATION_WINDOW_DAYS at write time', () => {
+    const now = new Date('2026-05-31T00:00:00Z');
+    const nowMs = now.getTime();
+    const twentyDaysAgo = new Date(nowMs - 20 * 86400_000).toISOString();
+    const fiveDaysAgo = new Date(nowMs - 5 * 86400_000).toISOString();
+
+    const initial = {
+      version: 1,
+      cases: {
+        'case-1': {
+          outcomes: ['pass'],
+          flakeHistory: [
+            { classifiedAtIso: twentyDaysAgo },  // outside 14d → pruned
+            { classifiedAtIso: fiveDaysAgo },    // inside 14d → kept
+          ],
+          updatedAt: '2026-05-01T00:00:00Z',
+        },
+      },
+    };
+    fs.writeFileSync(ringPath, JSON.stringify(initial));
+
+    appendRerunOutcome('case-1', 'pass', { ringBufferPath: ringPath, now: () => now });
+    const post = JSON.parse(fs.readFileSync(ringPath, 'utf8'));
+    expect(post.cases['case-1'].flakeHistory).toHaveLength(1);
+    expect(post.cases['case-1'].flakeHistory[0].classifiedAtIso).toBe(fiveDaysAgo);
+  });
+
+  it('R-validate: rejects invalid outcome with TypeError', () => {
+    expect(() => appendRerunOutcome('case-1', 'success', { ringBufferPath: ringPath }))
+      .toThrow(TypeError);
+  });
+
+  it('R-validate: rejects empty caseId with TypeError', () => {
+    expect(() => appendRerunOutcome('', 'pass', { ringBufferPath: ringPath }))
+      .toThrow(TypeError);
+  });
+
+  it('R-validate: rejects non-string caseId with TypeError', () => {
+    expect(() => appendRerunOutcome(null, 'pass', { ringBufferPath: ringPath }))
+      .toThrow(TypeError);
+  });
+});
+
+describe('buildFlakeInvestigationBody (Phase 45-02)', () => {
+  // R7
+  it('R7: produces deterministic markdown with caseId, full+prefix fingerprint, outcomes table, flake history', () => {
+    const input = {
+      caseId: 'US-foo-123',
+      fingerprint: 'a1b2c3d4e5f6',
+      outcomes: ['fail', 'pass', 'fail', 'pass', 'pass', 'fail', 'pass', 'pass', 'pass', 'fail'],
+      flakeHistory: [
+        { classifiedAtIso: '2026-05-15T00:00:00Z' },
+        { classifiedAtIso: '2026-05-22T00:00:00Z' },
+        { classifiedAtIso: '2026-05-29T00:00:00Z' },
+      ],
+    };
+    const body = buildFlakeInvestigationBody(input);
+
+    expect(typeof body).toBe('string');
+    // (a) contains caseId
+    expect(body).toContain('US-foo-123');
+    // (b) contains full 12-hex fingerprint AND 8-hex prefix
+    expect(body).toContain('a1b2c3d4e5f6');
+    expect(body).toContain('a1b2c3d4');
+    // (c) has a section listing outcomes (one of: 'Rolling outcomes', 'pass', 'fail', or `|` for markdown table)
+    expect(body).toMatch(/(Rolling outcomes|outcomes \(last 10)/i);
+    expect(body).toContain('pass');
+    expect(body).toContain('fail');
+    // (d) lists each flake history timestamp
+    expect(body).toContain('2026-05-15T00:00:00Z');
+    expect(body).toContain('2026-05-22T00:00:00Z');
+    expect(body).toContain('2026-05-29T00:00:00Z');
+    // Next steps human-review note
+    expect(body).toMatch(/human review|next steps|investigat/i);
+
+    // Deterministic: same input → same output (no Date.now inside)
+    const body2 = buildFlakeInvestigationBody(input);
+    expect(body2).toBe(body);
+  });
+});
+
+describe('e2e-rerun-validator integration (Phase 45-02 R8)', () => {
+  it('R8: scripts/e2e-rerun-validator.mjs imports appendRerunOutcome and calls it', () => {
+    const srcPath = path.resolve(__dirname, '..', '..', 'scripts', 'e2e-rerun-validator.mjs');
+    const src = fs.readFileSync(srcPath, 'utf8');
+    expect(src).toMatch(/import\s*\{[^}]*appendRerunOutcome[^}]*\}\s*from/);
+    expect(src).toMatch(/appendRerunOutcome\(/);
+  });
+});
+
+describe('bootstrap state files (Phase 45-02 — B1/B2)', () => {
+  // B1
+  it('B1: tests/e2e/.rerun-ring-buffer.json exists with version-1 shape', () => {
+    const filePath = path.resolve(__dirname, '..', 'e2e', '.rerun-ring-buffer.json');
+    expect(fs.existsSync(filePath)).toBe(true);
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    expect(parsed.version).toBe(1);
+    expect(typeof parsed.cases).toBe('object');
+    expect(parsed.cases).not.toBeNull();
+  });
+
+  // B2
+  it('B2: tests/e2e/.flake-suppression.json exists with version-1 shape', () => {
+    const filePath = path.resolve(__dirname, '..', 'e2e', '.flake-suppression.json');
+    expect(fs.existsSync(filePath)).toBe(true);
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    expect(parsed.version).toBe(1);
+    expect(typeof parsed.suppressions).toBe('object');
+    expect(parsed.suppressions).not.toBeNull();
   });
 });

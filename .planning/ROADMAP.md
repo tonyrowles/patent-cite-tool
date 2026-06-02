@@ -176,7 +176,10 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
   3. `invokeAnthropicSdkWithLedger` with `forceApi:true` outside CI throws a contract-error when `E2E_LEDGER_PATH_OVERRIDE` is unset, preventing future local SDK calls from polluting the committed ledger
   4. `package-lock.json` retains `"version": "0.100.1"` for `@anthropic-ai/sdk` with no caret; a Vitest static-grep assertion pins this
   5. The calendar-rollover fix uses epoch-relative fixture dates derived from a single `PIN_NOW_ISO` constant — changing that constant re-calibrates the whole test without requiring updates to individual fixture dates
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 48-01-PLAN.md — Four PRE-* fixes (guard, reset, epoch, lockfile) as sequential atomic commits per D-11
 
 ### Phase 49: Push v4.0-Integration PR
 **Goal**: All ~777 v4.0 commits land on origin/main via a merge-commit PR; CI passes green on the merged commit; all 6 v40-* workflows are confirmed present on origin
@@ -270,7 +273,7 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 48. Pre-Push Regression Fixes | v4.1 | 0/TBD | Not started | - |
+| 48. Pre-Push Regression Fixes | v4.1 | 0/1 | Not started | - |
 | 49. Push v4.0-Integration PR | v4.1 | 0/TBD | Not started | - |
 | 50. CLEANUP-04 Readiness Gate | v4.1 | 0/TBD | Not started | - |
 | 51. Live Readiness UATs | v4.1 | 0/TBD | Not started | - |

@@ -182,7 +182,7 @@ Plans:
 - [x] 48-01-PLAN.md — Four PRE-* fixes (guard, reset, epoch, lockfile) as sequential atomic commits per D-11
 
 ### Phase 49: Push v4.0-Integration PR
-**Goal**: All ~777 v4.0 commits land on origin/main via a merge-commit PR; CI passes green on the merged commit; all 6 v40-* workflows are confirmed present on origin
+**Goal**: All 208 v4.0+Phase-48 commits land on origin/main via an admin-bypass merge-commit PR (NOT squash); CI passes green on the merged commit; all 6 v40-* workflows are confirmed present on origin
 **Wave**: Wave-1 — single serialization point; blocks Phases 50, 51, 53
 **Depends on**: Phase 48
 **Requirements**: PUSH-01, PUSH-02
@@ -191,7 +191,10 @@ Plans:
   2. `gh workflow list | grep v40` shows all 6 v40-* workflows on origin (v40-auto-fix, v40-verifier-gate, v40-auto-promote, v40-deps-update, v40-pdfjs-frame-shift, v40-cost-ledger-snapshot)
   3. `gh pr view <integration-pr-n> --json statusCheckRollup` shows all required CI checks as PASS on the merged commit
   4. The integration PR merge event is recorded as a merge commit (not a squash commit) in the GitHub audit log
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 49-01-PLAN.md — 8-task release-engineering sequence: env probe → preflight bypass test → push+open PR → wait for CI → admin-bypass merge → SC harness → post-merge CI → INTEGRATION.md handoff
 
 ### Phase 50: CLEANUP-04 Readiness Gate
 **Goal**: Ruleset 17086676 enforces both required status checks and has no bypass actors; a committed break-glass procedure is tested before removal lands; a test PR confirms enforcement
@@ -274,7 +277,7 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 48. Pre-Push Regression Fixes | v4.1 | 1/1 | Complete    | 2026-06-02 |
-| 49. Push v4.0-Integration PR | v4.1 | 0/TBD | Not started | - |
+| 49. Push v4.0-Integration PR | v4.1 | 0/1 | Not started | - |
 | 50. CLEANUP-04 Readiness Gate | v4.1 | 0/TBD | Not started | - |
 | 51. Live Readiness UATs | v4.1 | 0/TBD | Not started | - |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |

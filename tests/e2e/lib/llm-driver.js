@@ -515,6 +515,17 @@ export async function invokeAnthropicSdkWithLedger({
   prNumber,
   forceApi = false,
 } = {}) {
+  const inCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+
+  // Step 0a — PRE-02 leak guard (Phase 48). LEDGER_PATH resolves to the
+  // committed file when E2E_LEDGER_PATH_OVERRIDE is unset (the IIFE at
+  // module-load time), so any local forceApi:true call without the override
+  // would pollute the committed ledger. Throw BEFORE any ledger code path.
+  // Plain Error per D-02; message string is locked verbatim.
+  if (forceApi === true && !inCi && !process.env.E2E_LEDGER_PATH_OVERRIDE) {
+    throw new Error('invokeAnthropicSdkWithLedger: forceApi:true blocked outside CI without E2E_LEDGER_PATH_OVERRIDE. Set E2E_LEDGER_PATH_OVERRIDE=<tmpfile> to redirect ledger writes, or run inside CI. Prevents committed-ledger pollution.');
+  }
+
   // Step 0 — Contract guard (Phase 42 Plan 02 — Pitfall 6 driver extension).
   // At least one of {systemPrompt, systemBlocks} MUST be supplied. We check
   // BEFORE the CI gate so the contract violation is unambiguous in unit tests
@@ -531,8 +542,6 @@ export async function invokeAnthropicSdkWithLedger({
         'enables cache_control) or systemPrompt (back-compat string form).',
     };
   }
-
-  const inCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
   // Step 1 — INVERSE CI gate
   if (!inCi && !forceApi) {

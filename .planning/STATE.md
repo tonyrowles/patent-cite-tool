@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Self-Healing Test Suite
-status: completed
+status: Awaiting next milestone
 stopped_at: ROADMAP.md + STATE.md + REQUIREMENTS.md traceability written; ready to plan Phase 39
-last_updated: "2026-06-01T07:19:49.780Z"
-last_activity: 2026-06-01 -- Phase 46 marked complete
+last_updated: "2026-06-02T03:48:56.592Z"
+last_activity: 2026-06-02 — Milestone v4.0 completed and archived
 progress:
   total_phases: 9
-  completed_phases: 8
-  total_plans: 22
-  completed_plans: 22
-  percent: 89
+  completed_phases: 9
+  total_plans: 26
+  completed_plans: 26
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 46 — /gsd:fix-issue Local UX + Ledger v2 Dashboard
+**Current focus:** Phase 47 — v4.0 Cleanup
 
 ## Current Position
 
-Phase: 46 — COMPLETE
-Plan: 1 of 2
-Status: Phase 46 complete
-Last activity: 2026-06-01 -- Phase 46 marked complete
-
-Progress: [░░░░░░░░░░] 0%
+Phase: Milestone v4.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-02 — Milestone v4.0 completed and archived
 
 ## Performance Metrics
 
@@ -97,6 +95,21 @@ Items acknowledged and carried forward from v3.1 milestone close on 2026-05-29:
 
 Total: 11 items. Carried into v4.0 — bookkeeping debt only; substance closed in v3.1 Phase 38-03 (8/8 human_verification items per `.planning/milestones/v3.1-MILESTONE-AUDIT.md`).
 
+Items acknowledged and carried forward from v4.0 milestone close on 2026-06-02:
+
+| Category | Item | Status | Notes |
+|----------|------|--------|-------|
+| uat_gap | 47-UAT-DEFERRED.md | unknown | 4 DEFERRED runbook stubs (UAT-47-a/b/d/e) per CONTEXT.md locked decision (requires-push); auditor cannot detect deferred-by-design |
+| uat_gap | 47-UAT-EVIDENCE.md | unknown | UAT-47-c PASS recorded inline; 4 DEFERRED linked to 47-UAT-DEFERRED.md per locked CONTEXT |
+| verification_gap | 42-VERIFICATION.md | human_needed | Phase 42's deferred demo became UAT-47-a runbook stub in Phase 47 per locked CONTEXT; closed indirectly via Phase 47 CLEANUP-03 |
+| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Orphan slug; pre-existing pre-v4.0 carryover |
+| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Pre-existing pre-v4.0 carryover; completed 2026-03-05 (a47dbb8) |
+| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Pre-existing pre-v4.0 carryover; completed 2026-04-12 (e51ba1b) |
+| tech_debt | bypass_actors=1 on ruleset 17086676 | deferred | Owner-self with bypass_mode=always; pre-existing Phase 39 setup; remediation in v4.1 readiness-gate post-push |
+| tech_debt | required_status_checks rule absent | deferred | verifier-gate + deps-update-gate MISSING; Pitfall 4 (canonical context-name format unresolvable pre-push); remediation in v4.1 readiness-gate via single gh api -X PUT |
+
+Total: 8 items. All are bookkeeping debt or locked-decision deferrals; no substantive blockers for v4.0 ship.
+
 ## Session Continuity
 
 Last session: 2026-05-30 — v4.0 roadmap drafted (this update)
@@ -105,5 +118,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Review ROADMAP.md (9 phases, 33 reqs mapped, Wave-1 parallelization marked)
-- Begin Phase 39 with `/gsd:plan-phase 39` — or fan out Wave-1 with parallel agents on 39, 40, 41
+- Start the next milestone with /gsd-new-milestone

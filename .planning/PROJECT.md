@@ -8,19 +8,17 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v4.0 Self-Healing Test Suite
+## Current State: v4.0 Self-Healing Test Suite (Shipped 2026-06-02)
 
-**Goal:** Close the LLM-driven feedback loop end-to-end — triaged GitHub issues from the v3.1 pipeline automatically produce draft PRs with proposed fixes, the affected case is re-verified on the proposed branch, and on merge the quarantine entry promotes to golden — preserving human-gated approval for every patch that ships.
+v4.0 closed the LLM-driven feedback loop end-to-end. Triaged GitHub issues from the v3.1 pipeline now automatically produce draft PRs (`v40-auto-fix.yml`) with LLM-proposed fixes (5 ERROR_CLASS scaffolds), the affected case is re-verified on the proposed branch (`v40-verifier-gate.yml` — 3×Tier A/B + 76-case regression + diff-guard), and on merge the quarantine entry promotes to golden (`v40-auto-promote.yml` + triple-gate `_skipCiGuard`). All human-gated invariants preserved: auto-fix PRs are draft by default, auto-promote opens a SEPARATE follow-up PR (never direct-to-main), CODEOWNERS-pinned files require code-owner review. 9 phases (39-47), 26 plans, 53 tasks shipped in ~3 days. Zero new npm dependencies (`@anthropic-ai/sdk@0.100.1` was the only addition).
 
-**Target features:**
-- Auto-fix PR proposer with per-ERROR_CLASS prompt strategy (WRONG_CITATION primary; LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, HARNESS_ERROR addressed; FLAKE explicitly re-quarantined without fix attempt)
-- Verifier-on-PR gate — auto-fix PR must pass the existing PDF verifier on the proposed branch before being marked ready-for-review
-- Auto-promote-to-golden on merged auto-fix — when a verifier-gated PR merges, run `promote-from-quarantine.mjs` automatically to close the quarantine → golden loop
-- Dual LLM transport: Anthropic SDK in GitHub Actions (24/7, cost-ledgered) + subscription-local `claude -p` via `/gsd:fix-issue <n>` (free dev iteration against Max 5 credit)
-- Cost ledger v2 — tracks API spend alongside subscription spend; warn at $80, hard-cap at $100; per-issue cost stamped in PR body
-- Dependency-update auto-PRs — weekly cron checks for outdated deps (Playwright, pdfjs-dist, sharp, vitest, esbuild); opens PRs with version bumps gated by full nightly suite
-- Preserve human-gated merge — auto-fix PRs are *draft* by default; no auto-merge for citation-accuracy code; the trust invariant matches v3.1's `promote-from-quarantine` pattern
-- Zero new core extension functionality — tooling/workflow phase, like v3.0 and v3.1
+## Next Milestone Goals
+
+- Push v4.0 to origin and exercise the post-push readiness gate (Phase 47 CLEANUP-03 deferred UATs (a)(b)(d)(e), CLEANUP-04 ruleset `required_status_checks` patch for `verifier-gate` + `deps-update-gate`)
+- First live auto-fix end-to-end run (UAT-47-a — issue #3 `US11427642-spec-short-1`, fp `139f821b3bb1`)
+- `auto-fix:partial-verified` semantics (verifier passes 3/5 → still gate ready? — deferred from v4.0 to empirically calibrate)
+- Auto-fix dashboard / triage metrics digest (extend weekly-digest with auto-fix success rate, cost-per-fix, time-to-merge)
+- Multi-model A/B (sonnet vs opus) for difficult ERROR_CLASSES (after baseline data exists)
 
 ## Requirements
 
@@ -124,18 +122,22 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - webextension-polyfill — Firefox supports chrome.* natively; unnecessary dependency
 - Build-time minification — keep source readable for extension store review
 
-## Latest Milestone: v3.1 LLM-Driven Product Improvement Loop (Shipped 2026-05-30)
+## Latest Milestone: v4.0 Self-Healing Test Suite (Shipped 2026-06-02)
 
-Closed the loop from v3.0's LLM exploratory testing into actionable product fixes. The nightly pipeline now: (1) replays each LLM-flagged anomaly 3× via verifier-only path to confirm reproducibility, (2) classifies findings via heuristic-first hybrid triage (6/8 ERROR_CLASSES with zero LLM, cluster pre-filter on N≥5, Tier C escalation, prompt-injection defense), (3) files richly-structured GitHub issues with reproducer + verifier disagreement + LLM rationale + golden diff (per-section char budgets, fingerprint on line 1), (4) appends CONFIRMED findings to a quarantine corpus that runs non-gating in the nightly cron and auto-tags `quarantine:ready-for-promotion` at `stable_runs ≥ 3` (human-gated promotion to golden via `promote-from-quarantine.mjs`), and (5) publishes a Monday 07:00 UTC weekly analytics digest to GitHub Discussions. 7 phases (32-38), 31 plans, 29 requirements shipped, ~9 days. Zero new npm dependencies; subscription-local LLM only (CI-guarded); no new core extension functionality.
+Closed the LLM-driven feedback loop end-to-end on top of v3.1's triage pipeline. The shipped pipeline now: (1) auto-fixes triaged GitHub issues via `v40-auto-fix.yml` (5 ERROR_CLASS PROMPT_SCAFFOLDS, `<issue_body_untrusted>` envelope + FORBIDDEN_DELIMITERS escape, `peter-evans/create-pull-request@v8` draft PRs with affected-cases HTML comment, branch-existence idempotency, fix_attempts cap of 3); (2) re-verifies the proposed branch via `v40-verifier-gate.yml` (3× affected-case at Tier A/B + 76-case regression + diff-size cap + diff-guard regex bank pinning `tests/test-cases.js`, `tests/golden/baseline.json`, etc. to `origin/main`); (3) auto-promotes merged auto-fix PRs to golden via `v40-auto-promote.yml` + `auto-fix-promote.mjs` with triple-gate `_skipCiGuard:true` (verified-label + merged + triage-sourced reconstructs human-gate invariant); (4) FLAKE 5-state machine (`classifyRerunOutcomes`) with rolling 10-element ring buffer, `FLAKE_ESCALATION` after N=3 re-files, 30-day suppression; (5) cost ledger v2 with unified `transport` (`subscription | sdk`) + `phase` fields, per-day/per-issue/per-PR sub-caps, `npm run fix-issue <n>` subscription-local wrapper for free Max-5 iteration; (6) weekly dep-update auto-PRs (`v40-deps-update.yml`) on a frozen watchlist, security/minor partitioning, separate verifier `pdfjs-dist` pin + frame-shift pre-flight. 9 phases (39-47), 26 plans, 53 tasks, ~3 days. Zero new npm deps (`@anthropic-ai/sdk@0.100.1` was the only addition). Two pre-existing live-state branch-protection items (`bypass_actors=1`, `required_status_checks` rule absent) deferred to v4.1 readiness-gate (post-v4.0-push) per locked Pitfall 4 decision.
 
-## Previous Milestone: v3.0 Autonomous E2E Testing Agent (Shipped 2026-05-20)
+## Previous Milestone: v3.1 LLM-Driven Product Improvement Loop (Shipped 2026-05-30)
+
+Closed the loop from v3.0's LLM exploratory testing into actionable product fixes. The nightly pipeline now: (1) replays each LLM-flagged anomaly 3× via verifier-only path to confirm reproducibility, (2) classifies findings via heuristic-first hybrid triage (6/8 ERROR_CLASSES with zero LLM, cluster pre-filter on N≥5, Tier C escalation, prompt-injection defense), (3) files richly-structured GitHub issues with reproducer + verifier disagreement + LLM rationale + golden diff (per-section char budgets, fingerprint on line 1), (4) appends CONFIRMED findings to a quarantine corpus that runs non-gating in the nightly cron and auto-tags `quarantine:ready-for-promotion` at `stable_runs ≥ 3` (human-gated promotion to golden via `promote-from-quarantine.mjs`), and (5) publishes a Monday 07:00 UTC weekly analytics digest to GitHub Discussions. 7 phases (32-38), 31 plans, 29 requirements shipped, ~9 days.
+
+## Earlier Milestone: v3.0 Autonomous E2E Testing Agent (Shipped 2026-05-20)
 
 Built a Playwright-driven testing agent that exercises the extension against real Google Patents, with independent PDF re-parse verification, nightly GitHub Actions cron with auto-issue filer, Worker fault-injection coverage, and LLM exploratory mode scaffolding (`claude -p` against Max 5 subscription; live UAT deferred to v3.1). 6 phases (26-31), 30 plans, 32 requirements shipped. Only non-functional source changes (data-testids + `X-PCT-Test-Mode` header).
 
 ## Context
 
-Shipped v3.1 with ~31,440 LOC across `src/`, `scripts/`, `tests/` (JavaScript/HTML/CSS/JSON/YAML).
-Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest, web-ext, sharp, Playwright + Chromium, headless `claude -p` (Max 5 subscription, local-dev only, $80/$100 monthly cap), GitHub Actions.
+Shipped v4.0 atop ~31,440+ LOC across `src/`, `scripts/`, `tests/` (JavaScript/HTML/CSS/JSON/YAML). v4.0 added ~3,500 LOC across `scripts/auto-fix.mjs`, `scripts/auto-fix-promote.mjs`, `scripts/verify-single-case.mjs`, `scripts/check-deps-and-pr.mjs`, `scripts/build-ledger-dashboard.mjs`, `tests/e2e/lib/fix-prompt-builder.js`, plus 6 new `v40-*.yml` workflows.
+Tech stack: Chrome MV3, Firefox MV3 (WebExtensions), esbuild, PDF.js v5, Shadow DOM, IndexedDB, offscreen document API (Chrome), Cloudflare Workers, Cloudflare KV, Vitest (1134 tests across 70 files), web-ext, sharp, Playwright + Chromium, headless `claude -p` (Max 5 subscription, local-dev only, $80/$100 monthly cap), `@anthropic-ai/sdk@0.100.1` EXACT (CI/auto-fix workflows only, ESLint-restricted to `llm-driver.js`), `peter-evans/create-pull-request@v8`, GitHub Actions.
 Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules in src/shared/ (constants, matching). Firefox uses background script instead of offscreen document. CI via GitHub Actions: nightly cron runs deterministic regression (76 golden patents) + fault-injection + (when `llm_run_id` provided) triage pipeline (rerun → triage → issue-file → quarantine-append) + non-gating quarantine spec. Monday 07:00 UTC weekly digest workflow publishes to GitHub Discussions.
 
 - **Google Patents HTML vs PDF mismatch**: Handled with fuzzy matching (exact → whitespace-stripped → punctuation-agnostic → bookend → Levenshtein). Long selections (>500 chars) may fail when texts genuinely diverge.
@@ -211,6 +213,15 @@ Architecture: src/ → esbuild → dist/chrome/ + dist/firefox/. Shared modules 
 | Per-section char budgets + fingerprint on line 1 | LLM rationale ≤800, verifier windows ≤600, golden diff ≤400; fingerprint on line 1 prevents >65,536 char overflow displacement | ✓ Good — issue UI renders cleanly |
 | Weekly digest via GitHub Discussion + Issue fallback | `gh api graphql createDiscussion` primary; `e2e-digest` labeled issue if Discussions disabled | ✓ Good — verified live at Phase 37 start |
 | `aggregateBySummaryKey` helper in weekly-digest.mjs | Maps ERROR_CLASS_SET → SUMMARY_KEYS; seeds passed/harness_error to 0 (synthetic classes); resolves DIGEST-04 self-reference | ✓ Good — Phase 38 INT-FIX-02 |
+| Continue phase numbering across milestones (38 → 39) | Mirrors v3.0/v3.1 convention; preserves cross-milestone phase IDs as stable references | ✓ Good — v4.0 phases 39-47 |
+| `_skipCiGuard:true` exemption gated by triple-assertion (verified-label + merged + triage-sourced) | Reconstructs human-gate invariant for the auto-promote workflow legitimately running in CI; single load-bearing trust decision in v4.0 | ✓ Good — `scripts/auto-fix-promote.mjs:assertTripleGate()` throws on any leg failure BEFORE `runPromote()` reached |
+| `tests/e2e/.llm-spend-ledger.json` flipped from gitignored to committed-but-versioned | Bootstraps cross-machine spend continuity; committed-ledger privacy audit (Phase 46) verified zero PII leak | ✓ Good — `[skip ci]` commit pattern from cost-ledger-snapshot workflow |
+| `@anthropic-ai/sdk@0.100.1` EXACT (no caret) + ESLint single-entry-point guard | Supply-chain hardening for the only LLM lib; lockfile + static-grep pin; restricted to `llm-driver.js` | ✓ Good — Phase 47 INT-FIX-LOCK layered-defended; auto-fix.mjs goes through driver |
+| Dual LLM transport — SDK in CI (`invokeAnthropicSdkWithLedger`) + subscription-local (`invokeClaudePWithLedger`) | 24/7 auto-fix needs SDK (no user); local iteration needs free subscription credit | ✓ Good — INVERSE CI gates on the two wrappers; shared `LEDGER_PATH`; `combinedMonthlyTotal` unifies caps |
+| Auto-fix PRs draft + human-merge required + auto-promote opens SEPARATE follow-up PR | Preserves human-gated trust invariant for citation-accuracy code (legal-filing core value); auto-promote NEVER direct-to-main | ✓ Good — `v40-auto-promote.yml` runs `peter-evans/create-pull-request@v8` for the follow-up; CODEOWNERS + post-merge verifier are defense layers |
+| 5-state FLAKE classifier replaces v3.1 binary CONFIRMED/FLAKE | Prevents both real-bugs-mis-classified-as-FLAKE and FLAKE-spam loops; per-case rolling 10-element ring buffer | ✓ Good — `classifyRerunOutcomes` sibling export; `runTriage` preserved for back-compat |
+| 4 of 5 v4.0 HUMAN-UATs DEFERRED at milestone close (requires-push) | v4.0 workflows local-only until push; live UAT against pushed state is a separate readiness gate | ✓ Good — Phase 47 CONTEXT.md Grey Area 1 locked; runbook stubs in `47-UAT-DEFERRED.md` operator-dispatchable |
+| BLOCKER-01 fix landed inline at milestone-audit (verifier-gate label producer) | Cross-workflow integration check surfaced auto-fix:verified label gap that TP-* per-touchpoint tests + deferred UAT missed | ✓ Good — `fix(47-cleanup): BLOCKER-01` commit `033613f` + YAML contract test `tests/unit/blocker-01-label-producer.test.js` |
 
 ## Evolution
 
@@ -230,4 +241,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-30 — v4.0 milestone kicked off (Self-Healing Test Suite)*
+*Last updated: 2026-06-02 — v4.0 milestone shipped (Self-Healing Test Suite)*

@@ -1,5 +1,40 @@
 # Milestones
 
+## v4.0 Self-Healing Test Suite (Shipped: 2026-06-02)
+
+**Phases completed:** 9 phases, 26 plans, 53 tasks
+
+**Key accomplishments:**
+
+- Pure-function v2 ledger surface (12 new exports + 1 pricing entry) extending v3.1's llm-ledger.js with binary per-day/per-issue/per-PR sub-caps, unified-cap reader, and back-compat transport-field passthrough — zero new dependencies, all 33 pre-existing tests pass byte-for-byte.
+- `.github/CODEOWNERS` pins 5 locked paths to @tonyrowles, `docs/v40-repo-config.md` documents the 7 manual repo-settings with gh api audit commands for Phase 47, and `tests/unit/codeowners.test.js` provides 7 static-grep drift assertions.
+- Landed the v4.0 SDK transport (`invokeAnthropicSdkWithLedger`) as a sibling export in `tests/e2e/lib/llm-driver.js` with the INVERSE CI gate, pinned `@anthropic-ai/sdk@0.100.1` EXACT, appended the ESLint single-entry-point guard LAST per Pitfall 3, and added 15 new Vitest cases — preserving every v3.1 invariant including the byte-for-byte invokeClaudePWithLedger CI gate.
+- Flipped `tests/e2e/.llm-spend-ledger.json` from gitignored to committed-but-versioned with a fresh-start `phase='39-bootstrap'` sentinel entry seeded via `appendLedgerEntry` (Pitfall 1 mitigation); deleted .gitignore lines 18-19 (28 lines -> 26 lines); added 2 new Vitest cases (48 + 49) that integration-check the on-disk artifacts against the LEDGER-04 contract. Task 3 (GitHub repo Settings UI clicks — Allow auto-merge OFF + branch protection ruleset on main) DEFERRED to orchestrator + maintainer.
+- Daily 02:00 UTC GitHub Action that commits a [skip ci]-tagged snapshot of `tests/e2e/.llm-spend-ledger.json` to main with a grep-friendly commit message encoding invocations + spend, pinned by a 13-case Vitest YAML contract that includes a verbatim-block parity gate (S13) against `e2e-weekly-digest.yml:106-110`.
+- Single-file ESM CLI (scripts/check-deps-and-pr.mjs, 372 LOC, zero new deps) that queries npm outdated + npm audit, partitions a frozen 6-package watchlist into security/minor/major/skipped buckets via the locked filter chain, writes $GITHUB_OUTPUT lines with constant per-package branch names, and appends idempotent NEVER_AUTO_BUMP notes to the committed tests/e2e/.manual-sdk-bumps.json audit trail. Pinned by 18 Vitest cases (A1-E2) covering frozen-tuple identity, partition logic on inline fixtures, dedup idempotency, spawnSync non-throw on npm outdated exit-1, and constant-branch-name emission.
+- Wired the weekly dep-update workflow (`.github/workflows/v40-deps-update.yml`, 226 LOC) — Monday 09:00 UTC cron + workflow_dispatch invoking scripts/check-deps-and-pr.mjs (40-02 deliverable), opening security + grouped-minor PRs via two `peter-evans/create-pull-request@v8` invocations (both draft + delete-branch + secrets.GITHUB_TOKEN), and named a `deps-update-gate` job that runs the smoke + regression nightly-suite shape as a Phase 47 required-status-checks slot reservation. Pinned by 19 YAML-level Vitest cases (D1-D11 + X1-X8) and back-ported `skipped_count` + `skipped_packages` $GITHUB_OUTPUT keys to scripts/check-deps-and-pr.mjs so the X7 manual-SDK-review issue step has the right gating conditional. Total: 437 lines net additions across 4 files; zero new npm dependencies; zero regressions on 40-02 unit tests or Phase 39 ledger tests.
+- Three-file shipment closes DEPS-04 (Pitfall 6 defense): (a) `package.json` gains a top-level `verifierDeps.pdfjs-dist` EXACT pin (5.5.207) that npm preserves verbatim per spec; (b) `tests/e2e/lib/pdf-verifier.js` swaps its static `import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'` for an override-aware loader using `createRequire(import.meta.url)` when `VERIFIER_PDFJS_PATH` env-var is truthy, with the empty-string-as-falsy contract preserved; (c) `.github/workflows/v40-pdfjs-frame-shift.yml` (separate file per locked decision #3) runs the regression suite TWICE on `auto-fix:pdfjs-bump`-labeled PRs (OLD pdfjs at the previous version installed into `/tmp/old-pdfjs` + NEW pdfjs default-bundled) and fails with `FRAME-SHIFT DETECTED` sentinel on citation-output divergence. Pinned by 23 Vitest cases (8 new in `check-deps-and-pr.test.js` Group F+G + 15 in `v40-pdfjs-frame-shift-yaml.test.js`); zero new npm dependencies; VFY-02 independence preserved (no src/ imports in pdf-verifier.js); full sweep 106/106 pass with no regression in pdf-verifier (15/15), 40-01 cost-ledger YAML (13/13), 40-02 check-deps groups A-E (18/18), or Phase 39 llm-ledger (37/37).
+- Pure-function FORBIDDEN_PATHS regex bank (6 LOCKED paths per Pitfall 3 Defense 2) and PR-body HTML-comment parser for the verifier-gate workflow, with 23 Vitest cases pinning behavior — both helpers ready for Phase 41-03 workflow wiring and Phase 42 auto-fix.mjs import (AUTOFIX-03 consumer).
+- Thin transport-pure CLI wrapper over verifyCitation that exit-code-gates the per-case verifier verdict, lets Plan 41-03's workflow drive 3×-consecutive runs from a bash for-loop, and preserves VFY-02 verifier isolation by construction.
+- Files verified to exist:
+- 1. [Rule 2 - Critical addition] Added `## Cleanup` assertion (D10) beyond the 9 plan D-cases
+- 1. [Rule 1 - Bug] Verifier Disagreement section also interpolates goldenCitation + observed citation unescaped
+- 1. [Rule 1 - Bug] `extractErrorClass` initially refused PASS labels (PASS not in ERROR_CLASSES)
+- Deferred to Phase 47 CLEANUP-03 HUMAN-UAT (a) — maintainer decision 2026-05-31.
+- 1. [Rule 3 - Blocking] Plan referenced `43-RESEARCH.md` that was never committed
+- 1. [Rule 1 - Bug] Header-comment literal tokens tripped two negative-pin Vitest assertions
+- Extended Phase 42's frozen PROMPT_SCAFFOLDS registry from 1 key (WRONG_CITATION) to 5 keys by adding LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, GOOGLE_DOM_DRIFT, and HARNESS_ERROR scaffolds via a shared buildScaffoldSystemPrompt helper that eliminates 4×80 lines of duplication and guarantees byte-stable forbidden-paths enumeration across all 5 classes.
+- Pure 5-state FLAKE classifier (CONFIRMED_BUG / LIKELY_BUG / INTERMITTENT / FLAKE / FLAKE_ESCALATION + FLAKE_SUPPRESSED) sibling-exported on Phase 34's triage-classifier.js, paired with committed ring-buffer + suppression state files and a 6→8 FORBIDDEN_PATHS bank extension that closes the Pitfall 3 verifier-gaming defense gap.
+- One-liner:
+- One-liner:
+- `tests/unit/build-ledger-dashboard.test.js` (11 new):
+- 5 v3.1→v4.0 ARCHITECTURE §4 touchpoint contracts pinned by 15 vitest regression assertions; 3 pre-existing test regressions resolved as atomic INT-FIX commits (ledger reset to seed-only, calendar-rollover flake fixed, @anthropic-ai/sdk EXACT 0.100.1 pin layered-defended).
+- `## GAPS FILLED`
+- UAT-47-c PASS via Strategy A+B (classifier-direct confirmed FLAKE_ESCALATION + 30-day suppression invariant end-to-end); 4 DEFERRED runbook stubs (a/b/d/e) authored verbatim from 47-RESEARCH.md; vitest static-grep guard pinning 22 contract assertions against future drift.
+- CODEOWNERS last-matching-rule order pinned by 9 vitest assertions; live `gh api` branch-protection audit captured (4 PASS + 2 tech_debt findings deferred to v4.1 per Pitfall 4 requires-push); `.planning/v4.0-MILESTONE-AUDIT.md` bootstrapped at canonical path with 9 frontmatter keys + 7 markdown sections + 194 lines — v4.0 milestone closeable.
+
+---
+
 ## v3.1 LLM-Driven Product Improvement Loop (Shipped: 2026-05-30)
 
 **Phases completed:** 7 phases (32–38), 31 plans, ~50 tasks

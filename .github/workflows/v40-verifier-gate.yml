@@ -367,6 +367,19 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Job 4: ready-flip -- flip PR draft -> ready iff every prior gate passed
+  #
+  # BLOCKER-01 fix (audit-milestone integration check, 2026-06-02): this job
+  # MUST also apply the `auto-fix:verified` label after the ready-flip succeeds.
+  # The downstream v40-auto-promote.yml job-level filter (line 67) waits on
+  # this label; without the producer step here, the entire PROMOTE-01..04
+  # chain is dead code at the workflow level (the script-level triple-gate in
+  # scripts/auto-fix-promote.mjs still enforces correctly, but the workflow
+  # filter never matches). ARCHITECTURE.md:141 specified this producer; the
+  # Phase 41 implementation missed it; TP-05 vitest test
+  # (tests/unit/v4-touchpoints.test.js:147-176) was narrowly scoped to the
+  # consumer-side string-pin and could not surface the gap; UAT-47-a (the
+  # live end-to-end test that would have caught this on first run) was
+  # correctly DEFERRED per CONTEXT.md `requires-push` semantics.
   # ---------------------------------------------------------------------------
   ready-flip:
     needs: [verifier-gate, regression-suite]
@@ -392,3 +405,28 @@ jobs:
           else
             echo "PR #$PR_NUMBER already ready-for-review; skipping flip"
           fi
+
+      - name: Ensure auto-fix:verified label exists
+        # Idempotent label create (mirrors the human-review-required pattern at
+        # diff-guard:95-104 and e2e-nightly.yml:97-102). --force updates the
+        # label if it already exists; || true makes the step safe if gh rejects
+        # --force. Color 0E8A16 is GitHub's green-tag default; matches the
+        # auto-fix:verified semantic ("clean / promoted to ready").
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create auto-fix:verified \
+            --color 0E8A16 \
+            --description "Verifier-gate confirmed 3xTier A/B + 76-case regression pass" \
+            --force 2>/dev/null || true
+
+      - name: Apply auto-fix:verified label
+        # BLOCKER-01 producer step — closes the missing seam to
+        # v40-auto-promote.yml's `contains(...labels.*.name, 'auto-fix:verified')`
+        # filter (line 67). Runs UNCONDITIONALLY after ready-flip (no `if:
+        # failure()` guard) because reaching this step means both verifier-gate
+        # and regression-suite passed (job-level `needs:` already gated us).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr edit "$PR_NUMBER" --add-label "auto-fix:verified"

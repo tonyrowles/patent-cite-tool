@@ -88,7 +88,20 @@ import {
 } from '../tests/e2e/lib/triage-classifier.js';
 
 const PHASE = '42-auto-fix';
-const TRANSPORT = 'sdk';
+// DEFAULT_TRANSPORT is the fall-through if runDispatcher is called WITHOUT a
+// transport opt (back-compat with pre-Phase-46 callers). All 7 ledger-write
+// call sites in this file MUST tag with the RUNTIME `transport` value
+// resolved from the --transport CLI flag (or the runDispatcher opt) so that
+// auxiliary forensic entries (diff-guard violations, malformed-diff,
+// idempotency-hits, cap-block, flake-dispatched, flake-suppressed) carry
+// the same transport label as the cost-bearing invokeClaudePWithLedger /
+// invokeAnthropicSdkWithLedger entries. Phase 47 WARNING-01 (audit-milestone
+// integration check, 2026-06-02): before this fix, all 7 auxiliary sites
+// hardcoded `transport: TRANSPORT` to 'sdk', forensically mis-tagging local
+// `npm run fix-issue --transport subscription` runs. Cost-bearing entries
+// were always correct (invokeClaudePWithLedger self-tags 'subscription' at
+// llm-driver.js:428); only the auxiliary entries leaked.
+const DEFAULT_TRANSPORT = 'sdk';
 const MODEL = 'claude-sonnet-4-6';
 // Phase 46-01 (AUTOFIX-06) — subscription-transport routing constants.
 // PHASE_46 tags ledger entries written by invokeClaudePWithLedger; SOURCE_FIX_ISSUE
@@ -246,10 +259,17 @@ export function changedPathsFromDiff(diff) {
  * arg array — CWE-94 hygiene; caseId is the only attacker-influenced value
  * and it is sanitized upstream by sanitizeCaseId in Phase 35.
  *
- * @param {{caseId: string|null, fingerprint: string, issueNumber: number, now?: () => Date}} opts
+ * Phase 47 WARNING-01: `transport` MUST be the RUNTIME value (resolved from
+ * the --transport CLI flag), not the module constant. Both ledger entries
+ * written here (FLAKE_SUPPRESSED short-circuit + flake-dispatched summary)
+ * are auxiliary forensic entries — callers under `--transport subscription`
+ * must see `transport: 'subscription'` on these rows so dashboard transport-
+ * filtering counts them under the right bucket.
+ *
+ * @param {{caseId: string|null, fingerprint: string, issueNumber: number, transport?: string, now?: () => Date}} opts
  * @returns {Promise<number|null>}
  */
-export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, now = () => new Date() }) {
+export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, transport = DEFAULT_TRANSPORT, now = () => new Date() }) {
   let ringBuffer;
   let suppressionsFile;
   try {
@@ -279,7 +299,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, now
       tokens_in: 0,
       tokens_out: 0,
       phase: PHASE,
-      transport: TRANSPORT,
+      transport,
       issueId: `issue-${issueNumber}`,
       fingerprint,
       source: 'flake-suppressed',
@@ -375,7 +395,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, now
     tokens_in: 0,
     tokens_out: 0,
     phase: PHASE,
-    transport: TRANSPORT,
+    transport,
     issueId: `issue-${issueNumber}`,
     fingerprint,
     source: 'flake-dispatched',
@@ -407,7 +427,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, now
  */
 export async function runDispatcher({
   issue,
-  transport = TRANSPORT,
+  transport = DEFAULT_TRANSPORT,
   forceApi = false,
   dryRun = false,
   push = false,
@@ -530,7 +550,7 @@ export async function runDispatcher({
       tokens_in: 0,
       tokens_out: 0,
       phase: PHASE,
-      transport: TRANSPORT,
+      transport,
       issueId: `issue-${issue}`,
       fingerprint,
       source: 'auto-fix-api',
@@ -559,6 +579,8 @@ export async function runDispatcher({
         caseId,
         fingerprint,
         issueNumber: issue,
+        transport,   // WARNING-01: thread runtime transport so flake-suppressed
+                     // and flake-dispatched ledger rows carry the correct tag
       });
       if (exitCode !== null) return exitCode;
       // Defensive fall-through: helper returned null only on unexpected
@@ -571,7 +593,7 @@ export async function runDispatcher({
       tokens_in: 0,
       tokens_out: 0,
       phase: PHASE,
-      transport: TRANSPORT,
+      transport,
       issueId: `issue-${issue}`,
       fingerprint,
       source: 'auto-fix-api',
@@ -667,7 +689,7 @@ export async function runDispatcher({
       tokens_in: 0,
       tokens_out: 0,
       phase: PHASE,
-      transport: TRANSPORT,
+      transport,
       issueId: `issue-${issue}`,
       fingerprint,
       source: 'auto-fix-api',
@@ -689,7 +711,7 @@ export async function runDispatcher({
       tokens_in: 0,
       tokens_out: 0,
       phase: PHASE,
-      transport: TRANSPORT,
+      transport,
       issueId: `issue-${issue}`,
       fingerprint,
       source: 'auto-fix-api',
@@ -726,7 +748,7 @@ export async function runDispatcher({
       tokens_in: 0,
       tokens_out: 0,
       phase: PHASE,
-      transport: TRANSPORT,
+      transport,
       issueId: `issue-${issue}`,
       fingerprint,
       source: 'auto-fix-api',
@@ -795,7 +817,7 @@ export async function runDispatcher({
     `fingerprint: ${fingerprint}\n` +
     `fix_attempts: ${attempts + 1}\n` +
     `model: ${MODEL}\n` +
-    `transport: ${TRANSPORT}`;
+    `transport: ${transport}`;
   process.stdout.write(
     `[auto-fix] suggested PR-create command:\n` +
       `  gh pr create --draft --base main --head ${branchName} ` +

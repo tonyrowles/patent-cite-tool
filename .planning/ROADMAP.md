@@ -290,7 +290,11 @@ Full details: `.planning/milestones/v3.1-ROADMAP.md`
   2. Nyquist coverage stamped on each v4.0 phase that carried draft VALIDATION.md; static-grep tests pin validated contracts where applicable
   3. Live HUMAN-UAT confirmations completed for: (a) end-to-end auto-fix flow against a real triage-labeled fork issue, (b) dep-PR pre-flight gate blocking on regression, (c) FLAKE escalation suppressing re-files, (d) ledger snapshot workflow committing daily snapshot, (e) verifier-gate diff-guard rejecting a crafted bypass attempt
   4. Repo-level audit confirms `Allow auto-merge: OFF`, branch protection on `main` with `Do not allow bypassing: ON` and required-status-checks listing the verifier-gate workflow, and `CODEOWNERS` pins still cover `src/`, `tests/`, `.github/workflows/`, `tests/golden/`, `tests/e2e/test-cases-quarantine.js`; static-grep test asserts CODEOWNERS contents
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 47-01-PLAN.md (wave 1) — CLEANUP-01 integration audit: 5 touchpoint regression tests in tests/unit/v4-touchpoints.test.js (TP-01..TP-05) + 3 INT-FIX commits (LEDGER ledger reset + CAL dynamic-month-key + LOCK package-lock static-grep)
+- [ ] 47-02-PLAN.md (wave 3) — CLEANUP-02 bulk Nyquist cold-stamp: 8 explicit Skill(gsd-validate-phase, N) invocations across phases 39-46; per-phase outcome table in 47-02-SUMMARY.md (depends on 47-01)
+- [ ] 47-03-PLAN.md (wave 4) — CLEANUP-03 HUMAN-UAT: UAT-47-c FLAKE escalation live execution (Strategy A synthetic fixture) + 4 DEFERRED runbook stubs in 47-UAT-DEFERRED.md + vitest stub-presence guard (depends on 47-02)
+- [ ] 47-04-PLAN.md (wave 5) — CLEANUP-04 branch-protection re-audit: CODEOWNERS static-grep test + live gh api ruleset audit (with conditional PATCH per CLAUDE.md C1/C2/C3) + bootstrap .planning/v4.0-MILESTONE-AUDIT.md consolidating all CLEANUP outcomes (depends on 47-03)
 
 ## Progress
 
@@ -307,7 +311,7 @@ v4.0 phases execute in numeric order: 39 → 40 → 41 → 42 → 43 → 44 → 
 | 44. v40-auto-promote.yml + Triple-Gate | v4.0 | 1/1 | Complete | 2026-05-31 |
 | 45. Per-ERROR_CLASS Expansion + FLAKE 5-State | v4.0 | 3/3 | Complete | 2026-05-31 |
 | 46. /gsd:fix-issue Local UX + Ledger v2 Dashboard | v4.0 | 2/2 | Complete | 2026-06-01 |
-| 47. v4.0 Cleanup | v4.0 | 0/TBD | Not started | - |
+| 47. v4.0 Cleanup | v4.0 | 0/4 | Planned | - |
 
 ## Next Milestone
 

@@ -21,9 +21,15 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
+// Phase 48 PRE-03 [Rule 3 - Blocking]: path updated to track the v4.0-archive
+// chore commit ad78b92 which moved Phase 47 directories under
+// .planning/milestones/v4.0-phases/. The runbook file itself is unchanged;
+// only the test's path reference is repaired so SC-1 (`npm test` exits 0)
+// holds. Out-of-scope fix per Phase 48 scope boundary rule (#3097); see
+// .planning/phases/48-pre-push-regression-fixes/deferred-items.md.
 const DEFERRED_PATH = path.join(
   REPO_ROOT,
-  '.planning/phases/47-v4-0-cleanup/47-UAT-DEFERRED.md',
+  '.planning/milestones/v4.0-phases/47-v4-0-cleanup/47-UAT-DEFERRED.md',
 );
 
 const REQUIRED_FIELD_HEADERS = [

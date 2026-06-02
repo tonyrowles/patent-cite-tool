@@ -47,7 +47,7 @@
 // well-meaning "tidy" by a contributor) trips this test at `npm run test:src`
 // before it reaches GitHub.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,11 +67,21 @@ const EXPECTED_ORDER = [
   /^\/tests\/e2e\/test-cases-quarantine\.js\s+@/,
 ];
 
-const src = fs.readFileSync(CODEOWNERS_PATH, 'utf8');
-const rules = src
-  .split('\n')
-  .filter((line) => line.trim() && !line.trim().startsWith('#'))
-  .map((line) => line.trim());
+// WR-01 (Phase 47 code review): defer the file read to beforeAll() so the
+// "CODEOWNERS file exists" assertion below runs first. If .github/CODEOWNERS
+// is ever deleted, the existence test produces a clear, targeted failure
+// rather than a vitest collection-phase ENOENT stack trace.
+let src = '';
+let rules = [];
+beforeAll(() => {
+  if (fs.existsSync(CODEOWNERS_PATH)) {
+    src = fs.readFileSync(CODEOWNERS_PATH, 'utf8');
+    rules = src
+      .split('\n')
+      .filter((line) => line.trim() && !line.trim().startsWith('#'))
+      .map((line) => line.trim());
+  }
+});
 
 describe('Phase 47 CLEANUP-04: CODEOWNERS pins (last-matching-rule order)', () => {
   it('CODEOWNERS file exists at .github/CODEOWNERS', () => {

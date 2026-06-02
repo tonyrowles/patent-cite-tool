@@ -11,10 +11,10 @@
 
 Three concrete blocking test fixes that must clear before the v4.0-integration PR can pass CI. Source: v4.0 session handoff document (`tests/unit/llm-ledger.test.js:1012`, `tests/e2e/scripts/e2e-weekly-digest.test.js:395`, `package-lock.json`).
 
-- [ ] **PRE-01**: Reset committed `tests/e2e/.llm-spend-ledger.json` to single bootstrap entry (`phase='39-bootstrap'`); the 4 leaked 2026-06 opus entries (`phase=null, transport=null`, ~$0.353) are removed; `npm run test -- llm-ledger.test.js` Test 48 returns to GREEN
-- [ ] **PRE-02**: `tests/e2e/lib/llm-driver.js:invokeAnthropicSdkWithLedger` gains a Step 0 guard that throws when `forceApi:true && !CI && !E2E_LEDGER_PATH_OVERRIDE`; prevents future committed-ledger pollution from local SDK calls
-- [ ] **PRE-03**: `tests/e2e/scripts/e2e-weekly-digest.test.js:395` calendar-rollover flake is fixed via epoch-relative fixture dates (replace hardcoded `2026-05` `PIN_NOW` with epoch-anchored constant + derived month/year); `npm test` passes regardless of current month
-- [ ] **PRE-04**: `package-lock.json` retains EXACT pin on `@anthropic-ai/sdk@0.100.1` (no caret); `npm install` does not reintroduce caret; static-grep Vitest assertion pins the lockfile entry
+- [x] **PRE-01**: Reset committed `tests/e2e/.llm-spend-ledger.json` to single bootstrap entry (`phase='39-bootstrap'`); the 4 leaked 2026-06 opus entries (`phase=null, transport=null`, ~$0.353) are removed; `npm run test -- llm-ledger.test.js` Test 48 returns to GREEN
+- [x] **PRE-02**: `tests/e2e/lib/llm-driver.js:invokeAnthropicSdkWithLedger` gains a Step 0 guard that throws when `forceApi:true && !CI && !E2E_LEDGER_PATH_OVERRIDE`; prevents future committed-ledger pollution from local SDK calls
+- [x] **PRE-03**: `tests/e2e/scripts/e2e-weekly-digest.test.js:395` calendar-rollover flake is fixed via epoch-relative fixture dates (replace hardcoded `2026-05` `PIN_NOW` with epoch-anchored constant + derived month/year); `npm test` passes regardless of current month
+- [x] **PRE-04**: `package-lock.json` retains EXACT pin on `@anthropic-ai/sdk@0.100.1` (no caret); `npm install` does not reintroduce caret; static-grep Vitest assertion pins the lockfile entry
 
 ### Push to Remote
 
@@ -114,10 +114,10 @@ Additive `<details>` collapsible section in the existing weekly digest. SUMMARY_
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRE-01 | Phase 48 | Pending |
-| PRE-02 | Phase 48 | Pending |
-| PRE-03 | Phase 48 | Pending |
-| PRE-04 | Phase 48 | Pending |
+| PRE-01 | Phase 48 | Complete |
+| PRE-02 | Phase 48 | Complete |
+| PRE-03 | Phase 48 | Complete |
+| PRE-04 | Phase 48 | Complete |
 | PUSH-01 | Phase 49 | Pending |
 | PUSH-02 | Phase 49 | Pending |
 | GATE-01 | Phase 50 | Pending |

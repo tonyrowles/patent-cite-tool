@@ -8,17 +8,24 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current State: v4.0 Self-Healing Test Suite (Shipped 2026-06-02)
+## Current Milestone: v4.1 Readiness Gate + Push
+
+**Goal:** Land v4.0's ~777 local commits on origin/main, exercise the self-healing loop live against real GitHub Actions, close v4.0's deferred UATs and v3.1's bookkeeping debt, and ship 3 forward-looking auto-fix improvements (dashboard, partial-verified semantics, multi-model A/B).
+
+**Target features:**
+
+- Pre-push test regression fixes (Test 48 ledger leak, calendar-rollover flake in `e2e-weekly-digest.test.js:395`, `package-lock.json` EXACT-pin verification on `@anthropic-ai/sdk@0.100.1`)
+- Push v4.0 to origin via single `v4.0-integration` PR + `gh pr merge --admin` self-merge; confirm CI green on remote
+- Live readiness UATs (post-push): UAT-47-a end-to-end auto-fix on issue #3 (`US11427642-spec-short-1`, fp `139f821b3bb1`); UAT-47-b dep-PR pre-flight gate; UAT-47-d daily ledger snapshot; UAT-47-e verifier-gate diff-guard bypass test
+- CLEANUP-04 — patch ruleset 17086676 `required_status_checks` to add `verifier-gate` + `deps-update-gate` job names; resolve `bypass_actors=1` (owner-self `bypass_mode=always`)
+- Auto-fix dashboard — extend weekly-digest with auto-fix success rate, cost-per-fix, time-to-merge
+- `auto-fix:partial-verified` semantics — define + implement gate behavior when verifier passes 3/5 (now empirically calibratable post-UAT-47-a)
+- Multi-model A/B (sonnet vs opus) for difficult ERROR_CLASSES — instrumented against the first live auto-fix run baselines
+- v3.1 bookkeeping cleanup — re-stamp frontmatter on 5 carry-over VERIFICATION.md / HUMAN-UAT.md files; clear 3 orphan quick-task slug references
+
+## Last Shipped: v4.0 Self-Healing Test Suite (Shipped 2026-06-02)
 
 v4.0 closed the LLM-driven feedback loop end-to-end. Triaged GitHub issues from the v3.1 pipeline now automatically produce draft PRs (`v40-auto-fix.yml`) with LLM-proposed fixes (5 ERROR_CLASS scaffolds), the affected case is re-verified on the proposed branch (`v40-verifier-gate.yml` — 3×Tier A/B + 76-case regression + diff-guard), and on merge the quarantine entry promotes to golden (`v40-auto-promote.yml` + triple-gate `_skipCiGuard`). All human-gated invariants preserved: auto-fix PRs are draft by default, auto-promote opens a SEPARATE follow-up PR (never direct-to-main), CODEOWNERS-pinned files require code-owner review. 9 phases (39-47), 26 plans, 53 tasks shipped in ~3 days. Zero new npm dependencies (`@anthropic-ai/sdk@0.100.1` was the only addition).
-
-## Next Milestone Goals
-
-- Push v4.0 to origin and exercise the post-push readiness gate (Phase 47 CLEANUP-03 deferred UATs (a)(b)(d)(e), CLEANUP-04 ruleset `required_status_checks` patch for `verifier-gate` + `deps-update-gate`)
-- First live auto-fix end-to-end run (UAT-47-a — issue #3 `US11427642-spec-short-1`, fp `139f821b3bb1`)
-- `auto-fix:partial-verified` semantics (verifier passes 3/5 → still gate ready? — deferred from v4.0 to empirically calibrate)
-- Auto-fix dashboard / triage metrics digest (extend weekly-digest with auto-fix success rate, cost-per-fix, time-to-merge)
-- Multi-model A/B (sonnet vs opus) for difficult ERROR_CLASSES (after baseline data exists)
 
 ## Requirements
 
@@ -241,4 +248,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-02 — v4.0 milestone shipped (Self-Healing Test Suite)*
+*Last updated: 2026-06-02 — v4.1 milestone started (Readiness Gate + Push)*

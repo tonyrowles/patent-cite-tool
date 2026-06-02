@@ -737,6 +737,11 @@ describe('Phase 39 LEDGER-03: invokeAnthropicSdkWithLedger inverse CI gate', () 
   });
 
   it('Test 33: forceApi:true (not CI) → bypasses gate, reaches SDK', async () => {
+    // Phase 48 PRE-02: the Step 0 leak guard requires E2E_LEDGER_PATH_OVERRIDE
+    // (or CI=true) when forceApi:true outside CI. This test exercises the
+    // legitimate local-dev escape hatch — readLedger/appendLedgerEntry are
+    // mocked above, so no real ledger write occurs even with the override set.
+    vi.stubEnv('E2E_LEDGER_PATH_OVERRIDE', '/tmp/pct-test33-ledger.json');
     mockSdkResponse(makeSdkSuccessResponse());
     const result = await drv.invokeAnthropicSdkWithLedger({
       systemPrompt: 'sys',

@@ -218,10 +218,10 @@ export function aggregateBySummaryKey({ nightlyIssues, quarantineIssues, monthly
 // fs.existsSync FIRST — monthlyTotal returns 0 for both $0 and no-ledger (Pitfall 2)
 // ---------------------------------------------------------------------------
 /**
- * @param {{ ledgerPath?: string }} opts
+ * @param {{ ledgerPath?: string, now?: Date }} opts
  * @returns {string}
  */
-export function renderCostLine({ ledgerPath } = {}) {
+export function renderCostLine({ ledgerPath, now } = {}) {
   const effectivePath = ledgerPath ?? LEDGER_PATH;
   // D-15: check file existence BEFORE calling readLedger/monthlyTotal.
   // readLedger() returns an empty ledger on file-absence (returns 0 for monthlyTotal),
@@ -229,7 +229,12 @@ export function renderCostLine({ ledgerPath } = {}) {
   if (!fs.existsSync(effectivePath)) {
     return 'cost data unavailable';
   }
-  const spent = monthlyTotal(readLedger(effectivePath));
+  // Phase 48 PRE-03 / D-08-AMEND: thread the test-pinned `now` through to the
+  // month-key derivation so the cost-line lookup aligns with the caller's
+  // anchor instead of `currentMonth()` (live clock). When `now` is undefined,
+  // monthlyTotal defaults to currentMonth() — preserves production behavior.
+  const month = now ? now.toISOString().slice(0, 7) : undefined;
+  const spent = monthlyTotal(readLedger(effectivePath), month);
   return `$${spent.toFixed(2)} / $${HARD_CAP_USD} (${Math.round((spent / HARD_CAP_USD) * 100)}%)`;
 }
 

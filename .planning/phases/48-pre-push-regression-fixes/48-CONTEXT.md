@@ -44,7 +44,8 @@ Restore `npm test` to exit 0 locally so CI can pass green on the v4.0-integratio
 - **D-05:** **Single top-of-file anchor: `const PIN_NOW_ISO = '2026-05-25T00:00:00Z'`.** Existing `PIN_NOW` factory at line 64 is replaced (or rewritten as `() => new Date(PIN_NOW_ISO)`). All derived dates flow from this one string.
 - **D-06:** **Tiny in-file helper:** `const daysAgo = (n) => new Date(Date.parse(PIN_NOW_ISO) - n * 86400000).toISOString()`. Defined next to the anchor. Each fixture replaces `'2026-05-22T...'` with `daysAgo(3)`, `'2026-05-19T...'` with `daysAgo(6)`, `'2026-05-10T...'` with `daysAgo(15)`, etc. The call-site name IS the semantics ("created 3 days before now").
 - **D-07:** Replace the hardcoded `'2026-05'` month key (line ~395) with `PIN_NOW_ISO.slice(0, 7)`. Replace the hardcoded `'2026-W22'` week label with `isoWeekLabel(new Date(PIN_NOW_ISO))` (or whatever the file's existing week-label fn is).
-- **D-08:** **No new helper module.** Everything stays inside `e2e-weekly-digest.test.js`. Single-file edit. No env-overridable hatch (no `process.env.TEST_PIN_NOW`) — keeps the test deterministic and avoids env-interpretation surface.
+- **D-08:** **No new helper module.** All new helpers stay inside `e2e-weekly-digest.test.js`. No env-overridable hatch (no `process.env.TEST_PIN_NOW`) — keeps the test deterministic and avoids env-interpretation surface.
+  - **D-08-AMEND (2026-06-02, planning):** Adding a single optional `now: Date` parameter to the existing `renderCostLine` export in `scripts/weekly-digest.mjs` is **permitted** as part of this phase. This is an additive, backward-compatible signature change to an existing production function — not a new module. It is required to thread the `PIN_NOW_ISO` anchor into the production month-key lookup so the test does not have to hardcode `'2026-05'` (D-07 band-aid) or rely on a live clock (Phase 47 band-aid that PRE-03 supersedes). All call sites that omit the param continue to use `new Date()` — no behavior change in production. `scripts/weekly-digest.mjs` is added to "Source files to modify" below.
 
 ### Plan Structure & Commit Convention
 
@@ -92,6 +93,7 @@ Restore `npm test` to exit 0 locally so CI can pass green on the v4.0-integratio
 - `tests/e2e/.llm-spend-ledger.json` — current state: 2 month buckets (`2026-05` bootstrap + `2026-06` 4-entry leak). PRE-01 deletes the `2026-06` bucket.
 - `tests/e2e/lib/llm-driver.js` — `invokeAnthropicSdkWithLedger` (signature documented around line 510). PRE-02 adds Step 0 guard at first line of function body.
 - `tests/e2e/scripts/e2e-weekly-digest.test.js` — current state: `PIN_NOW = () => new Date('2026-05-25T00:00:00Z')` at line 64; hardcoded `'2026-05'` at line ~395 (was 389 pre-Phase-47); inline fixture ISO strings at multiple sites. PRE-03 refactors to single `PIN_NOW_ISO` + `daysAgo(n)`.
+- `scripts/weekly-digest.mjs` — `renderCostLine({ ledgerPath })` at line ~224 currently derives the month key from `new Date()` internally. PRE-03 adds an optional `now: Date` parameter (default `new Date()`) so the test can thread `PIN_NOW()` deterministically. See D-08-AMEND above. Additive only — no behavior change for existing call sites.
 - `tests/unit/llm-ledger.test.js:1012` — Test 48 anchor (`months.length toBe(1)`). NOT MODIFIED; it goes green after PRE-01.
 - `tests/unit/package-lock-pinned.test.js` — Phase 47 artifact (4 assertions). PRE-04 verifies still passes; only modified if regression detected.
 - `package.json` line 39 — `"@anthropic-ai/sdk": "0.100.1"`. Verified-only by PRE-04.

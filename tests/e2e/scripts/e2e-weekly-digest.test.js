@@ -386,7 +386,7 @@ describe('cost data unavailable when ledger absent', () => {
     const ledgerData = {
       version: 1,
       months: {
-        '2026-05': { invocations: 5, total_usd: 12.5, last_invocation_iso: null, iterations: [] },
+        [new Date().toISOString().slice(0, 7)]: { invocations: 5, total_usd: 12.5, last_invocation_iso: null, iterations: [] },
       },
     };
     fs.writeFileSync(tmpLedger, JSON.stringify(ledgerData));

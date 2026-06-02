@@ -52,7 +52,7 @@ The 4 DEFERRED runbook stubs from `47-UAT-DEFERRED.md` — re-stamped to PASS wi
 Forward-looking gate state for when verifier passes N/M cases (not all-or-nothing). The single most load-bearing architectural decision in v4.1 — the existing `assertTripleGate` trust invariant MUST NOT be widened. Source: PROJECT.md "Current Milestone" goal #5.
 
 - [ ] **PARTIAL-01**: A new `assertPartialGate` function is exported from `scripts/auto-fix-promote.mjs` as a SEPARATE entry point (not a widened `assertTripleGate`); it does NOT call `runPromote({_skipCiGuard:true})`; the existing `assertTripleGate` body is byte-unchanged
-- [ ] **PARTIAL-02**: `.github/workflows/v40-verifier-gate.yml` `ready-flip` job gains a conditional step that produces an `auto-fix:partial-verified` label when at least 4/5 (≥60%) of affected cases pass; the full-pass `auto-fix:verified` path is byte-unchanged
+- [ ] **PARTIAL-02**: `.github/workflows/v40-verifier-gate.yml` `ready-flip` job gains a conditional step that produces an `auto-fix:partial-verified` label when at least 4/5 (≥80%) of affected cases pass; the full-pass `auto-fix:verified` path is byte-unchanged
 - [ ] **PARTIAL-03**: `.github/workflows/v40-auto-promote.yml` job-level `if:` filter widens to include `auto-fix:partial-verified`; partial-pass promotion mutates the corpus only for the PASSING case subset (failing cases stay in quarantine)
 - [ ] **PARTIAL-04**: A Vitest assertion `assertTripleGate` throws on `auto-fix:partial-verified` (proves the trust invariant boundary holds); the test ships in the SAME commit as the new label / `assertPartialGate` function
 
@@ -112,42 +112,40 @@ Additive `<details>` collapsible section in the existing weekly digest. SUMMARY_
 
 ## Traceability
 
-Empty initially. Will be populated by the roadmapper in Phase 10 of the workflow.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRE-01 | TBD | Pending |
-| PRE-02 | TBD | Pending |
-| PRE-03 | TBD | Pending |
-| PRE-04 | TBD | Pending |
-| PUSH-01 | TBD | Pending |
-| PUSH-02 | TBD | Pending |
-| GATE-01 | TBD | Pending |
-| GATE-02 | TBD | Pending |
-| GATE-03 | TBD | Pending |
-| UAT-01 | TBD | Pending |
-| UAT-02 | TBD | Pending |
-| UAT-03 | TBD | Pending |
-| UAT-04 | TBD | Pending |
-| BOOKS-01 | TBD | Pending |
-| BOOKS-02 | TBD | Pending |
-| PARTIAL-01 | TBD | Pending |
-| PARTIAL-02 | TBD | Pending |
-| PARTIAL-03 | TBD | Pending |
-| PARTIAL-04 | TBD | Pending |
-| AB-01 | TBD | Pending |
-| AB-02 | TBD | Pending |
-| AB-03 | TBD | Pending |
-| AB-04 | TBD | Pending |
-| DASH-01 | TBD | Pending |
-| DASH-02 | TBD | Pending |
-| DASH-03 | TBD | Pending |
+| PRE-01 | Phase 48 | Pending |
+| PRE-02 | Phase 48 | Pending |
+| PRE-03 | Phase 48 | Pending |
+| PRE-04 | Phase 48 | Pending |
+| PUSH-01 | Phase 49 | Pending |
+| PUSH-02 | Phase 49 | Pending |
+| GATE-01 | Phase 50 | Pending |
+| GATE-02 | Phase 50 | Pending |
+| GATE-03 | Phase 50 | Pending |
+| UAT-01 | Phase 51 | Pending |
+| UAT-02 | Phase 51 | Pending |
+| UAT-03 | Phase 51 | Pending |
+| UAT-04 | Phase 51 | Pending |
+| BOOKS-01 | Phase 52 | Pending |
+| BOOKS-02 | Phase 52 | Pending |
+| PARTIAL-01 | Phase 53 | Pending |
+| PARTIAL-02 | Phase 53 | Pending |
+| PARTIAL-03 | Phase 53 | Pending |
+| PARTIAL-04 | Phase 53 | Pending |
+| AB-01 | Phase 54 | Pending |
+| AB-02 | Phase 54 | Pending |
+| AB-03 | Phase 54 | Pending |
+| AB-04 | Phase 54 | Pending |
+| DASH-01 | Phase 55 | Pending |
+| DASH-02 | Phase 55 | Pending |
+| DASH-03 | Phase 55 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total across 8 categories
-- Mapped to phases: 0 (roadmapper populates)
-- Unmapped: 26 (will resolve to 0 after roadmap creation)
+- Mapped to phases: 26/26 (100%)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-02*
-*Last updated: 2026-06-02 after milestone v4.1 initial definition*
+*Last updated: 2026-06-02 — traceability table populated by roadmapper*

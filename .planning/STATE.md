@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Readiness Gate + Push
 status: planning
-last_updated: "2026-06-02T16:06:24.335Z"
+last_updated: "2026-06-02T00:00:00.000Z"
 last_activity: 2026-06-02
 progress:
-  total_phases: 0
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,19 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-30)
+See: .planning/PROJECT.md (updated 2026-06-02)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 47 — v4.0 Cleanup
+**Current focus:** Phase 48 — Pre-Push Regression Fixes
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 1 of 8 (Phase 48 — Pre-Push Regression Fixes)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-02 — Milestone v4.1 started
+Status: Ready to plan
+Last activity: 2026-06-02 — v4.1 roadmap created; 8 phases (48-55) mapped to 26 requirements
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -44,77 +46,49 @@ Last activity: 2026-06-02 — Milestone v4.1 started
 | v2.3 Post-v2.2 Hardening | 3 | 5 | 1 day |
 | v3.0 Autonomous E2E Testing Agent | 6 | 30 | ~7 days |
 | v3.1 LLM-Driven Product Improvement Loop | 7 | 31 | ~9 days |
-| v4.0 Self-Healing Test Suite | 9 (planned) | TBD | TBD |
+| v4.0 Self-Healing Test Suite | 9 | 26 | ~3 days |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
-- 2026-05-30: v4.0 roadmap drafted from REQUIREMENTS.md (33 reqs, 8 categories) + research/SUMMARY.md + research/ARCHITECTURE.md §5. 9 phases (39-47), Wave-1 parallelization (39+40+41 zero shared write surface), per-ARCHITECTURE-§5 dependency graph: 39→42→43→44, 40→41→42, 44→45→47, 46→47.
+- 2026-06-02: v4.1 roadmap drafted from REQUIREMENTS.md (26 reqs, 8 categories) + research/SUMMARY.md 4-wave structure. 8 phases (48-55). Wave-0 (48) blocks all; Wave-1 (49) is the single serialization point; Wave-2 (50, 51, 52) parallelizable post-push; Wave-3 (53, 54) parallelizable with Wave-2; Wave-4 (55) depends on Phase 54 model field.
 
 ### Decisions
 
-Recent decisions affecting v4.0 work (full log in PROJECT.md Key Decisions table after Phase 39 lands):
-
-- v4.0-roadmap: Continue phase numbering from v3.1 (38 → 39). Mirrors v3.0/v3.1 convention.
-- v4.0-roadmap: Use ARCHITECTURE.md §5 phase ordering 39-47 over alternative orderings; fold PITFALLS.md's "branch protection FIRST" insight into Phase 39 as Wave-0 prereqs.
-- v4.0-roadmap: Ledger persistence stays at existing `tests/e2e/.llm-spend-ledger.json` (flipped from gitignored to committed); avoids breaking v3.1 local ledger continuity.
-- v4.0-roadmap: `_skipCiGuard` exemption gated by triple-assertion (verified-label + merged + triage-sourced) — single load-bearing trust-invariant decision in milestone, audited in Phase 47.
+- v4.1-roadmap: Continue phase numbering from v4.0 (47 → 48). Mirrors all prior milestone conventions.
+- v4.1-roadmap: 4-wave structure from canonical research convergence. Wave constraints LOCKED: Phase 48 blocks all; push is the serialization point; CLEANUP-04 must run post-merge for integration_id resolvability; partial-verified must NOT widen assertTripleGate.
+- v4.1-roadmap: PARTIAL-04 is the single most load-bearing requirement. Its Vitest assertion that assertTripleGate throws on auto-fix:partial-verified ships in the SAME commit as the new label.
+- v4.1-roadmap: Phase 55 (dashboard) depends on Phase 54 (model field in ledger). Phase 53 benefits from Phase 51 UAT-47-a evidence but can start in parallel.
 
 ### Pending Todos
 
-None at v4.0 entry.
+None at v4.1 planning entry.
 
 ### Blockers/Concerns
 
-None at planning kickoff. Research flags carried forward to per-phase research:
-
-- **Phase 42:** Empirical diff-size calibration (initial cap 200 LOC src/ + 50 LOC tests; recalibrate after first 10 fixes)
-- **Phase 44:** `auto-fix:partial-verified` semantics deferred (default all-or-nothing)
-- **Phase 45:** Per-ERROR_CLASS prompt engineering — ~2-3 days per class for empirical tuning
-- **Phase 46:** Committed-ledger privacy audit (monthly spend pattern, model IDs in git history)
+- **Phase 50:** integration_id capture must be an explicit numbered step in the plan; ruleset PUT payload must be constructed from a GET of current state to preserve existing rules.
+- **Phase 51:** UAT-47-a runbook must include remove-then-add label step and branch pre-existence check as numbered steps. UAT-47-e branch must be CLOSED (not merged) immediately after gate fires.
+- **Phase 53:** assertTripleGate body must remain byte-unchanged; assertPartialGate must NOT call runPromote({_skipCiGuard:true}); plan review recommended before coding.
 
 ## Deferred Items
 
-Items acknowledged and carried forward from v3.1 milestone close on 2026-05-29:
+Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4.1 phases:
 
 | Category | Item | Status | Notes |
 |----------|------|--------|-------|
-| uat_gap | 32-UAT-EVIDENCE.md | passed | 0 pending scenarios; stale frontmatter only |
-| uat_gap | 35-HUMAN-UAT.md | testing | 2 pending scenarios (uncommitted in-progress local edit) |
-| uat_gap | 36-HUMAN-UAT.md | partial | 0 pending scenarios; stale frontmatter |
-| uat_gap | 37-HUMAN-UAT.md | partial | 0 pending scenarios; stale frontmatter |
-| uat_gap | 38-UAT-EVIDENCE.md | unknown | 0 pending scenarios; status field not stamped |
-| verification_gap | 35-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (5 PASS); file not re-stamped |
-| verification_gap | 36-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (2 PASS); file not re-stamped |
-| verification_gap | 37-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (1 PASS); file not re-stamped |
-| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Orphan slug reference; directory not present |
-| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Completed 2026-03-05 (a47dbb8); directory removed |
-| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Completed 2026-04-12 (e51ba1b); directory removed |
-
-Total: 11 items. Carried into v4.0 — bookkeeping debt only; substance closed in v3.1 Phase 38-03 (8/8 human_verification items per `.planning/milestones/v3.1-MILESTONE-AUDIT.md`).
-
-Items acknowledged and carried forward from v4.0 milestone close on 2026-06-02:
-
-| Category | Item | Status | Notes |
-|----------|------|--------|-------|
-| uat_gap | 47-UAT-DEFERRED.md | unknown | 4 DEFERRED runbook stubs (UAT-47-a/b/d/e) per CONTEXT.md locked decision (requires-push); auditor cannot detect deferred-by-design |
-| uat_gap | 47-UAT-EVIDENCE.md | unknown | UAT-47-c PASS recorded inline; 4 DEFERRED linked to 47-UAT-DEFERRED.md per locked CONTEXT |
-| verification_gap | 42-VERIFICATION.md | human_needed | Phase 42's deferred demo became UAT-47-a runbook stub in Phase 47 per locked CONTEXT; closed indirectly via Phase 47 CLEANUP-03 |
-| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Orphan slug; pre-existing pre-v4.0 carryover |
-| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Pre-existing pre-v4.0 carryover; completed 2026-03-05 (a47dbb8) |
-| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Pre-existing pre-v4.0 carryover; completed 2026-04-12 (e51ba1b) |
-| tech_debt | bypass_actors=1 on ruleset 17086676 | deferred | Owner-self with bypass_mode=always; pre-existing Phase 39 setup; remediation in v4.1 readiness-gate post-push |
-| tech_debt | required_status_checks rule absent | deferred | verifier-gate + deps-update-gate MISSING; Pitfall 4 (canonical context-name format unresolvable pre-push); remediation in v4.1 readiness-gate via single gh api -X PUT |
-
-Total: 8 items. All are bookkeeping debt or locked-decision deferrals; no substantive blockers for v4.0 ship.
+| uat_gap | 47-UAT-DEFERRED.md | unknown | 4 DEFERRED runbook stubs (UAT-47-a/b/d/e); addressed in Phase 51 |
+| tech_debt | bypass_actors=1 on ruleset 17086676 | deferred | Owner-self bypass_mode=always; addressed in Phase 50 |
+| tech_debt | required_status_checks rule absent | deferred | verifier-gate + deps-update-gate missing; addressed in Phase 50 |
+| uat_gap | 32-UAT-EVIDENCE.md stale frontmatter | passed | Addressed in Phase 52 |
+| uat_gap | 35-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
+| uat_gap | 36-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
+| uat_gap | 37-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
+| uat_gap | 38-UAT-EVIDENCE.md stale frontmatter | unknown | Addressed in Phase 52 |
+| quick_task | 3 orphan quick-task slug references | missing | Addressed in Phase 52 |
 
 ## Session Continuity
 
-Last session: 2026-05-30 — v4.0 roadmap drafted (this update)
-Stopped at: ROADMAP.md + STATE.md + REQUIREMENTS.md traceability written; ready to plan Phase 39
+Last session: 2026-06-02 — v4.1 roadmap created (this update)
+Stopped at: ROADMAP.md + STATE.md + REQUIREMENTS.md traceability written; ready to plan Phase 48
 Resume file: None
-
-## Operator Next Steps
-
-- Start the next milestone with /gsd-new-milestone

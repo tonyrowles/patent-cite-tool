@@ -225,7 +225,20 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 51-01-PLAN.md — Execute UAT-47-e + UAT-47-a LIVE on canonical; document UAT-47-b + UAT-47-d as deferred with sharper runbooks; close phase with STATE.md Phase 56 follow-up + ROADMAP update
+- [x] 51-01-PLAN.md — Execute UAT-47-e + UAT-47-a LIVE on canonical; document UAT-47-b + UAT-47-d as deferred with sharper runbooks; close phase with STATE.md Phase 56 follow-up + ROADMAP update
+
+### Phase 51.1: Required-Check Trigger Hotfix
+**Goal**: `v40-verifier-gate.yml` and `v40-deps-update.yml` actually fire on PRs into main so Phase 50's required_status_checks rule has a reporting provider; the repo's PR pipeline is unjammed; a verification test PR (CLOSED, not merged) confirms both checks now appear on a real PR
+**Wave**: Wave-2b.1 — emergency hotfix inserted after Phase 51 discovered REGRESSION-51-01
+**Depends on**: Phase 51 (which surfaced the regression)
+**Requirements**: REGRESSION-51-01 (HIGH-severity discovered defect)
+**Success Criteria** (what must be TRUE):
+  1. `.github/workflows/v40-verifier-gate.yml` `pull_request:` trigger fires on PRs whose base is `main` (the `branches: ['auto-fix/*']` BASE-ref filter is removed or rewritten so the trigger condition is satisfied for normal PRs)
+  2. `.github/workflows/v40-deps-update.yml` gains a `pull_request:` trigger so the `deps-update-gate` job actually runs as a check provider on dep-update PRs
+  3. A verification test PR opened against `main` after the fix lands shows BOTH `verifier-gate` AND `deps-update-gate` contexts present in `gh pr checks` output (whether they pass or fail is secondary — what matters is they FIRE)
+  4. The verification PR is CLOSED + branch deleted immediately after evidence capture (mirrors UAT-47-e / GATE-03 convention); no live LOCKED-path touch
+  5. Ruleset 17086676 ends Phase 51.1 with `bypass_actors=[]` (Phase 50 SC-2 preserved); the bypass actor is added via break-glass for the duration of the fix-commit + verification PR window, then removed
+**Plans**: TBD
 
 ### Phase 52: v3.1 Bookkeeping Cleanup
 **Goal**: All stale planning-file frontmatter is corrected and orphan reference rows are removed — completing the bookkeeping debt deferred from v3.1 and carried through v4.0

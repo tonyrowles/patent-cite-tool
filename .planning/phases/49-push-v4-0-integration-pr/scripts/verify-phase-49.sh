@@ -65,10 +65,15 @@ do_post_merge() {
   git cat-file -p "$MERGE_SHA" > "$EVIDENCE_DIR/merge-commit-object.txt"
 
   # SC-1 (commit-count): from env-probe.json (execution-time-derived per issue #2)
+  # Phase 49 deviation: plan's `origin/main..origin/v4.0-integration || MERGE_SHA-fallback`
+  # never fell through because the LHS git rev-list returns exit 0 when count is 0
+  # — and post-merge, v4.0-integration is an ancestor of main via the merge commit so
+  # the count IS legitimately 0. Use the MERGE_SHA^1..^2 approach unconditionally; it
+  # computes commits-on-PR-side-of-merge regardless of branch deletion state.
   EXPECTED=$(jq -r .commits_ahead "$EVIDENCE_DIR/env-probe.json")
-  ACTUAL=$(git rev-list --count origin/main..origin/v4.0-integration 2>/dev/null || git rev-list --count "$MERGE_SHA^1..$MERGE_SHA^2")
+  ACTUAL=$(git rev-list --count "$MERGE_SHA^1..$MERGE_SHA^2")
   test "$ACTUAL" -eq "$EXPECTED" || { echo "FAIL SC-1: commit count $ACTUAL != expected $EXPECTED (from env-probe.json)"; exit 1; }
-  echo "SC-1 (commit-count): $ACTUAL commits == expected $EXPECTED — PASS"
+  echo "SC-1 (commit-count): $ACTUAL commits (via MERGE_SHA^1..^2) == expected $EXPECTED — PASS"
 
   # SC-1 (single integration merge commit present)
   MERGE_COMMIT_COUNT=$(git log --merges origin/main --oneline | grep -c 'merge(v4.0-integration)')

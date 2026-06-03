@@ -155,7 +155,7 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 - Wave-4 (Phase 55): Depends on Phase 54 (reads `model` field from ledger)
 
 - [x] **Phase 48: Pre-Push Regression Fixes** - Fix Test 48 ledger leak, calendar-rollover flake, and @anthropic-ai/sdk EXACT pin before CI can pass on the integration PR (completed 2026-06-02)
-- [ ] **Phase 49: Push v4.0-Integration PR** - Create, self-approve, and admin-merge the v4.0-integration PR; confirm CI green on origin/main
+- [x] **Phase 49: Push v4.0-Integration PR** - Create, self-approve, and admin-merge the v4.0-integration PR; confirm CI green on origin/main (completed 2026-06-03)
 - [ ] **Phase 50: CLEANUP-04 Readiness Gate** - Patch ruleset 17086676 required_status_checks + remove bypass_actors; confirm gate enforced on test PR
 - [ ] **Phase 51: Live Readiness UATs** - Execute all 4 DEFERRED runbook stubs (UAT-47-a/b/d/e) against live GitHub Actions; capture evidence artifacts
 - [ ] **Phase 52: v3.1 Bookkeeping Cleanup** - Re-stamp 5 stale HUMAN-UAT/VERIFICATION frontmatter files; remove 3 orphan quick-task slug rows from STATE.md
@@ -194,7 +194,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 49-01-PLAN.md — 8-task release-engineering sequence: env probe → preflight bypass test → push+open PR → wait for CI → admin-bypass merge → SC harness → post-merge CI → INTEGRATION.md handoff
+- [x] 49-01-PLAN.md — 8-task release-engineering sequence: env probe → preflight bypass test → push+open PR → wait for CI → admin-bypass merge → SC harness → post-merge CI → INTEGRATION.md handoff
 
 ### Phase 50: CLEANUP-04 Readiness Gate
 **Goal**: Ruleset 17086676 enforces both required status checks and has no bypass actors; a committed break-glass procedure is tested before removal lands; a test PR confirms enforcement
@@ -277,7 +277,7 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 48. Pre-Push Regression Fixes | v4.1 | 1/1 | Complete    | 2026-06-02 |
-| 49. Push v4.0-Integration PR | v4.1 | 0/1 | Not started | - |
+| 49. Push v4.0-Integration PR | v4.1 | 1/1 | Complete   | 2026-06-03 |
 | 50. CLEANUP-04 Readiness Gate | v4.1 | 0/TBD | Not started | - |
 | 51. Live Readiness UATs | v4.1 | 0/TBD | Not started | - |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |

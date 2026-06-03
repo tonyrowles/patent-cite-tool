@@ -1,0 +1,6 @@
+=== integration_id discovery 2026-06-03T04:12:28Z ===
+Source SHA: c0bb37d5dfeb28f7ce7901fa50e36d231d6fc6e2 (Phase 49 merge commit)
+Query: gh api /repos/.../commits/<sha>/check-runs --jq '[.check_runs[].app.id] | unique'
+Result: 15368
+Expected: 15368 (GitHub Actions App ID, https://github.com/apps/github-actions)
+NOT 26860592872 (that is the workflow-run databaseId from 49-INTEGRATION.md — conflated)

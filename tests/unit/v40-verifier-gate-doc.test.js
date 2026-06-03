@@ -107,3 +107,31 @@ describe('docs/v40-verifier-gate-manual-test.md structural contract (VFY-GATE-05
     expect(doc).toMatch(/^## Cleanup\b/m);
   });
 });
+
+// Phase 50 Plan 50-01 Task 02 — GATE-01 SC-4 static-grep pins for required_status_checks
+// contexts. The live ruleset 17086676 (post-PUT) requires two job-name contexts:
+// `verifier-gate` (declared in .github/workflows/v40-verifier-gate.yml:181) and
+// `deps-update-gate` (declared in .github/workflows/v40-deps-update.yml:164). If either
+// jobid is renamed OR a `name:` override is added later, the check-run name drifts off
+// the required context string and enforcement silently breaks (Pitfall 7 / T-50-11).
+// These two `it()` blocks pin the 2-space-indented jobid declaration shape and force
+// any rename-PR to update this test in lockstep — npm test catches drift.
+//
+// Coverage map:
+//   D11: v40-verifier-gate.yml declares `verifier-gate:` jobid (line 181 per Phase 49 audit)
+//   D12: v40-deps-update.yml declares `deps-update-gate:` jobid (line 164 per Phase 49 audit)
+
+describe('Phase 50 GATE-01: required_status_checks context strings pinned in YAML', () => {
+  const VERIFIER_GATE_YML = path.resolve(PROJECT_ROOT, '.github/workflows/v40-verifier-gate.yml');
+  const DEPS_UPDATE_YML = path.resolve(PROJECT_ROOT, '.github/workflows/v40-deps-update.yml');
+
+  it('D11: v40-verifier-gate.yml declares `verifier-gate:` jobid (line 181 per Phase 49 audit)', () => {
+    const yml = fs.readFileSync(VERIFIER_GATE_YML, 'utf8');
+    expect(yml).toMatch(/^\s{2}verifier-gate:\s*$/m);
+  });
+
+  it('D12: v40-deps-update.yml declares `deps-update-gate:` jobid (line 164 per Phase 49 audit)', () => {
+    const yml = fs.readFileSync(DEPS_UPDATE_YML, 'utf8');
+    expect(yml).toMatch(/^\s{2}deps-update-gate:\s*$/m);
+  });
+});

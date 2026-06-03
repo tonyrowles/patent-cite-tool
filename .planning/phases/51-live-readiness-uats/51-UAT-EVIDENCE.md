@@ -1,12 +1,14 @@
 ---
 phase: 51-live-readiness-uats
 plan: 01
-status: in-progress
+status: complete
 created: 2026-06-03T05:30:00Z
+completed_at: 2026-06-03T05:40:00Z
 canonical_repo: tonyrowles/patent-cite-tool
 requirements_addressed: [UAT-01, UAT-02, UAT-03, UAT-04]
-sequence_followed: "UAT-47-e first (D-13), UAT-47-a second"
+sequence_followed: "UAT-47-e first (D-13), UAT-47-a second (auto-deferred)"
 budget_cap_usd: 5
+budget_spent_usd: 0
 related_phases:
   - phase: 47
     relation: source-runbook
@@ -14,7 +16,11 @@ related_phases:
   - phase: 50
     relation: enabler-and-blocker
     ref: .planning/phases/50-cleanup-04-readiness-gate/50-01-SUMMARY.md
-    notes: "Phase 50 ruleset ENABLES UAT-47-e (verifier-gate required) but BLOCKS UAT-47-d (push to main forbidden)"
+    notes: "Phase 50 ruleset ENABLES UAT-47-e (verifier-gate required) but BLOCKS UAT-47-d (push to main forbidden). Phase 51 ALSO discovered verifier-gate's pull_request.branches trigger is structurally inert."
+  - phase: 56
+    relation: enqueued-follow-up
+    ref: STATE.md Pending Todos
+    notes: "v4.2 backlog item folds all four UATs (47-a, 47-b, 47-d, 47-e) into one work unit covering ledger-commit refactor + verifier-gate trigger patch + deps-update audit + fixture-mutator authoring."
 ---
 
 # Phase 51 — Live Readiness UATs Evidence
@@ -26,6 +32,17 @@ related_phases:
 This document re-stamps the 4 UATs that were DEFERRED at Phase 47 close (requires-push). Two are executed LIVE on the canonical `tonyrowles/patent-cite-tool` repo (UAT-47-e + UAT-47-a per D-01); two are documented as STILL-DEFERRED / BLOCKED-BY-PHASE-50 with sharper runbooks for a Phase 56 follow-up.
 
 Section order honors D-13 execution sequence (47-e first, 47-a second), with the two deferred-row sections after.
+
+## Outcome Matrix
+
+| UAT | Status | Evidence | Defer Target |
+|---|---|---|---|
+| UAT-47-e | FAIL | `evidence/uat-47-e-pr-{checks,labels,comments}.json` (3 files; all 3 D-11 heuristics failed because v40-verifier-gate's `pull_request.branches:` filter targets BASE ref not HEAD; the gate never fired on PR #13) | Phase 56 (workflow trigger patch — Option α or β) |
+| UAT-47-a | AUTO-DEFERRED (per D-13) | `evidence/uat-47-a-auto-deferred.md` (no live trigger; $0 spent; issue #3 label unchanged; no PR opened on auto-fix/3-139f821b) | Phase 56 (re-attempt after verifier-gate trigger patched) |
+| UAT-47-b | STILL-DEFERRED | N/A (requires regression-fixture-mutator.sh authoring + likely the same verifier-gate trigger audit) | Phase 56 (fixture-mutator + deps-update-gate audit folded into one work item) |
+| UAT-47-d | BLOCKED-BY-PHASE-50 | `evidence/uat-47-a-auto-deferred.md` (live confirmation deferred) + `.planning/phases/50-cleanup-04-readiness-gate/evidence/final-ruleset.json` (ruleset state proves the block) | Phase 56 (Option A PR-then-merge or Option B ledger-snapshots/* branch refactor) |
+
+**Net outcome:** 0 PASS / 1 FAIL / 1 AUTO-DEFERRED / 1 STILL-DEFERRED / 1 BLOCKED-BY-PHASE-50. The single FAIL (UAT-47-e) surfaces a workflow design bug in v40-verifier-gate.yml that was not visible at Phase 47/49/50 planning time (no UAT had previously attempted to fire the gate on a real PR). Phase 51's primary value-add is THIS discovery, even though no UAT passed.
 
 ## Pre-flight Checks (Task 1)
 
@@ -97,24 +114,86 @@ Section order honors D-13 execution sequence (47-e first, 47-a second), with the
 
 ## UAT-47-b — Dep-PR pre-flight gate blocking on regression
 
-**status:** TBD (Task 4 will mark STILL-DEFERRED with sharper runbook)
-**deferred_reason:** TBD
-**defer_target:** Phase 56 (v4.2 backlog) — see STATE.md Pending Todos entry from D-20
-**runbook:** `.planning/milestones/v4.0-phases/47-v4-0-cleanup/47-UAT-DEFERRED.md` §UAT-47-b
+**status:** STILL-DEFERRED
+**deferred_reason:** Awkward to automate manually — requires both (1) a dep-update PR to exist and (2) a synthetic regression to be composed onto its branch. The v40-deps-update.yml workflow opens a PR on its own schedule; coordinating a deterministic regression push onto an ad-hoc branch produces flaky test conditions when run by hand. Compounded by the Phase 51 discovery that v40-verifier-gate.yml's trigger does not fire on PRs into main (see §UAT-47-e deviation #2) — the deps-update-gate may have the same misconfiguration and require pre-patching before a synthetic-regression UAT yields signal.
+**defer_target:** Phase 56 (v4.2 backlog) — see STATE.md Pending Todos entry from D-20 (folds with UAT-47-d follow-up and the §UAT-47-e verifier-gate trigger patch).
 
-(Task 4 fills this section.)
+**runbook (sharper, for v4.2):**
+
+1. **Pre-step (NEW, surfaced by Phase 51):** Inspect `.github/workflows/v40-deps-update.yml` for the same `pull_request.branches:` BASE/HEAD confusion that broke verifier-gate in §UAT-47-e deviation #2. If present, patch first using the same Option α/β remediation documented in `evidence/uat-47-a-auto-deferred.md`. The deps-update-gate must be confirmed firing on dep-PR branches before the regression-injection step is meaningful.
+2. Build `tests/e2e/uat-helpers/regression-fixture-mutator.sh` — a small script that takes a case-id argument, applies a deterministic citation-text mutation to the corresponding fixture under `tests/golden/`, and writes a one-line summary of the mutation to stdout. The mutator must be idempotent (re-running with the same case-id produces the same diff) so the regression is reproducible across runs.
+3. `gh workflow run v40-deps-update.yml` — wait for the workflow to open a dep-PR (poll `gh pr list --head 'v40-deps-update/*' --limit 1` every 30s for up to 10 min).
+4. Once the PR exists, `git fetch origin && git checkout <dep-pr-branch>`; run `tests/e2e/uat-helpers/regression-fixture-mutator.sh US11427642-spec-short-1` (or any quarantined case); `git commit -m "test(uat-47-b): inject deterministic regression" && git push`.
+5. Poll `gh pr checks <pr-n> --json bucket,name,state` for `deps-update-gate` to flip to FAILURE (up to 15 min). NOTE: use the `bucket` field (was `conclusion` in the original Phase 47 runbook — `gh pr checks` JSON schema does not expose `conclusion`, confirmed during Phase 51 Task 2).
+6. Assert success heuristics (verbatim from 47-UAT-DEFERRED.md §UAT-47-b, with the `bucket` rename):
+   - `gh pr checks <pr-n>` shows `deps-update-gate` with `state=FAILURE` / `bucket=fail`.
+   - PR has a comment posted with the regression detail.
+7. Rollback: `gh pr close <pr-n> --delete-branch` (mirrors UAT-47-e's hygiene per CONTEXT D-12).
+
+**why_not_now:** Authoring `regression-fixture-mutator.sh` is itself a Phase 56 work item — it's a new tool, not a Phase 51 deliverable. Running this UAT today by hand-mutating the dep-PR branch in an ad-hoc way would not produce a runbook future operators can re-execute. Additionally the verifier-gate trigger discovery in Phase 51 may imply deps-update-gate needs the same patch first.
+
+**evidence:** N/A (no live run)
+**runbook_source:** .planning/milestones/v4.0-phases/47-v4-0-cleanup/47-UAT-DEFERRED.md §UAT-47-b
 
 ---
 
 ## UAT-47-d — Ledger snapshot workflow committing daily snapshot
 
-**status:** TBD (Task 4 will mark BLOCKED-BY-PHASE-50)
-**block_reason:** TBD
-**defer_target:** Phase 56 (v4.2 backlog) — see STATE.md Pending Todos entry from D-20
-**runbook:** `.planning/milestones/v4.0-phases/47-v4-0-cleanup/47-UAT-DEFERRED.md` §UAT-47-d
+**status:** BLOCKED-BY-PHASE-50
+**block_reason:** `v40-cost-ledger-snapshot.yml` line 91 executes `git push origin main` directly. Phase 50 (ruleset 17086676) removed `bypass_actors` and made `verifier-gate` + `deps-update-gate` required status checks on `main`. There is no actor with `bypass_mode=always` on the ruleset, so this direct push is structurally rejected by the platform — not by the workflow logic, but by the protected-branch enforcement layer. This is a v4.0-design / v4.1-enforcement collision, discovered at Phase 51 UAT-execution time (pre-flight check 1d in Task 1 confirmed `bypass_actor_count=0`, `enforcement=active`).
 
-(Task 4 fills this section.)
+**affected_workflows:**
+  - `v40-cost-ledger-snapshot.yml` (cron 02:00 UTC + workflow_dispatch) — primary blocker target.
+  - `v40-auto-fix.yml` — ALSO commits ledger to main after a successful run; same structural block applies. UAT-47-a was AUTO-DEFERRED per D-13 before this side-channel could be empirically captured, but the structural block remains. The Phase 56 patch must address both workflows.
+  - **v40-verifier-gate.yml** (discovered via §UAT-47-e): NOT blocked by the ruleset, but has its OWN structural block — `pull_request.branches:` filter targets BASE not HEAD, so the gate cannot fire on PRs into main. This is a SEPARATE Phase 50 / v4.0-design regression that Phase 56 should fold into the same trigger-correctness audit.
+
+**defer_target:** Phase 56 (v4.2 backlog) — see STATE.md Pending Todos entry from D-20.
+
+**runbook_options (sharper, for v4.2):**
+
+**Option A — Migrate to PR-then-merge with the documented break-glass:**
+1. Modify `v40-cost-ledger-snapshot.yml` to open a PR on branch `ledger-snapshots/YYYY-MM-DD` instead of pushing directly to main (`gh pr create --base main --head ledger-snapshots/$(date +%F)`).
+2. Add `[skip ci]` to the PR title to suppress redundant CI on the no-op ledger PR.
+3. Auto-merge via `gh pr merge --auto --squash` once required checks (verifier-gate, deps-update-gate) pass — but: ledger PRs touch only `tests/e2e/.llm-spend-ledger.json`, which IS one of the LOCKED paths under diff-guard! So this option REQUIRES also adding ledger-only PRs to a diff-guard allowlist via a new "ledger-snapshot bot" actor pattern.
+4. The v40-auto-fix workflow needs the same treatment for its post-run ledger commit (separate PR per auto-fix run, or batched into the daily snapshot).
+5. **Prerequisite:** v40-verifier-gate.yml's trigger must be patched first (see §UAT-47-e deviation #2 / Option α or β) — otherwise no required-check signal exists for the auto-merge to wait on.
+
+**Option B — Migrate to a `ledger-snapshots/*` branch pattern that does not touch main:**
+1. Modify `v40-cost-ledger-snapshot.yml` to push to `ledger-snapshots/YYYY-MM-DD` and STOP there — no PR, no merge to main.
+2. Add a separate weekly digest workflow that reads from the `ledger-snapshots/*` branches (`git log refs/remotes/origin/ledger-snapshots/* -- tests/e2e/.llm-spend-ledger.json`) to aggregate cost data.
+3. This avoids the diff-guard/locked-path entanglement entirely and requires no break-glass.
+4. Same treatment needed for v40-auto-fix's ledger-commit step (write to a `ledger-runs/<run-id>` branch).
+5. **Independent of the verifier-gate trigger patch** — Option B is the cleaner choice if Phase 56 wants to ship the ledger fix before completing the verifier-gate audit.
+
+**break_glass (for one-off operator intervention only, NOT a long-term fix):**
+- `docs/v40-repo-config.md` §7 documents the procedure: temporarily add owner to `bypass_actors`, perform the push, remove from `bypass_actors`. This is NOT a recommended path for an automated workflow — it would defeat Phase 50's GATE-02 invariant.
+
+**why_not_now:** Phase 51 explicitly scope-locks this discovery to documentation (per CONTEXT §Out of scope). Implementing the fix requires editing two `v40-*` workflow YAML files (trust-invariant-locked in v4.1) — that's the work Phase 56 will plan and execute.
+
+**evidence (block confirmation):**
+  - `evidence/uat-47-a-auto-deferred.md` — documents that the v40-auto-fix workflow was NOT triggered (because UAT-47-a was auto-deferred per D-13), so the runtime evidence of the ledger-commit-to-main rejection that the original plan anticipated (`evidence/uat-47-a-ledger-commit-attempt.txt`) was not captured. The block is confirmed by the ruleset state alone (next bullet).
+  - `.planning/phases/50-cleanup-04-readiness-gate/evidence/final-ruleset.json` — proves `bypass_actors=[]` and `enforcement=active` (the rule state doing the blocking). Pre-flight check 1d in Task 1 re-confirmed this state at Phase 51 execution time.
+
+**runbook_source:** .planning/milestones/v4.0-phases/47-v4-0-cleanup/47-UAT-DEFERRED.md §UAT-47-d
 
 ---
 
-*Skeleton written by Task 1; placeholders filled by Tasks 2-4.*
+## Phase 56 follow-up (v4.2 backlog)
+
+Per D-20, the STATE.md `Pending Todos` table gains one entry recommending a Phase 56 follow-up that:
+1. Refactors `v40-cost-ledger-snapshot.yml` to either Option A (PR-then-merge) or Option B (ledger-snapshots/* branch pattern) — see §UAT-47-d runbook_options. **Recommended: Option B** (lower coupling to the verifier-gate trigger patch, ships independently).
+2. Applies the same refactor to `v40-auto-fix.yml`'s post-run ledger-commit step (same structural block surfaced during UAT-47-a planning; was AUTO-DEFERRED before runtime confirmation).
+3. **NEW (Phase 51 discovery):** Patches `v40-verifier-gate.yml` trigger — `pull_request.branches: ['auto-fix/*']` targets BASE ref, not HEAD; the workflow as-shipped cannot fire on real auto-fix PRs into main. See §UAT-47-e deviation #2 and `evidence/uat-47-a-auto-deferred.md` for the Option α/β patch suggestions.
+4. **NEW (Phase 51 inference):** Audit `v40-deps-update.yml` and any other `v40-*-gate.yml` workflow for the same `pull_request.branches:` BASE/HEAD confusion. If present, apply the same patch pattern (job-level `if:` instead of `on:`-level `branches:` filter).
+5. Authors `tests/e2e/uat-helpers/regression-fixture-mutator.sh` enabling UAT-47-b to be re-executed deterministically.
+6. Re-runs UAT-47-e, UAT-47-a, UAT-47-b, UAT-47-d against the refactored workflows; adds PASS evidence to a `56-UAT-EVIDENCE.md` follow-up document.
+
+All four deferrals (47-a, 47-b, 47-d, 47-e) are folded into ONE Phase 56 work item, not four, because:
+- Option B from 47-d unblocks the 47-a ledger side-effect simultaneously.
+- The 47-e trigger patch is a prerequisite for 47-a's empirical verifier-gate evidence.
+- The 47-b workflow audit shares the same trigger-correctness mindset as 47-e.
+- All four UATs are dispatch-orderable with the same operator-approval ceremony Phase 51 documented (D-15/D-16 pattern).
+
+---
+
+*Skeleton written by Task 1; placeholders filled by Tasks 2-4 (Task 4 added §UAT-47-b STILL-DEFERRED + §UAT-47-d BLOCKED-BY-PHASE-50 + §Phase 56 follow-up).*

@@ -24,3 +24,9 @@ tests/e2e/.spec-cache/
 # Claude Code local state (worktrees, settings, scheduled-task locks). Never commit:
 # worktrees leak transient agent-* dirs; settings.local.json contains per-machine prefs.
 .claude/
+
+# Local extension build artifacts (Firefox/Chrome packed zips). Never commit:
+# these are produced by `npm run build:*` and `web-ext build` for store uploads.
+patent-cite-firefox.zip
+patent-cite-chrome.zip
+*.xpi

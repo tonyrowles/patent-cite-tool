@@ -28,16 +28,24 @@ do_pre_merge() {
   echo "--- Pre-merge mode: asserting pragmatic SC-3 + T-49-CI-FALSE-GREEN ---"
 
   # SC-3 (pragmatic): zero non-SUCCESS concluded checks on PR statusCheckRollup
+  # Phase 49 deviation: SKIPPED counted as acceptable. Workflows like
+  # V40 pdfjs Frame-Shift Pre-Flight legitimately skip when their `paths:`
+  # filter doesn't match the diff; treating SKIPPED as a failure would block
+  # any PR that doesn't touch every conditional workflow's scope.
   FAIL=$(gh pr view "$PR_N" --json statusCheckRollup \
-    --jq '[.statusCheckRollup[] | select(.conclusion != null and .conclusion != "SUCCESS")] | length')
-  test "$FAIL" = "0" || { echo "FAIL SC-3: $FAIL non-SUCCESS checks on PR #$PR_N (pragmatic reading)"; exit 1; }
-  echo "SC-3 (pre-merge): zero non-SUCCESS checks — PASS"
+    --jq '[.statusCheckRollup[] | select(.conclusion != null and .conclusion != "SUCCESS" and .conclusion != "SKIPPED")] | length')
+  test "$FAIL" = "0" || { echo "FAIL SC-3: $FAIL non-SUCCESS-and-non-SKIPPED checks on PR #$PR_N (pragmatic reading)"; exit 1; }
+  echo "SC-3 (pre-merge): zero non-SUCCESS non-SKIPPED checks — PASS"
 
   # T-49-CI-FALSE-GREEN mitigation: CI check must have fired AND reported SUCCESS
+  # Phase 49 deviation: filter by workflowName (declared workflow name) rather
+  # than the lowercased `name` field returned by GraphQL. The plan's check used
+  # `name == "CI"` which never matches because GraphQL normalizes name to "ci".
+  # At least one `workflowName == "CI"` entry with conclusion=SUCCESS is required.
   CI_OK=$(gh pr view "$PR_N" --json statusCheckRollup \
-    --jq '[.statusCheckRollup[] | select(.name == "CI" and .conclusion == "SUCCESS")] | length')
-  test "$CI_OK" = "1" || { echo "FAIL T-49-CI-FALSE-GREEN: CI check did not fire or did not report SUCCESS on PR #$PR_N (CI_OK=$CI_OK)"; exit 1; }
-  echo "T-49-CI-FALSE-GREEN: CI check fired and SUCCESS — PASS"
+    --jq '[.statusCheckRollup[] | select(.workflowName == "CI" and .conclusion == "SUCCESS")] | length')
+  test "$CI_OK" -ge 1 || { echo "FAIL T-49-CI-FALSE-GREEN: CI workflow did not fire or did not report SUCCESS on PR #$PR_N (CI_OK=$CI_OK)"; exit 1; }
+  echo "T-49-CI-FALSE-GREEN: CI workflow fired and SUCCESS ($CI_OK run(s)) — PASS"
 
   echo "===== ALL pre-merge SCs PASS (SC-3 pragmatic + T-49-CI-FALSE-GREEN) — see $EVIDENCE_DIR for evidence ====="
 }
@@ -81,16 +89,21 @@ do_post_merge() {
   echo "SC-1 (worktree-merge preservation): all SHAs in expected-worktree-merges.txt are ancestors of origin/main — PASS"
 
   # SC-2 (6 v40-* workflows discoverable on origin)
-  V40_COUNT=$(gh workflow list --all --json name \
-    --jq '[.[] | select(.name | startswith("v40-"))] | length')
+  # Phase 49 deviation: filter by PATH rather than NAME. The plan's
+  # `select(.name | startswith("v40-"))` never matches because the workflow
+  # declared names are "V40 Auto Promote" etc. (uppercase V, spaces), not
+  # "v40-..." (lowercase, dashes). Filename pattern .github/workflows/v40-*.yml
+  # is the stable matcher.
+  V40_COUNT=$(gh workflow list --all --json path \
+    --jq '[.[] | select(.path | startswith(".github/workflows/v40-"))] | length')
   test "$V40_COUNT" = "6" || { echo "FAIL SC-2: only $V40_COUNT v40-* workflows visible (expected 6)"; exit 1; }
   echo "SC-2: $V40_COUNT v40-* workflows discoverable — PASS"
 
-  # Capture workflow names to evidence (SOLE writer per issue #7)
+  # Capture workflow names+paths to evidence (SOLE writer per issue #7)
   gh workflow list --all --json name,path,state \
-    --jq '[.[] | select(.name | startswith("v40-"))] | sort_by(.name)' \
+    --jq '[.[] | select(.path | startswith(".github/workflows/v40-"))] | sort_by(.path)' \
     > "$EVIDENCE_DIR/post-merge-workflows.json"
-  echo "SC-2: v40-* workflow names captured to $EVIDENCE_DIR/post-merge-workflows.json"
+  echo "SC-2: v40-* workflow names+paths captured to $EVIDENCE_DIR/post-merge-workflows.json"
 
   # Negative test: ruleset immutability (SOLE writer per issue #7)
   gh api repos/tonyrowles/patent-cite-tool/rulesets/17086676 > "$EVIDENCE_DIR/post-merge-ruleset.json"

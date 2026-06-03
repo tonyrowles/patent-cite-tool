@@ -1,0 +1,270 @@
+diff --git a/.github/workflows/v40-deps-update.yml b/.github/workflows/v40-deps-update.yml
+index 83d8a1f..af2c6cf 100644
+--- a/.github/workflows/v40-deps-update.yml
++++ b/.github/workflows/v40-deps-update.yml
+@@ -45,6 +45,8 @@
+ name: V40 Deps Update
+ 
+ on:
++  pull_request:
++    types: [opened, synchronize, reopened]
+   schedule:
+     - cron: '0 9 * * 1'   # Monday 09:00 UTC — 40-CONTEXT locked decision #2
+   workflow_dispatch: {}    # Manual trigger for testing
+@@ -171,14 +173,28 @@ jobs:
+       GITHUB_REPOSITORY: ${{ github.repository }}
+ 
+     steps:
++      - name: Scope decision (v40-deps-update/* PRs only; fast-path SUCCESS otherwise)
++        id: scope
++        if: github.event_name == 'pull_request'
++        run: |
++          if [[ "${{ github.head_ref }}" == v40-deps-update/* ]]; then
++            echo "active=true" >> "$GITHUB_OUTPUT"
++          else
++            echo "active=false" >> "$GITHUB_OUTPUT"
++            echo "Fast-path SUCCESS — non-v40-deps-update PR (head=${{ github.head_ref }})"
++          fi
++
+       - uses: actions/checkout@v4
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+ 
+       - uses: actions/setup-node@v4
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         with:
+           node-version: 22
+           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+ 
+       - name: Install dependencies
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: |
+           if [ -f package-lock.json ]; then
+             npm ci
+@@ -188,20 +204,23 @@ jobs:
+ 
+       - name: Cache Playwright Chromium
+         id: playwright-cache
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         uses: actions/cache@v4
+         with:
+           path: ~/.cache/ms-playwright
+           key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+ 
+       - name: Install Playwright Chromium
+-        if: steps.playwright-cache.outputs.cache-hit != 'true'
++        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && (steps.playwright-cache.outputs.cache-hit != 'true')
+         run: npx playwright install chromium
+ 
+       - name: Build Chrome extension
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: npm run build:chrome
+ 
+       - name: Pre-flight smoke (1 case)
+         id: smoke
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         continue-on-error: true
+         # Mirrors e2e-nightly.yml smoke probe (seed patent, single case).
+         run: |
+@@ -211,7 +230,7 @@ jobs:
+             specs/regression.spec.js
+ 
+       - name: Run E2E regression (deterministic daily rotation)
+-        if: steps.smoke.outcome == 'success'
++        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && (steps.smoke.outcome == 'success')
+         continue-on-error: true
+         # Mirrors e2e-nightly.yml regression invocation — uses the cron-case
+         # selector for the day's rotating 30-case sample. continue-on-error
+diff --git a/.github/workflows/v40-verifier-gate.yml b/.github/workflows/v40-verifier-gate.yml
+index af40b84..9f92f1f 100644
+--- a/.github/workflows/v40-verifier-gate.yml
++++ b/.github/workflows/v40-verifier-gate.yml
+@@ -44,7 +44,6 @@ name: V40 Verifier Gate
+ on:
+   pull_request:
+     types: [opened, synchronize, reopened]
+-    branches: ['auto-fix/*']
+ 
+ permissions:
+   contents: read
+@@ -187,17 +186,31 @@ jobs:
+       PR_NUM: ${{ github.event.pull_request.number }}
+ 
+     steps:
++      - name: Scope decision (auto-fix/* PRs only; fast-path SUCCESS otherwise)
++        id: scope
++        if: github.event_name == 'pull_request'
++        run: |
++          if [[ "${{ github.head_ref }}" == auto-fix/* ]]; then
++            echo "active=true" >> "$GITHUB_OUTPUT"
++          else
++            echo "active=false" >> "$GITHUB_OUTPUT"
++            echo "Fast-path SUCCESS — non-auto-fix PR (head=${{ github.head_ref }})"
++          fi
++
+       - uses: actions/checkout@v4
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         with:
+           ref: ${{ github.event.pull_request.head.sha }}
+           fetch-depth: 0   # required for origin/main verifier-pin
+ 
+       - uses: actions/setup-node@v4
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         with:
+           node-version: 22
+           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+ 
+       - name: Install dependencies
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: |
+           if [ -f package-lock.json ]; then
+             npm ci
+@@ -207,22 +220,26 @@ jobs:
+ 
+       - name: Cache Playwright Chromium
+         id: playwright-cache
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         uses: actions/cache@v4
+         with:
+           path: ~/.cache/ms-playwright
+           key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+ 
+       - name: Install Playwright Chromium
+-        if: steps.playwright-cache.outputs.cache-hit != 'true'
++        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && (steps.playwright-cache.outputs.cache-hit != 'true')
+         run: npx playwright install chromium
+ 
+       - name: Verify Playwright binary
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: npx playwright --version
+ 
+       - name: Build Chrome extension
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: npm run build:chrome
+ 
+       - name: Pin verifier files to origin/main
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         # VFY-GATE-04 Layer 4 — pin AFTER PR-branch checkout but BEFORE
+         # verifyCitation invocation. THREE files (NOT four): golden-loader.js
+         # does not exist per 41-RESEARCH §Pattern 4 Assumption A8.
+@@ -240,6 +257,7 @@ jobs:
+           done
+ 
+       - name: Verify affected cases 3x consecutively
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         # 41-RESEARCH Pattern 5 verbatim. PR_BODY via env-hop (CWE-94 defense)
+         # then piped via stdin to parse-affected-cases.mjs (regex-only parser).
+         # Empty CASES is a HARD FAIL per Pitfall C (would otherwise silently
+@@ -290,7 +308,7 @@ jobs:
+           fi
+ 
+       - name: Upload per-case verifier reports
+-        if: always()
++        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && always()
+         uses: actions/upload-artifact@v4
+         with:
+           name: verifier-gate-reports-${{ github.run_id }}
+@@ -313,17 +331,31 @@ jobs:
+       PR_NUM: ${{ github.event.pull_request.number }}
+ 
+     steps:
++      - name: Scope decision (auto-fix/* PRs only; fast-path SUCCESS otherwise)
++        id: scope
++        if: github.event_name == 'pull_request'
++        run: |
++          if [[ "${{ github.head_ref }}" == auto-fix/* ]]; then
++            echo "active=true" >> "$GITHUB_OUTPUT"
++          else
++            echo "active=false" >> "$GITHUB_OUTPUT"
++            echo "Fast-path SUCCESS — non-auto-fix PR (head=${{ github.head_ref }})"
++          fi
++
+       - uses: actions/checkout@v4
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         with:
+           ref: ${{ github.event.pull_request.head.sha }}
+           fetch-depth: 0
+ 
+       - uses: actions/setup-node@v4
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         with:
+           node-version: 22
+           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+ 
+       - name: Install dependencies
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: |
+           if [ -f package-lock.json ]; then
+             npm ci
+@@ -333,22 +365,26 @@ jobs:
+ 
+       - name: Cache Playwright Chromium
+         id: playwright-cache
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         uses: actions/cache@v4
+         with:
+           path: ~/.cache/ms-playwright
+           key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+ 
+       - name: Install Playwright Chromium
+-        if: steps.playwright-cache.outputs.cache-hit != 'true'
++        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && (steps.playwright-cache.outputs.cache-hit != 'true')
+         run: npx playwright install chromium
+ 
+       - name: Verify Playwright binary
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: npx playwright --version
+ 
+       - name: Build Chrome extension
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         run: npm run build:chrome
+ 
+       - name: Run 76-case regression suite
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         # Full PR-branch regression (unpinned). No --grep filter, no
+         # continue-on-error -- regression IS a blocking gate (Pitfall 8 #4).
+         run: |
+@@ -357,7 +393,7 @@ jobs:
+             specs/regression.spec.js
+ 
+       - name: Comment on regression failure
+-        if: failure()
++        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && failure()
+         env:
+           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           PR_NUMBER: ${{ github.event.pull_request.number }}
+@@ -390,7 +426,19 @@ jobs:
+       PR_NUM: ${{ github.event.pull_request.number }}
+ 
+     steps:
++      - name: Scope decision (auto-fix/* PRs only; fast-path SUCCESS otherwise)
++        id: scope
++        if: github.event_name == 'pull_request'
++        run: |
++          if [[ "${{ github.head_ref }}" == auto-fix/* ]]; then
++            echo "active=true" >> "$GITHUB_OUTPUT"
++          else
++            echo "active=false" >> "$GITHUB_OUTPUT"
++            echo "Fast-path SUCCESS — non-auto-fix PR (head=${{ github.head_ref }})"
++          fi
++
+       - name: Flip draft -> ready (idempotent)
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         # Pitfall D mitigation -- gh pr ready returns non-zero on already-ready
+         # PRs and has no --force flag. The defensive isDraft check makes
+         # workflow_dispatch re-runs safe.
+@@ -407,6 +455,7 @@ jobs:
+           fi
+ 
+       - name: Ensure auto-fix:verified label exists
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         # Idempotent label create (mirrors the human-review-required pattern at
+         # diff-guard:95-104 and e2e-nightly.yml:97-102). --force updates the
+         # label if it already exists; || true makes the step safe if gh rejects
+@@ -421,6 +470,7 @@ jobs:
+             --force 2>/dev/null || true
+ 
+       - name: Apply auto-fix:verified label
++        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+         # BLOCKER-01 producer step — closes the missing seam to
+         # v40-auto-promote.yml's `contains(...labels.*.name, 'auto-fix:verified')`
+         # filter (line 67). Runs UNCONDITIONALLY after ready-flip (no `if:

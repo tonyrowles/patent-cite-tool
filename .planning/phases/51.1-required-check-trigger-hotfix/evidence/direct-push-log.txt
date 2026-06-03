@@ -1,0 +1,114 @@
+=== Phase 51.1 Task 4 — direct-push log ===
+Push timestamp (UTC): 2026-06-03T16:08:00Z (approximate; see git log for exact commit times)
+
+--- PRE-PUSH origin/main SHA ---
+c0bb37d5dfeb28f7ce7901fa50e36d231d6fc6e2
+(This is the Phase 49 admin-bypass merge commit from 2026-05-xx — Phase 50, 51, and 51.1 work
+ had been local-only until this push. Plan Sub-step 4a anticipated this gap explicitly.)
+
+--- LOCAL HEAD SHA (pre-push) ---
+ea45a473cce107d532412dc53eb21785f3c0d823
+Subject: chore(51.1): T3 — fix v40-verifier-gate.yml + v40-deps-update.yml triggers (REGRESSION-51-01 closure)
+
+--- COMMIT LIST (origin/main..HEAD, 44 commits) ---
+ea45a47 chore(51.1): T3 — fix v40-verifier-gate.yml + v40-deps-update.yml triggers (REGRESSION-51-01 closure)
+583346e chore(51.1): T2 — break-glass re-add bypass actor (window OPEN)
+a5a791c chore(51.1): pre-hotfix baselines (ruleset + 2 YAML snapshots)
+cfb0951 chore(51.1): pre-flight — gitignore local extension zips so Task 1 working-tree assertion passes
+cd5fd05 docs(51.1): create phase plan + tag D-06 coverage
+c4a5769 docs(51.1): smart discuss context — Option α fast-path SUCCESS fix
+8311d37 docs(roadmap): insert Phase 51.1 hotfix (REGRESSION-51-01: required-check triggers don't fire on PRs to main)
+11c0c5d docs(51): VERIFICATION.md — gaps_found (REGRESSION-51-01 HIGH: required checks never fire on PRs to main)
+adac8ac docs(51): document Sub-step 5e literal-check deviation (6th docs commit appended after closure)
+1122334 docs(51): append SUMMARY self-check section (artifacts + commits + branch hygiene verified)
+a11afbe chore(51): final 51-01-SUMMARY + STATE.md Phase 56 pending todo + ROADMAP update
+5121c39 chore(51): document UAT-47-b STILL DEFERRED + UAT-47-d STRUCTURALLY BLOCKED (Phase 50 regression); fold all 4 UATs into one Phase 56 follow-up
+aedafa0 chore(51): UAT-47-a — auto-deferred per D-13 (UAT-47-e failed: verifier-gate trigger structurally inert on PRs into main; Phase 56 prerequisite documented)
+24b4f08 chore(51): UAT-47-e — assertion FAILURE (verifier-gate trigger bug: pull_request.branches filters BASE not HEAD); PRs #12+#13 closed; UAT-47-a auto-deferred per D-13
+3cb821a chore(51): pre-flight checks + 51-UAT-EVIDENCE.md skeleton + evidence INDEX
+417a0f0 docs(51): tag D-NN decision IDs in plan must_haves.truths (coverage gate)
+35eaba1 docs(51): create phase plan — Live Readiness UATs
+cb6caf5 docs(51): smart discuss context — scope decisions (47-a + 47-e LIVE, 47-b + 47-d STILL DEFERRED)
+26f64fc docs(50): VERIFICATION.md — passed (4/4 SCs, one non-blocking Method A deviation documented)
+0a268e2 chore(50): mark phase 50 complete (STATE + ROADMAP)
+bcaa89c chore(50): final ruleset snapshot + evidence INDEX + 50-01-SUMMARY (Phase 50 closure)
+b57d3a9 chore(50): GATE-02 — PUT bypass_actors=[] (5 rules preserved, current_user_can_bypass→never)
+d455b32 chore(50): break-glass live cycle — idempotent re-add of actor 254599900 (3 snapshots, length==1 throughout)
+fab8d2a chore(50): GATE-03 test PR cycle verifies enforcement (CLOSED)
+9c3b016 chore(50): GATE-01 PUT ruleset required_status_checks + Vitest jobid pins
+79d5415 chore(50): break-glass docs §7 + pre-patch baseline + rollback.sh
+58c26d4 docs(50): RESEARCH.md from gsd-phase-researcher (GH Rulesets API + verb correction)
+e128ced docs(50): tag D-NN decision IDs in plan must_haves.truths (coverage gate)
+12ad35b docs(50): create phase plan — six-task sequential closure of CLEANUP-04 + bypass removal
+413bced docs(50): smart discuss context
+c3ef0ea chore(49-01): mark Phase 49 plan complete in STATE + ROADMAP
+43cdf66 merge(49-01): land Phase 49 planning artifacts (evidence, scripts, INTEGRATION, SUMMARY) (worktree)
+62fd7e9 docs(49-01): write SUMMARY.md — plan complete, all 4 SCs closed, 2 inline-fix deviations documented
+49129e0 docs(49-01): Task 08 — write 49-INTEGRATION.md handoff for Phase 50
+6485167 chore(49-01): Task 07 — post-merge CI on MERGE_SHA all SUCCESS (SC-3 closed)
+d5a5bb0 chore(49-01): Task 06 — post-merge SC harness PASS (SC-1, SC-2, SC-4 + negative tests)
+187aa18 chore(49-01): Task 05 — admin-bypass merge of PR #10 landed as c0bb37d (2 parents, NOT squash)
+d8184f8 chore(49-01): Task 04 — pre-merge SC harness PASS (patched); CI 2x SUCCESS, ruleset untouched
+4d3780b chore(49-01): patch verify-phase-49.sh — three plan-spec bugs surfaced at runtime
+b868f1f chore(49-01): update env-probe.json — vitest fileParallelism fix advanced HEAD to 21ed7d9 (215 commits)
+6276751 chore(49-01): update env-probe.json — lint-fix commit advanced HEAD to c9e23c9 (214 commits)
+9c51f9e chore(49-01): Task 03 — push v4.0-integration + open integration PR #10
+56c8aa3 chore(49-01): Task 02 preflight bypass probe evidence — MERGED_THEN_REVERTED
+d76f3c4 chore(49-01): Wave-0 scaffold — verify-phase-49.sh + evidence baseline
+
+Total: 44 commits to push.
+
+--- PRE-PUSH BYPASS WINDOW STATE ---
+gh api .../rulesets/17086676 --jq '{bypass_count, can_bypass, rules_count}'
+{"bypass_count":1,"can_bypass":"always","rules_count":5}
+(Bypass window confirmed OPEN — Task 2's actor 254599900 still in place.)
+
+--- PUSH COMMAND ---
+git push origin main
+
+--- PUSH OUTPUT ---
+remote: Bypassed rule violations for refs/heads/main:
+remote:
+remote: - This branch must not contain merge commits.
+remote:   Found 1 violation:
+remote:
+remote:   43cdf66c4619fd61c124c5f1837fe3d9a34e0072
+remote:
+remote: - Changes must be made through a pull request.
+remote:
+remote: - 2 of 2 required status checks are expected.
+remote:
+To https://github.com/tonyrowles/patent-cite-tool.git
+   c0bb37d..ea45a47  main -> main
+
+(GitHub reported 3 bypassed rules: non-merge-commit (Phase 49 merge 43cdf66 carried forward
+ from the worktree wave), PR-required, and required_status_checks. All 3 were bypassed by
+ actor 254599900 — exactly the audit signal Phase 51.1 needs for the audit log. The
+ required_status_checks bypass is the existence proof that REGRESSION-51-01 is real:
+ GitHub's gate engine acknowledges "2 of 2 required status checks are expected" but there
+ are no providers for them on a PR. The YAML fix in this push closes that gap going forward.)
+
+--- POST-PUSH origin/main SHA ---
+ea45a473cce107d532412dc53eb21785f3c0d823
+
+--- ASSERTION RESULT ---
+diff /tmp/t04-local-head.txt /tmp/t04-post-remote.txt → exit 0 (MATCH-OK)
+git fetch origin main → 'main -> FETCH_HEAD' (fast-forward landed)
+git rev-parse origin/main → ea45a473cce107d532412dc53eb21785f3c0d823 (matches local HEAD)
+
+PRE-PUSH HEAD (local)  : ea45a473cce107d532412dc53eb21785f3c0d823
+POST-PUSH HEAD (origin): ea45a473cce107d532412dc53eb21785f3c0d823
+MATCH                  : YES
+
+No --force used. Fast-forward only (44 commits advanced c0bb37d → ea45a47).
+Bypass window REMAINS OPEN (Task 6 closes it).
+
+--- TASK 4 OUTCOME ---
+- Phase 49 closure commits + Phase 50 closure commits + Phase 51 closure commits + Phase 51.1 hotfix
+  Tasks 1-3 commits all landed on origin/main in one fast-forward push.
+- origin/main HEAD now carries the YAML trigger fix (.github/workflows/v40-verifier-gate.yml has
+  the BASE-ref filter removed; .github/workflows/v40-deps-update.yml has the new pull_request
+  trigger; both files carry the scope-decision fast-path step in their PR-gate jobs).
+- Task 5's verification PR can now empirically observe both required check contexts firing
+  against the post-fix YAML on origin/main.
+- REGRESSION-51-01 structural fix is now LIVE on origin/main.

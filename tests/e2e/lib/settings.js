@@ -82,7 +82,6 @@ export async function waitForPatentParsed(context, { timeoutMs = 30_000 } = {}) 
   const deadline = Date.now() + timeoutMs;
   let last = { status: 'unknown' };
   while (Date.now() < deadline) {
-    // eslint-disable-next-line no-await-in-loop
     const snap = await sw.evaluate(async () => {
       const data = await chrome.storage.local.get('currentPatent');
       const p = data.currentPatent || null;
@@ -101,7 +100,6 @@ export async function waitForPatentParsed(context, { timeoutMs = 30_000 } = {}) 
     if (snap.status === 'error' || snap.status === 'unavailable' || snap.status === 'no-text-layer') {
       throw new Error(`waitForPatentParsed: terminal status "${snap.status}" — cannot proceed`);
     }
-    // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 250));
   }
   throw new Error(

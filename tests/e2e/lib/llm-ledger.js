@@ -17,6 +17,7 @@
 //   checkSpendCap(ledger, month?)          { status, monthly_total_usd, month, message }
 //   phaseTotal(ledger, phase)              cross-month sum of cost_usd for entries with .phase===phase
 //   checkPhaseSpendCap(ledger, phase)      { status, phase_total_usd, phase, message }
+//   countFixAttempts(ledger, fingerprint)  count of Phase 42 auto-fix iterations for a given fingerprint
 //   appendLedgerEntry(ledgerPath, entry)   entry may carry an optional `phase` field (D-14 back-compat)
 //
 // Design notes:
@@ -124,10 +125,51 @@ export const PHASE_HARD_CAP_USD = 10;
 export const PHASE_WARN_THRESHOLD_USD = 8;
 
 /**
+ * Phase 39 (LEDGER-03) — per-day hard cap. Cumulative spend on a single UTC
+ * day at-or-above this threshold triggers `status: 'block'` from checkDayCap
+ * and callers MUST refuse further invocations until the next UTC day.
+ *
+ * BINARY sub-cap (NO warn threshold) per 39-CONTEXT.md lock: sub-caps are
+ * a single-bit refusal, not a warn/block ramp. The monthly cap retains the
+ * warn ramp; sub-caps are runaway-defense (Pitfall 2 — single-typo cron
+ * fan-out → 288×/day) so any partial soft state would defeat the purpose.
+ *
+ * Value $10 LOCKED by 39-CONTEXT.md ("Implementation Decisions — Cap
+ * thresholds: Sub-caps: per-day $10, per-issue $1, per-PR $2").
+ */
+export const DAY_HARD_CAP_USD = 10;
+
+/**
+ * Phase 39 (LEDGER-03) — per-issue hard cap. Cumulative spend tagged with
+ * a single `issueId` at-or-above this threshold triggers `status: 'block'`
+ * from checkIssueCap. Mirrors DAY_HARD_CAP_USD discipline (binary sub-cap,
+ * no warn ramp). Value $1 LOCKED by 39-CONTEXT.md.
+ */
+export const ISSUE_HARD_CAP_USD = 1;
+
+/**
+ * Phase 39 (LEDGER-03) — per-PR hard cap. Cumulative spend tagged with a
+ * single `prNumber` at-or-above this threshold triggers `status: 'block'`
+ * from checkPrCap. Mirrors DAY_HARD_CAP_USD discipline (binary sub-cap, no
+ * warn ramp). Value $2 LOCKED by 39-CONTEXT.md.
+ */
+export const PR_HARD_CAP_USD = 2;
+
+/**
  * @returns {string} the current month as "YYYY-MM" (UTC; ISO 8601 prefix)
  */
 export function currentMonth() {
   return new Date().toISOString().slice(0, 7);
+}
+
+/**
+ * Phase 39 (LEDGER-03) — current UTC day in YYYY-MM-DD form. Mirrors
+ * currentMonth() for the per-day sub-cap helpers (dayTotal / checkDayCap).
+ *
+ * @returns {string} "YYYY-MM-DD" (UTC; ISO 8601 date prefix)
+ */
+export function currentIsoDay() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 /**
@@ -189,6 +231,54 @@ export function phaseTotal(ledger, phase) {
     }
   }
   return +sum.toFixed(6);
+}
+
+/**
+ * Phase 42 AUTOFIX-05 — count of Phase 42 auto-fix iterations recorded against
+ * a specific issue fingerprint. Sibling of phaseTotal; same defensive-filter
+ * shape, same cross-month iteration, but returns a COUNT rather than a cost
+ * sum.
+ *
+ * Predicate: an iteration entry is counted iff
+ *   it.phase === '42-auto-fix'   AND   it.fingerprint === fingerprint
+ *
+ * Plan 42-02's scripts/auto-fix.mjs dispatcher uses this to cap auto-fix
+ * retries at 3 per fingerprint before adding the `human-review-required`
+ * label and refusing further auto-fix on that fingerprint (per 42-CONTEXT.md
+ * AUTOFIX-05 / fix_attempts decision).
+ *
+ * Defensive returns (mirror phaseTotal's null-guard pattern):
+ *   - null / undefined ledger                  → 0
+ *   - missing or non-object ledger.months      → 0
+ *   - non-string fingerprint                   → 0
+ *   - empty-string fingerprint                 → 0
+ *
+ * The non-string / empty-string fingerprint guard matters: pre-Phase-42
+ * ledger entries do NOT carry a `fingerprint` field at all. If the caller
+ * passed undefined and we did NOT guard, `entry.fingerprint === undefined`
+ * would be TRUE for every legacy entry — silently counting every Phase 31/32/34
+ * call as an auto-fix attempt and triggering the human-review escalation on
+ * the first real auto-fix.
+ *
+ * @param {object} ledger
+ * @param {string} fingerprint  e.g. 'deadbeef1234' (first 12 hex of v3.1 fp)
+ * @returns {number}  count of matching iterations across all month buckets
+ */
+export function countFixAttempts(ledger, fingerprint) {
+  if (typeof fingerprint !== 'string' || fingerprint.length === 0) return 0;
+  const months = ledger?.months;
+  if (!months || typeof months !== 'object') return 0;
+  let n = 0;
+  for (const bucket of Object.values(months)) {
+    const iterations = bucket?.iterations;
+    if (!Array.isArray(iterations)) continue;
+    for (const it of iterations) {
+      if (it && it.phase === '42-auto-fix' && it.fingerprint === fingerprint) {
+        n += 1;
+      }
+    }
+  }
+  return n;
 }
 
 /**
@@ -275,6 +365,257 @@ export function checkPhaseSpendCap(ledger, phase) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Phase 39 (LEDGER-02 / LEDGER-03) — ledger-v2 helpers (additive, pure)
+// ---------------------------------------------------------------------------
+
+/**
+ * Phase 39 (LEDGER-03) — sum of cost_usd for all iterations[] entries (across
+ * EVERY month bucket) whose `iso` field starts with the requested UTC day.
+ *
+ * Defensive filtering mirrors phaseTotal: ignores non-finite cost_usd values
+ * (NaN, undefined, null, Infinity); ignores entries where iso is not a string.
+ * Iterates every month bucket because a single UTC day MAY span two month
+ * buckets when the day is at a month boundary (e.g. 2026-05-31 vs 2026-06-01)
+ * — but more importantly because `appendLedgerEntry` always routes to
+ * `currentMonth()` from the writer's local clock, so reading by iso prefix is
+ * the source-of-truth filter.
+ *
+ * Returns 0 for missing/empty ledgers (mirrors phaseTotal). Result is rounded
+ * to 6 decimal places to avoid float drift.
+ *
+ * @param {object} ledger
+ * @param {string} [isoDay=currentIsoDay()]  e.g. "2026-05-30"
+ * @returns {number}
+ */
+export function dayTotal(ledger, isoDay = currentIsoDay()) {
+  const months = ledger?.months;
+  if (!months || typeof months !== 'object') return 0;
+  let sum = 0;
+  for (const bucket of Object.values(months)) {
+    const iterations = bucket?.iterations;
+    if (!Array.isArray(iterations)) continue;
+    for (const it of iterations) {
+      if (it && typeof it.iso === 'string' && it.iso.startsWith(isoDay)
+          && Number.isFinite(it.cost_usd)) {
+        sum += it.cost_usd;
+      }
+    }
+  }
+  return +sum.toFixed(6);
+}
+
+/**
+ * Phase 39 (LEDGER-03) — sum of cost_usd for iterations[] entries tagged with
+ * the requested `issueId`. Mirrors phaseTotal exactly in shape and defensive
+ * filtering; the only difference is the filter predicate (`it.issueId ===
+ * issueId` vs `it.phase === phase`).
+ *
+ * @param {object} ledger
+ * @param {string} issueId  e.g. "issue-123"
+ * @returns {number}
+ */
+export function issueTotal(ledger, issueId) {
+  const months = ledger?.months;
+  if (!months || typeof months !== 'object') return 0;
+  let sum = 0;
+  for (const bucket of Object.values(months)) {
+    const iterations = bucket?.iterations;
+    if (!Array.isArray(iterations)) continue;
+    for (const it of iterations) {
+      if (it && it.issueId === issueId && Number.isFinite(it.cost_usd)) {
+        sum += it.cost_usd;
+      }
+    }
+  }
+  return +sum.toFixed(6);
+}
+
+/**
+ * Phase 39 (LEDGER-03) — sum of cost_usd for iterations[] entries tagged with
+ * the requested `prNumber`. Mirrors issueTotal exactly; filter is strict ===
+ * so numeric IDs match without string coercion.
+ *
+ * @param {object} ledger
+ * @param {number} prNumber  e.g. 456
+ * @returns {number}
+ */
+export function prTotal(ledger, prNumber) {
+  const months = ledger?.months;
+  if (!months || typeof months !== 'object') return 0;
+  let sum = 0;
+  for (const bucket of Object.values(months)) {
+    const iterations = bucket?.iterations;
+    if (!Array.isArray(iterations)) continue;
+    for (const it of iterations) {
+      if (it && it.prNumber === prNumber && Number.isFinite(it.cost_usd)) {
+        sum += it.cost_usd;
+      }
+    }
+  }
+  return +sum.toFixed(6);
+}
+
+/**
+ * Phase 39 (LEDGER-03) — classify the ledger's per-day spend against the
+ * BINARY day cap. Returns `status: 'block'` when total >= DAY_HARD_CAP_USD
+ * ($10), otherwise `status: 'ok'`. NO warn state (per 39-CONTEXT lock — sub-
+ * caps are binary refusals, not warn/block ramps).
+ *
+ * Return-shape uses distinct keys (`day_total_usd` / `iso_day`) NOT
+ * `monthly_total_usd` / `month` so callers cannot accidentally mix the two
+ * views — mirrors the discipline established by checkPhaseSpendCap's
+ * `phase_total_usd` / `phase` key choice.
+ *
+ * @param {object} ledger
+ * @param {string} [isoDay=currentIsoDay()]
+ * @returns {{ status: 'ok'|'block', day_total_usd: number, iso_day: string, message: string }}
+ */
+export function checkDayCap(ledger, isoDay = currentIsoDay()) {
+  const total = dayTotal(ledger, isoDay);
+  if (total >= DAY_HARD_CAP_USD) {
+    return {
+      status: 'block',
+      day_total_usd: total,
+      iso_day: isoDay,
+      message:
+        `Day ${isoDay} LLM spend $${total.toFixed(2)} >= $${DAY_HARD_CAP_USD.toFixed(2)}. ` +
+        `Refusing further invocations until next UTC day.`,
+    };
+  }
+  return {
+    status: 'ok',
+    day_total_usd: total,
+    iso_day: isoDay,
+    message: '',
+  };
+}
+
+/**
+ * Phase 39 (LEDGER-03) — classify the ledger's per-issue spend against the
+ * BINARY issue cap. Mirrors checkDayCap shape; uses `issue_total_usd` and
+ * `issue_id` keys.
+ *
+ * @param {object} ledger
+ * @param {string} issueId
+ * @returns {{ status: 'ok'|'block', issue_total_usd: number, issue_id: string, message: string }}
+ */
+export function checkIssueCap(ledger, issueId) {
+  const total = issueTotal(ledger, issueId);
+  if (total >= ISSUE_HARD_CAP_USD) {
+    return {
+      status: 'block',
+      issue_total_usd: total,
+      issue_id: issueId,
+      message:
+        `Issue ${issueId} LLM spend $${total.toFixed(2)} >= $${ISSUE_HARD_CAP_USD.toFixed(2)}. ` +
+        `Refusing further invocations for this issue.`,
+    };
+  }
+  return {
+    status: 'ok',
+    issue_total_usd: total,
+    issue_id: issueId,
+    message: '',
+  };
+}
+
+/**
+ * Phase 39 (LEDGER-03) — classify the ledger's per-PR spend against the
+ * BINARY PR cap. Mirrors checkDayCap shape; uses `pr_total_usd` and
+ * `pr_number` keys.
+ *
+ * @param {object} ledger
+ * @param {number} prNumber
+ * @returns {{ status: 'ok'|'block', pr_total_usd: number, pr_number: number, message: string }}
+ */
+export function checkPrCap(ledger, prNumber) {
+  const total = prTotal(ledger, prNumber);
+  if (total >= PR_HARD_CAP_USD) {
+    return {
+      status: 'block',
+      pr_total_usd: total,
+      pr_number: prNumber,
+      message:
+        `PR #${prNumber} LLM spend $${total.toFixed(2)} >= $${PR_HARD_CAP_USD.toFixed(2)}. ` +
+        `Refusing further invocations for this PR.`,
+    };
+  }
+  return {
+    status: 'ok',
+    pr_total_usd: total,
+    pr_number: prNumber,
+    message: '',
+  };
+}
+
+/**
+ * Phase 39 (LEDGER-02) — combined cross-transport monthly total. Since the
+ * single committed LEDGER_PATH is shared by BOTH transports (subscription
+ * and sdk — Phase 39 design constraint per 39-CONTEXT.md), the bucket's
+ * `total_usd` already reflects the combined sum and this helper is presently
+ * identical to monthlyTotal().
+ *
+ * The wrapper exists to (a) signal cap-check intent to readers ("this is the
+ * unified-cap reader") and (b) reserve a hook for future per-transport
+ * breakdown if the schema ever splits.
+ *
+ * @param {object} ledger
+ * @param {string} [month=currentMonth()]
+ * @returns {number}
+ */
+export function combinedMonthlyTotal(ledger, month = currentMonth()) {
+  return monthlyTotal(ledger, month);
+}
+
+/**
+ * Phase 39 (LEDGER-02) — combined monthly total with per-transport breakdown.
+ * Walks iterations[] and partitions cost_usd by entry.transport, returning
+ * the original combined total alongside the breakdown for forensic audit.
+ *
+ * Transport classification (per 39-RESEARCH.md A8 — back-compat default):
+ *   - `'sdk'`           → bucket `sdk`
+ *   - `'subscription'`  → bucket `subscription`
+ *   - absent / missing  → bucket `subscription` (pre-Phase-39 entries were
+ *                          all subscription transport; back-compat default)
+ *   - any other string  → bucket `unknown` (audit-visible without corrupting
+ *                          the combined sum)
+ *
+ * Returns 0/empty breakdown for missing months. Each per-transport sum is
+ * rounded to 6 decimal places (matches the float-drift discipline in
+ * monthlyTotal / appendLedgerEntry / phaseTotal).
+ *
+ * @param {object} ledger
+ * @param {string} [month=currentMonth()]
+ * @returns {{ combined: number, by_transport: { subscription: number, sdk: number, unknown: number } }}
+ */
+export function combinedMonthlyTotalByTransport(ledger, month = currentMonth()) {
+  const bucket = ledger?.months?.[month];
+  const out = {
+    combined: bucket?.total_usd ?? 0,
+    by_transport: { subscription: 0, sdk: 0, unknown: 0 },
+  };
+  const iterations = Array.isArray(bucket?.iterations) ? bucket.iterations : [];
+  for (const it of iterations) {
+    if (!it || !Number.isFinite(it.cost_usd)) continue;
+    let key;
+    if (it.transport === 'sdk') {
+      key = 'sdk';
+    } else if (it.transport === 'subscription' || it.transport === undefined || it.transport === null) {
+      // Back-compat default per A8: pre-Phase-39 entries without `transport`
+      // are subscription. Explicit 'subscription' also maps here.
+      key = 'subscription';
+    } else {
+      key = 'unknown';
+    }
+    out.by_transport[key] += it.cost_usd;
+  }
+  for (const k of Object.keys(out.by_transport)) {
+    out.by_transport[k] = +out.by_transport[k].toFixed(6);
+  }
+  return out;
+}
+
 /**
  * Append a single iteration entry to the ledger. Reads the current ledger
  * (or initializes an empty one), creates the current-month bucket if
@@ -314,6 +655,33 @@ export function checkPhaseSpendCap(ledger, phase) {
  *   spread through to iterations[] verbatim — legacy callers that omit
  *   `phase` continue to produce valid entries; new callers may set
  *   `phase: '32'` / `'34'` / etc. to feed phaseTotal / checkPhaseSpendCap.
+ *
+ *   Phase 39 (LEDGER-01) additive optional fields — NO function-body change
+ *   required because the `m.iterations.push(entry)` call at the bottom of
+ *   this function already spreads the entry verbatim. Documented here so
+ *   readers don't have to grep callers to discover the shape:
+ *
+ *     transport?:               'subscription' | 'sdk'
+ *       Distinguishes the two cost-bearing transports added in v4.0.
+ *       Absent entries default to 'subscription' in
+ *       combinedMonthlyTotalByTransport (back-compat per 39-RESEARCH.md A8).
+ *
+ *     issueId?:                 string
+ *       e.g. 'issue-123' — fed to issueTotal / checkIssueCap for the
+ *       per-issue $1 sub-cap (LEDGER-03).
+ *
+ *     prNumber?:                number
+ *       e.g. 456 — fed to prTotal / checkPrCap for the per-PR $2 sub-cap
+ *       (LEDGER-03). Strict-=== matching, no string coercion.
+ *
+ *     cache_creation_tokens?:   number
+ *     cache_read_tokens?:       number
+ *       SDK-path-only token-usage breakdowns from the Anthropic SDK response
+ *       (subscription / claude -p path doesn't expose these distinctly).
+ *
+ *     error?:                   string
+ *       Free-form short error message recorded by invokeAnthropicSdkWithLedger
+ *       when the SDK call throws — truncated to ~200 chars by the caller.
  */
 export function appendLedgerEntry(ledgerPath, entry) {
   const ledger = readLedger(ledgerPath);

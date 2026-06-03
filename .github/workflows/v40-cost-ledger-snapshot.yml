@@ -1,0 +1,91 @@
+# .github/workflows/v40-cost-ledger-snapshot.yml
+#
+# Phase 40 Plan 40-01 (Phase 40 deliverable #5 per 40-CONTEXT.md line 17).
+#
+# Daily 02:00 UTC snapshot of tests/e2e/.llm-spend-ledger.json. Lands well
+# before e2e-weekly-digest's Monday 07:00 slot. Mirrors e2e-weekly-digest.yml
+# lines 98-110 [skip ci] commit pattern VERBATIM (byte-identical modulo the
+# git add path + commit message — enforced by S13 test gate).
+#
+# [skip ci] in the commit message is LOAD-BEARING — prevents this bot push
+# from re-triggering ci.yml, which runs on push to the default branch. Without
+# it, every daily snapshot commit would queue a full CI run (threat T-40-01-02).
+#
+# Security note — contents: write is the ONLY required permission. This is a
+# single-file commit workflow; it does NOT touch issues, pull-requests, or
+# discussions. Least-privilege per threat-model T-40-01-05.
+
+name: V40 Cost Ledger Snapshot
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # Daily 02:00 UTC — 40-CONTEXT.md line 34
+  workflow_dispatch: {}    # Manual trigger for testing
+
+# Static concurrency group prevents schedule + workflow_dispatch from racing.
+# cancel-in-progress: false so a running snapshot is never killed by a new trigger.
+concurrency:
+  group: v40-cost-ledger-snapshot
+  cancel-in-progress: false
+
+permissions:
+  contents: write     # commit-in-run: git push tests/e2e/.llm-spend-ledger.json
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        # Default persist-credentials: true lets the GITHUB_TOKEN push under
+        # contents: write — no PAT needed for commit-in-run.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Capture snapshot summary for commit message
+        # Reads tests/e2e/lib/llm-ledger.js to compute today's invocation count
+        # + total spend. Mirrors e2e-weekly-digest.yml:85-96 env-var hop via
+        # $GITHUB_ENV (CWE-94 defense — value never interpolated into shell).
+        run: |
+          node -e "
+            import('./tests/e2e/lib/llm-ledger.js').then(m => {
+              const fs = require('node:fs');
+              const ledger = m.readLedger();
+              const isoDay = m.currentIsoDay();
+              const invocations = (ledger.months[m.currentMonth()]?.iterations || [])
+                .filter(it => it.iso?.startsWith(isoDay)).length;
+              const spend = m.dayTotal(ledger, isoDay).toFixed(2);
+              fs.appendFileSync(process.env.GITHUB_ENV, 'SNAPSHOT_DATE=' + isoDay + '\n');
+              fs.appendFileSync(process.env.GITHUB_ENV, 'INVOCATIONS=' + invocations + '\n');
+              fs.appendFileSync(process.env.GITHUB_ENV, 'SPEND_USD=' + spend + '\n');
+            });
+          "
+
+      - name: Regenerate ledger dashboard
+        # Phase 46 Plan 02 — regenerate docs/v40-ledger-dashboard.md from
+        # the just-snapshotted ledger so both files commit atomically in
+        # the next step. Read-only against the ledger; deterministic
+        # output for an unchanged ledger (the Generated: field is derived
+        # from the ledger's max iso, not the wall clock — RESEARCH Pitfall 2).
+        run: |
+          node scripts/build-ledger-dashboard.mjs --output docs/v40-ledger-dashboard.md
+
+      - name: Commit daily ledger snapshot
+        # [skip ci] is LOAD-BEARING — prevents this bot push from re-triggering
+        # ci.yml. Mirrors e2e-weekly-digest.yml:98-110 VERBATIM (byte-identical
+        # modulo the git add path + commit message; S13 test gate enforces this).
+        # Idempotent guard pattern below: no-op if the ledger is unchanged.
+        # \$ (escaped dollar) prevents YAML from treating $${{...}} as a shell var;
+        # the literal $ in the commit message reads as "$0.47 spent".
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/e2e/.llm-spend-ledger.json docs/v40-ledger-dashboard.md
+          git diff --cached --quiet || git commit -m "[skip ci] ledger snapshot ${{ env.SNAPSHOT_DATE }}: ${{ env.INVOCATIONS }} invocations, \$${{ env.SPEND_USD }} spent"
+          git push

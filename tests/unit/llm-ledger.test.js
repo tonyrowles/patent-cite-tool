@@ -72,6 +72,23 @@ import {
   PHASE_HARD_CAP_USD,
   PHASE_WARN_THRESHOLD_USD,
   LEDGER_PATH,
+  // Phase 39 LEDGER-01/02/03 additions
+  DAY_HARD_CAP_USD,
+  ISSUE_HARD_CAP_USD,
+  PR_HARD_CAP_USD,
+  currentIsoDay,
+  dayTotal,
+  issueTotal,
+  prTotal,
+  checkDayCap,
+  checkIssueCap,
+  checkPrCap,
+  combinedMonthlyTotal,
+  combinedMonthlyTotalByTransport,
+  // Phase 42 AUTOFIX-05 — count of Phase 42 auto-fix iterations for a given
+  // fingerprint. Sibling of phaseTotal; consumed by Plan 42-02 dispatcher to
+  // cap retries at 3 before adding the `human-review-required` label.
+  countFixAttempts,
 } from '../e2e/lib/llm-ledger.js';
 
 let tmpDir;
@@ -672,5 +689,518 @@ describe('Phase 32 — per-phase ledger helpers (D-13/D-14/D-15/D-16)', () => {
     expect(fs.existsSync(ledgerPath2)).toBe(true);
     const r = readLedger(ledgerPath2);
     expect(r).toEqual({ version: 1, months: {} });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 39 — ledger-v2: transport field + combined monthly total + binary
+// per-day / per-issue / per-PR sub-caps (LEDGER-01 / LEDGER-02 / LEDGER-03)
+// ---------------------------------------------------------------------------
+//
+// Phase 39 coverage map (Tests 34–47, per 39-01-PLAN.md Task 3):
+//   34. appendLedgerEntry with transport:'sdk' persists the field
+//   35. appendLedgerEntry with transport:'subscription' persists the field
+//   36. appendLedgerEntry without transport stores no transport property
+//       (LEDGER-01 back-compat: pre-Phase-39 callers still produce valid
+//       entries, 'transport' key MUST NOT appear in iterations[0])
+//   37. appendLedgerEntry round-trips all five new optional fields together
+//       (issueId / prNumber / cache_creation_tokens / cache_read_tokens / error)
+//   38. combinedMonthlyTotal + combinedMonthlyTotalByTransport on empty ledger
+//   39. combinedMonthlyTotal + combinedMonthlyTotalByTransport on mixed sub+sdk
+//   40. combinedMonthlyTotalByTransport default 'subscription' for missing
+//       transport field (39-RESEARCH A8 back-compat)
+//   41. combinedMonthlyTotalByTransport buckets unrecognized transport tags
+//       under 'unknown' (preserves combined sum integrity)
+//   42. checkDayCap returns ok when day total $5.00
+//   43. checkDayCap blocks at exactly $10.00 inclusive (binary cap boundary)
+//   44. checkDayCap filters by isoDay (UTC day boundary across month edge)
+//   45. checkIssueCap blocks at exactly $1.00 inclusive; return shape uses
+//       issue_total_usd + issue_id keys (NOT cost_usd / id)
+//   46. checkIssueCap ignores entries from other issueIds
+//   47. checkPrCap blocks at exactly $2.00 inclusive; return shape uses
+//       pr_total_usd + pr_number keys
+
+describe('Phase 39 LEDGER-01: appendLedgerEntry transport + ledger-v2 fields (additive)', () => {
+  let tmpDir39a;
+  let ledgerPath39a;
+
+  beforeEach(() => {
+    tmpDir39a = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-ledger-phase39a-'));
+    ledgerPath39a = path.join(tmpDir39a, '.llm-spend-ledger.json');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir39a, { recursive: true, force: true });
+  });
+
+  it("Test 34: appendLedgerEntry with transport:'sdk' persists the field through to iterations[]", () => {
+    appendLedgerEntry(ledgerPath39a, makeEntry({ cost_usd: 0.10, transport: 'sdk' }));
+    const written = JSON.parse(fs.readFileSync(ledgerPath39a, 'utf8'));
+    const month = currentMonth();
+    expect(written.months[month].iterations).toHaveLength(1);
+    expect(written.months[month].iterations[0].transport).toBe('sdk');
+    // readLedger should also round-trip the field.
+    const r = readLedger(ledgerPath39a);
+    expect(r.months[month].iterations[0].transport).toBe('sdk');
+  });
+
+  it("Test 35: appendLedgerEntry with transport:'subscription' persists the field", () => {
+    appendLedgerEntry(ledgerPath39a, makeEntry({ cost_usd: 0.20, transport: 'subscription' }));
+    const r = readLedger(ledgerPath39a);
+    const month = currentMonth();
+    expect(r.months[month].iterations[0].transport).toBe('subscription');
+  });
+
+  it("Test 36: appendLedgerEntry without transport stores no transport property (LEDGER-01 back-compat)", () => {
+    const entry = makeEntry({ cost_usd: 0.30 });
+    expect(entry.transport).toBeUndefined();
+    appendLedgerEntry(ledgerPath39a, entry);
+    const r = readLedger(ledgerPath39a);
+    const month = currentMonth();
+    const it0 = r.months[month].iterations[0];
+    // The key MUST NOT appear at all (not even as 'transport: undefined') so
+    // pre-Phase-39 entries on disk remain byte-for-byte identical after
+    // round-trip. JSON.stringify drops undefined values, so the on-disk shape
+    // is checked indirectly via `'transport' in it0`.
+    expect('transport' in it0).toBe(false);
+    // Spot-check pre-existing legacy fields survived intact.
+    expect(it0.cost_usd).toBe(0.30);
+    expect(it0.iteration_n).toBe(1);
+  });
+
+  it("Test 37: appendLedgerEntry round-trips all 5 new optional fields together", () => {
+    const entry = makeEntry({
+      cost_usd: 0.40,
+      transport: 'sdk',
+      issueId: 'issue-42',
+      prNumber: 7,
+      cache_creation_tokens: 100,
+      cache_read_tokens: 200,
+      error: 'sdk timeout',
+    });
+    appendLedgerEntry(ledgerPath39a, entry);
+    const r = readLedger(ledgerPath39a);
+    const it0 = r.months[currentMonth()].iterations[0];
+    expect(it0.transport).toBe('sdk');
+    expect(it0.issueId).toBe('issue-42');
+    expect(it0.prNumber).toBe(7);
+    expect(it0.cache_creation_tokens).toBe(100);
+    expect(it0.cache_read_tokens).toBe(200);
+    expect(it0.error).toBe('sdk timeout');
+    // Spread MUST also preserve pre-existing fields.
+    expect(it0.cost_usd).toBe(0.40);
+    expect(it0.model).toBe('claude-opus-4-7[1m]');
+  });
+});
+
+describe('Phase 39 LEDGER-02: combinedMonthlyTotal + combinedMonthlyTotalByTransport', () => {
+  let tmpDir39b;
+  let ledgerPath39b;
+
+  beforeEach(() => {
+    tmpDir39b = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-ledger-phase39b-'));
+    ledgerPath39b = path.join(tmpDir39b, '.llm-spend-ledger.json');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir39b, { recursive: true, force: true });
+  });
+
+  it('Test 38: empty ledger → combinedMonthlyTotal=0; by_transport all zero', () => {
+    const empty = { version: 1, months: {} };
+    expect(combinedMonthlyTotal(empty)).toBe(0);
+    const t = combinedMonthlyTotalByTransport(empty);
+    expect(t).toEqual({
+      combined: 0,
+      by_transport: { subscription: 0, sdk: 0, unknown: 0 },
+    });
+  });
+
+  it('Test 39: one subscription + one sdk entry → combined 1.25; by_transport partitions correctly', () => {
+    // Two appends to the same month bucket; first subscription $0.50, then sdk $0.75.
+    appendLedgerEntry(ledgerPath39b, makeEntry({ cost_usd: 0.50, transport: 'subscription' }));
+    appendLedgerEntry(ledgerPath39b, makeEntry({ cost_usd: 0.75, transport: 'sdk', iteration_n: 2 }));
+    const ledger = readLedger(ledgerPath39b);
+
+    expect(combinedMonthlyTotal(ledger)).toBe(1.25);
+    const t = combinedMonthlyTotalByTransport(ledger);
+    expect(t.combined).toBe(1.25);
+    expect(t.by_transport).toEqual({ subscription: 0.5, sdk: 0.75, unknown: 0 });
+  });
+
+  it("Test 40: entry without transport → bucketed under 'subscription' (39-RESEARCH A8 back-compat)", () => {
+    appendLedgerEntry(ledgerPath39b, makeEntry({ cost_usd: 0.30 })); // no transport
+    const ledger = readLedger(ledgerPath39b);
+    expect(combinedMonthlyTotal(ledger)).toBe(0.3);
+    const t = combinedMonthlyTotalByTransport(ledger);
+    expect(t.combined).toBe(0.3);
+    expect(t.by_transport).toEqual({ subscription: 0.3, sdk: 0, unknown: 0 });
+  });
+
+  it("Test 41: entry with transport:'mystery' → bucketed under 'unknown'", () => {
+    appendLedgerEntry(ledgerPath39b, makeEntry({ cost_usd: 0.42, transport: 'mystery' }));
+    const ledger = readLedger(ledgerPath39b);
+    const t = combinedMonthlyTotalByTransport(ledger);
+    expect(t.by_transport).toEqual({ subscription: 0, sdk: 0, unknown: 0.42 });
+    // Combined total still equals the bucket's total_usd (audit-visible without
+    // corrupting the cap-check view).
+    expect(t.combined).toBe(0.42);
+  });
+});
+
+describe('Phase 39 LEDGER-03: checkDayCap binary boundary at $10.00', () => {
+  let tmpDir39c;
+  let ledgerPath39c;
+
+  beforeEach(() => {
+    tmpDir39c = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-ledger-phase39c-'));
+    ledgerPath39c = path.join(tmpDir39c, '.llm-spend-ledger.json');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir39c, { recursive: true, force: true });
+  });
+
+  it('Test 42: checkDayCap returns ok when day total $5.00', () => {
+    appendLedgerEntry(ledgerPath39c, makeEntry({ cost_usd: 5.0, iso: '2026-05-30T10:00:00Z' }));
+    const r = checkDayCap(readLedger(ledgerPath39c), '2026-05-30');
+    expect(r.status).toBe('ok');
+    expect(r.day_total_usd).toBe(5);
+    expect(r.iso_day).toBe('2026-05-30');
+    expect(r.message).toBe('');
+  });
+
+  it('Test 43: checkDayCap blocks at exactly $10.00 inclusive (binary boundary)', () => {
+    appendLedgerEntry(ledgerPath39c, makeEntry({ cost_usd: 10.0, iso: '2026-05-30T10:00:00Z' }));
+    const r = checkDayCap(readLedger(ledgerPath39c), '2026-05-30');
+    expect(r.status).toBe('block');
+    expect(r.day_total_usd).toBe(10);
+    expect(r.iso_day).toBe('2026-05-30');
+    expect(r.message).toContain('$10.00');
+    expect(r.message).toContain('Refusing');
+    expect(r.message).toContain('2026-05-30');
+  });
+
+  it('Test 44: checkDayCap filters entries by isoDay (UTC day boundary across month edge)', () => {
+    // Direct write across two months to exercise the cross-month iteration path
+    // (appendLedgerEntry routes to currentMonth() which we cannot manipulate
+    // mid-test). Mirrors the seedLedgerFile pattern from Phase 32 Tests 22-30.
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1,
+          total_usd: 5.0,
+          last_invocation_iso: '2026-05-29T23:59:00Z',
+          iterations: [
+            { iso: '2026-05-29T23:59:00Z', cost_usd: 5.0, model: 'claude-sonnet-4-6' },
+          ],
+        },
+        '2026-06': {
+          invocations: 1,
+          total_usd: 5.0,
+          last_invocation_iso: '2026-05-30T00:00:00Z',
+          iterations: [
+            // Bucketed under 2026-06 but iso is on 2026-05-30 (writer's
+            // currentMonth() differs from the iso's day — possible in narrow
+            // clock-skew windows; the filter MUST trust iso, not the bucket).
+            { iso: '2026-05-30T00:00:00Z', cost_usd: 5.0, model: 'claude-sonnet-4-6' },
+          ],
+        },
+      },
+    };
+    // Day 2026-05-30 has $5.00 (from the 2026-06 bucket — bucket-key
+    // independent because dayTotal filters on iso prefix).
+    expect(checkDayCap(ledger, '2026-05-30').day_total_usd).toBe(5);
+    expect(checkDayCap(ledger, '2026-05-30').status).toBe('ok');
+    // Day 2026-05-29 has the other $5.00.
+    expect(checkDayCap(ledger, '2026-05-29').day_total_usd).toBe(5);
+  });
+});
+
+describe('Phase 39 LEDGER-03: checkIssueCap and checkPrCap binary boundaries', () => {
+  let tmpDir39d;
+  let ledgerPath39d;
+
+  beforeEach(() => {
+    tmpDir39d = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-ledger-phase39d-'));
+    ledgerPath39d = path.join(tmpDir39d, '.llm-spend-ledger.json');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir39d, { recursive: true, force: true });
+  });
+
+  it('Test 45: checkIssueCap blocks at exactly $1.00 inclusive; return shape uses issue_total_usd + issue_id', () => {
+    appendLedgerEntry(ledgerPath39d, makeEntry({ cost_usd: 1.0, issueId: 'issue-99' }));
+    const r = checkIssueCap(readLedger(ledgerPath39d), 'issue-99');
+    expect(r.status).toBe('block');
+    expect(r.issue_total_usd).toBe(1);
+    expect(r.issue_id).toBe('issue-99');
+    expect(r.message).toContain('issue-99');
+    expect(r.message).toContain('$1.00');
+    // Discipline mirror at llm-ledger.js:240 — keys MUST be issue-scoped,
+    // never cost_usd / id.
+    expect(r.cost_usd).toBeUndefined();
+    expect(r.id).toBeUndefined();
+    // Negative discipline: also MUST NOT use day/PR/monthly key names.
+    expect(r.day_total_usd).toBeUndefined();
+    expect(r.pr_total_usd).toBeUndefined();
+    expect(r.monthly_total_usd).toBeUndefined();
+  });
+
+  it('Test 46: checkIssueCap ignores entries from other issueIds', () => {
+    appendLedgerEntry(ledgerPath39d, makeEntry({ cost_usd: 0.99, issueId: 'issue-1', iteration_n: 1 }));
+    appendLedgerEntry(ledgerPath39d, makeEntry({ cost_usd: 0.99, issueId: 'issue-2', iteration_n: 2 }));
+    const r1 = checkIssueCap(readLedger(ledgerPath39d), 'issue-1');
+    expect(r1.status).toBe('ok');
+    expect(r1.issue_total_usd).toBe(0.99);
+    // Sanity: issue-2 is also ok individually.
+    const r2 = checkIssueCap(readLedger(ledgerPath39d), 'issue-2');
+    expect(r2.status).toBe('ok');
+    expect(r2.issue_total_usd).toBe(0.99);
+  });
+
+  it('Test 47: checkPrCap blocks at exactly $2.00 inclusive; return shape uses pr_total_usd + pr_number', () => {
+    appendLedgerEntry(ledgerPath39d, makeEntry({ cost_usd: 1.0, prNumber: 123, iteration_n: 1 }));
+    appendLedgerEntry(ledgerPath39d, makeEntry({ cost_usd: 1.0, prNumber: 123, iteration_n: 2 }));
+    const r = checkPrCap(readLedger(ledgerPath39d), 123);
+    expect(r.status).toBe('block');
+    expect(r.pr_total_usd).toBe(2);
+    expect(r.pr_number).toBe(123);
+    expect(r.message).toContain('#123');
+    expect(r.message).toContain('$2.00');
+    // Discipline mirror — keys MUST be PR-scoped, never bleed into other views.
+    expect(r.cost_usd).toBeUndefined();
+    expect(r.day_total_usd).toBeUndefined();
+    expect(r.issue_total_usd).toBeUndefined();
+    expect(r.monthly_total_usd).toBeUndefined();
+  });
+
+  it('Sanity: exported sub-cap constants DAY_HARD_CAP_USD=10, ISSUE_HARD_CAP_USD=1, PR_HARD_CAP_USD=2', () => {
+    expect(DAY_HARD_CAP_USD).toBe(10);
+    expect(ISSUE_HARD_CAP_USD).toBe(1);
+    expect(PR_HARD_CAP_USD).toBe(2);
+    // currentIsoDay() shape sanity (also exercises an unused-import lint guard).
+    expect(currentIsoDay()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // dayTotal / issueTotal / prTotal exported (smoke).
+    expect(dayTotal({}, '2026-05-30')).toBe(0);
+    expect(issueTotal({}, 'issue-x')).toBe(0);
+    expect(prTotal({}, 999)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 39 LEDGER-04 — committed-ledger schema + .gitignore flip guards.
+// Reads the REAL on-disk artifacts (NOT a tmpDir copy) — these are
+// integration-shaped checks that the commit landing matches the contract.
+// ---------------------------------------------------------------------------
+describe('Phase 39 LEDGER-04: committed ledger flip', () => {
+  it('Test 48: committed tests/e2e/.llm-spend-ledger.json is valid v1 with bootstrap entry', () => {
+    const REAL_LEDGER_PATH = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..',
+      'e2e',
+      '.llm-spend-ledger.json',
+    );
+    expect(fs.existsSync(REAL_LEDGER_PATH)).toBe(true);
+    const text = fs.readFileSync(REAL_LEDGER_PATH, 'utf8');
+    const j = JSON.parse(text);
+    expect(j.version).toBe(1);
+    // Exactly one bootstrap entry — fresh-start per CONTEXT seed policy.
+    const months = Object.keys(j.months);
+    expect(months.length).toBe(1);
+    const bucket = j.months[months[0]];
+    expect(bucket.invocations).toBe(1);
+    expect(bucket.total_usd).toBe(0);
+    expect(bucket.iterations.length).toBe(1);
+    const it = bucket.iterations[0];
+    expect(it.phase).toBe('39-bootstrap');
+    expect(it.transport).toBe('sdk');
+    expect(it.cost_usd).toBe(0);
+    expect(it.source).toBe('phase-39-flip');
+    expect(it.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('Test 49: .gitignore does NOT contain tests/e2e/.llm-spend-ledger.json (LEDGER-04 commitment)', () => {
+    const REPO_ROOT = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+    );
+    const gitignore = fs.readFileSync(path.join(REPO_ROOT, '.gitignore'), 'utf8');
+    expect(gitignore).not.toContain('tests/e2e/.llm-spend-ledger.json');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 42 AUTOFIX-05 — countFixAttempts(ledger, fingerprint) helper
+//
+// Sibling of phaseTotal — same defensive-filter shape, same cross-month
+// iteration. Filters iterations where:
+//   it.phase === '42-auto-fix'  AND  it.fingerprint === fingerprint
+// and returns the COUNT (not the cost sum — that's phaseTotal's job).
+//
+// Plan 42-02's scripts/auto-fix.mjs dispatcher imports this to cap
+// auto-fix retries at 3 per fingerprint before adding the
+// `human-review-required` label and refusing further auto-fix on that
+// fingerprint (per CONTEXT D-AUTOFIX-05).
+//
+// Defensive: returns 0 on null/undefined ledger; on non-string or empty
+// fingerprint; on missing months object. Mirrors phaseTotal's null-guard
+// pattern exactly.
+// ---------------------------------------------------------------------------
+
+describe('Phase 42 AUTOFIX-05: countFixAttempts(ledger, fingerprint)', () => {
+  const FP = 'deadbeef1234';
+  const OTHER_FP = 'cafebabe5678';
+
+  it('Test 50: empty/missing ledger → returns 0', () => {
+    expect(countFixAttempts({}, FP)).toBe(0);
+    expect(countFixAttempts({ months: {} }, FP)).toBe(0);
+    expect(countFixAttempts(null, FP)).toBe(0);
+    expect(countFixAttempts(undefined, FP)).toBe(0);
+  });
+
+  it('Test 51: ledger with no phase=42-auto-fix entries → returns 0', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 1,
+          total_usd: 0.5,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            // Phase 32 entry, NOT 42-auto-fix → ignored.
+            { iso: '2026-05-18T00:00:00.000Z', cost_usd: 0.5, phase: '32', fingerprint: FP },
+            // Phase 39 entry → ignored.
+            { iso: '2026-05-19T00:00:00.000Z', cost_usd: 0.1, phase: '39', fingerprint: FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(0);
+  });
+
+  it('Test 52: 3 matching entries in a single month → returns 3', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 3,
+          total_usd: 0.30,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            { iso: 'a', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'b', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'c', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(3);
+  });
+
+  it('Test 53: matches across MULTIPLE months (2 in month A + 1 in month B) → returns 3', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-04': {
+          invocations: 2,
+          total_usd: 0.20,
+          last_invocation_iso: '2026-04-29T00:00:00.000Z',
+          iterations: [
+            { iso: '2026-04-28T00:00:00.000Z', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: '2026-04-29T00:00:00.000Z', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+          ],
+        },
+        '2026-05': {
+          invocations: 1,
+          total_usd: 0.10,
+          last_invocation_iso: '2026-05-02T00:00:00.000Z',
+          iterations: [
+            { iso: '2026-05-02T00:00:00.000Z', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(3);
+  });
+
+  it('Test 54: mixed — 5 phase=42-auto-fix entries but only 2 match the requested fingerprint → returns 2', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 5,
+          total_usd: 0.50,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            { iso: 'a', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'b', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: OTHER_FP },
+            { iso: 'c', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: OTHER_FP },
+            { iso: 'd', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            { iso: 'e', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: OTHER_FP },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, FP)).toBe(2);
+    expect(countFixAttempts(ledger, OTHER_FP)).toBe(3);
+  });
+
+  it('Test 55: defensive — non-string/empty fingerprint → returns 0; missing fingerprint field → ignored', () => {
+    const ledger = {
+      version: 1,
+      months: {
+        '2026-05': {
+          invocations: 2,
+          total_usd: 0.20,
+          last_invocation_iso: '2026-05-18T00:00:00.000Z',
+          iterations: [
+            { iso: 'a', cost_usd: 0.10, phase: '42-auto-fix', fingerprint: FP },
+            // Entry with NO fingerprint field — must NOT count even when caller
+            // passes undefined (otherwise `undefined === undefined` collapses).
+            { iso: 'b', cost_usd: 0.10, phase: '42-auto-fix' },
+          ],
+        },
+      },
+    };
+    expect(countFixAttempts(ledger, null)).toBe(0);
+    expect(countFixAttempts(ledger, undefined)).toBe(0);
+    expect(countFixAttempts(ledger, '')).toBe(0);
+    expect(countFixAttempts(ledger, 12345)).toBe(0);
+    expect(countFixAttempts(ledger, {})).toBe(0);
+    // Sanity: with a valid fingerprint the legitimate entry is found.
+    expect(countFixAttempts(ledger, FP)).toBe(1);
+  });
+
+  it('Test 56: round-trip with appendLedgerEntry — write 3 entries, read back, count = 3', () => {
+    // Exercises the canonical write path (Plan 42-02 dispatcher will use the
+    // same appendLedgerEntry call) and proves countFixAttempts reads them
+    // correctly. tmpDir-per-test pattern keeps the real on-disk ledger pristine.
+    appendLedgerEntry(ledgerPath, makeEntry({
+      cost_usd: 0.05,
+      phase: '42-auto-fix',
+      fingerprint: FP,
+      iteration_n: 1,
+    }));
+    appendLedgerEntry(ledgerPath, makeEntry({
+      cost_usd: 0.05,
+      phase: '42-auto-fix',
+      fingerprint: FP,
+      iteration_n: 2,
+    }));
+    appendLedgerEntry(ledgerPath, makeEntry({
+      cost_usd: 0.05,
+      phase: '42-auto-fix',
+      fingerprint: FP,
+      iteration_n: 3,
+    }));
+
+    const written = readLedger(ledgerPath);
+    expect(countFixAttempts(written, FP)).toBe(3);
+    // Cross-fingerprint isolation.
+    expect(countFixAttempts(written, OTHER_FP)).toBe(0);
   });
 });

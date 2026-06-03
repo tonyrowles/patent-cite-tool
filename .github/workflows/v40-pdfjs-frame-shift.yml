@@ -1,0 +1,200 @@
+# .github/workflows/v40-pdfjs-frame-shift.yml
+#
+# Phase 40 Plan 40-04 (DEPS-04 / Pitfall 6 defense) — Verifier-frozen
+# pre-flight workflow.
+#
+# Per 40-CONTEXT locked decision #3: this is a SEPARATE workflow file
+# (NOT inlined in v40-deps-update.yml). It runs ONLY on PRs that bump
+# pdfjs-dist, and the gate is the manually-applied `auto-fix:pdfjs-bump`
+# label. For Phase 40, label-apply is HUMAN-driven by the codeowned
+# reviewer of a v40-deps-update/pdfjs-dist-* PR. Future phases automate
+# the label via a separate PR-open listener workflow.
+#
+# Goal: when the candidate PR bumps `devDependencies.pdfjs-dist` from vX
+# to vY, run the regression suite TWICE on the same PR branch — first
+# with the verifier loading the OLD pdfjs (via VERIFIER_PDFJS_PATH set to
+# /tmp/old-pdfjs), then with the verifier loading the NEW pdfjs (env
+# unset / empty-string falsy). Compare citation outputs; divergence =
+# FRAME-SHIFT DETECTED → the dep bump is masking a real bug.
+#
+# Override mechanism: tests/e2e/lib/pdf-verifier.js reads
+# process.env.VERIFIER_PDFJS_PATH and uses createRequire(import.meta.url)
+# to load a SIBLING pdfjs install at that path's
+# `${path}/node_modules/pdfjs-dist/legacy/build/pdf.mjs`. The override
+# preserves VFY-02 independence (no src/ imports), and the empty-string
+# falsy contract (workflow sets env to "" for the NEW-pdfjs run) routes
+# the verifier through its default bundled-pdfjs import path.
+#
+# Known limitation (deferred to Phase 47 CLEANUP-04): the regression
+# suite's per-case JSON artifact lives at
+# tests/e2e/artifacts/${PLAYWRIGHT_RUN_ID}/report.json. PLAYWRIGHT_RUN_ID
+# defaults to ${{ github.run_id }} which is constant across the two runs
+# within a single job — they would overwrite each other. This workflow
+# explicitly sets PLAYWRIGHT_RUN_ID to a per-run sentinel (e.g.,
+# "old-pdfjs" and "new-pdfjs") so each run produces a stable, separately-
+# addressable artifact tree. The diff step compares the per-case verdict
+# objects across the two report.json files. Cosmetic-only fields
+# (timestamps, durations) are stripped before the JSON.stringify
+# comparison; this is intentionally over-strict on first cut so the
+# first production pdfjs bump surfaces any false-positive pattern, and
+# Phase 47 refines the comparison to citation-string-only diff.
+#
+# Permissions: contents: read ONLY. Read-only token suffices because the
+# workflow does NOT push, comment, or create issues. The frame-shift
+# signal is the workflow's exit code — a red X on the PR check tells the
+# human reviewer to investigate.
+
+name: V40 pdfjs Frame-Shift Pre-Flight
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+
+# PR-scoped concurrency: newer pushes on the same PR cancel an in-flight
+# run. Group keyed by PR number so different PRs don't contend.
+concurrency:
+  group: v40-pdfjs-frame-shift-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verifier-frozen-preflight:
+    # Label-filter happens INSIDE the job (GitHub Actions doesn't support
+    # label-name filtering directly in the trigger surface for
+    # pull_request.labeled). The OR-arm handles `synchronize` events
+    # AFTER the label has been applied (push-to-PR triggers a re-run).
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'auto-fix:pdfjs-bump') ||
+      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'auto-fix:pdfjs-bump'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          # fetch-depth 0 because we need `git show origin/main:package.json`
+          # to compare PREV (main) vs NEW (PR head).
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Detect pdfjs-dist version delta
+        id: delta
+        run: |
+          PREV=$(git show origin/main:package.json | node -e \
+            "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).devDependencies['pdfjs-dist'].replace(/^[\^~]/, '')))")
+          NEW=$(node -e \
+            "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).devDependencies['pdfjs-dist'].replace(/^[\^~]/, ''))")
+          echo "prev=$PREV" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW"   >> "$GITHUB_OUTPUT"
+          if [ "$PREV" = "$NEW" ]; then
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+            echo "No pdfjs-dist version delta (PREV=$PREV NEW=$NEW) — pre-flight will skip downstream steps."
+          else
+            echo "skip=0" >> "$GITHUB_OUTPUT"
+            echo "pdfjs-dist delta detected: $PREV → $NEW"
+          fi
+
+      - name: Install OLD pdfjs into /tmp/old-pdfjs
+        if: steps.delta.outputs.skip == '0'
+        run: |
+          mkdir -p /tmp/old-pdfjs
+          cd /tmp/old-pdfjs
+          npm init -y >/dev/null
+          npm install pdfjs-dist@${{ steps.delta.outputs.prev }} --no-save
+          # Verify the install landed where the verifier expects.
+          test -f /tmp/old-pdfjs/node_modules/pdfjs-dist/legacy/build/pdf.mjs
+
+      - name: Install repo deps
+        if: steps.delta.outputs.skip == '0'
+        run: npm ci
+
+      - name: Run regression suite (verifier on OLD pdfjs)
+        if: steps.delta.outputs.skip == '0'
+        env:
+          VERIFIER_PDFJS_PATH: /tmp/old-pdfjs
+          PLAYWRIGHT_RUN_ID: frame-shift-old-pdfjs
+        run: |
+          npm run e2e:regression || true
+          # Snapshot the artifact tree under a stable name. The regression
+          # suite writes to tests/e2e/artifacts/${PLAYWRIGHT_RUN_ID}/.
+          mkdir -p /tmp/results-old-pdfjs
+          if [ -d "tests/e2e/artifacts/frame-shift-old-pdfjs" ]; then
+            cp -r tests/e2e/artifacts/frame-shift-old-pdfjs/. /tmp/results-old-pdfjs/
+          fi
+
+      - name: Run regression suite (verifier on NEW pdfjs)
+        if: steps.delta.outputs.skip == '0'
+        env:
+          # Empty string is INTENTIONAL (JS falsy → pdf-verifier.js routes
+          # through the default bundled-pdfjs import path). Do NOT remove
+          # this — leaving the env unset is functionally equivalent but the
+          # explicit "" documents the contract for future readers.
+          VERIFIER_PDFJS_PATH: ""
+          PLAYWRIGHT_RUN_ID: frame-shift-new-pdfjs
+        run: |
+          npm run e2e:regression || true
+          mkdir -p /tmp/results-new-pdfjs
+          if [ -d "tests/e2e/artifacts/frame-shift-new-pdfjs" ]; then
+            cp -r tests/e2e/artifacts/frame-shift-new-pdfjs/. /tmp/results-new-pdfjs/
+          fi
+
+      - name: Compare citation outputs (frame-shift detection)
+        if: steps.delta.outputs.skip == '0'
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const path = require('node:path');
+            function loadReport(dir) {
+              const p = path.join(dir, 'report.json');
+              if (!fs.existsSync(p)) {
+                console.error('MISSING report.json at ' + p + ' — regression suite did not produce expected artifact.');
+                return null;
+              }
+              return JSON.parse(fs.readFileSync(p, 'utf8'));
+            }
+            const oldR = loadReport('/tmp/results-old-pdfjs');
+            const newR = loadReport('/tmp/results-new-pdfjs');
+            if (!oldR || !newR) {
+              console.error('FRAME-SHIFT DETECTED: cannot compare — one or both report.json artifacts missing.');
+              process.exit(1);
+            }
+            // The Phase 28 report.json shape uses a `cases` map keyed by
+            // case-id. Each case has an objectof verdict fields; we strip
+            // cosmetic timestamps/durations before stringify-compare.
+            const STRIP = new Set(['duration_ms', 'started_at', 'ended_at', 'pages_parsed']);
+            function normalize(c) {
+              const out = {};
+              for (const k of Object.keys(c || {}).sort()) {
+                if (STRIP.has(k)) continue;
+                out[k] = c[k];
+              }
+              return out;
+            }
+            const diffs = [];
+            const oldCases = oldR.cases || {};
+            const newCases = newR.cases || {};
+            const allKeys = new Set([...Object.keys(oldCases), ...Object.keys(newCases)]);
+            for (const k of allKeys) {
+              const a = JSON.stringify(normalize(oldCases[k]));
+              const b = JSON.stringify(normalize(newCases[k]));
+              if (a !== b) diffs.push(k);
+            }
+            if (diffs.length > 0) {
+              console.error('FRAME-SHIFT DETECTED on cases: ' + diffs.join(', '));
+              console.error('Investigate: a pdfjs-dist bump altered verifier verdicts. This may indicate the bump is masking a real bug (Pitfall 6).');
+              process.exit(1);
+            }
+            console.log('Frame-shift pre-flight: OK (' + allKeys.size + ' cases matched between OLD and NEW pdfjs).');
+          "
+
+      - name: Skip notice
+        if: steps.delta.outputs.skip == '1'
+        run: echo "No pdfjs-dist version change between main and PR head — frame-shift pre-flight not applicable."

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "months": {
+    "2026-05": {
+      "invocations": 1,
+      "total_usd": 0,
+      "last_invocation_iso": "2026-05-31T16:03:31.595Z",
+      "iterations": [
+        {
+          "iso": "2026-05-31T16:03:31.594Z",
+          "model": "claude-sonnet-4-6",
+          "cost_usd": 0,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "phase": "39-bootstrap",
+          "transport": "sdk",
+          "source": "phase-39-flip"
+        }
+      ]
+    }
+  }
+}

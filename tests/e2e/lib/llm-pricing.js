@@ -15,8 +15,8 @@
 // RESEARCH.md confirms the field is always present in healthy responses).
 // Even on `is_error: true`, total_cost_usd is typically present.
 //
-// Rates last updated: 2026-05 (per Anthropic public pricing for Opus 4.7
-// and Sonnet 4.5). Update by editing PRICING_BY_MODEL below; do NOT
+// Rates last updated: 2026-05 (Opus 4.7, Sonnet 4.5, Sonnet 4.6 per CONTEXT
+// lock 39-CONTEXT.md). Update by editing PRICING_BY_MODEL below; do NOT
 // inline these numbers anywhere else.
 
 /**
@@ -37,6 +37,7 @@ export const PRICING_BY_MODEL = Object.freeze({
   'claude-opus-4-7[1m]':   Object.freeze({ input_per_mtok: 15, output_per_mtok: 75 }),
   'claude-opus-4-7':       Object.freeze({ input_per_mtok: 15, output_per_mtok: 75 }),
   'claude-sonnet-4-5':     Object.freeze({ input_per_mtok: 3,  output_per_mtok: 15 }),
+  'claude-sonnet-4-6':     Object.freeze({ input_per_mtok: 3,  output_per_mtok: 15 }),
   'default':               Object.freeze({ input_per_mtok: 15, output_per_mtok: 75 }),
 });
 

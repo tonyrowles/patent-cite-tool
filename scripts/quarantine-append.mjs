@@ -35,6 +35,8 @@ const STABLE_RUNS_THRESHOLD = 3;
 
 function parseArgs(argv) {
   let inputPath = null;
+  let escalateReset = null;
+  let caseId = null;
   for (let i = 2; i < argv.length; i++) {
     if (argv[i].startsWith('--input=')) {
       process.stderr.write(
@@ -51,14 +53,57 @@ function parseArgs(argv) {
       }
       inputPath = next;
       i++;
+    // Phase 45-03 — --escalate-stable-runs-reset (FLAKE-03)
+    } else if (argv[i].startsWith('--escalate-stable-runs-reset=')) {
+      process.stderr.write(
+        '[quarantine-append] equals syntax not supported for --escalate-stable-runs-reset; use `--escalate-stable-runs-reset <value>`\n',
+      );
+      process.exit(2);
+    } else if (argv[i] === '--escalate-stable-runs-reset') {
+      const next = argv[i + 1];
+      if (next === undefined || next === null || next === '' || next.startsWith('--')) {
+        process.stderr.write('[quarantine-append] missing value for --escalate-stable-runs-reset\n');
+        process.exit(2);
+      }
+      const parsed = Number(next);
+      if (parsed !== 1) {
+        process.stderr.write(
+          `[quarantine-append] --escalate-stable-runs-reset only accepts value 1; got '${next}'\n`,
+        );
+        process.exit(2);
+      }
+      escalateReset = parsed;
+      i++;
+    // Phase 45-03 — --case (FLAKE-03)
+    } else if (argv[i].startsWith('--case=')) {
+      process.stderr.write(
+        '[quarantine-append] equals syntax not supported for --case; use `--case <value>`\n',
+      );
+      process.exit(2);
+    } else if (argv[i] === '--case') {
+      const next = argv[i + 1];
+      if (next === undefined || next === null || next === '' || next.startsWith('--')) {
+        process.stderr.write('[quarantine-append] missing value for --case\n');
+        process.exit(2);
+      }
+      caseId = next;
+      i++;
     } else if (argv[i] === '--help' || argv[i] === '-h') {
       process.stdout.write(
-        'Usage: node scripts/quarantine-append.mjs --input <triage-report.json>\n' +
+        'Usage:\n' +
+        '  node scripts/quarantine-append.mjs --input <triage-report.json>\n' +
+        '  node scripts/quarantine-append.mjs --escalate-stable-runs-reset 1 --case <id>\n' +
         '\n' +
         'Options:\n' +
         '  --input <path>  Path to triage-report.json; must reside under\n' +
         '                  tests/e2e/artifacts/ or tests/e2e/fixtures/ (WR-05).\n' +
         '                  Sibling llm-report.json + rerun-report.json auto-discovered.\n' +
+        '  --escalate-stable-runs-reset 1\n' +
+        '                  Phase 45-03 FLAKE-03: reset stable_runs to 1 for the\n' +
+        '                  case-id given via --case. Only the value `1` is accepted.\n' +
+        '                  Mutually exclusive with --input.\n' +
+        '  --case <id>     Required with --escalate-stable-runs-reset; the corpus\n' +
+        '                  entry id whose stable_runs is reset.\n' +
         '  --help, -h      Show this help message.\n' +
         '\n' +
         'Exit codes: 0 success | 1 runtime/path error | 2 bad flag value\n',
@@ -66,7 +111,20 @@ function parseArgs(argv) {
       process.exit(0);
     }
   }
-  return { inputPath };
+  // Phase 45-03 mutual-exclusion + missing-case validation
+  if (inputPath && escalateReset != null) {
+    process.stderr.write(
+      '[quarantine-append] --input and --escalate-stable-runs-reset are mutually exclusive\n',
+    );
+    process.exit(2);
+  }
+  if (escalateReset != null && !caseId) {
+    process.stderr.write(
+      '[quarantine-append] --case <id> is required with --escalate-stable-runs-reset\n',
+    );
+    process.exit(2);
+  }
+  return { inputPath, escalateReset, caseId };
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +230,26 @@ export async function upsertQuarantineEntry(newEntry, opts = {}) {
 // ---------------------------------------------------------------------------
 
 async function main(argv = process.argv) {
-  const { inputPath: rawInput } = parseArgs(argv);
+  const { inputPath: rawInput, escalateReset, caseId } = parseArgs(argv);
+
+  // Phase 45-03 — FLAKE-03 reset path (mutually exclusive with --input mode).
+  // Reads the corpus via the same cache-busted dynamic import pattern as
+  // upsertQuarantineEntry; mutates `stable_runs` to 1 for the matching entry;
+  // preserves added_iso (D-11 invariant) and all other fields verbatim.
+  if (escalateReset === 1 && caseId) {
+    const url = pathToFileURL(CORPUS_PATH).href + '?t=' + Date.now() + '-' + Math.random();
+    const { TEST_CASES_QUARANTINE } = await import(url);
+    const arr = [...TEST_CASES_QUARANTINE];
+    const existing = arr.find((e) => e.id === caseId);
+    if (!existing) {
+      process.stderr.write(`[quarantine-append] case-id ${caseId} not found in corpus\n`);
+      process.exit(1);
+    }
+    existing.stable_runs = 1;
+    atomicWriteJson(CORPUS_PATH, stringifyCorpus(arr));
+    process.stdout.write(`[quarantine-append] reset stable_runs=1 for ${caseId}\n`);
+    process.exit(0);
+  }
 
   if (!rawInput) {
     process.stderr.write('[quarantine-append] --input <path> is required\n');

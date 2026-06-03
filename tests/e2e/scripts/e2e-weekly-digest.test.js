@@ -61,7 +61,12 @@ let mockGhDir;
 let transcriptPath;
 let runDir;
 
-const PIN_NOW = () => new Date('2026-05-25T00:00:00Z');
+// Phase 48 PRE-03 (D-05/D-06/D-08): single epoch anchor + daysAgo derivation.
+// All fixture dates derive from PIN_NOW_ISO; assertion-site week labels use
+// isoWeekLabel(PIN_NOW()). Helper stays inline per D-08 — no new module.
+const PIN_NOW_ISO = '2026-05-25T00:00:00Z';
+const PIN_NOW = () => new Date(PIN_NOW_ISO);
+const daysAgo = (n) => new Date(Date.parse(PIN_NOW_ISO) - n * 86400000).toISOString();
 
 function loadFixture() {
   return JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8'));
@@ -245,7 +250,7 @@ describe('five aggregations present', () => {
     // Rendered markdown has all five sections
     const costLine = 'cost data unavailable'; // no ledger in test
     const md = renderDigest({
-      weekLabel: '2026-W22',
+      weekLabel: isoWeekLabel(PIN_NOW()),
       agg,
       costLine,
       now: PIN_NOW(),
@@ -269,7 +274,7 @@ describe('<=50 lines', () => {
     const { nightlyIssues, quarantineIssues } = splitFixture(fixture);
     const agg = aggregate({ nightlyIssues, quarantineIssues, now: PIN_NOW() });
     const costLine = 'cost data unavailable';
-    const md = renderDigest({ weekLabel: '2026-W22', agg, costLine, now: PIN_NOW() });
+    const md = renderDigest({ weekLabel: isoWeekLabel(PIN_NOW()), agg, costLine, now: PIN_NOW() });
     const lineCount = md.split('\n').length;
     expect(lineCount).toBeLessThanOrEqual(50);
   });
@@ -326,7 +331,7 @@ describe('CR-01: category resolved by ERROR_CLASSES membership, not label order'
 
   it("buckets an issue with no errorClass label as 'UNCLASSIFIED'", () => {
     const onlyStructural = [
-      { number: 999, created_at: '2026-05-24T00:00:00Z', labels: [{ name: 'e2e-nightly' }, { name: 'triage' }] },
+      { number: 999, created_at: daysAgo(1), labels: [{ name: 'e2e-nightly' }, { name: 'triage' }] },
     ];
     const agg = aggregate({ nightlyIssues: onlyStructural, quarantineIssues: [], now: PIN_NOW() });
     const byCategory = Object.fromEntries(agg.breakdown.map(b => [b.category, b.count]));
@@ -383,14 +388,18 @@ describe('cost data unavailable when ledger absent', () => {
 
   it('returns $X.XX / $100 (Y%) format when ledger present', () => {
     const tmpLedger = path.join(runDir, 'test-ledger.json');
+    // Phase 48 PRE-03 / D-07: month-key derived from PIN_NOW_ISO anchor — no
+    // live `new Date()` band-aid. The matching `renderCostLine({...now:PIN_NOW()})`
+    // call below threads the same anchor so the lookup hits this bucket
+    // deterministically across any calendar month.
     const ledgerData = {
       version: 1,
       months: {
-        '2026-05': { invocations: 5, total_usd: 12.5, last_invocation_iso: null, iterations: [] },
+        [PIN_NOW_ISO.slice(0, 7)]: { invocations: 5, total_usd: 12.5, last_invocation_iso: null, iterations: [] },
       },
     };
     fs.writeFileSync(tmpLedger, JSON.stringify(ledgerData));
-    const result = renderCostLine({ ledgerPath: tmpLedger });
+    const result = renderCostLine({ ledgerPath: tmpLedger, now: PIN_NOW() });
     expect(result).toMatch(/^\$\d+\.\d{2} \/ \$100 \(\d+%\)$/);
     expect(result).toContain('12.50');
     expect(result).toContain('13%'); // Math.round(12.5/100*100) = 13

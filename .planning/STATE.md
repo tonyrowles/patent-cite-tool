@@ -1,33 +1,36 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.1
-milestone_name: LLM-Driven Product Improvement Loop
-status: Awaiting next milestone
-last_updated: "2026-05-30T02:04:44.622Z"
-last_activity: 2026-05-30 — Milestone v3.1 completed and archived
+milestone: v4.1
+milestone_name: Readiness Gate + Push
+status: executing
+stopped_at: Phase 48 context gathered
+last_updated: "2026-06-02T21:30:10.514Z"
+last_activity: 2026-06-02 -- Phase 49 planning complete
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 31
-  completed_plans: 31
-  percent: 100
+  total_phases: 8
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 1
+  percent: 13
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-30)
+See: .planning/PROJECT.md (updated 2026-06-02)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Planning next milestone
+**Current focus:** Phase 49 — push v4.0 integration pr
 
 ## Current Position
 
-Phase: Milestone v3.1 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-30 — Milestone v3.1 completed and archived
+Phase: 49
+Plan: Not started
+Status: Ready to execute
+Last activity: 2026-06-02 -- Phase 49 planning complete
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -44,60 +47,49 @@ Last activity: 2026-05-30 — Milestone v3.1 completed and archived
 | v2.3 Post-v2.2 Hardening | 3 | 5 | 1 day |
 | v3.0 Autonomous E2E Testing Agent | 6 | 30 | ~7 days |
 | v3.1 LLM-Driven Product Improvement Loop | 7 | 31 | ~9 days |
+| v4.0 Self-Healing Test Suite | 9 | 26 | ~3 days |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
-(none — pending next milestone)
+- 2026-06-02: v4.1 roadmap drafted from REQUIREMENTS.md (26 reqs, 8 categories) + research/SUMMARY.md 4-wave structure. 8 phases (48-55). Wave-0 (48) blocks all; Wave-1 (49) is the single serialization point; Wave-2 (50, 51, 52) parallelizable post-push; Wave-3 (53, 54) parallelizable with Wave-2; Wave-4 (55) depends on Phase 54 model field.
 
 ### Decisions
 
-All milestone decisions archived in PROJECT.md Key Decisions table (cleared at v3.1 close).
+- v4.1-roadmap: Continue phase numbering from v4.0 (47 → 48). Mirrors all prior milestone conventions.
+- v4.1-roadmap: 4-wave structure from canonical research convergence. Wave constraints LOCKED: Phase 48 blocks all; push is the serialization point; CLEANUP-04 must run post-merge for integration_id resolvability; partial-verified must NOT widen assertTripleGate.
+- v4.1-roadmap: PARTIAL-04 is the single most load-bearing requirement. Its Vitest assertion that assertTripleGate throws on auto-fix:partial-verified ships in the SAME commit as the new label.
+- v4.1-roadmap: Phase 55 (dashboard) depends on Phase 54 (model field in ledger). Phase 53 benefits from Phase 51 UAT-47-a evidence but can start in parallel.
 
 ### Pending Todos
 
-None.
+None at v4.1 planning entry.
 
 ### Blockers/Concerns
 
-None at milestone boundary — next milestone scoping should re-evaluate any open design questions.
-
-### Quick Tasks Completed
-
-| # | Description | Date | Commit |
-|---|-------------|------|--------|
-| 2 | Fix CI: commit package-lock.json (currently gitignored but required by npm ci) | 2026-03-05 | a47dbb8 |
-| 260412-fde | Fix spurious results reporting impossible page numbers like 203 for patent US10203551 | 2026-04-12 | e51ba1b |
-
-(Quick-task directories were cleaned up out-of-band; slugs preserved here for history.)
+- **Phase 50:** integration_id capture must be an explicit numbered step in the plan; ruleset PUT payload must be constructed from a GET of current state to preserve existing rules.
+- **Phase 51:** UAT-47-a runbook must include remove-then-add label step and branch pre-existence check as numbered steps. UAT-47-e branch must be CLOSED (not merged) immediately after gate fires.
+- **Phase 53:** assertTripleGate body must remain byte-unchanged; assertPartialGate must NOT call runPromote({_skipCiGuard:true}); plan review recommended before coding.
 
 ## Deferred Items
 
-Items acknowledged and deferred at v3.1 milestone close on 2026-05-29:
+Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4.1 phases:
 
 | Category | Item | Status | Notes |
 |----------|------|--------|-------|
-| uat_gap | 32-UAT-EVIDENCE.md | passed | 0 pending scenarios; stale frontmatter only |
-| uat_gap | 35-HUMAN-UAT.md | testing | 2 pending scenarios (uncommitted in-progress local edit) |
-| uat_gap | 36-HUMAN-UAT.md | partial | 0 pending scenarios; stale frontmatter |
-| uat_gap | 37-HUMAN-UAT.md | partial | 0 pending scenarios; stale frontmatter |
-| uat_gap | 38-UAT-EVIDENCE.md | unknown | 0 pending scenarios; status field not stamped |
-| verification_gap | 35-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (5 PASS); file not re-stamped |
-| verification_gap | 36-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (2 PASS); file not re-stamped |
-| verification_gap | 37-VERIFICATION.md | human_needed | Confirmed live in Phase 38-03 (1 PASS); file not re-stamped |
-| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Orphan slug reference; quick task directory not present |
-| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Completed 2026-03-05 (commit a47dbb8); directory removed but reference persisted |
-| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Completed 2026-04-12 (commit e51ba1b); directory removed but reference persisted |
-
-Total: 11 items. Verification/UAT debt reflects bookkeeping lag — Phase 38-03 closed 8/8 human_verification items per `.planning/v3.1-MILESTONE-AUDIT.md` (status `tech_debt` with note that audit is substantively `passed` post Phase 38).
+| uat_gap | 47-UAT-DEFERRED.md | unknown | 4 DEFERRED runbook stubs (UAT-47-a/b/d/e); addressed in Phase 51 |
+| tech_debt | bypass_actors=1 on ruleset 17086676 | deferred | Owner-self bypass_mode=always; addressed in Phase 50 |
+| tech_debt | required_status_checks rule absent | deferred | verifier-gate + deps-update-gate missing; addressed in Phase 50 |
+| uat_gap | 32-UAT-EVIDENCE.md stale frontmatter | passed | Addressed in Phase 52 |
+| uat_gap | 35-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
+| uat_gap | 36-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
+| uat_gap | 37-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
+| uat_gap | 38-UAT-EVIDENCE.md stale frontmatter | unknown | Addressed in Phase 52 |
+| quick_task | 3 orphan quick-task slug references | missing | Addressed in Phase 52 |
 
 ## Session Continuity
 
-Last activity: 2026-05-29 — Phase 38 marked complete (v3.1 LLM-Driven Product Improvement Loop)
-Status: Milestone v3.1 closing
-Next: `/gsd:new-milestone` after close completes
-
-## Operator Next Steps
-
-- Start the next milestone with /gsd-new-milestone
+Last session: 2026-06-02T17:13:45.819Z
+Stopped at: Phase 48 context gathered
+Resume file: .planning/phases/48-pre-push-regression-fixes/48-CONTEXT.md

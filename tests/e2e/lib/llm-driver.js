@@ -43,9 +43,12 @@
 //     ledger records the spend.
 
 import { spawn } from 'node:child_process';
+import Anthropic from '@anthropic-ai/sdk';
 import {
   LEDGER_PATH, readLedger, checkSpendCap, checkPhaseSpendCap, appendLedgerEntry,
+  checkDayCap, checkIssueCap, checkPrCap,
 } from './llm-ledger.js';
+import { fallbackCostUsd } from './llm-pricing.js';
 
 /**
  * Hard timeout for one `claude -p` invocation. Subscription-mode round-trip is
@@ -413,6 +416,8 @@ export async function invokeClaudePWithLedger({
 
   // Step 5 — Append to ledger ALWAYS (Pitfall 8: cost may be 0 on hard
   // failures but is still recorded for forensic reconciliation).
+  // Phase 46-01 (AUTOFIX-06): self-tag transport so forensic greps over the
+  // committed ledger don't have to infer subscription-vs-sdk by absence.
   appendLedgerEntry(LEDGER_PATH, {
     iso: new Date().toISOString(),
     model: modelId,
@@ -420,6 +425,7 @@ export async function invokeClaudePWithLedger({
     tokens_in: parsed.rawJson?.usage?.input_tokens ?? 0,
     tokens_out: parsed.rawJson?.usage?.output_tokens ?? 0,
     phase,
+    transport: 'subscription',
     source,
   });
 
@@ -440,5 +446,202 @@ export async function invokeClaudePWithLedger({
     modelId,
     costUsd,
     rawJson: parsed.rawJson ?? null,
+  };
+}
+
+/**
+ * Phase 39 (LEDGER-03 + CLEANUP-04 partial) — SDK transport with INVERSE CI gate.
+ *
+ * Sibling of invokeClaudePWithLedger. v3.1's invokeClaudePWithLedger refuses
+ * to run in CI (subscription-local invariant TRIAGE-04, line 384). This SDK
+ * wrapper is the OPPOSITE: refuses to run UNLESS CI=true OR forceApi=true.
+ *
+ * Both wrappers share LEDGER_PATH and the cap-precheck primitives — the
+ * transport: 'sdk' tag distinguishes ledger entries for combinedMonthlyTotal
+ * forensic greps. Per CONTEXT-locked default model: claude-sonnet-4-6.
+ *
+ * Pitfall mitigations:
+ *   - Pitfall 2 (cost-runaway): 4 cap prechecks (monthly + day + issue + PR)
+ *     before SDK invocation; refusal does NOT consume API budget
+ *   - Pitfall 8 (always-append): ledger entry written on success, sdk_error,
+ *     AND the SDK error try-catch path (so failed calls still leave forensic
+ *     trace even if the API charged for the partial generation)
+ *
+ * D-06 execution order (mirrors invokeClaudePWithLedger):
+ *   1. INVERSE CI gate — short-circuits if not CI && !forceApi (no SDK call, no ledger entry)
+ *   2. Pre-flight caps — monthly + day + (issue if issueId) + (PR if prNumber) + (phase if phase)
+ *   3. SDK call — client.messages.create wrapped in try/catch
+ *   4. Cost — fallbackCostUsd(response.model, in_tokens, out_tokens) since SDK has no total_cost_usd field
+ *   5. Append — UNCONDITIONAL (success or sdk_error)
+ *   6. Return parsed result
+ *
+ * @param {{
+ *   systemPrompt?: string,     string-form system prompt; Phase 39 default path.
+ *                              Mutually-or with systemBlocks (one of the two
+ *                              MUST be provided).
+ *   systemBlocks?: Array<{type:'text', text:string, cache_control?:{type:'ephemeral', ttl:'5m'|'1h'}}>,
+ *                              Phase 42 Pitfall 6 fix — array-form system field
+ *                              that lets cache_control take effect. When
+ *                              supplied, takes precedence over systemPrompt.
+ *                              The Anthropic SDK silently drops cache_control
+ *                              from the string form, killing prompt-cache
+ *                              savings; the array form is the structural fix.
+ *   userPrompt: string,
+ *   model?: string,            default 'claude-sonnet-4-6' (CONTEXT lock)
+ *   maxTokens?: number,        default 4096
+ *   timeoutMs?: number,        default 120_000 (2 min — code-fix prompts)
+ *   phase?: string,
+ *   issueId?: string,          e.g., 'issue-123' — engages per-issue cap
+ *   prNumber?: number,         e.g., 456 — engages per-PR cap
+ *   forceApi?: boolean,        local override; default false
+ * }} opts
+ * @returns {Promise<
+ *   {ok:true, llmText:string, modelId:string, costUsd:number, rawJson:object}
+ *   | {ok:false, ciGate:true, message:string}
+ *   | {ok:false, capBlocked:true, monthly, day, issue, pr, phaseCap}
+ *   | {ok:false, errorReason:'sdk_error', errorMessage:string}
+ *   | {ok:false, errorReason:'contract-error', errorMessage:string}
+ * >}
+ */
+export async function invokeAnthropicSdkWithLedger({
+  systemPrompt,
+  systemBlocks,
+  userPrompt,
+  model = 'claude-sonnet-4-6',
+  maxTokens = 4096,
+  timeoutMs = 120_000,
+  phase,
+  issueId,
+  prNumber,
+  forceApi = false,
+} = {}) {
+  const inCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+
+  // Step 0a — PRE-02 leak guard (Phase 48). LEDGER_PATH resolves to the
+  // committed file when E2E_LEDGER_PATH_OVERRIDE is unset (the IIFE at
+  // module-load time), so any local forceApi:true call without the override
+  // would pollute the committed ledger. Throw BEFORE any ledger code path.
+  // Plain Error per D-02; message string is locked verbatim.
+  if (forceApi === true && !inCi && !process.env.E2E_LEDGER_PATH_OVERRIDE) {
+    throw new Error('invokeAnthropicSdkWithLedger: forceApi:true blocked outside CI without E2E_LEDGER_PATH_OVERRIDE. Set E2E_LEDGER_PATH_OVERRIDE=<tmpfile> to redirect ledger writes, or run inside CI. Prevents committed-ledger pollution.');
+  }
+
+  // Step 0 — Contract guard (Phase 42 Plan 02 — Pitfall 6 driver extension).
+  // At least one of {systemPrompt, systemBlocks} MUST be supplied. We check
+  // BEFORE the CI gate so the contract violation is unambiguous in unit tests
+  // that run without CI=true. systemBlocks takes precedence when both are
+  // supplied (the array-form is the cache_control-enabled path).
+  const hasSystemPrompt = typeof systemPrompt === 'string' && systemPrompt.length > 0;
+  const hasSystemBlocks = Array.isArray(systemBlocks) && systemBlocks.length > 0;
+  if (!hasSystemPrompt && !hasSystemBlocks) {
+    return {
+      ok: false,
+      errorReason: 'contract-error',
+      errorMessage:
+        'invokeAnthropicSdkWithLedger requires one of systemBlocks (array form, ' +
+        'enables cache_control) or systemPrompt (back-compat string form).',
+    };
+  }
+
+  // Step 1 — INVERSE CI gate
+  if (!inCi && !forceApi) {
+    return {
+      ok: false,
+      ciGate: true,
+      message:
+        'invokeAnthropicSdkWithLedger refused: not in CI and forceApi:false. ' +
+        'Use invokeClaudePWithLedger for the local subscription transport.',
+    };
+  }
+
+  // Step 2 — Cap prechecks (4 sub-caps: monthly, day, issue, PR + phase)
+  const ledger = readLedger(LEDGER_PATH);
+  const monthly = checkSpendCap(ledger);
+  const day = checkDayCap(ledger);
+  const issue = issueId ? checkIssueCap(ledger, issueId) : { status: 'ok' };
+  const pr = prNumber ? checkPrCap(ledger, prNumber) : { status: 'ok' };
+  const phaseCap = phase ? checkPhaseSpendCap(ledger, phase) : { status: 'ok' };
+
+  if (
+    monthly.status === 'block' || day.status === 'block' ||
+    issue.status === 'block' || pr.status === 'block' || phaseCap.status === 'block'
+  ) {
+    return { ok: false, capBlocked: true, monthly, day, issue, pr, phaseCap };
+  }
+
+  // Step 3 — SDK call
+  const client = new Anthropic({ maxRetries: 2, timeout: timeoutMs });
+  let response;
+  try {
+    response = await client.messages.create({
+      model,
+      max_tokens: maxTokens,
+      // Pitfall 6: array-form systemBlocks (when supplied) carries
+      // cache_control through to the SDK. String-form systemPrompt is the
+      // Phase 39 back-compat path.
+      system: hasSystemBlocks ? systemBlocks : systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+  } catch (err) {
+    // Pitfall 8 — record failed call so the ledger reflects every attempt,
+    // even if the SDK threw before extracting usage (cost recorded as 0).
+    appendLedgerEntry(LEDGER_PATH, {
+      iso: new Date().toISOString(),
+      model,
+      cost_usd: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+      phase,
+      transport: 'sdk',
+      issueId,
+      prNumber,
+      source: 'auto-fix-api',
+      error: String(err && err.message ? err.message : err).slice(0, 200),
+    });
+    return {
+      ok: false,
+      errorReason: 'sdk_error',
+      errorMessage: String(err && err.message ? err.message : err),
+    };
+  }
+
+  // Step 4 — Cost from usage (no total_cost_usd on the SDK path)
+  const inputTokens = response.usage && Number.isFinite(response.usage.input_tokens)
+    ? response.usage.input_tokens : 0;
+  const outputTokens = response.usage && Number.isFinite(response.usage.output_tokens)
+    ? response.usage.output_tokens : 0;
+  const cacheCreation = response.usage && Number.isFinite(response.usage.cache_creation_input_tokens)
+    ? response.usage.cache_creation_input_tokens : 0;
+  const cacheRead = response.usage && Number.isFinite(response.usage.cache_read_input_tokens)
+    ? response.usage.cache_read_input_tokens : 0;
+  const costUsd = fallbackCostUsd(response.model, inputTokens, outputTokens);
+
+  // Step 5 — ALWAYS append (Pitfall 8)
+  appendLedgerEntry(LEDGER_PATH, {
+    iso: new Date().toISOString(),
+    model: response.model,
+    cost_usd: costUsd,
+    tokens_in: inputTokens,
+    tokens_out: outputTokens,
+    cache_creation_tokens: cacheCreation,
+    cache_read_tokens: cacheRead,
+    phase,
+    transport: 'sdk',
+    issueId,
+    prNumber,
+    source: 'auto-fix-api',
+  });
+
+  // Step 6 — Return
+  const llmText =
+    response.content && response.content[0] && response.content[0].type === 'text'
+      ? response.content[0].text
+      : '';
+  return {
+    ok: true,
+    llmText,
+    modelId: response.model,
+    costUsd,
+    rawJson: response,
   };
 }

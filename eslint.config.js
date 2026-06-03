@@ -51,6 +51,12 @@ export default [
     files: ['tests/e2e/lib/pdf-verifier.js'],
     rules: {
       'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@anthropic-ai/sdk',
+          message:
+            'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+            'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+        }],
         patterns: [
           {
             group: [
@@ -82,6 +88,12 @@ export default [
     files: ['tests/e2e/lib/rerun-validator.js'],
     rules: {
       'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@anthropic-ai/sdk',
+          message:
+            'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+            'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+        }],
         patterns: [
           {
             group: [
@@ -142,7 +154,128 @@ export default [
               'e2e-triage-classifier.mjs must use invokeClaudePWithLedger (D-07) — direct invokeClaudeP ' +
               'calls bypass the ledger and CI gate. See .planning/research/PITFALLS.md Pitfall 12.',
           },
+          {
+            name: '@anthropic-ai/sdk',
+            message:
+              'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+              'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+          },
         ],
+      }],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 42 (PROMPT-04) — fix-prompt-builder purity rule.
+  // ---------------------------------------------------------------------------
+  //
+  // Restricts `tests/e2e/lib/fix-prompt-builder.js` from importing node:fs,
+  // node:child_process, node:path (purity — same discipline as the v3.1
+  // issue-payload-builder, but enforced here at the lint layer rather than
+  // by Vitest source-grep). The fix-prompt-builder is the pure layer the
+  // Plan 42-02 dispatcher imports; if it could read files or spawn
+  // subprocesses, the auto-fix loop's purity invariant (deterministic prompt
+  // construction from given inputs) would collapse.
+  //
+  // Pitfall 1 / Pitfall 3 (commit 345cdcb) PREVENTION: this per-file block
+  // INLINES the @anthropic-ai/sdk paths restriction. The catch-all SDK guard
+  // BELOW must add this file's path to its `ignores:` list (see the augmented
+  // list below — 6 entries, was 5) so per-file rules are not silently
+  // clobbered by the catch-all's later-wins merge. The 4th programmatic
+  // ESLint test in tests/unit/eslint-fix-prompt-builder-guard.test.js is
+  // the regression guard for that scenario.
+  //
+  // KEY DIFFERENCE from pdf-verifier / rerun-validator blocks: those use
+  // `patterns.group` to restrict a directory tree (src/**). This block uses
+  // `paths` because the targets are NAMED PACKAGES (node:fs, node:child_process,
+  // node:path, @anthropic-ai/sdk). `paths` is the correct ESLint shape for
+  // the package-name case (mirrors triage-classifier + SDK guard blocks).
+  {
+    files: ['tests/e2e/lib/fix-prompt-builder.js'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          {
+            name: 'node:fs',
+            message:
+              'fix-prompt-builder must be pure — no I/O. (PROMPT-04)',
+          },
+          {
+            name: 'node:child_process',
+            message:
+              'fix-prompt-builder must be pure — no subprocesses. (PROMPT-04)',
+          },
+          {
+            name: 'node:path',
+            message:
+              'fix-prompt-builder must be pure — no path computation. (PROMPT-04)',
+          },
+          {
+            name: '@anthropic-ai/sdk',
+            message:
+              'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+              'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+          },
+        ],
+      }],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 39 (LEDGER-03 + CLEANUP-04 partial) — SDK single-entry-point rule.
+  // ---------------------------------------------------------------------------
+  //
+  // Restricts `import ... from '@anthropic-ai/sdk'` to tests/e2e/lib/llm-driver.js
+  // ONLY. Every other path must consume the SDK via invokeAnthropicSdkWithLedger
+  // — preserves the ledger/cap discipline (Pitfall 2 cost-runaway) and the
+  // single-entry-point invariant that mirrors the v3.1 invokeClaudePWithLedger
+  // wrapper.
+  //
+  // CRITICAL: this block MUST be the LAST block in the array. Per Pitfall 3
+  // (39-RESEARCH.md), ESLint flat-config rules MERGE in array order with
+  // LATER blocks overriding EARLIER ones for the same rule key. Appending
+  // here ensures the @anthropic-ai/sdk restriction is the final word FOR
+  // FILES NOT ALREADY COVERED by earlier per-file blocks.
+  //
+  // The ignores list below mirrors every file with its own per-file
+  // `no-restricted-imports` block ABOVE — for those files, this catch-all
+  // would CLOBBER their existing rules. Each of those per-file blocks
+  // INLINES the @anthropic-ai/sdk restriction so the SDK guard still applies
+  // there. (Concrete instance of the "later block wins for same rule key"
+  // hazard from Pitfall 3 — discovered post-merge as 17 failing v3.1 tests
+  // when this block originally used `**/*.{js,mjs}` without ignores.)
+  //
+  // KEY DIFFERENCE from the pdf-verifier / rerun-validator blocks: those use
+  // `patterns.group` to restrict a directory TREE (src/**). This block uses
+  // `paths` to restrict a specific NAMED PACKAGE — `paths` is the correct
+  // ESLint shape for the package-name case (mirrors the triage-classifier
+  // block above which uses `paths` with `importNames`).
+  {
+    files: ['**/*.{js,mjs}'],
+    ignores: [
+      'tests/e2e/lib/llm-driver.js',
+      'tests/e2e/lib/pdf-verifier.js',
+      'tests/e2e/lib/rerun-validator.js',
+      'tests/e2e/lib/triage-classifier.js',
+      'scripts/e2e-triage-classifier.mjs',
+      // Phase 42 PROMPT-04: fix-prompt-builder has its own per-file block
+      // ABOVE that INLINES the @anthropic-ai/sdk restriction. Adding the
+      // path here keeps the catch-all from clobbering the per-file's
+      // node:fs/node:child_process/node:path rules (Pitfall 1 / Pitfall 3
+      // — commit 345cdcb regression guard).
+      'tests/e2e/lib/fix-prompt-builder.js',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@anthropic-ai/sdk',
+          message:
+            'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+            'Direct @anthropic-ai/sdk imports forbidden — mirrors v3.1 ' +
+            'invokeClaudePWithLedger CI-gate + ledger discipline. See ' +
+            '.planning/phases/39-sdk-driver-ledger-v2-branch-protection-wave-0/39-RESEARCH.md ' +
+            '§Pattern 4 and PITFALLS.md Pitfall 2.',
+        }],
       }],
     },
   },

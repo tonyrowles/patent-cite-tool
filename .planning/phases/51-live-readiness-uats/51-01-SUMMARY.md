@@ -141,3 +141,34 @@ The 5 deviations are enumerated in the frontmatter `deviations:` list. Key narra
 Phase 51 closes with 1 FAIL + 3 deferrals, but Phase 51's primary purpose was achieved: the v4.0/v4.1 self-healing infrastructure has been exercised against canonical infra and the gaps surfaced. The Phase 56 follow-up has a complete, executable roadmap (workflow trigger patches + ledger-commit refactor + fixture-mutator authoring + 4-UAT re-sweep). No data loss; no destructive mutations on origin; no API spend; ledger preserved at $0 for current-month bucket.
 
 **Phase 51 status: COMPLETE (with documented FAIL + deferrals propagated to Phase 56).**
+
+## Self-Check: PASSED
+
+All 7 expected artifacts present:
+- `.planning/phases/51-live-readiness-uats/51-UAT-EVIDENCE.md`
+- `.planning/phases/51-live-readiness-uats/evidence/INDEX.md`
+- `.planning/phases/51-live-readiness-uats/evidence/uat-47-e-pr-checks.json`
+- `.planning/phases/51-live-readiness-uats/evidence/uat-47-e-pr-labels.json`
+- `.planning/phases/51-live-readiness-uats/evidence/uat-47-e-pr-comments.json`
+- `.planning/phases/51-live-readiness-uats/evidence/uat-47-a-auto-deferred.md`
+- `.planning/phases/51-live-readiness-uats/51-01-SUMMARY.md`
+
+All 5 expected commits present in `git log`:
+- `3cb821a` Task 1 (pre-flight + skeleton)
+- `24b4f08` Task 2 (UAT-47-e FAIL + UAT-47-a auto-defer in EVIDENCE.md)
+- `aedafa0` Task 3 (UAT-47-a auto-defer marker file)
+- `5121c39` Task 4 (UAT-47-b + UAT-47-d documentation)
+- `a11afbe` Task 5 (SUMMARY + STATE + ROADMAP)
+
+Branch hygiene on origin verified clean:
+- `test-only/diff-guard-uat-47-e-*` — DELETED
+- `auto-fix/test-uat47e-*` — DELETED
+- `auto-fix/3-139f821b*` — D-05 baseline preserved (UAT-47-a auto-deferred; no branch created)
+
+No open UAT PRs; PRs #12 and #13 both CLOSED with `--delete-branch`.
+
+D-20 locked verbatim text confirmed in `STATE.md §Pending Todos` via `grep -F`.
+
+`STATE.md` frontmatter advanced: `completed_phases: 3 → 4`, `total_plans: 3 → 4`, `completed_plans: 3 → 4`, `percent: 38 → 50`.
+
+`ROADMAP.md` Phase 51 row checkbox flipped `[ ]` → `[x]` with completion narrative.

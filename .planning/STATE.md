@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Readiness Gate + Push
-status: completed
-stopped_at: Phase 48 context gathered
-last_updated: "2026-06-03T04:39:53.575Z"
-last_activity: 2026-06-03 -- Phase 50 marked complete
+status: executing
+stopped_at: Phase 51 closed
+last_updated: "2026-06-03T05:42:00Z"
+last_activity: 2026-06-03 -- Phase 51 marked complete (1 FAIL + 3 deferrals; Phase 56 enqueued)
 progress:
   total_phases: 8
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 38
+  completed_phases: 4
+  total_plans: 4
+  completed_plans: 4
+  percent: 50
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 50 — COMPLETE
+Phase: 51 — COMPLETE (1 FAIL + 3 deferrals; Phase 56 follow-up enqueued)
 Plan: 1 of 1
-Status: Phase 50 complete
-Last activity: 2026-06-03 -- Phase 50 marked complete
+Status: Phase 51 complete; Wave-2 ready to advance (Phase 52 next; Phase 53 can also begin)
+Last activity: 2026-06-03 -- Phase 51 marked complete
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -62,10 +62,11 @@ Progress: [██████████] 100%
 - v4.1-roadmap: PARTIAL-04 is the single most load-bearing requirement. Its Vitest assertion that assertTripleGate throws on auto-fix:partial-verified ships in the SAME commit as the new label.
 - v4.1-roadmap: Phase 55 (dashboard) depends on Phase 54 (model field in ledger). Phase 53 benefits from Phase 51 UAT-47-a evidence but can start in parallel.
 - [Phase 50]: Closure (2026-06-03): ruleset 17086676 hardened — 5 rules including required_status_checks for verifier-gate+deps-update-gate (integration_id=15368), bypass_actors=[], current_user_can_bypass→never. Two PUTs in audit log. Test PR proved enforcement (Method A+B); break-glass runbook (docs §7) live-tested idempotent BEFORE bypass removal. Vitest D11+D12 pin jobid strings. 6 atomic commits 79d5415→9c3b016→fab8d2a→d455b32→b57d3a9→bcaa89c.
+- [Phase 51]: Closure (2026-06-03): 0 PASS / 1 FAIL / 1 AUTO-DEFERRED / 1 STILL-DEFERRED / 1 BLOCKED-BY-PHASE-50. UAT-47-e FAILED — v40-verifier-gate.yml's pull_request.branches:['auto-fix/*'] targets BASE ref not HEAD; the gate cannot fire on PRs into main. UAT-47-a AUTO-DEFERRED per D-13 (sequence-gate). UAT-47-b STILL-DEFERRED (fixture-mutator authoring required). UAT-47-d BLOCKED-BY-PHASE-50 (ruleset blocks ledger-commit push to main). 5 atomic commits 3cb821a→24b4f08→aedafa0→5121c39→(final). Phase 56 follow-up enqueued (see Pending Todos) folding all four UATs into one v4.2 work unit covering verifier-gate trigger patch + ledger-commit refactor + deps-update audit + fixture-mutator. $0 API spent; no destructive mutations on origin; 2 transient test PRs (#12, #13) opened+closed with --delete-branch.
 
 ### Pending Todos
 
-None at v4.1 planning entry.
+- Phase 56 (v4.2 backlog): refactor v40-cost-ledger-snapshot.yml + v40-auto-fix.yml ledger-commit-to-main pattern (UAT-47-d structurally blocked by Phase 50 ruleset; UAT-47-a's ledger commit also affected — both need PR-then-merge or branch-redirect)
 
 ### Blockers/Concerns
 
@@ -79,7 +80,7 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 | Category | Item | Status | Notes |
 |----------|------|--------|-------|
-| uat_gap | 47-UAT-DEFERRED.md | unknown | 4 DEFERRED runbook stubs (UAT-47-a/b/d/e); addressed in Phase 51 |
+| uat_gap | 47-UAT-DEFERRED.md | partial | 4 DEFERRED runbook stubs re-stamped in Phase 51-UAT-EVIDENCE.md: UAT-47-e FAIL (verifier-gate trigger bug surfaced), UAT-47-a AUTO-DEFERRED (D-13), UAT-47-b STILL-DEFERRED, UAT-47-d BLOCKED-BY-PHASE-50; all four folded into Phase 56 follow-up |
 | tech_debt | bypass_actors=1 on ruleset 17086676 | deferred | Owner-self bypass_mode=always; addressed in Phase 50 |
 | tech_debt | required_status_checks rule absent | deferred | verifier-gate + deps-update-gate missing; addressed in Phase 50 |
 | uat_gap | 32-UAT-EVIDENCE.md stale frontmatter | passed | Addressed in Phase 52 |
@@ -91,6 +92,6 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 ## Session Continuity
 
-Last session: 2026-06-02T17:13:45.819Z
-Stopped at: Phase 48 context gathered
-Resume file: .planning/phases/48-pre-push-regression-fixes/48-CONTEXT.md
+Last session: 2026-06-03T05:42:00Z
+Stopped at: Phase 51 closed
+Resume file: .planning/phases/51-live-readiness-uats/51-01-SUMMARY.md (next: Phase 52 context-gather)

@@ -11,6 +11,7 @@ deviations:
   - "[D-13 sequence] UAT-47-e FAIL → UAT-47-a AUTO-DEFERRED. No live trigger of v40-auto-fix.yml; no ledger spend; no label cycle on issue #3; no auto-fix/3-139f821b branch created."
   - "[gh CLI schema correction] `gh pr checks --json conclusion` is invalid; correct field is `bucket` (values: pass/fail/pending). Used statusCheckRollup via gh pr view --json statusCheckRollup as the forensic capture instead. Documented as runbook hint in §UAT-47-b sharper runbook."
   - "[Pre-execution hygiene] STATE.md had uncommitted planning-time mutations (Phase 51 entry counters) when execution started. Reverted via git checkout to satisfy clean-tree precondition for branch creation; Task 5 re-establishes the final STATE.md values."
+  - "[Post-closure self-check append] 6th commit 1122334 docs(51) added self-check section to SUMMARY.md after the closing Task 5 chore(51) landed. Sub-step 5e's literal check ('5 chore(51) commits in last 5') no longer passes because the 6th commit is docs(51), but the 5 chore(51) commits are still atomic per task and present in git log. Spirit-of-the-plan honored; literal check deviation documented."
 provides:
   uat_47_a_pr_open: false
   uat_47_a_phase_53_handoff: null
@@ -47,7 +48,7 @@ next_phase: 52
 | STATE.md | Updated frontmatter, Current Position, Pending Todos with locked D-20 entry |
 | ROADMAP.md | Phase 51 checkbox flipped `[ ]` → `[x]` with completed date |
 
-5 atomic commits in canonical order (D-19):
+5 atomic `chore(51):` commits in canonical order (D-19), plus 1 post-closure `docs(51):` self-check append:
 
 | Task | Commit | Subject |
 |---|---|---|
@@ -55,7 +56,10 @@ next_phase: 52
 | 2 | `24b4f08` | `chore(51): UAT-47-e — assertion FAILURE (verifier-gate trigger bug: pull_request.branches filters BASE not HEAD); PRs #12+#13 closed; UAT-47-a auto-deferred per D-13` |
 | 3 | `aedafa0` | `chore(51): UAT-47-a — auto-deferred per D-13 (UAT-47-e failed: verifier-gate trigger structurally inert on PRs into main; Phase 56 prerequisite documented)` |
 | 4 | `5121c39` | `chore(51): document UAT-47-b STILL DEFERRED + UAT-47-d STRUCTURALLY BLOCKED (Phase 50 regression); fold all 4 UATs into one Phase 56 follow-up` |
-| 5 | (this commit) | `chore(51): final 51-01-SUMMARY + STATE.md Phase 56 pending todo + ROADMAP update` |
+| 5 | `a11afbe` | `chore(51): final 51-01-SUMMARY + STATE.md Phase 56 pending todo + ROADMAP update` |
+| 5+ | `1122334` | `docs(51): append SUMMARY self-check section (artifacts + commits + branch hygiene verified)` |
+
+**Sub-step 5e plan-check deviation:** the plan's verification asserts "5 chore(51) commits in last 5". After the post-closure self-check append (commit `1122334`), the last 5 commits contain 4 `chore(51)` + 1 `docs(51)`. The 5 `chore(51)` commits are still present and atomic per task (their order in `git log --all | grep chore\(51\)` matches the 5-task plan); the docs append is a post-closure transparency artifact and is intentionally NOT a `chore(51):` commit because it documents the closure rather than executing a closure task. Net: 5 chore commits preserved + 1 docs commit appended ≠ plan's literal check, but spirit-of-the-plan (one atomic commit per task) is honored. Documented as deviation in frontmatter.
 
 ## Live-infrastructure mutations performed
 

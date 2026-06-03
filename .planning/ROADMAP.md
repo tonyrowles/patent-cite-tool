@@ -156,7 +156,7 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 
 - [x] **Phase 48: Pre-Push Regression Fixes** - Fix Test 48 ledger leak, calendar-rollover flake, and @anthropic-ai/sdk EXACT pin before CI can pass on the integration PR (completed 2026-06-02)
 - [x] **Phase 49: Push v4.0-Integration PR** - Create, self-approve, and admin-merge the v4.0-integration PR; confirm CI green on origin/main (completed 2026-06-03)
-- [ ] **Phase 50: CLEANUP-04 Readiness Gate** - Patch ruleset 17086676 required_status_checks + remove bypass_actors; confirm gate enforced on test PR
+- [x] **Phase 50: CLEANUP-04 Readiness Gate** - Patch ruleset 17086676 required_status_checks + remove bypass_actors; confirm gate enforced on test PR (completed 2026-06-03)
 - [ ] **Phase 51: Live Readiness UATs** - Execute all 4 DEFERRED runbook stubs (UAT-47-a/b/d/e) against live GitHub Actions; capture evidence artifacts
 - [ ] **Phase 52: v3.1 Bookkeeping Cleanup** - Re-stamp 5 stale HUMAN-UAT/VERIFICATION frontmatter files; remove 3 orphan quick-task slug rows from STATE.md
 - [ ] **Phase 53: auto-fix:partial-verified Semantics** - Implement assertPartialGate (separate from assertTripleGate); partial label producer in verifier-gate; widened auto-promote filter
@@ -209,7 +209,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 50-01-PLAN.md — Six-task sequential: break-glass docs §7 → GATE-01 PUT + Vitest pins → GATE-03 test PR cycle → break-glass live add-then-remove → GATE-02 PUT bypass_actors=[] → final snapshot + INDEX + SUMMARY
+- [x] 50-01-PLAN.md — Six-task sequential: break-glass docs §7 → GATE-01 PUT + Vitest pins → GATE-03 test PR cycle → break-glass live add-then-remove → GATE-02 PUT bypass_actors=[] → final snapshot + INDEX + SUMMARY
 
 ### Phase 51: Live Readiness UATs
 **Goal**: All 4 DEFERRED runbook stubs from 47-UAT-DEFERRED.md are re-stamped PASS with captured evidence artifacts; the self-healing loop is confirmed end-to-end on real GitHub infrastructure
@@ -281,7 +281,7 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 |-------|-----------|----------------|--------|-----------|
 | 48. Pre-Push Regression Fixes | v4.1 | 1/1 | Complete    | 2026-06-02 |
 | 49. Push v4.0-Integration PR | v4.1 | 1/1 | Complete   | 2026-06-03 |
-| 50. CLEANUP-04 Readiness Gate | v4.1 | 0/TBD | Not started | - |
+| 50. CLEANUP-04 Readiness Gate | v4.1 | 1/1 | Complete   | 2026-06-03 |
 | 51. Live Readiness UATs | v4.1 | 0/TBD | Not started | - |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |
 | 53. auto-fix:partial-verified Semantics | v4.1 | 0/TBD | Not started | - |

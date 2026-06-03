@@ -105,7 +105,41 @@ gh api GET /repos/tonyrowles/patent-cite-tool/actions/secrets --jq '.secrets[].n
 
 **`[skip ci]` is LOAD-BEARING** — without it, the bot push re-triggers `ci.yml` which re-runs the auto-fix workflow which re-files the ledger update. Infinite loop.
 
-## 7. Phase 47 re-audit checklist
+## 7. Break-Glass: temporarily re-allowing bypass on ruleset 17086676
+
+**When to use:** A genuine emergency that requires merging to `main` without the `verifier-gate` + `deps-update-gate` required status checks passing — for example, a security fix that the verifier itself is broken on, or a credential rotation that the CI environment refuses to run. The bypass actor was removed in Phase 50 (CLEANUP-04); break-glass is the *only* path to a force-merge after that point.
+
+**Procedure is manual by definition** — no automation. The operator executes the two `gh api` commands below, performs the emergency merge, and reverts the bypass within the time-box. Skipping any step is an audit-log incident.
+
+### (a) Re-add the operator bypass actor
+
+```bash
+gh api -X PUT /repos/tonyrowles/patent-cite-tool/rulesets/17086676 \
+  --input <(echo '{"bypass_actors":[{"actor_id":254599900,"actor_type":"User","bypass_mode":"always"}]}')
+```
+
+This re-grants operator `@tonyrowles` (actor_id `254599900`) `bypass_mode: always` on ruleset 17086676 — the exact pre-Phase-50 state. The PUT preserves the 5 rules (Pattern 2 partial-body merge — `rules` key is omitted, so it is preserved).
+
+### (b) Remove the bypass actor after emergency merge
+
+```bash
+gh api -X PUT /repos/tonyrowles/patent-cite-tool/rulesets/17086676 \
+  --input <(echo '{"bypass_actors":[]}')
+```
+
+This is the inverse — empties the bypass list, restoring the post-Phase-50 enforced state. Run this AS SOON AS the emergency merge completes; do not leave the bypass standing.
+
+### (c) Time-box & audit trail
+
+- **Maximum bypass duration: 1 hour.** From the moment of step (a) until step (b), the ruleset is degraded. If you exceed 1 hour, the operational invariant is broken and a follow-up incident review is mandatory.
+- **Before step (a):** create `docs/incidents/<YYYY-MM-DD>-<short-slug>.md` describing
+  - why the break-glass is being used,
+  - the PR (or commit) being unblocked,
+  - the planned `remove-bypass` timestamp (no more than 1 hour ahead).
+- **Commit the incident log file alongside the re-add PUT in the SAME working session.** The file is the operator's audit trail; the GitHub audit log already records both `repository_ruleset.update` events but does not record the *reason*.
+- No SLA-enforcement automation in scope; this is a single-maintainer ops procedure.
+
+## 8. Phase 47 re-audit checklist
 
 Phase 47 (CLEANUP-04 re-audit) MUST verify:
 - [ ] `allow_auto_merge: false` via `gh api`

@@ -206,7 +206,10 @@ Plans:
   2. `gh api GET /repos/tonyrowles/patent-cite-tool/rulesets/17086676 --jq '.bypass_actors'` returns an empty array `[]`
   3. A test PR opened after the patch cannot merge until both `verifier-gate` and `deps-update-gate` checks report success; the break-glass PATCH command is committed to docs and confirmed functional before bypass removal
   4. A Vitest static-grep assertion pins both job name context strings (`verifier-gate`, `deps-update-gate`) against their YAML job definitions, so drift is caught at `npm test`
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 50-01-PLAN.md — Six-task sequential: break-glass docs §7 → GATE-01 PUT + Vitest pins → GATE-03 test PR cycle → break-glass live add-then-remove → GATE-02 PUT bypass_actors=[] → final snapshot + INDEX + SUMMARY
 
 ### Phase 51: Live Readiness UATs
 **Goal**: All 4 DEFERRED runbook stubs from 47-UAT-DEFERRED.md are re-stamped PASS with captured evidence artifacts; the self-healing loop is confirmed end-to-end on real GitHub infrastructure

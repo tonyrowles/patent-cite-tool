@@ -222,7 +222,10 @@ Plans:
   2. UAT-47-b: The `deps-update-gate` job appears in a dep-update PR's checks and blocks the PR from merging while the smoke + regression suite fails; a captured `gh pr checks` output confirms the gate fired
   3. UAT-47-d: The `cost-ledger-snapshot` workflow commits a `[skip ci]`-tagged snapshot to main at 02:00 UTC; `git log origin/main --oneline -1` confirms the commit hash and `[skip ci]` message format
   4. UAT-47-e: The verifier-gate diff-guard rejects a crafted PR that touches one of the 6 LOCKED paths; the test branch is named `test-only/diff-guard-*`; the PR is CLOSED (not merged) immediately after the gate fires; captured `gh pr checks` output shows the diff-guard failure
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 51-01-PLAN.md — Execute UAT-47-e + UAT-47-a LIVE on canonical; document UAT-47-b + UAT-47-d as deferred with sharper runbooks; close phase with STATE.md Phase 56 follow-up + ROADMAP update
 
 ### Phase 52: v3.1 Bookkeeping Cleanup
 **Goal**: All stale planning-file frontmatter is corrected and orphan reference rows are removed — completing the bookkeeping debt deferred from v3.1 and carried through v4.0

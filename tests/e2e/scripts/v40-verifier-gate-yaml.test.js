@@ -64,9 +64,15 @@ describe('v40-verifier-gate.yml contract (Phase 41-03)', () => {
     expect(yaml).toMatch(/types:\s*\[opened,\s*synchronize,\s*reopened\]/);
   });
 
-  it("V2 — branches filter is 'auto-fix/*'", () => {
-    // Head-branch glob filter matching Phase 43 auto-fix branch convention
-    expect(yaml).toMatch(/branches:\s*\[['"]auto-fix\/\*['"]\]/);
+  it('V2 — no base-ref branches filter (Phase 51.1 removed it)', () => {
+    // Phase 51.1 REGRESSION-51-01 fix: the `branches:` key under `pull_request:`
+    // filters by BASE ref (target), not HEAD ref (source). Filtering by
+    // ['auto-fix/*'] base meant the workflow never fired on PRs into main, so
+    // verifier-gate (a required check after Phase 50 GATE-01) never reported
+    // → all PRs to main blocked indefinitely. Phase 51.1 removed the filter
+    // and added in-job scope-decision steps for HEAD-ref filtering. V2 now
+    // asserts the BASE-ref filter is GONE.
+    expect(yaml).not.toMatch(/^\s*branches:\s*\[['"]auto-fix\/\*['"]\]/m);
   });
 
   it('V3 — concurrency.group is PR-scoped, cancel-in-progress: true', () => {

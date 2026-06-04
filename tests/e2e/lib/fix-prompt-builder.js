@@ -21,6 +21,14 @@
 //   "<issue_body_untrusted>\n<body>\n</issue_body_untrusted>" — nothing
 //   outside the envelope. Mirrors v3.1's <patent_data> defense.
 //
+// Phase 54 AB-02 (additive): buildFixPrompt's ok:true return gains a top-level
+//   `model` field sourced from routeModel(errorClass) (tests/e2e/lib/llm-router.js).
+//   Existing return fields are byte-unchanged; the skip-class returns are
+//   byte-unchanged (the dispatcher short-circuits skip classes before any SDK
+//   call, so the `model` field is unnecessary on that path per D-08/D-09).
+//   The ./llm-router.js import is permitted by the D-04 purity invariant
+//   because llm-router.js itself has zero imports and zero I/O.
+//
 // PROMPT-03 (frozen registry): PROMPT_SCAFFOLDS is Object.freeze()'d. Phase 42
 //   shipped EXACTLY 1 key (WRONG_CITATION); Phase 45 extends to 5 keys.
 //   FLAKE / LLM_API_ERROR / PASS remain in SKIP_CLASS_ESCALATIONS (NOT
@@ -47,6 +55,14 @@
 // DIFF_FENCE_START ("===DIFF_START===") and DIFF_FENCE_END ("===DIFF_END===")
 // fences. Plan 42-02's dispatcher (scripts/auto-fix.mjs) uses a regex
 // extraction between the fences to parse out the diff before `git apply --check`.
+
+// Phase 54 AB-02 (D-07): import routeModel for the additive `model` field on
+// buildFixPrompt's ok:true return. The llm-router.js sibling has zero imports
+// + zero I/O (pinned by tests/unit/llm-router.test.js purity-invariant test),
+// so this import does NOT violate the D-04 purity invariant on this file
+// (the ESLint per-file block in eslint.config.js restricts node:fs,
+// node:child_process, node:path, @anthropic-ai/sdk — NOT ./llm-router.js).
+import { routeModel } from './llm-router.js';
 
 // ---------------------------------------------------------------------------
 // Public string constants
@@ -408,5 +424,11 @@ export function buildFixPrompt({ errorClass, issueBody } = {}) {
   const userPrompt = `${ENVELOPE_OPEN}\n${safeBody}\n${ENVELOPE_CLOSE}`;
   const systemPrompt = scaffold();
 
-  return { ok: true, systemPrompt, userPrompt };
+  // Phase 54 AB-02 (D-06/D-07/D-08): additive top-level `model` field sourced
+  // from routeModel(errorClass). The dispatcher (scripts/auto-fix.mjs) reads
+  // `built.model` and passes it to invokeAnthropicSdkWithLedger so the ledger
+  // entry records the actually-invoked model per ERROR_CLASS. Per D-09 the
+  // field is optional — callers that ignore it continue to work; only the
+  // {ok, systemPrompt, userPrompt} fields are part of the established contract.
+  return { ok: true, systemPrompt, userPrompt, model: routeModel(errorClass) };
 }

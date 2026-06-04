@@ -483,3 +483,96 @@ describe('Phase 45 PROMPT-03 extension: historical-replay fixtures (no SDK mocke
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Phase 54 AB-02: top-level `model` field on buildFixPrompt's ok:true return
+// ---------------------------------------------------------------------------
+//
+// PIN MATRIX (additive — existing pins above unchanged):
+//   A. errorClass=GOOGLE_DOM_DRIFT             -> built.model === 'claude-opus-4-7'
+//   B. errorClass=LLM_HALLUCINATED_SELECTION   -> built.model === 'claude-opus-4-7'
+//   C. errorClass=WRONG_CITATION               -> built.model === 'claude-sonnet-4-6'
+//   D. errorClass=HARNESS_ERROR                -> built.model === 'claude-sonnet-4-6'
+//   E. Existing fields {ok, systemPrompt, userPrompt} are still present and
+//      typed correctly on supported-class returns (additive-purity pin).
+//   F. Skip-class returns (FLAKE) are byte-unchanged: ok=false, escalate present;
+//      `model` field MAY or MAY NOT be added on skip path (Phase 54 leaves the
+//      skip-class shape unchanged per D-08 — the dispatcher short-circuits skip
+//      classes before any SDK call so the field is unnecessary there).
+//
+// These tests exercise the AB-02 wire-up surface end-to-end at the
+// buildFixPrompt boundary; the underlying routeModel() contract is pinned
+// independently by tests/unit/llm-router.test.js.
+
+describe('Phase 54 AB-02 — model field on ok:true return (routed by errorClass)', () => {
+  const SAMPLE_BODY = '<!-- fp: deadbeef1234 -->\ncase-id: US12345-test\nseed: 7';
+
+  it('A. GOOGLE_DOM_DRIFT → built.model = claude-opus-4-7', () => {
+    const r = buildFixPrompt({ errorClass: 'GOOGLE_DOM_DRIFT', issueBody: SAMPLE_BODY });
+    expect(r.ok).toBe(true);
+    expect(r.model).toBe('claude-opus-4-7');
+  });
+
+  it('B. LLM_HALLUCINATED_SELECTION → built.model = claude-opus-4-7', () => {
+    const r = buildFixPrompt({ errorClass: 'LLM_HALLUCINATED_SELECTION', issueBody: SAMPLE_BODY });
+    expect(r.ok).toBe(true);
+    expect(r.model).toBe('claude-opus-4-7');
+  });
+
+  it('C. WRONG_CITATION → built.model = claude-sonnet-4-6 (default fallthrough)', () => {
+    const r = buildFixPrompt({ errorClass: 'WRONG_CITATION', issueBody: SAMPLE_BODY });
+    expect(r.ok).toBe(true);
+    expect(r.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('D. HARNESS_ERROR → built.model = claude-sonnet-4-6 (default fallthrough)', () => {
+    const r = buildFixPrompt({ errorClass: 'HARNESS_ERROR', issueBody: SAMPLE_BODY });
+    expect(r.ok).toBe(true);
+    expect(r.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('E. existing ok:true return fields are byte-unchanged (additive-purity pin)', () => {
+    // The AB-02 contract is ADDITIVE: ok/systemPrompt/userPrompt must remain
+    // present + correctly typed for every supported class. Only `model` is
+    // newly added.
+    for (const errorClass of [
+      'WRONG_CITATION',
+      'LLM_HALLUCINATED_SELECTION',
+      'WORKER_FALLBACK_FAILED',
+      'GOOGLE_DOM_DRIFT',
+      'HARNESS_ERROR',
+    ]) {
+      const r = buildFixPrompt({ errorClass, issueBody: SAMPLE_BODY });
+      expect(r.ok).toBe(true);
+      expect(typeof r.systemPrompt).toBe('string');
+      expect(r.systemPrompt.length).toBeGreaterThan(0);
+      expect(typeof r.userPrompt).toBe('string');
+      expect(r.userPrompt.startsWith(`${ENVELOPE_OPEN}\n`)).toBe(true);
+      expect(r.userPrompt.endsWith(`\n${ENVELOPE_CLOSE}`)).toBe(true);
+      // model is the new field; pinned per-class above.
+      expect(typeof r.model).toBe('string');
+    }
+  });
+
+  it('F. FLAKE skip-class return is byte-unchanged (no model field needed; escalate preserved)', () => {
+    // Phase 54 leaves the skip-class short-circuit shape untouched per D-08.
+    // The dispatcher short-circuits skip classes BEFORE any SDK call, so the
+    // `model` field is irrelevant on this path. What MUST hold is the
+    // {ok:false, escalate:'re-quarantine'} contract from Phase 42.
+    const r = buildFixPrompt({ errorClass: 'FLAKE', issueBody: SAMPLE_BODY });
+    expect(r.ok).toBe(false);
+    expect(r.escalate).toBe('re-quarantine');
+  });
+
+  it('LLM_API_ERROR skip-class return is byte-unchanged (escalate=retry)', () => {
+    const r = buildFixPrompt({ errorClass: 'LLM_API_ERROR', issueBody: SAMPLE_BODY });
+    expect(r.ok).toBe(false);
+    expect(r.escalate).toBe('retry');
+  });
+
+  it('PASS skip-class return is byte-unchanged (escalate=close-as-pass)', () => {
+    const r = buildFixPrompt({ errorClass: 'PASS', issueBody: SAMPLE_BODY });
+    expect(r.ok).toBe(false);
+    expect(r.escalate).toBe('close-as-pass');
+  });
+});

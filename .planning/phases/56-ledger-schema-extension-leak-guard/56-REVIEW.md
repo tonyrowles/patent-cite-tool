@@ -1,56 +1,49 @@
 ---
 phase: 56-ledger-schema-extension-leak-guard
-reviewed: 2026-06-04T15:15:00Z
+reviewed: 2026-06-04T15:30:00Z
 depth: standard
 files_reviewed: 3
 files_reviewed_list:
   - scripts/auto-fix.mjs
   - tests/unit/auto-fix.test.js
   - tests/unit/llm-ledger.test.js
-status: findings_present
 findings:
-  critical: 2
-  warning: 4
-  info: 3
-  total: 9
+  critical: 0
+  warning: 0
+  info: 0
+  total: 0
+status: clean
 ---
 
-# Phase 56: Code Review Report
+# Phase 56: Code Review Report (iteration 2 re-review)
 
-**Reviewed:** 2026-06-04T15:15:00Z
+**Reviewed:** 2026-06-04T15:30:00Z
 **Depth:** standard
 **Files Reviewed:** 3
-**Status:** findings_present
+**Status:** clean
 
 ## Summary
 
-Phase 56 adds a `safeAppendLedger` wrapper in `scripts/auto-fix.mjs` that guards the 7 direct `appendLedgerEntry` call sites against local-shell leakage into the committed ledger, wires `errorClass` onto each of those 7 entries, adds a single integration test (LEDGER-04) that exercises the diff-guard call site under `process.env.CI='true'`, and relaxes Test 48 cardinality in `tests/unit/llm-ledger.test.js` to accept ≥1 bootstrap entry rather than exactly one.
+All six in-scope findings from `56-REVIEW.iter2.md` (2 BLOCKER + 4 WARNING; the 3 INFO findings IN-01/IN-02/IN-03 were deferred per `--fix` default scope and explicitly excluded from this re-review per the orchestrator brief) are resolved in commits `4bb47cc..0b126a1` on `main`. No new BLOCKER or WARNING-class defects surfaced during the re-scan. Both Vitest suites pass under the two empirically load-bearing environments:
 
-The wiring is functionally consistent and the new LEDGER-04 test passes locally. However, the leak guard introduces TWO correctness regressions that are demonstrable by running the existing test suite outside CI, plus several smaller defects in the guard's predicate logic, comments, and ordering of side effects. Findings below.
+- `CI=true npx vitest run tests/unit/auto-fix.test.js tests/unit/llm-ledger.test.js` → 103/103 pass.
+- `CI= GITHUB_ACTIONS= E2E_LEDGER_PATH_OVERRIDE= npx vitest run tests/unit/auto-fix.test.js` → 42/42 pass (the original CR-01 symptom: pre-fix produced "18 failed | 24 passed").
 
-## Critical Issues
+Load-bearing invariants verified unchanged from base `1b9f615`:
+- `tests/e2e/lib/llm-ledger.js` and `.github/workflows/v40-auto-fix.yml` are byte-identical to base (`git diff 1b9f615 -- ...` returns empty).
+- `safeAppendLedger` remains module-internal (no `export` keyword).
+- The module-level `MODEL` constant is untouched (Phase 60 owns CLEAN-01 per orchestrator brief).
+- No `outcome` / `pr_merged` ledger fields added (Phase 58 territory).
 
-### CR-01: `safeAppendLedger` breaks 18 pre-existing auto-fix tests when `CI` is unset
+## Finding-by-finding verification
 
-**File:** `scripts/auto-fix.mjs:127-140`, `tests/unit/auto-fix.test.js` (entire file)
-**Issue:** The new wrapper throws when neither `process.env.CI` nor `process.env.E2E_LEDGER_PATH_OVERRIDE` is set. Only ONE test in `tests/unit/auto-fix.test.js` (the new LEDGER-04 test at line 1277) sets `process.env.CI = 'true'` before invoking `runDispatcher`. Every other test that reaches a `safeAppendLedger` path (Tests 2/3/4/7/8/9/10/12, G2, D1-D6, I1-I3, 46.9, etc.) relies on `CI` being set externally by the test runner.
+### CR-01 — file-level CI snapshot so safeAppendLedger passes locally — RESOLVED
 
-Empirical evidence (reviewer ran this locally):
+**Commit:** `4bb47cc`
+**Files:** `tests/unit/auto-fix.test.js`
 
-```
-$ CI= GITHUB_ACTIONS= E2E_LEDGER_PATH_OVERRIDE= npx vitest run tests/unit/auto-fix.test.js
-Test Files  1 failed (1)
-     Tests  18 failed | 24 passed (42)
-```
-
-Each failure surfaces `safeAppendLedger refused: cannot write to /tmp/test-ledger.json outside CI...` Vitest does not implicitly set `CI=true`, and `package.json:28` defines `test:src` as bare `vitest run` — no `cross-env CI=true` wrapper. Any developer running `npm test` (or `npm run test:src`) on a workstation without `CI` already exported in their shell will hit 18 test failures. CI passes only because GitHub Actions sets `CI=true` automatically.
-
-This violates the load-bearing claim in the wrapper's own docstring (lines 114-119): *"The mocked appendLedgerEntry is called transparently from inside this un-mocked wrapper body, so the wrapper's process.env.CI check executes in tests while the mocked appendLedgerEntry still records calls for assertion."* That works ONLY when CI=true is already set; otherwise the guard throws before reaching the mocked sink.
-
-**Fix:** Set `process.env.CI = 'true'` at module load in `tests/unit/auto-fix.test.js` (with a `beforeAll`/`afterAll` snapshot+restore) so every test in the file passes the guard, then explicitly toggle it off inside any test that needs to exercise the refusal path. Alternatively, gate `safeAppendLedger` on `process.env.NODE_ENV !== 'test'` OR `process.env.CI` OR `process.env.E2E_LEDGER_PATH_OVERRIDE` so Vitest's auto-set `NODE_ENV=test` provides a third escape hatch. Either change must include a sanity test that `CI= GITHUB_ACTIONS= E2E_LEDGER_PATH_OVERRIDE= npx vitest run tests/unit/auto-fix.test.js` passes.
-
+Verified at `tests/unit/auto-fix.test.js:250-258`:
 ```js
-// tests/unit/auto-fix.test.js — add near top of file
 let __savedCI;
 beforeAll(() => { __savedCI = process.env.CI; process.env.CI = 'true'; });
 afterAll(() => {
@@ -59,145 +52,86 @@ afterAll(() => {
 });
 ```
 
-### CR-02: `safeAppendLedger` predicate accepts `CI=false`/`CI=0`/`CI=anything` — divergent from the rest of the codebase
+Snapshot-and-restore semantics are correct. Empirical check: `CI= GITHUB_ACTIONS= E2E_LEDGER_PATH_OVERRIDE= npx vitest run tests/unit/auto-fix.test.js` now reports 42/42 pass (pre-fix: 18 failed | 24 passed). The LEDGER-04 test at the bottom of the file still has its own `try/finally { delete process.env.CI; }`; because LEDGER-04 is the LAST describe block in the file (last `describe` at line 1317; file ends at 1342) and vitest is configured `fileParallelism: false` (`vitest.config.js`) with no `it.concurrent` calls in the file, no subsequent test sees the deleted env — and `afterAll` restores the pre-file value from `__savedCI`. CR-01 fully resolved.
 
-**File:** `scripts/auto-fix.mjs:128`
-**Issue:** The guard uses `!process.env.CI` (truthy/falsy on the string). In JavaScript, the strings `'false'`, `'0'`, `'no'`, and any other non-empty value are all truthy, so the guard PASSES when `CI=false` or `CI=0`. Compare with `tests/e2e/lib/llm-driver.js:387,518` and `tests/e2e/lib/llm-ledger.js:86` which all use the canonical strict form `process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true'`.
+### CR-02 — align safeAppendLedger CI guard with canonical form — RESOLVED
 
-Consequences:
-- A developer who has `export CI=false` in their shell (e.g., a common pattern for opting OUT of CI-tagged behavior elsewhere) will pass this guard and leak entries to the committed ledger — the exact failure mode this wrapper was added to prevent.
-- The guard also does NOT accept `GITHUB_ACTIONS=true` as a CI signal, despite the rest of the codebase treating it as equivalent. A CI runner that sets only `GITHUB_ACTIONS` (or any of the other CI-flavor envs that the driver accepts) would be refused.
+**Commit:** `d78bea2`
+**Files:** `scripts/auto-fix.mjs`
 
-**Fix:** Align the predicate with the rest of the codebase:
-
+Verified at `scripts/auto-fix.mjs:155-170`:
 ```js
-function safeAppendLedger(entry) {
-  const inCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-  const hasOverride =
-    typeof process.env.E2E_LEDGER_PATH_OVERRIDE === 'string' &&
-    process.env.E2E_LEDGER_PATH_OVERRIDE.trim().length > 0;
-  if (!inCi && !hasOverride) {
-    throw new Error(/* ... */);
-  }
-  appendLedgerEntry(LEDGER_PATH, entry);
-}
+const inCi =
+  process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+const hasOverride =
+  typeof process.env.E2E_LEDGER_PATH_OVERRIDE === 'string' &&
+  process.env.E2E_LEDGER_PATH_OVERRIDE.trim().length > 0;
+if (!inCi && !hasOverride) { throw new Error(...); }
 ```
 
-The same trim-and-length check that `llm-ledger.js:74-98` uses for `E2E_LEDGER_PATH_OVERRIDE` should also be mirrored here; the current `!process.env.E2E_LEDGER_PATH_OVERRIDE` accepts a single-space string `' '` as opt-in.
+Strict-equality CI check (`=== 'true'`) matches the canonical form at `tests/e2e/lib/llm-driver.js:387,518` and `tests/e2e/lib/llm-ledger.js:86`. `GITHUB_ACTIONS=true` is now accepted as a CI signal. The override is type-checked + trim-and-length checked (mirrors the `llm-ledger.js:74-98` WR-05 IIFE), so a whitespace-only override no longer accidentally opts in. The three originally-broken cases (`CI=false`, `CI=0`, whitespace-only override) are all now refused; `GITHUB_ACTIONS=true` is now accepted. CR-02 fully resolved.
 
-## Warnings
+### WR-01 — E2E_LEDGER_PATH_OVERRIDE runtime-opt-in misleading in JSDoc — RESOLVED
 
-### WR-01: `E2E_LEDGER_PATH_OVERRIDE` opt-in does NOT actually redirect the write target
+**Commit:** `381d08f`
+**Files:** `scripts/auto-fix.mjs` (JSDoc only)
 
-**File:** `scripts/auto-fix.mjs:127-140`
-**Issue:** `safeAppendLedger` checks `process.env.E2E_LEDGER_PATH_OVERRIDE` at CALL time, but then writes to `LEDGER_PATH`, which was resolved at MODULE LOAD time by the IIFE in `tests/e2e/lib/llm-ledger.js:74-98`. If a test process imports `auto-fix.mjs` first and then sets `E2E_LEDGER_PATH_OVERRIDE`, the guard passes but the write lands on the canonical `tests/e2e/.llm-spend-ledger.json` (the committed file). This silently defeats the "integration-test escape hatch" claim in the docstring (line 99-101).
+Verified at `scripts/auto-fix.mjs:102-116` — the JSDoc now contains an `IMPORTANT — runtime-opt-in caveat` block that explicitly states `E2E_LEDGER_PATH_OVERRIDE` is checked at CALL time but `LEDGER_PATH` is resolved at MODULE LOAD time by the WR-05 IIFE in `tests/e2e/lib/llm-ledger.js:74-98`. The caveat names the workaround (set the env BEFORE the Node process imports `auto-fix.mjs` or any transitive import of `llm-ledger.js`) and explains why the existing `tests/unit/auto-fix.test.js` suite escapes the trap (`vi.mock` stubs BOTH `appendLedgerEntry` AND `LEDGER_PATH`). Documentation-only fix is acceptable for a non-existent integration test surface; the trap is now discoverable by any future integration-test author. WR-01 fully resolved.
 
-The risk is contained today because the auto-fix.test.js suite uses `vi.mock` to substitute both `appendLedgerEntry` AND `LEDGER_PATH`, so the wrapper's `LEDGER_PATH` is `'/tmp/test-ledger.json'` (the mock constant) — not the real path. But the docstring promises a runtime opt-in that does not exist outside the mocked path, and any future integration test that imports the real module while setting the env at runtime will hit this trap.
+### WR-02 — dispatchFlakeState side effects ordered before terminal safeAppendLedger — RESOLVED
 
-**Fix:** Either (a) document explicitly that `E2E_LEDGER_PATH_OVERRIDE` must be set BEFORE the module loads or the override is a no-op, or (b) have `safeAppendLedger` resolve the path at call time via the same IIFE logic, or (c) refuse if `process.env.E2E_LEDGER_PATH_OVERRIDE` resolves to a different path than `LEDGER_PATH`. Option (c) catches the most-likely misuse:
+**Commit:** `fc88e36`
+**Files:** `scripts/auto-fix.mjs`
 
-```js
-if (hasOverride) {
-  const expected = path.resolve(process.env.E2E_LEDGER_PATH_OVERRIDE.trim());
-  if (expected !== LEDGER_PATH) {
-    throw new Error(
-      `E2E_LEDGER_PATH_OVERRIDE was set AFTER module load — ` +
-      `LEDGER_PATH still points at ${LEDGER_PATH}, not ${expected}. ` +
-      `Set E2E_LEDGER_PATH_OVERRIDE before importing auto-fix.mjs.`,
-    );
-  }
-}
-```
+Verified at `scripts/auto-fix.mjs:377-396` — the helper now pre-flights the CI/override guard at the TOP of `dispatchFlakeState`, BEFORE any of the four side effects can fire (`gh label create`, `gh issue create`, `atomicWriteJson(SUPPRESSION_PATH, ...)`, `execFileSync('node', ['scripts/quarantine-append.mjs', ...])`). The predicate is byte-identical to CR-02's `safeAppendLedger` predicate (same `inCi` + `hasOverride` shape) so the two cannot diverge. The throw message references the CI / override env vars explicitly so the failure mode is self-explanatory at the call site. WR-02 fully resolved.
 
-### WR-02: `dispatchFlakeState` performs side effects BEFORE `safeAppendLedger` can fail
+WR-02 epilogue (`runDispatcher` Step 6 ordering) confirmed safe by the fix doc and re-verified at `scripts/auto-fix.mjs:671-696`: the `safeAppendLedger` call lands BEFORE the `gh issue comment` so a throw aborts before any external side effect — no pre-flight needed there.
 
-**File:** `scripts/auto-fix.mjs:370-433` (FLAKE_ESCALATION + FLAKE branches) leading into the trailing `safeAppendLedger` at line 444
-**Issue:** When `decision.state === 'FLAKE_ESCALATION'` (or FLAKE), the helper does the following BEFORE writing the summary ledger entry:
-1. `execFileSync('gh', ['label', 'create', ...])` (line 374) — creates a GitHub label
-2. `execFileSync('gh', ['issue', 'create', ...])` (line 387) — opens a public issue
-3. `atomicWriteJson(SUPPRESSION_PATH, ...)` (line 409) — writes a suppression entry to disk
-4. `execFileSync('node', ['scripts/quarantine-append.mjs', ...])` (line 419) — mutates the quarantine corpus
+### WR-03 — stale line-number references in errorClass annotation comments — RESOLVED
 
-THEN it calls `safeAppendLedger` (line 444). If the wrapper throws (e.g., a developer running `--force-api` locally without `CI=true` to test the FLAKE branch), all four side effects have already landed but the ledger entry is missing. Auditability is broken: an external GitHub issue exists, a suppression is on disk, and the corpus is reset, but the ledger has no record. Re-running will re-issue the side effects (no idempotency guarantee on the issue-create) because the suppression check is also corrupted.
+**Commit:** `12ca473`
+**Files:** `scripts/auto-fix.mjs`, `tests/unit/auto-fix.test.js`
 
-**Fix:** Either pre-flight the guard check at the top of `dispatchFlakeState` so the helper bails BEFORE producing side effects, or wrap the four side-effect blocks in the same `inCi || hasOverride` gate that `safeAppendLedger` uses. Pre-flight is the minimal fix:
+Verified by `grep -n "line 495\|line 707" scripts/auto-fix.mjs tests/unit/auto-fix.test.js` — returns ZERO matches (was 6+ pre-fix). All five `// LEDGER-01 — in scope from Step 4 (line 495)` comments are replaced with the symbol-anchored form `// LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4` (visible at scripts/auto-fix.mjs:682, 729, 826, 849, 887). The two stale `line 707` references in the test file are rewritten as `Step 12 (diff-guard violation) call site` and `at the Step 12 call site` (`tests/unit/auto-fix.test.js:1296, 1326`). Symbol-anchoring survives unrelated line shifts; the future-drift vector noted in REVIEW.iter2 is closed. WR-03 fully resolved.
 
-```js
-export async function dispatchFlakeState({ ... }) {
-  // Pre-flight the leak guard so we don't issue gh/quarantine side effects
-  // and then fail to record the ledger entry.
-  if (!process.env.CI && !process.env.E2E_LEDGER_PATH_OVERRIDE) {
-    throw new Error('dispatchFlakeState refused outside CI/override — same gate as safeAppendLedger');
-  }
-  // ...
-}
-```
+### WR-04 — dispatchFlakeState hardcoded errorClass: null — RESOLVED
 
-Same concern applies to `runDispatcher` Step 6 (line 600: ls-remote idempotency ledger write follows a `gh issue comment` at line 615 — but the order is reversed here: ledger first, then comment, so the leak is one-sided). Verify the order at every call site.
+**Commit:** `0b126a1`
+**Files:** `scripts/auto-fix.mjs`
 
-### WR-03: Stale line-number references in 6 of the 7 `errorClass` annotation comments
+Verified at:
+- `scripts/auto-fix.mjs:376` — signature: `dispatchFlakeState({ ..., errorClass = null, now = ... })` adds the new param with a defensive `null` default.
+- `scripts/auto-fix.mjs:429` — FLAKE_SUPPRESSED branch: `errorClass: errorClass ?? null,   // LEDGER-01 — threaded from runDispatcher per WR-04`.
+- `scripts/auto-fix.mjs:526` — flake-dispatched summary: `errorClass: errorClass ?? null,   // LEDGER-01 — threaded from runDispatcher per WR-04`.
+- `scripts/auto-fix.mjs:711-713` — caller threads it: `errorClass,  // Phase 56 WR-04 — thread errorClass so the FLAKE_SUPPRESSED / and flake-dispatched ledger rows carry 'FLAKE' instead of / a hardcoded null ...`.
 
-**File:** `scripts/auto-fix.mjs:610, 654, 751, 774, 812` (and the LEDGER-04 test comment in `tests/unit/auto-fix.test.js:1257`)
-**Issue:** Every wired errorClass site carries the comment `// LEDGER-01 — in scope from Step 4 (line 495)`. Line 495 in the current file is the `VALID_TRANSPORTS` allow-list check (Step 1b), NOT the `extractErrorClass` call. The actual extraction is at line 549. The LEDGER-04 test comment at `tests/unit/auto-fix.test.js:1257` references *"line 707 call site (Step 12 — diff-guard violation)"* but line 707 in `scripts/auto-fix.mjs` is `phase: PHASE,` inside the SDK-error ledger write at Step 10. The actual diff-guard violation `safeAppendLedger` is at line 764.
+`grep -n "errorClass: null" scripts/auto-fix.mjs` returns ZERO matches in the dispatchFlakeState body. The `errorClass ?? null` fallback preserves the original behavior when an unexpected caller fails to pass the value, but the live call path now threads `'FLAKE'` end-to-end. WR-04 fully resolved.
 
-These stale references will mislead future maintainers grep'ing for the comment landmark. They are also brittle — any line addition above them flips them further off.
+## Out-of-scope findings (informational, not flagged)
 
-**Fix:** Either (a) update each comment to the correct current line number, (b) drop the line number and reference the step name only (e.g., `// LEDGER-01 — errorClass in scope from Step 4 ERROR_CLASS extraction`), or (c) anchor the comment on a named symbol (`// LEDGER-01 — errorClass from extractErrorClass(issueJson.labels)`).
+Per the orchestrator brief:
+- **IN-02 / CLEAN-01** — the module-level `MODEL` constant remains in place. Phase 60 owns this cleanup.
+- **outcome / pr_merged** ledger field absence is Phase 58 scope, not flagged here.
 
-### WR-04: `dispatchFlakeState` ledger entries hardcode `errorClass: null` even when caller has it in scope
+The 3 INFO findings from `56-REVIEW.iter2.md` (IN-01 Test 48 cardinality strengthening, IN-02 MODEL-constant lifetime, IN-03 LEDGER-04 parameterization) were deferred by the fixer per default `--fix` scope (BLOCKER + WARNING only). They are NOT re-flagged here — the brief explicitly drops them.
 
-**File:** `scripts/auto-fix.mjs:357, 454`
-**Issue:** Both flake-dispatched and flake-suppressed ledger entries set `errorClass: null` with the comment `LEDGER-01 — dispatchFlakeState body has no errorClass in scope`. But `runDispatcher` already extracted `errorClass` at line 549 BEFORE calling `dispatchFlakeState` at line 633. The caller could thread it through:
+## Re-scan: no new BLOCKER / WARNING surfaces
 
-```js
-const exitCode = await dispatchFlakeState({
-  caseId,
-  fingerprint,
-  issueNumber: issue,
-  transport,
-  errorClass,   // ← currently dropped on the floor
-});
-```
+I re-scanned the three in-scope files for:
+- Hardcoded secrets / API keys / tokens — none found.
+- `eval`, `innerHTML`, `exec`, `shell_exec`, `system` outside the audited `execFileSync` array-arg pattern — none found.
+- Empty catch blocks — none found (every catch logs to stderr or comments why it is swallowed, e.g., idempotent label-create).
+- `==` / `!=` loose-equality on identity-sensitive values — none found; strict equality used throughout.
+- Debug artifacts (`console.log`, `debugger`, raw TODO/FIXME/XXX/HACK) — none found.
+- Null/undefined dereference of `process.env.*` values — guarded by `typeof === 'string'` checks where it matters.
+- New shadowing in `dispatchFlakeState` from the `__wr02_` prefix vars — checked: those names are unique within the helper body and do not collide with caller scope.
+- `errorClass ?? null` v.s. `errorClass || null` — the fixer correctly used `??` so the falsy string `''` would round-trip rather than silently becoming `null`; in practice `extractErrorClass` only returns a member of `RECOGNIZED_LABELS` or the sentinel `'AMBIGUOUS'` / `null`, so the distinction is moot today but the choice is forward-correct.
 
-This matters for downstream consumers (dashboards, audit queries) that filter by `errorClass`. A FLAKE-labeled run currently shows up as `errorClass: null` even though we know it was `FLAKE`. The Phase 47 WARNING-01 fix (threading `transport` through to fix the forensic mis-tagging) is exactly the same pattern and is now repeated by-omission for `errorClass`.
-
-If the intent is to leave this for Phase 58/60, document it; otherwise wire it.
-
-**Fix:** Add `errorClass` to the `dispatchFlakeState` signature default and pass it from the caller. Update both ledger entries to `errorClass: errorClass ?? null`.
-
-## Info
-
-### IN-01: Test 48 (`llm-ledger.test.js`) cardinality relaxation hides bootstrap-entry-count contract regressions
-
-**File:** `tests/unit/llm-ledger.test.js:1010-1024`
-**Issue:** The pre-Phase-56 assertion was *"exactly 1 bootstrap entry, exactly 1 month bucket, invocations=1, total_usd=0"*. Post-Phase-56 it is *"≥1 entry with phase='39-bootstrap'"* with no upper bound and no month-count constraint. The relaxation accepts a state where the bootstrap entry has been duplicated (e.g., by a re-run of `phase-39-flip`) — that is an unrelated regression Test 48 used to catch.
-
-The relaxation also drops the assertion that `bucket.invocations === 1` and `bucket.total_usd === 0` (post-relax it only checks `boot.cost_usd === 0` on the bootstrap entry, not the bucket aggregate). A bucket aggregate that drifts (e.g., a $0 entry that incorrectly bumped `total_usd`) would now pass.
-
-**Fix:** Strengthen the post-relax assertion to lock the bootstrap entry's stability while allowing additional entries:
-
-```js
-const bootstraps = allIterations.filter((e) => e?.phase === '39-bootstrap');
-expect(bootstraps.length).toBe(1);  // bootstrap is unique even when ledger has live entries
-// ... existing per-entry shape checks ...
-```
-
-Or assert that ALL `phase === '39-bootstrap'` entries have the locked shape (in case the live entries somehow re-use the phase tag).
-
-### IN-02: Dead module-level `MODEL` constant is referenced from 7 ledger sites — Phase 60 cleanup will need to update each
-
-**File:** `scripts/auto-fix.mjs:157, 347, 444, 600, 644, 741, 764, 802, 878`
-**Issue:** Per Phase 56 scope discipline this is NOT flagged as a defect (Phase 60 owns CLEAN-01). Informational note for the Phase 60 reviewer: `MODEL = 'claude-sonnet-4-6'` is used as a literal value at every `safeAppendLedger` call site AND at the PR-body hint (line 878). When Phase 60 removes the module-level constant in favor of either `built.model` (the real resolved model) or the SDK result's `modelId`, every one of these references must be updated to avoid a silent `MODEL is not defined` crash at runtime. Consider replacing `model: MODEL` with `model: built?.model ?? MODEL_FALLBACK` as a transitional step.
-
-### IN-03: LEDGER-04 test does not assert `errorClass` is wired at the OTHER 6 ledger call sites
-
-**File:** `tests/unit/auto-fix.test.js:1276-1300`
-**Issue:** The new test only exercises the diff-guard violation site (line 764 in the source — the comment says line 707 which is stale per WR-03). The other 6 sites (FLAKE_SUPPRESSED dispatch line 347, FLAKE dispatch line 444, branchExisted line 600, skip-class line 644, malformed-diff line 741, apply-check-failed line 802) are wired but unverified by tests. A future refactor that drops `errorClass` from any one of those sites would not be caught.
-
-**Fix:** Parametrize the LEDGER-04 test over the 7 call-site fixtures, or add one targeted assertion per site. Minimal addition: re-use the existing tests that already reach each call site (e.g., Test 8 reaches apply-check-failed, Test 12 reaches branchExisted, Tests 9/10 reach malformed-diff, Tests 3/4 reach skip-class) — add a single `expect(entries.some((e) => e.errorClass === <expected>)).toBe(true)` to each.
+No new defects.
 
 ---
 
-_Reviewed: 2026-06-04T15:15:00Z_
+_Reviewed: 2026-06-04T15:30:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Iteration: 2 (re-review of fixes applied for `56-REVIEW.iter2.md`)_

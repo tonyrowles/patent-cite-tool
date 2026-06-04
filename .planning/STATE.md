@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Readiness Gate + Push
 status: completed
-stopped_at: Phase 51.1 closed (REGRESSION-51-01 resolved)
-last_updated: "2026-06-04T00:58:27.272Z"
-last_activity: 2026-06-04 -- Phase 52 marked complete
+stopped_at: Phase 53 closed (PARTIAL-01..04 — assertPartialGate + runPartialPromote + Vitest pin)
+last_updated: "2026-06-04T02:01:56Z"
+last_activity: 2026-06-04 -- Phase 53 marked complete
 progress:
   total_phases: 9
-  completed_phases: 6
-  total_plans: 6
-  completed_plans: 6
-  percent: 67
+  completed_phases: 7
+  total_plans: 7
+  completed_plans: 7
+  percent: 78
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 53 — auto-fix:partial-verified Semantics
+**Current focus:** Phase 54 — Multi-Model A/B
 
 ## Current Position
 
-Phase: 52 — COMPLETE
+Phase: 53 — COMPLETE
 Plan: 1 of 1
-Status: Phase 52 complete
-Last activity: 2026-06-04 -- Phase 52 marked complete
+Status: Phase 53 complete
+Last activity: 2026-06-04 -- Phase 53 marked complete
 
-Progress: [██████░░░░] 56%
+Progress: [███████░░░] 78%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [██████░░░░] 56%
 - [Phase 50]: Closure (2026-06-03): ruleset 17086676 hardened — 5 rules including required_status_checks for verifier-gate+deps-update-gate (integration_id=15368), bypass_actors=[], current_user_can_bypass→never. Two PUTs in audit log. Test PR proved enforcement (Method A+B); break-glass runbook (docs §7) live-tested idempotent BEFORE bypass removal. Vitest D11+D12 pin jobid strings. 6 atomic commits 79d5415→9c3b016→fab8d2a→d455b32→b57d3a9→bcaa89c.
 - [Phase 51]: Closure (2026-06-03): 0 PASS / 1 FAIL / 1 AUTO-DEFERRED / 1 STILL-DEFERRED / 1 BLOCKED-BY-PHASE-50. UAT-47-e FAILED — v40-verifier-gate.yml's pull_request.branches:['auto-fix/*'] targets BASE ref not HEAD; the gate cannot fire on PRs into main. UAT-47-a AUTO-DEFERRED per D-13 (sequence-gate). UAT-47-b STILL-DEFERRED (fixture-mutator authoring required). UAT-47-d BLOCKED-BY-PHASE-50 (ruleset blocks ledger-commit push to main). 5 atomic commits 3cb821a→24b4f08→aedafa0→5121c39→(final). Phase 56 follow-up enqueued (see Pending Todos) folding all four UATs into one v4.2 work unit covering verifier-gate trigger patch + ledger-commit refactor + deps-update audit + fixture-mutator. $0 API spent; no destructive mutations on origin; 2 transient test PRs (#12, #13) opened+closed with --delete-branch.
 - [Phase 51.1]: Closure (2026-06-03): REGRESSION-51-01 resolved — v40-verifier-gate.yml BASE-ref filter `branches:['auto-fix/*']` REMOVED + v40-deps-update.yml `pull_request:` trigger ADDED + verbatim scope-decision fast-path step prepended to 4 PR-gate jobs (verifier-gate/regression-suite/ready-flip in verifier-gate.yml; deps-update-gate in deps-update.yml); diff-guard + dep-scan jobs unguarded by design (universal LOCKED-path check + PR-creator). Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline on {rules, bypass_actors, current_user_can_bypass}). Break-glass §7 runbook live-tested end-to-end with one extra cycle to land closure commits after planned in-task push was blocked by its own bypass removal. Verification PR #14 captured BOTH required contexts firing (verifier-gate + deps-update-gate both SUCCESS via scope-decision fast-path), then CLOSED+branch-deleted. 8 atomic chore(51.1) commits cfb0951→a5a791c→583346e→ea45a47→9d388ad→59546dd→1aa226e→(T7 closure). Phase 56 pending-todo line amended in-place with [NOTE 2026-06-03] annotation per D-16.
+- [Phase 53]: Closure (2026-06-04): all 4 PARTIAL-* REQs CLOSED. assertPartialGate + runPartialPromote added as SEPARATE entry points in scripts/auto-fix-promote.mjs (assertTripleGate body byte-unchanged vs HEAD~3 baseline; verified after each of the 3 commits). `_skipCiGuard:\s*true` grep count (non-comment) holds at 1 across all 3 commits (only the existing main() verified-branch call). PARTIAL-04 Vitest trust-invariant pin (T5: assertTripleGate throws on auto-fix:partial-verified) ships in the SAME COMMIT as PARTIAL_LABEL + assertPartialGate (D-18). v40-verifier-gate.yml ready-flip emits auto-fix:partial-verified label conditional on >=4/5 + FLAKE-absent (D-09..D-13); existing verified-label step byte-unchanged (D-10). v40-auto-promote.yml job-level if-filter widened to OR-branch (verified clause preserved verbatim); cross-workflow data path uses `<!-- partial_passing_cases: c1,c2 -->` PR-comment HTML marker. Rule 1 deviation: plan referenced non-existent `promoteFromQuarantine` export — used existing `runPromote` with `_skipCiGuard:false` (same per-case primitive, preserves trust invariant). Documented Task 3 file-list deviation: commit (c) re-touches v40-verifier-gate.yml for additive marker-tail only (PARTIAL-02 bytes unchanged). 3 atomic feat(53) commits in D-20 locked order: (a) 0aa8202 PARTIAL-01+04 → (b) 0489305 PARTIAL-02 → (c) 3d4db45 PARTIAL-03. Vitest delta: +18 unit tests (8→26 in tests/unit/auto-fix-promote-gate.test.js). Commits stay LOCAL; operator will batch-push all v4.1 phases (52-55) in single milestone-close PR. Pre-existing failures noted (NOT Phase 53): v40-verifier-gate-yaml.test.js V2 (Phase 51.1 unfinished test update); llm-ledger.test.js Test 48 (runtime-mutated working copy).
 
 ### Pending Todos
 
@@ -92,6 +93,6 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 ## Session Continuity
 
-Last session: 2026-06-03T17:50:00Z
-Stopped at: Phase 51.1 closed (REGRESSION-51-01 resolved)
-Resume file: .planning/phases/51.1-required-check-trigger-hotfix/51.1-01-SUMMARY.md (next: Phase 52 context-gather)
+Last session: 2026-06-04T02:01:56Z
+Stopped at: Phase 53 closed (PARTIAL-01..04 complete; 3 atomic feat(53) commits LOCAL)
+Resume file: .planning/phases/53-auto-fix-partial-verified-semantics/53-01-SUMMARY.md (next: Phase 54 context-gather — Multi-Model A/B)

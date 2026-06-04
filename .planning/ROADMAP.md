@@ -12,7 +12,7 @@
 - ✅ **v3.0 Autonomous E2E Testing Agent** — Phases 26-31 (shipped 2026-05-20)
 - ✅ **v3.1 LLM-Driven Product Improvement Loop** — Phases 32-38 (shipped 2026-05-30)
 - ✅ **v4.0 Self-Healing Test Suite** — Phases 39-47 (shipped 2026-06-02)
-- 🚧 **v4.1 Readiness Gate + Push** — Phases 48-55 (in progress)
+- 🚧 **v4.1 Readiness Gate + Push** — Phases 48-55 (ready for milestone-close batch PR — all phases complete LOCAL; push pending)
 
 ## Phases
 
@@ -162,7 +162,7 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 - [x] **Phase 52: v3.1 Bookkeeping Cleanup** - Re-stamp 5 stale HUMAN-UAT/VERIFICATION frontmatter files; remove 3 orphan quick-task slug rows from STATE.md (completed 2026-06-03)
 - [x] **Phase 53: auto-fix:partial-verified Semantics** - Implement assertPartialGate (separate from assertTripleGate); partial label producer in verifier-gate; widened auto-promote filter (completed 2026-06-04; 3 atomic feat(53) commits: 0aa8202 -> 0489305 -> 3d4db45; all 4 PARTIAL-* CLOSED; assertTripleGate body byte-unchanged; _skipCiGuard:true count=1)
 - [x] **Phase 54: Multi-Model A/B** - llm-router (frozen MODEL_ROUTES) + buildFixPrompt model field + auto-fix.mjs wire + a-b-winner abstention-mode (completed 2026-06-04; 4 atomic feat(54) commits LOCAL: d744caa → 1efbb4c → 09809fd → 6014368 + closure chore; AB-04 in abstention mode per D-20 schema gap; Phase 56 follow-up enqueued for ledger schema extension)
-- [ ] **Phase 55: Auto-Fix Dashboard** - aggregateAutoFixMetrics + renderAutoFixSection in weekly-digest.mjs; 7 observable metrics in collapsible section
+- [x] **Phase 55: Auto-Fix Dashboard** - renderAutoFixPipelineSection + fetchAutoFixPrs in scripts/weekly-digest.mjs; 7 observable metrics in `<details>` collapsible section; runDigest step (6.5) appends section AFTER renderDigest (preserves ≤50-line budget); SUMMARY_KEYS byte-unchanged (D-12) (completed 2026-06-04; 3 atomic commits LOCAL: 82a49dd feat(55) DASH-02 → 704284e feat(55) DASH-01+03 → chore(55) closure; +5 Vitest assertions; all 3 DASH-* CLOSED)
 
 ## Phase Details
 
@@ -298,7 +298,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 55-01-PLAN.md — renderAutoFixPipelineSection + fetchAutoFixPrs + 5 Vitest pins → runDigest wires Auto-Fix Pipeline section (combinedMonthlyTotalByTransport.combined, mergedAt!==null filter) → closure (SUMMARY+STATE+ROADMAP); 3 atomic local commits (2 feat(55) + 1 chore(55)) in LOCKED D-22 order; autonomous: true
+- [x] 55-01-PLAN.md — 3-task plan completed 2026-06-04 in LOCKED D-22 order: (a) 82a49dd feat(55) DASH-02 renderAutoFixPipelineSection + fetchAutoFixPrs + Vitest pins (SUMMARY_KEYS byte-unchanged) → (b) 704284e feat(55) DASH-01 + DASH-03 runDigest wires Auto-Fix Pipeline section (combinedMonthlyTotalByTransport.combined, mergedAt!==null filter, NaN-guarded) → (c) chore(55) closure. All 3 DASH-* CLOSED. SUMMARY_KEYS byte-unchanged across all 3 commits (`git diff HEAD~3 -- tests/e2e/lib/llm-report.js | wc -l` = 0; D-12 enforced). 5 new Vitest assertions in tests/unit/weekly-digest-auto-fix.test.js (Tests 2-6). T-55-05 INFO acknowledged: most metric VALUES display `n/a` at ship time (wiring ships, data populates from Phase 56 ledger schema extension). autonomous: true; LOCAL only per D-23.
 
 ## Progress
 
@@ -315,4 +315,4 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |
 | 53. auto-fix:partial-verified Semantics | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 54. Multi-Model A/B | v4.1 | 1/1 | Complete | 2026-06-04 |
-| 55. Auto-Fix Dashboard | v4.1 | 0/TBD | Not started | - |
+| 55. Auto-Fix Dashboard | v4.1 | 1/1 | Complete | 2026-06-04 |

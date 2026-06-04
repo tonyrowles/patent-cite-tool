@@ -269,6 +269,10 @@ export function parseSourceIssue({ body = '', commitMessage = '' } = {}) {
 const KNOWN_FLAGS = new Set([
   '--pr', '--pr-labels', '--pr-merged', '--pr-body', '--pr-commit-message',
   '--source-issue', '--source-issue-labels', '--case-id',
+  // Phase 53 PARTIAL-03 (D-16): --passing-cases CSV for the partial path.
+  // Ignored by the verified path; consumed by assertPartialGate +
+  // runPartialPromote on the partial branch of main().
+  '--passing-cases',
   '--help', '-h',
 ]);
 
@@ -290,6 +294,11 @@ export function parseArgv(argv) {
   let sourceIssue = null;
   let sourceIssueLabelsCsv = '';
   let caseId = null;
+  // Phase 53 PARTIAL-03 (D-16): CSV of passing cases for the partial path.
+  // The verified path ignores this; the partial path consumes it as
+  // assertPartialGate({ passingCases }). Empty default mirrors the
+  // existing labels-CSV pattern.
+  let passingCasesCsv = '';
 
   for (let i = 2; i < argv.length; i++) {
     const tok = argv[i];
@@ -299,7 +308,7 @@ export function parseArgv(argv) {
         '  --pr <n> --pr-labels <csv> --pr-merged <true|false> \\\n' +
         '  --pr-body <path> --pr-commit-message <string> \\\n' +
         '  --source-issue <n> --source-issue-labels <csv> \\\n' +
-        '  --case-id <id>\n',
+        '  --case-id <id> [--passing-cases <csv>]\n',
       );
       process.exit(0);
     }
@@ -316,6 +325,7 @@ export function parseArgv(argv) {
       case '--source-issue':         sourceIssue = takeValue(argv, i, tok); i++; break;
       case '--source-issue-labels':  sourceIssueLabelsCsv = takeValue(argv, i, tok); i++; break;
       case '--case-id':              caseId = takeValue(argv, i, tok); i++; break;
+      case '--passing-cases':        passingCasesCsv = takeValue(argv, i, tok); i++; break;
     }
   }
 
@@ -337,6 +347,9 @@ export function parseArgv(argv) {
       ? sourceIssueLabelsCsv.split(',').map((s) => s.trim()).filter(Boolean)
       : [],
     caseId,
+    passingCases: passingCasesCsv
+      ? passingCasesCsv.split(',').map((s) => s.trim()).filter(Boolean)
+      : [],
   };
 }
 
@@ -362,56 +375,130 @@ async function main(argv = process.argv) {
     }
   }
 
-  // Triple-gate FIRST. Any leg failure throws and aborts before any mutation.
-  try {
-    assertTripleGate({
-      prLabels: args.prLabels,
-      merged: args.prMerged,
-      sourceIssueLabels: args.sourceIssueLabels,
+  // Phase 53 PARTIAL-03 (D-15): label-branch decision. The workflow-level
+  // if: filter (v40-auto-promote.yml) already widened to accept BOTH labels;
+  // here the script disambiguates: hasVerified takes the existing triple-
+  // gate + runPromote({_skipCiGuard:true}) path UNCHANGED; hasPartial takes
+  // the new assertPartialGate + runPartialPromote({_skipCiGuard:false}) path;
+  // neither label exits 0 defensively (the workflow filter should prevent
+  // reaching this branch, but defense-in-depth against direct CLI misuse).
+  // Co-presence (both labels): verified takes precedence — partial is a
+  // NEW capability, NOT a replacement.
+  const hasVerified = args.prLabels.includes('auto-fix:verified');
+  const hasPartial  = args.prLabels.includes(PARTIAL_LABEL);
+
+  if (hasVerified) {
+    // ====================================================================
+    // VERIFIED PATH — Phase 44 triple-gate + runPromote (BYTE-UNCHANGED).
+    // ====================================================================
+
+    // Triple-gate FIRST. Any leg failure throws and aborts before any mutation.
+    try {
+      assertTripleGate({
+        prLabels: args.prLabels,
+        merged: args.prMerged,
+        sourceIssueLabels: args.sourceIssueLabels,
+      });
+    } catch (err) {
+      process.stderr.write(`[auto-fix-promote] ${err.message}\n`);
+      process.exit(1);
+    }
+
+    // Source-issue id: cross-check the workflow-resolved --source-issue against
+    // parseSourceIssue. If the workflow passed an id, the body/commit recovery
+    // must AGREE with it (defense against argv tampering). If --source-issue
+    // is absent, parseSourceIssue is the sole source of truth.
+    let resolvedSourceIssue;
+    try {
+      resolvedSourceIssue = parseSourceIssue({
+        body,
+        commitMessage: args.prCommitMessage,
+      });
+    } catch (err) {
+      process.stderr.write(`[auto-fix-promote] ${err.message}\n`);
+      process.exit(1);
+    }
+    if (args.sourceIssue !== null && args.sourceIssue !== resolvedSourceIssue) {
+      process.stderr.write(
+        `[auto-fix-promote] --source-issue ${args.sourceIssue} disagrees with parsed id ${resolvedSourceIssue}\n`,
+      );
+      process.exit(1);
+    }
+
+    // Triple-gate satisfied. Now invoke runPromote with the _skipCiGuard
+    // exemption (the ONLY caller permitted to do so; Phase 35 designed the
+    // param for exactly this use case).
+    const result = await runPromote({
+      id: args.caseId,
+      confirm: true,
+      _skipCiGuard: true,
     });
-  } catch (err) {
-    process.stderr.write(`[auto-fix-promote] ${err.message}\n`);
-    process.exit(1);
-  }
+    if (result.exitCode !== 0) {
+      process.stderr.write(
+        `[auto-fix-promote] runPromote returned exitCode ${result.exitCode} for case ${args.caseId}\n`,
+      );
+      process.exit(1);
+    }
 
-  // Source-issue id: cross-check the workflow-resolved --source-issue against
-  // parseSourceIssue. If the workflow passed an id, the body/commit recovery
-  // must AGREE with it (defense against argv tampering). If --source-issue
-  // is absent, parseSourceIssue is the sole source of truth.
-  let resolvedSourceIssue;
-  try {
-    resolvedSourceIssue = parseSourceIssue({
-      body,
-      commitMessage: args.prCommitMessage,
-    });
-  } catch (err) {
-    process.stderr.write(`[auto-fix-promote] ${err.message}\n`);
-    process.exit(1);
-  }
-  if (args.sourceIssue !== null && args.sourceIssue !== resolvedSourceIssue) {
-    process.stderr.write(
-      `[auto-fix-promote] --source-issue ${args.sourceIssue} disagrees with parsed id ${resolvedSourceIssue}\n`,
+    process.stdout.write(
+      `[auto-fix-promote] promoted ${args.caseId} (source issue #${resolvedSourceIssue})\n`,
     );
-    process.exit(1);
+    process.exit(0);
   }
 
-  // Triple-gate satisfied. Now invoke runPromote with the _skipCiGuard
-  // exemption (the ONLY caller permitted to do so; Phase 35 designed the
-  // param for exactly this use case).
-  const result = await runPromote({
-    id: args.caseId,
-    confirm: true,
-    _skipCiGuard: true,
-  });
-  if (result.exitCode !== 0) {
-    process.stderr.write(
-      `[auto-fix-promote] runPromote returned exitCode ${result.exitCode} for case ${args.caseId}\n`,
+  if (hasPartial) {
+    // ====================================================================
+    // PARTIAL PATH — Phase 53 assertPartialGate + runPartialPromote.
+    // _skipCiGuard:true is NEVER reached on this branch.
+    // ====================================================================
+    try {
+      assertPartialGate({
+        prLabels: args.prLabels,
+        merged: args.prMerged,
+        sourceIssueLabels: args.sourceIssueLabels,
+        passingCases: args.passingCases,
+      });
+    } catch (err) {
+      process.stderr.write(`[auto-fix-promote] ${err.message}\n`);
+      process.exit(1);
+    }
+
+    let resolvedSourceIssue;
+    try {
+      resolvedSourceIssue = parseSourceIssue({
+        body,
+        commitMessage: args.prCommitMessage,
+      });
+    } catch (err) {
+      process.stderr.write(`[auto-fix-promote] ${err.message}\n`);
+      process.exit(1);
+    }
+    if (args.sourceIssue !== null && args.sourceIssue !== resolvedSourceIssue) {
+      process.stderr.write(
+        `[auto-fix-promote] --source-issue ${args.sourceIssue} disagrees with parsed id ${resolvedSourceIssue}\n`,
+      );
+      process.exit(1);
+    }
+
+    const partialResult = await runPartialPromote(args.passingCases);
+    if (partialResult.halted) {
+      process.stderr.write(
+        `[auto-fix-promote] ${partialResult.error}\n`,
+      );
+      process.exit(1);
+    }
+
+    process.stdout.write(
+      `[auto-fix-promote] partial-promoted ${partialResult.promoted.length}/${args.passingCases.length} cases (source issue #${resolvedSourceIssue}): ${partialResult.promoted.join(',')}\n`,
     );
-    process.exit(1);
+    process.exit(0);
   }
 
-  process.stdout.write(
-    `[auto-fix-promote] promoted ${args.caseId} (source issue #${resolvedSourceIssue})\n`,
+  // Neither label — defensive no-op exit 0 (the workflow's if: filter
+  // SHOULD prevent reaching here, but the script defends against direct
+  // CLI misuse).
+  process.stderr.write(
+    '[auto-fix-promote] no recognized verified label on PR — no-op exit 0\n',
   );
   process.exit(0);
 }

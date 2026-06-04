@@ -21,10 +21,10 @@ Wires `errorClass` into the auto-fix ledger entry shape, adds the call-site guar
 
 Refactors the daily snapshot workflow so its push lands on a `ledger-snapshots/*` branch instead of `main`, unblocking the Phase 50 ruleset constraint. **Scope-locked to `v40-cost-ledger-snapshot.yml` only — refactoring `v40-auto-fix.yml`'s ledger commit is a LOAD-BEARING anti-feature (Pitfall 1).**
 
-- [ ] **COMMIT-01**: `.github/workflows/v40-cost-ledger-snapshot.yml` pushes to `ledger-snapshots/daily-${SNAPSHOT_DATE}` branch instead of `main`; concurrency group prevents same-day races
-- [ ] **COMMIT-02**: `.github/workflows/v40-verifier-gate.yml` diff-guard job gains a scope-decision fast-path step for non-`auto-fix/*` PRs (so ledger-snapshot branch PRs do not trip FORBIDDEN_PATHS regex 5)
-- [ ] **COMMIT-03**: S13 Vitest YAML contract case in `tests/e2e/scripts/v40-cost-ledger-snapshot-yaml.test.js` updated to match new push target; new positive assertion pins `ledger-snapshots/` branch prefix
-- [ ] **COMMIT-04**: `.github/workflows/v40-auto-fix.yml` ledger-commit step BYTE-UNCHANGED — verification gate: `grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml` equals 1 after the refactor commit (Pitfall 1 anti-feature pin)
+- [x] **COMMIT-01**: `.github/workflows/v40-cost-ledger-snapshot.yml` pushes to `ledger-snapshots/daily-${SNAPSHOT_DATE}` branch instead of `main`; concurrency group prevents same-day races
+- [x] **COMMIT-02**: `.github/workflows/v40-verifier-gate.yml` diff-guard job gains a scope-decision fast-path step for non-`auto-fix/*` PRs (so ledger-snapshot branch PRs do not trip FORBIDDEN_PATHS regex 5)
+- [x] **COMMIT-03**: S13 Vitest YAML contract case in `tests/e2e/scripts/v40-cost-ledger-snapshot-yaml.test.js` updated to match new push target; new positive assertion pins `ledger-snapshots/` branch prefix
+- [x] **COMMIT-04**: `.github/workflows/v40-auto-fix.yml` ledger-commit step BYTE-UNCHANGED — verification gate: `grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml` equals 1 after the refactor commit (Pitfall 1 anti-feature pin)
 
 ### Promote Outcome Ledger Entry
 
@@ -105,10 +105,10 @@ Populated by the v4.2 roadmapper (2026-06-04).
 | LEDGER-02 | 56 | Complete |
 | LEDGER-03 | 56 | Complete |
 | LEDGER-04 | 56 | Complete |
-| COMMIT-01 | 57 | Pending |
-| COMMIT-02 | 57 | Pending |
-| COMMIT-03 | 57 | Pending |
-| COMMIT-04 | 57 | Pending |
+| COMMIT-01 | 57 | Complete |
+| COMMIT-02 | 57 | Complete |
+| COMMIT-03 | 57 | Complete |
+| COMMIT-04 | 57 | Complete |
 | PROMOTE-01 | 58 | Pending |
 | PROMOTE-02 | 58 | Pending |
 | PROMOTE-03 | 58 | Pending |

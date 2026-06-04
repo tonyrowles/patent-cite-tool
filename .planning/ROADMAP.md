@@ -160,7 +160,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 **Parallelization:** Phase 56 and Phase 57 touch disjoint files and can ship in either order. Phase 56 recommended first so UAT-47-a (Phase 59 SWEEP-03) populates `errorClass` from the first live run.
 
 - [x] **Phase 56: Ledger Schema Extension + Leak Guard** - Wire `errorClass` into all 7 `auto-fix.mjs` call sites; add `safeAppendLedger` wrapper enforcing CI/override guard; relax Test 48; Vitest coverage (completed 2026-06-04)
-- [ ] **Phase 57: Ledger-Commit Branch Redirect** - Refactor `v40-cost-ledger-snapshot.yml` to push `ledger-snapshots/daily-*` branch; update diff-guard scope-decision; update S13 YAML contract test; pin `v40-auto-fix.yml` direct-to-main as anti-feature
+- [x] **Phase 57: Ledger-Commit Branch Redirect** - Refactor `v40-cost-ledger-snapshot.yml` to push `ledger-snapshots/daily-*` branch; update diff-guard scope-decision; update S13 YAML contract test; pin `v40-auto-fix.yml` direct-to-main as anti-feature (completed 2026-06-04)
 - [ ] **Phase 58: Promote Outcome Ledger Entry** - Narrow IMPORTS POLICY in `auto-fix-promote.mjs`; write event-sourced outcome entries on promotion success/failure; Vitest coverage
 - [ ] **Phase 59: Fixture-Mutator + 4-UAT Re-Sweep** - Ship `inject-defect.mjs`; execute UAT-47-e → UAT-47-d → UAT-47-a → UAT-47-b in D-13 cost discipline order; produce `56-UAT-EVIDENCE.md`; post-UAT cleanup
 - [ ] **Phase 60: Carry-Along Cleanup** - Remove dead `MODEL` const from `auto-fix.mjs`; complete Phase 51.1's unfinished `v40-verifier-gate-yaml.test.js` V2 update; milestone closure artifacts
@@ -191,7 +191,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
   3. `grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml` equals 1 after the refactor commit — the two-commit split in `v40-auto-fix.yml` is byte-unchanged
   4. The S13 Vitest YAML contract case in `tests/e2e/scripts/v40-cost-ledger-snapshot-yaml.test.js` passes with a positive assertion pinning the `ledger-snapshots/` branch prefix
 **Plans**: 1 plan
-  - [ ] 57-01-PLAN.md — Workflow edits (COMMIT-01 push refspec + COMMIT-02 diff-guard scope step) + test updates (COMMIT-03 S8/S13 + COMMIT-04 v40-auto-fix.yml byte-unchanged pin) in single atomic feat(57) commit
+  - [x] 57-01-PLAN.md — Workflow edits (COMMIT-01 push refspec + COMMIT-02 diff-guard scope step) + test updates (COMMIT-03 S8/S13 + COMMIT-04 v40-auto-fix.yml byte-unchanged pin) in single atomic feat(57) commit
 
 ### Phase 58: Promote Outcome Ledger Entry
 **Goal**: Promotion success and failure events are durably recorded in the ledger as event-sourced entries; `a-b-winner.mjs` can exit abstention automatically once entries accumulate without any code edit
@@ -248,7 +248,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 | 54. Multi-Model A/B | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 55. Auto-Fix Dashboard | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 56. Ledger Schema Extension + Leak Guard | v4.2 | 3/3 | Complete    | 2026-06-04 |
-| 57. Ledger-Commit Branch Redirect | v4.2 | 0/1 | Not started | - |
+| 57. Ledger-Commit Branch Redirect | v4.2 | 1/1 | Complete    | 2026-06-04 |
 | 58. Promote Outcome Ledger Entry | v4.2 | 0/TBD | Not started | - |
 | 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/TBD | Not started | - |
 | 60. Carry-Along Cleanup | v4.2 | 0/TBD | Not started | - |

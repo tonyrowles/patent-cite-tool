@@ -46,6 +46,7 @@ import {
   assertPartialGate,
   runPartialPromote,
   parseSourceIssue,
+  parseArgv,
   PARTIAL_THRESHOLD,
   PARTIAL_LABEL,
 } from '../../scripts/auto-fix-promote.mjs';
@@ -283,6 +284,39 @@ describe('parseSourceIssue (Phase 44)', () => {
       body: 'no source_issue comment',
       commitMessage: 'no fix marker',
     })).toThrow(/TRIPLE_GATE_FAILED: cannot identify source issue/);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 53 PARTIAL-03 (D-16): parseArgv --passing-cases recognition.
+// The flag's CSV is parsed identically to --pr-labels and --source-issue-
+// labels (split on comma, trim, filter empty). The partial path consumes
+// the parsed array as assertPartialGate({passingCases}); the verified path
+// ignores it.
+// ---------------------------------------------------------------------------
+describe('parseArgv --passing-cases (Phase 53)', () => {
+
+  const REQUIRED = [
+    'node', 'scripts/auto-fix-promote.mjs',
+    '--pr', '1',
+    '--pr-merged', 'true',
+    '--case-id', 'c1',
+  ];
+
+  it('PA1 — --passing-cases CSV decoded into an array', () => {
+    const result = parseArgv([...REQUIRED, '--passing-cases', 'c1,c2,c3']);
+    expect(result.passingCases).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('PA2 — missing --passing-cases yields empty array', () => {
+    const result = parseArgv([...REQUIRED]);
+    expect(result.passingCases).toEqual([]);
+  });
+
+  it('PA3 — --passing-cases CSV with whitespace + trailing comma trims + filters', () => {
+    const result = parseArgv([...REQUIRED, '--passing-cases', 'c1, c2 , c3,']);
+    expect(result.passingCases).toEqual(['c1', 'c2', 'c3']);
   });
 
 });

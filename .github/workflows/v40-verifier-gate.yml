@@ -618,4 +618,16 @@ jobs:
             --description "Verifier-gate passed >=4/5 of affected cases; failing cases stay quarantined" \
             --force 2>/dev/null || true
           gh pr edit "$PR_NUMBER" --add-label "auto-fix:partial-verified"
-          gh pr comment "$PR_NUMBER" --body "Verifier-gate PARTIAL PASS — ${PASS_COUNT}/${AFFECTED} affected cases passed. Failing case(s): ${FAILING_CASES}. Promotion will mutate the corpus only for the passing subset on merge."
+          # Phase 53 PARTIAL-03 (D-16) marker tail — cross-workflow data
+          # handoff. v40-auto-promote.yml's parse step greps PR comments for
+          # this HTML marker to recover the passing-cases CSV (the workflows
+          # are separate runners, so job outputs cannot cross over). PURE
+          # ADDITION to the comment body — does not alter the human-readable
+          # status text above. Documented structural exception to PARTIAL-02
+          # commit purity (committed in Phase 53 commit (c) per D-20).
+          gh pr comment "$PR_NUMBER" --body "$(cat <<EOF
+          Verifier-gate PARTIAL PASS — ${PASS_COUNT}/${AFFECTED} affected cases passed. Failing case(s): ${FAILING_CASES}. Promotion will mutate the corpus only for the passing subset on merge.
+
+          <!-- partial_passing_cases: ${PASSING_CASES} -->
+          EOF
+          )"

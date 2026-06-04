@@ -64,7 +64,15 @@ jobs:
     # verdict). The script-level triple-gate re-asserts these in pure JS so
     # the script is also Vitest-mockable; the workflow-level filter saves
     # runner minutes on the no-op path (unverified closes, draft closes).
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'auto-fix:verified')
+    # Phase 53 PARTIAL-03 (D-14): widened if-filter — OR-branch preserves the
+    # existing 'auto-fix:verified' clause verbatim and adds 'auto-fix:partial-
+    # verified' for the partial path. Script-side main() label branch (D-15)
+    # disambiguates the two.
+    if: |
+      github.event.pull_request.merged == true && (
+        contains(github.event.pull_request.labels.*.name, 'auto-fix:verified') ||
+        contains(github.event.pull_request.labels.*.name, 'auto-fix:partial-verified')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -131,10 +139,32 @@ jobs:
             echo "cannot identify source issue from PR body or commit message" >&2
             exit 1
           fi
+
+          # Phase 53 PARTIAL-03 (D-16): recover the partial_passing_cases CSV
+          # from PR comments. v40-verifier-gate.yml's partial-label step
+          # (Phase 53 Task 3 EDIT-C) emits a comment containing
+          #   <!-- partial_passing_cases: c1,c2,... -->
+          # exactly when the auto-fix:partial-verified label is applied.
+          # The script's main() label branch (D-15) consumes the CSV via the
+          # --passing-cases CLI arg. Verified-only PRs skip recovery entirely
+          # (PARTIAL_PASSING_CASES stays empty; script ignores it).
+          PARTIAL_PASSING_CASES=""
+          if echo "$LABELS_CSV" | grep -q 'auto-fix:partial-verified'; then
+            ALL_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[].body' 2>/dev/null || echo "")
+            PARTIAL_PASSING_CASES=$(echo "$ALL_COMMENTS" | grep -oE '<!-- partial_passing_cases: [^ ]+ -->' \
+              | head -1 \
+              | sed -E 's/<!-- partial_passing_cases: ([^ ]+) -->/\1/')
+            if [ -z "$PARTIAL_PASSING_CASES" ]; then
+              echo "::error::PR carries auto-fix:partial-verified but no <!-- partial_passing_cases: ... --> marker found in comments"
+              exit 1
+            fi
+          fi
+
           {
             echo "pr_labels=$LABELS_CSV"
             echo "case_ids=$CASE_IDS_CSV"
             echo "source_issue=$SOURCE_ISSUE_RAW"
+            echo "partial_passing_cases=$PARTIAL_PASSING_CASES"
           } >> "$GITHUB_OUTPUT"
 
       - name: Resolve source-issue labels
@@ -152,12 +182,19 @@ jobs:
         # Loop runPromote once per case-id (Open Question 3 lock — research
         # §Architecture Decision 3). Any single failure aborts the whole
         # loop; no partial promotion.
+        #
+        # Phase 53 PARTIAL-03 (D-15, D-16): the script's main() label branch
+        # routes between assertTripleGate+runPromote (verified path, byte-
+        # unchanged) and assertPartialGate+runPartialPromote (partial path,
+        # _skipCiGuard:false). --passing-cases is passed UNCONDITIONALLY;
+        # the verified branch ignores it.
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_LABELS: ${{ steps.parse.outputs.pr_labels }}
           SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
           SOURCE_ISSUE_LABELS: ${{ steps.source.outputs.source_issue_labels }}
           CASE_IDS: ${{ steps.parse.outputs.case_ids }}
+          PARTIAL_PASSING_CASES: ${{ steps.parse.outputs.partial_passing_cases }}
         run: |
           PR_COMMIT_MSG=$(cat /tmp/pr-commit-message.txt)
           for CASE_ID in ${CASE_IDS//,/ }; do
@@ -169,7 +206,8 @@ jobs:
               --pr-commit-message "$PR_COMMIT_MSG" \
               --source-issue "$SOURCE_ISSUE" \
               --source-issue-labels "$SOURCE_ISSUE_LABELS" \
-              --case-id "$CASE_ID"
+              --case-id "$CASE_ID" \
+              --passing-cases "$PARTIAL_PASSING_CASES"
           done
 
       - name: Build auto-promote PR body

@@ -216,7 +216,6 @@ Plans:
 **Goal**: All 4 DEFERRED runbook stubs from 47-UAT-DEFERRED.md are re-stamped PASS with captured evidence artifacts; the self-healing loop is confirmed end-to-end on real GitHub infrastructure
 **Wave**: Wave-2b — runs after Phase 49; parallelizable with Phases 50 and 52
 **Depends on**: Phase 49 (requires v40-* workflows live on origin)
-**Requirements**: UAT-01, UAT-02, UAT-03, UAT-04
 **Note on Phase 53 dependency**: Phase 53's partial-verified threshold calibration (4/5 floor) benefits from UAT-47-a evidence; Phase 53 can start in parallel but should incorporate UAT-47-a results before finalising the threshold constant
 **Success Criteria** (what must be TRUE):
   1. UAT-47-a: A draft PR opens on branch `auto-fix/3-139f821b` with LLM-proposed fix for issue #3 (`US11427642-spec-short-1`, fingerprint `139f821b3bb1`); verifier-gate runs 3x affected case + 76-case regression + diff-guard; runbook includes the remove-then-add `triage` label step and a pre-run branch-absence check
@@ -281,7 +280,10 @@ Plans:
   2. `fix-prompt-builder.js:buildFixPrompt` return value includes a `model` field sourced from `routeModel(errorClass)`; existing return fields are unchanged; the field is optional (existing callers that ignore it continue to work)
   3. `auto-fix.mjs` passes the `model` from `buildFixPrompt` into `invokeAnthropicSdkWithLedger`; the committed ledger's `model` field reflects the actually-invoked model (not a hardcoded default)
   4. `scripts/a-b-winner.mjs` outputs `NO_WINNER_YET` when per-model-per-class sample count is below `N_PER_ARM_REQUIRED` (committed constant, default 20); this constant is in code, not a prose note; when N >= 20 per arm per class it outputs a markdown table to stdout
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 54-01-PLAN.md — 5-task plan in LOCKED D-24 order: (a) feat(54) AB-01 llm-router.js + Vitest → (b) feat(54) AB-02 buildFixPrompt top-level model field + Vitest → (c) feat(54) AB-03 auto-fix.mjs wires built.model → (d) feat(54) AB-04 a-b-winner.mjs (N_PER_ARM_REQUIRED=20, abstention mode per D-20) + Vitest → (T5) chore(54) closure (SUMMARY + STATE + ROADMAP); LOCAL commits only per D-25; autonomous per D-26
 
 ### Phase 55: Auto-Fix Dashboard
 **Goal**: The weekly digest gains a collapsible auto-fix performance section with 7 observable metrics; the frozen 7-element SUMMARY_KEYS contract is preserved byte-for-byte; no new npm dependencies are introduced
@@ -309,5 +311,5 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 | 51.1. Required-Check Trigger Hotfix | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |
 | 53. auto-fix:partial-verified Semantics | v4.1 | 1/1 | Complete | 2026-06-04 |
-| 54. Multi-Model A/B | v4.1 | 0/TBD | Not started | - |
+| 54. Multi-Model A/B | v4.1 | 0/1 | Planned | - |
 | 55. Auto-Fix Dashboard | v4.1 | 0/TBD | Not started | - |

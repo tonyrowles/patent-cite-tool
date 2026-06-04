@@ -89,7 +89,6 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 | uat_gap | 36-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
 | uat_gap | 37-HUMAN-UAT.md stale frontmatter | partial | Addressed in Phase 52 |
 | uat_gap | 38-UAT-EVIDENCE.md stale frontmatter | unknown | Addressed in Phase 52 |
-| quick_task | 3 orphan quick-task slug references | missing | Addressed in Phase 52 |
 
 ## Session Continuity
 

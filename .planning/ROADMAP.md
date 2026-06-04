@@ -265,7 +265,10 @@ Plans:
   2. A Vitest test (shipped in the same commit as the new label) asserts `assertTripleGate` throws when given only `auto-fix:partial-verified` label — proving the trust invariant boundary holds
   3. `v40-verifier-gate.yml` `ready-flip` job produces `auto-fix:partial-verified` when at least 4/5 (>=80%) of affected cases pass; the full-pass `auto-fix:verified` path is unchanged; the two labels are mutually exclusive on any given PR
   4. `v40-auto-promote.yml` job-level `if:` filter accepts `auto-fix:partial-verified`; partial-pass promotion mutates the corpus ONLY for passing case subset; failing cases remain in quarantine
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 53-01-PLAN.md — assertPartialGate + runPartialPromote + Vitest trust-invariant pin (PARTIAL-01 + PARTIAL-04) + ready-flip partial-label producer (PARTIAL-02) + auto-promote filter widening + main() label branch (PARTIAL-03); 3 atomic feat(53) commits in locked D-20 order
 
 ### Phase 54: Multi-Model A/B
 **Goal**: Auto-fix model routing is deterministic by ERROR_CLASS via a pure-function router; the ledger records which model was actually invoked per fix; a winner-declaration script prevents premature conclusions

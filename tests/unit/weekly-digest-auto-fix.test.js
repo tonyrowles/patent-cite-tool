@@ -22,9 +22,13 @@
 //                  step re-runs it as a regression gate via `vitest -t "SUMMARY_KEYS"`.
 
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   renderAutoFixPipelineSection,
   fetchAutoFixPrs,
+  runDigest,
 } from '../../scripts/weekly-digest.mjs';
 
 // -------- helpers (synthetic fixtures inline; no I/O against committed ledger) --------
@@ -169,5 +173,104 @@ describe('Phase 55 DASH-01..03 — Auto-Fix Pipeline section', () => {
     expect(md).toMatch(/\| verified_merged \| 2 \|/);
     // success_rate = (2 / 4) * 100 = 50.0%
     expect(md).toMatch(/\| success_rate \| 50\.0% \|/);
+  });
+
+  // ----------------------------------------------------------------------------
+  // Test 6 (DASH-01 wiring) — runDigest appends the section AFTER renderDigest
+  //   * captured issue body contains <details> + <summary>Auto-Fix Pipeline</summary>
+  //   * all 7 metric keys appear in the body
+  //   * the section appears strictly AFTER "## Classification Breakdown"
+  //   * cost_per_fix uses combinedMonthlyTotalByTransport().combined (D-06)
+  // ----------------------------------------------------------------------------
+
+  it('Test 6 (DASH-01): runDigest appends Auto-Fix Pipeline section after Classification Breakdown', async () => {
+    // synthetic temp ledger so combinedMonthlyTotalByTransport returns a known total
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wd55-'));
+    const ledgerPath = path.join(tmpDir, 'ledger.json');
+    fs.writeFileSync(
+      ledgerPath,
+      JSON.stringify(
+        makeLedger('2026-06', 1.2, [
+          { iso: '2026-06-01T10:00:00Z', cost_usd: 0.6, transport: 'subscription' },
+          { iso: '2026-06-02T10:00:00Z', cost_usd: 0.6, transport: 'sdk' },
+        ]),
+      ),
+    );
+    const reportsDir = path.join(tmpDir, 'reports');
+
+    // capture the body posted to createDigestIssue
+    let capturedTitle = null;
+    let capturedBody = null;
+    const fakeGh = {
+      listOpenIssuesByLabel(_label) {
+        return [];
+      },
+      hasDiscussions() {
+        return false;
+      },
+      createDigestIssue(title, body) {
+        capturedTitle = title;
+        capturedBody = body;
+        return 'https://example/issues/1';
+      },
+      createDiscussion(_t, _b) {
+        return '';
+      },
+    };
+
+    // fake fetchAutoFixPrs — one verified+merged PR for non-degenerate values
+    const fakeFetch = ({ now }) => ({
+      prs: [
+        {
+          number: 100,
+          state: 'CLOSED',
+          mergedAt: '2026-06-03T11:30:00Z',
+          createdAt: '2026-06-03T10:00:00Z',
+          labels: [{ name: 'auto-fix:verified' }],
+          body: '<!-- source_issue: 42 -->',
+        },
+      ],
+      fetchedAt: now,
+      error: null,
+    });
+
+    const result = await runDigest({
+      ghClient: fakeGh,
+      ledgerPath,
+      reportsDir,
+      now: () => new Date('2026-06-04T12:00:00Z'),
+      publishMode: 'issue',
+      fetchAutoFixPrs: fakeFetch,
+    });
+
+    expect(result.mode).toBe('issue');
+    expect(capturedTitle).toMatch(/Weekly analytics 2026-W23/);
+    expect(capturedBody).toBeTruthy();
+    // <details>/<summary> wrapper present
+    expect(capturedBody).toContain('<details>');
+    expect(capturedBody).toContain('<summary>Auto-Fix Pipeline</summary>');
+    // All 7 metric keys appear in the body
+    for (const k of [
+      'auto_fix_attempted',
+      'verified_merged',
+      'success_rate',
+      'cost_per_fix',
+      'time_to_merge_p50',
+      'fix_attempts_p50',
+      'flake_escalation_count',
+    ]) {
+      expect(capturedBody).toContain(k);
+    }
+    // Ordering invariant: the section is appended AFTER the existing digest
+    // body (Classification Breakdown lives in renderDigest's output).
+    const cbIdx = capturedBody.indexOf('## Classification Breakdown');
+    const afIdx = capturedBody.indexOf('<summary>Auto-Fix Pipeline</summary>');
+    expect(cbIdx).toBeGreaterThan(-1);
+    expect(afIdx).toBeGreaterThan(cbIdx);
+    // cost_per_fix invariant: total 1.20 / 1 attempt → $1.2000
+    expect(capturedBody).toMatch(/\| cost_per_fix \| \$1\.2000 \|/);
+
+    // cleanup
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 });

@@ -190,7 +190,8 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
   2. A ledger-snapshot PR (non-`auto-fix/*` head ref) opened against main gets a SUCCESS verdict from all verifier-gate jobs via the diff-guard scope-decision fast-path — no FORBIDDEN_PATHS rejection
   3. `grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml` equals 1 after the refactor commit — the two-commit split in `v40-auto-fix.yml` is byte-unchanged
   4. The S13 Vitest YAML contract case in `tests/e2e/scripts/v40-cost-ledger-snapshot-yaml.test.js` passes with a positive assertion pinning the `ledger-snapshots/` branch prefix
-**Plans**: TBD
+**Plans**: 1 plan
+  - [ ] 57-01-PLAN.md — Workflow edits (COMMIT-01 push refspec + COMMIT-02 diff-guard scope step) + test updates (COMMIT-03 S8/S13 + COMMIT-04 v40-auto-fix.yml byte-unchanged pin) in single atomic feat(57) commit
 
 ### Phase 58: Promote Outcome Ledger Entry
 **Goal**: Promotion success and failure events are durably recorded in the ledger as event-sourced entries; `a-b-winner.mjs` can exit abstention automatically once entries accumulate without any code edit
@@ -247,7 +248,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 | 54. Multi-Model A/B | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 55. Auto-Fix Dashboard | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 56. Ledger Schema Extension + Leak Guard | v4.2 | 3/3 | Complete    | 2026-06-04 |
-| 57. Ledger-Commit Branch Redirect | v4.2 | 0/TBD | Not started | - |
+| 57. Ledger-Commit Branch Redirect | v4.2 | 0/1 | Not started | - |
 | 58. Promote Outcome Ledger Entry | v4.2 | 0/TBD | Not started | - |
 | 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/TBD | Not started | - |
 | 60. Carry-Along Cleanup | v4.2 | 0/TBD | Not started | - |

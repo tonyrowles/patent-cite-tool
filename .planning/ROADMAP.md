@@ -160,7 +160,7 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 - [x] **Phase 51: Live Readiness UATs** - 4 DEFERRED runbook stubs re-stamped against live GitHub Actions (completed 2026-06-03): UAT-47-e FAIL (surfaced v40-verifier-gate trigger bug), UAT-47-a AUTO-DEFERRED per D-13, UAT-47-b STILL-DEFERRED, UAT-47-d BLOCKED-BY-PHASE-50; all four folded into Phase 56 follow-up (v4.2 backlog)
 - [x] **Phase 51.1: Required-Check Trigger Hotfix** - REGRESSION-51-01 resolved (completed 2026-06-03): v40-verifier-gate.yml BASE-ref filter removed + v40-deps-update.yml pull_request trigger added + scope-decision fast-path step on 4 PR-gate jobs; verification PR #14 captured both required contexts firing then CLOSED; Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline)
 - [x] **Phase 52: v3.1 Bookkeeping Cleanup** - Re-stamp 5 stale HUMAN-UAT/VERIFICATION frontmatter files; remove 3 orphan quick-task slug rows from STATE.md (completed 2026-06-03)
-- [ ] **Phase 53: auto-fix:partial-verified Semantics** - Implement assertPartialGate (separate from assertTripleGate); partial label producer in verifier-gate; widened auto-promote filter
+- [x] **Phase 53: auto-fix:partial-verified Semantics** - Implement assertPartialGate (separate from assertTripleGate); partial label producer in verifier-gate; widened auto-promote filter (completed 2026-06-04; 3 atomic feat(53) commits: 0aa8202 -> 0489305 -> 3d4db45; all 4 PARTIAL-* CLOSED; assertTripleGate body byte-unchanged; _skipCiGuard:true count=1)
 - [ ] **Phase 54: Multi-Model A/B** - llm-router.js static routing table; fix-prompt-builder model field; auto-fix.mjs model routing; a-b-winner.mjs winner script
 - [ ] **Phase 55: Auto-Fix Dashboard** - aggregateAutoFixMetrics + renderAutoFixSection in weekly-digest.mjs; 7 observable metrics in collapsible section
 
@@ -308,6 +308,6 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 | 51. Live Readiness UATs | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 51.1. Required-Check Trigger Hotfix | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |
-| 53. auto-fix:partial-verified Semantics | v4.1 | 0/TBD | Not started | - |
+| 53. auto-fix:partial-verified Semantics | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 54. Multi-Model A/B | v4.1 | 0/TBD | Not started | - |
 | 55. Auto-Fix Dashboard | v4.1 | 0/TBD | Not started | - |

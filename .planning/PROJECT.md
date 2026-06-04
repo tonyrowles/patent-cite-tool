@@ -8,22 +8,24 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v4.1 Readiness Gate + Push
+## Current Milestone: Planning v4.2 (Phase 56 Backlog)
 
-**Goal:** Land v4.0's ~777 local commits on origin/main, exercise the self-healing loop live against real GitHub Actions, close v4.0's deferred UATs and v3.1's bookkeeping debt, and ship 3 forward-looking auto-fix improvements (dashboard, partial-verified semantics, multi-model A/B).
+**Status:** Between milestones. v4.1 shipped 2026-06-04; v4.2 planning starts via `/gsd:new-milestone`.
 
-**Target features:**
+**Phase 56 (v4.2) consolidated backlog from v4.1 close** (per STATE.md Pending Todos):
+- 4-UAT re-sweep against origin (47-a end-to-end auto-fix; 47-b deps-update-gate synthetic regression; 47-d ledger snapshot post-refactor; 47-e diff-guard rejection re-test)
+- Ledger schema extension (per-entry `errorClass` + `outcome` / `pr_merged` fields) to unblock AB-04 winner declaration + Phase 55 dashboard real values
+- `v40-cost-ledger-snapshot.yml` + `v40-auto-fix.yml` ledger-commit-to-main pattern refactor (Phase 50 ruleset blocks direct push to main; PR-then-merge or `ledger-snapshots/*` branch redirect needed)
+- Dead `MODEL` const cleanup in `scripts/auto-fix.mjs`
+- `tests/e2e/scripts/v40-verifier-gate-yaml.test.js` V2 test update — DONE in Phase 51.2
+- `tests/unit/llm-ledger.test.js` Test 48 working-copy ledger fix (auto-fix-api leak vector per `project_auto_fix_ledger_leak_vector.md` memory file)
+- `auto-fix-api` ledger-leak guard hardening (covers the path PRE-02's `invokeAnthropicSdkWithLedger` guard does not)
 
-- Pre-push test regression fixes (Test 48 ledger leak, calendar-rollover flake in `e2e-weekly-digest.test.js:395`, `package-lock.json` EXACT-pin verification on `@anthropic-ai/sdk@0.100.1`)
-- Push v4.0 to origin via single `v4.0-integration` PR + `gh pr merge --admin` self-merge; confirm CI green on remote
-- Live readiness UATs (post-push): UAT-47-a end-to-end auto-fix on issue #3 (`US11427642-spec-short-1`, fp `139f821b3bb1`); UAT-47-b dep-PR pre-flight gate; UAT-47-d daily ledger snapshot; UAT-47-e verifier-gate diff-guard bypass test
-- CLEANUP-04 — patch ruleset 17086676 `required_status_checks` to add `verifier-gate` + `deps-update-gate` job names; resolve `bypass_actors=1` (owner-self `bypass_mode=always`)
-- Auto-fix dashboard — extend weekly-digest with auto-fix success rate, cost-per-fix, time-to-merge
-- `auto-fix:partial-verified` semantics — define + implement gate behavior when verifier passes 3/5 (now empirically calibratable post-UAT-47-a)
-- Multi-model A/B (sonnet vs opus) for difficult ERROR_CLASSES — instrumented against the first live auto-fix run baselines
-- v3.1 bookkeeping cleanup — re-stamp frontmatter on 5 carry-over VERIFICATION.md / HUMAN-UAT.md files; clear 3 orphan quick-task slug references
+## Last Shipped: v4.1 Readiness Gate + Push (Shipped 2026-06-04)
 
-## Last Shipped: v4.0 Self-Healing Test Suite (Shipped 2026-06-02)
+v4.1 landed v4.0's 215 commits on origin/main and hardened the ruleset trust boundary while shipping 3 forward-looking auto-fix improvements. Ruleset 17086676 enforces both required status checks (verifier-gate + deps-update-gate pinned to GitHub Actions App 15368) with zero bypass actors; break-glass §7 runbook committed and live-tested. `assertPartialGate` + `runPartialPromote` ship as SEPARATE entry points (`assertTripleGate` body byte-unchanged; Vitest pins the trust-invariant boundary). Multi-model deterministic ERROR_CLASS routing via `llm-router.js` (frozen `MODEL_ROUTES`; `GOOGLE_DOM_DRIFT` + `LLM_HALLUCINATED_SELECTION` → opus, default sonnet); `a-b-winner.mjs` in abstention mode pending Phase 56 ledger schema. Auto-Fix Pipeline `<details>` section in weekly digest with 7 NaN-guarded observable metrics (SUMMARY_KEYS byte-unchanged). Two emergent hotfixes surfaced via live trust-boundary exercise: 51.1 fixed v40-verifier-gate.yml BASE-ref trigger + v40-deps-update.yml missing pull_request trigger (REGRESSION-51-01); 51.2 scope-gated diff-guard size cap + inverted v2 test (REGRESSION-51.2-01). 9 phases (48-55) + 2 hotfixes (51.1, 51.2), 11 plans, ~80 atomic commits in ~2 days; 4 UATs deferred to Phase 56 per documented decisions. Zero new npm dependencies (third consecutive milestone).
+
+## Previously Shipped: v4.0 Self-Healing Test Suite (Shipped 2026-06-02)
 
 v4.0 closed the LLM-driven feedback loop end-to-end. Triaged GitHub issues from the v3.1 pipeline now automatically produce draft PRs (`v40-auto-fix.yml`) with LLM-proposed fixes (5 ERROR_CLASS scaffolds), the affected case is re-verified on the proposed branch (`v40-verifier-gate.yml` — 3×Tier A/B + 76-case regression + diff-guard), and on merge the quarantine entry promotes to golden (`v40-auto-promote.yml` + triple-gate `_skipCiGuard`). All human-gated invariants preserved: auto-fix PRs are draft by default, auto-promote opens a SEPARATE follow-up PR (never direct-to-main), CODEOWNERS-pinned files require code-owner review. 9 phases (39-47), 26 plans, 53 tasks shipped in ~3 days. Zero new npm dependencies (`@anthropic-ai/sdk@0.100.1` was the only addition).
 

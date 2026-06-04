@@ -1245,3 +1245,57 @@ describe('Phase 46 — subscription transport routing + --push', () => {
     expect(fnBody).toContain('subscription-local invariant (CI detected)');
   });
 });
+
+// =======================================================================
+// Phase 56 LEDGER-04: errorClass wired into ledger entries
+// =======================================================================
+//
+// Asserts that runDispatcher() in mocked mode emits a ledger entry whose
+// errorClass field equals the issue's ERROR_CLASS label. Exercises the
+// line 707 call site (Step 12 — diff-guard violation) because that path
+// has the fewest mock prerequisites: just feed back a fenced diff that
+// touches a forbidden path and the dispatcher writes the violation entry
+// and exits with code 1.
+//
+// Why CI=true is set inside the test (per RESEARCH §4 + Wave 0 W0a):
+//   safeAppendLedger (auto-fix.mjs LEDGER-02 wrapper) reads process.env.CI
+//   directly. The wrapper is defined INSIDE auto-fix.mjs (not in the
+//   mocked llm-ledger.js module), so the vi.mock factory does NOT replace
+//   it — the wrapper's guard executes on every call site. Without
+//   process.env.CI = 'true', the wrapper throws and the test fails with
+//   "safeAppendLedger refused" instead of an errorClass assertion miss.
+//   The try/finally cleanup is hermetic because vitest.config.js sets
+//   fileParallelism:false (Wave 0 §A1 verified that
+//   tests/setup/chrome-stub.js does not touch process.env.CI).
+//
+// Why we do NOT add safeAppendLedger to the vi.mock factory at lines
+// 62-67 (Pitfall A from RESEARCH § Common Pitfalls): adding it as
+// vi.fn() would silently bypass the guard in tests, hiding any future
+// regression that breaks the leak-prevention contract. The
+// un-mocked-wrapper / mocked-appendLedgerEntry split is the point.
+describe('LEDGER-04: errorClass wired into ledger entries (Phase 56)', () => {
+  it('runDispatcher mocked-mode emits a ledger entry carrying errorClass="WRONG_CITATION"', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'WRONG_CITATION'] }),
+      lsRemoteEmptyRule(),
+      ghIssueCommentOkRule(),
+    ]);
+    vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('tests/test-cases.js'), // FORBIDDEN path triggers diff-guard at line 707
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0.05,
+      rawJson: {},
+    });
+    try {
+      process.env.CI = 'true';
+      const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+      expect(exit).toBe(1); // diff-guard violation → exit 1
+      const entries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+      expect(entries.length).toBeGreaterThan(0);
+      expect(entries.some((e) => e.errorClass === 'WRONG_CITATION')).toBe(true);
+    } finally {
+      delete process.env.CI;
+    }
+  });
+});

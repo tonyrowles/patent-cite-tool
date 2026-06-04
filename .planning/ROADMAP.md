@@ -295,7 +295,10 @@ Plans:
   1. The Monday weekly digest contains a `<details>` collapsible section labeled "Auto-Fix Pipeline" with a markdown table of 7 metrics (auto_fix_attempted, verified_merged, success_rate, cost_per_fix, time_to_merge_p50, fix_attempts_p50, flake_escalation_count); all metrics are NaN/Infinity-guarded
   2. The Vitest assertion `SUMMARY_KEYS.length === 7` passes; the frozen 7-key array is byte-unchanged; auto-fix metrics appear in a SEPARATE section, not as SUMMARY_KEYS entries
   3. `cost_per_fix` uses `combinedMonthlyTotalByTransport` (not raw sum) to avoid double-counting subscription + SDK invocations for the same issue; `time_to_merge` filters to `mergedAt !== null` entries only
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 55-01-PLAN.md — renderAutoFixPipelineSection + fetchAutoFixPrs + 5 Vitest pins → runDigest wires Auto-Fix Pipeline section (combinedMonthlyTotalByTransport.combined, mergedAt!==null filter) → closure (SUMMARY+STATE+ROADMAP); 3 atomic local commits (2 feat(55) + 1 chore(55)) in LOCKED D-22 order; autonomous: true
 
 ## Progress
 

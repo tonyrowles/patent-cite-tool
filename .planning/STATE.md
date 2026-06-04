@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Readiness Gate + Push
-status: executing
-stopped_at: Phase 51.1 closed
-last_updated: "2026-06-03T17:50:00Z"
-last_activity: 2026-06-03 -- Phase 51.1 marked complete (REGRESSION-51-01 closed; Phase 50 SC-2 restored; verification PR #14 captured both checks firing)
+status: completed
+stopped_at: Phase 51.1 closed (REGRESSION-51-01 resolved)
+last_updated: "2026-06-04T00:58:27.272Z"
+last_activity: 2026-06-04 -- Phase 52 marked complete
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
-  percent: 56
+  completed_phases: 6
+  total_plans: 6
+  completed_plans: 6
+  percent: 67
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 50 — CLEANUP-04 Readiness Gate
+**Current focus:** Phase 53 — auto-fix:partial-verified Semantics
 
 ## Current Position
 
-Phase: 51.1 — COMPLETE (REGRESSION-51-01 closed; 5/5 SCs PASS; Phase 50 SC-1+SC-2 preserved)
+Phase: 52 — COMPLETE
 Plan: 1 of 1
-Status: Phase 51.1 complete; PR pipeline unjammed; Wave-2 fully unblocked (Phase 52 next; Phase 53 can also begin)
-Last activity: 2026-06-03 -- Phase 51.1 marked complete
+Status: Phase 52 complete
+Last activity: 2026-06-04 -- Phase 52 marked complete
 
 Progress: [██████░░░░] 56%
 

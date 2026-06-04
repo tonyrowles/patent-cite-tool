@@ -97,40 +97,41 @@ Explicitly excluded. Anti-features carried forward from v4.0/v4.1 with the warni
 
 ## Traceability
 
-Empty initially. Populated by the v4.2 roadmapper.
+Populated by the v4.2 roadmapper (2026-06-04).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LEDGER-01 | TBD | Pending |
-| LEDGER-02 | TBD | Pending |
-| LEDGER-03 | TBD | Pending |
-| LEDGER-04 | TBD | Pending |
-| COMMIT-01 | TBD | Pending |
-| COMMIT-02 | TBD | Pending |
-| COMMIT-03 | TBD | Pending |
-| COMMIT-04 | TBD | Pending |
-| PROMOTE-01 | TBD | Pending |
-| PROMOTE-02 | TBD | Pending |
-| PROMOTE-03 | TBD | Pending |
-| PROMOTE-04 | TBD | Pending |
-| MUTATOR-01 | TBD | Pending |
-| MUTATOR-02 | TBD | Pending |
-| MUTATOR-03 | TBD | Pending |
-| MUTATOR-04 | TBD | Pending |
-| MUTATOR-05 | TBD | Pending |
-| SWEEP-01 | TBD | Pending |
-| SWEEP-02 | TBD | Pending |
-| SWEEP-03 | TBD | Pending |
-| SWEEP-04 | TBD | Pending |
-| SWEEP-05 | TBD | Pending |
-| SWEEP-06 | TBD | Pending |
-| CLEAN-01 | TBD | Pending |
-| CLEAN-02 | TBD | Pending |
+| LEDGER-01 | 56 | Pending |
+| LEDGER-02 | 56 | Pending |
+| LEDGER-03 | 56 | Pending |
+| LEDGER-04 | 56 | Pending |
+| COMMIT-01 | 57 | Pending |
+| COMMIT-02 | 57 | Pending |
+| COMMIT-03 | 57 | Pending |
+| COMMIT-04 | 57 | Pending |
+| PROMOTE-01 | 58 | Pending |
+| PROMOTE-02 | 58 | Pending |
+| PROMOTE-03 | 58 | Pending |
+| PROMOTE-04 | 58 | Pending |
+| MUTATOR-01 | 59 | Pending |
+| MUTATOR-02 | 59 | Pending |
+| MUTATOR-03 | 59 | Pending |
+| MUTATOR-04 | 59 | Pending |
+| MUTATOR-05 | 59 | Pending |
+| SWEEP-01 | 59 | Pending |
+| SWEEP-02 | 59 | Pending |
+| SWEEP-03 | 59 | Pending |
+| SWEEP-04 | 59 | Pending |
+| SWEEP-05 | 59 | Pending |
+| SWEEP-06 | 59 | Pending |
+| CLEAN-01 | 60 | Pending |
+| CLEAN-02 | 60 | Pending |
 
 **Coverage:**
 - v4.2 requirements: 25 total
-- Mapped to phases: 0 (roadmap-pending)
-- Unmapped: 25 ⚠️ (resolved when roadmapper writes ROADMAP.md)
+- Mapped to phases: 25 (Phase 56: 4, Phase 57: 4, Phase 58: 4, Phase 59: 11, Phase 60: 2)
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-04*
+*Traceability populated: 2026-06-04*

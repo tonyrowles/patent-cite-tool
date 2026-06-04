@@ -95,9 +95,25 @@ import {
  * direct ledger-write call sites in this file.
  *
  * Refuses to append to the committed ledger unless the caller is running in
- * CI (process.env.CI is set) OR has explicitly opted in via
- * E2E_LEDGER_PATH_OVERRIDE (integration-test escape hatch defined in
- * tests/e2e/lib/llm-ledger.js:74-98 — WR-05 IIFE).
+ * CI (process.env.CI === 'true' or GITHUB_ACTIONS === 'true' per CR-02) OR
+ * has explicitly opted in via E2E_LEDGER_PATH_OVERRIDE (integration-test
+ * escape hatch defined in tests/e2e/lib/llm-ledger.js:74-98 — WR-05 IIFE).
+ *
+ * IMPORTANT — runtime-opt-in caveat (Phase 56 WR-01, REVIEW.md):
+ * E2E_LEDGER_PATH_OVERRIDE is checked here at CALL time, but the actual
+ * write target — LEDGER_PATH, imported from tests/e2e/lib/llm-ledger.js —
+ * is resolved at MODULE LOAD time by the WR-05 IIFE (llm-ledger.js:74-98).
+ * Setting E2E_LEDGER_PATH_OVERRIDE AFTER auto-fix.mjs has already loaded
+ * will pass this guard BUT the write still lands on the canonical
+ * tests/e2e/.llm-spend-ledger.json (the committed file). To actually
+ * redirect the write target, set E2E_LEDGER_PATH_OVERRIDE in the shell
+ * env BEFORE the Node process imports auto-fix.mjs (or any transitive
+ * import of llm-ledger.js). The tests/unit/auto-fix.test.js suite avoids
+ * this trap because it uses vi.mock to stub BOTH appendLedgerEntry AND
+ * LEDGER_PATH, so the wrapper's LEDGER_PATH is the mocked '/tmp/...'
+ * constant — not the real path resolved by the IIFE. Any future
+ * INTEGRATION test (no vi.mock on llm-ledger.js) that imports auto-fix.mjs
+ * first and then sets the env var will hit the trap.
  *
  * Why this wrapper exists: the 7 direct appendLedgerEntry call sites in
  * scripts/auto-fix.mjs (pre-Phase-56) bypass the PRE-02 guard inside

@@ -158,6 +158,7 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 - [x] **Phase 49: Push v4.0-Integration PR** - Create, self-approve, and admin-merge the v4.0-integration PR; confirm CI green on origin/main (completed 2026-06-03)
 - [x] **Phase 50: CLEANUP-04 Readiness Gate** - Patch ruleset 17086676 required_status_checks + remove bypass_actors; confirm gate enforced on test PR (completed 2026-06-03)
 - [x] **Phase 51: Live Readiness UATs** - 4 DEFERRED runbook stubs re-stamped against live GitHub Actions (completed 2026-06-03): UAT-47-e FAIL (surfaced v40-verifier-gate trigger bug), UAT-47-a AUTO-DEFERRED per D-13, UAT-47-b STILL-DEFERRED, UAT-47-d BLOCKED-BY-PHASE-50; all four folded into Phase 56 follow-up (v4.2 backlog)
+- [x] **Phase 51.1: Required-Check Trigger Hotfix** - REGRESSION-51-01 resolved (completed 2026-06-03): v40-verifier-gate.yml BASE-ref filter removed + v40-deps-update.yml pull_request trigger added + scope-decision fast-path step on 4 PR-gate jobs; verification PR #14 captured both required contexts firing then CLOSED; Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline)
 - [ ] **Phase 52: v3.1 Bookkeeping Cleanup** - Re-stamp 5 stale HUMAN-UAT/VERIFICATION frontmatter files; remove 3 orphan quick-task slug rows from STATE.md
 - [ ] **Phase 53: auto-fix:partial-verified Semantics** - Implement assertPartialGate (separate from assertTripleGate); partial label producer in verifier-gate; widened auto-promote filter
 - [ ] **Phase 54: Multi-Model A/B** - llm-router.js static routing table; fix-prompt-builder model field; auto-fix.mjs model routing; a-b-winner.mjs winner script
@@ -238,7 +239,10 @@ Plans:
   3. A verification test PR opened against `main` after the fix lands shows BOTH `verifier-gate` AND `deps-update-gate` contexts present in `gh pr checks` output (whether they pass or fail is secondary — what matters is they FIRE)
   4. The verification PR is CLOSED + branch deleted immediately after evidence capture (mirrors UAT-47-e / GATE-03 convention); no live LOCKED-path touch
   5. Ruleset 17086676 ends Phase 51.1 with `bypass_actors=[]` (Phase 50 SC-2 preserved); the bypass actor is added via break-glass for the duration of the fix-commit + verification PR window, then removed
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [x] 51.1-01-PLAN.md — 7 sequential tasks: baselines → break-glass add → YAML edits → direct push → verification PR → break-glass remove → SUMMARY+STATE+ROADMAP (completed 2026-06-03)
 
 ### Phase 52: v3.1 Bookkeeping Cleanup
 **Goal**: All stale planning-file frontmatter is corrected and orphan reference rows are removed — completing the bookkeeping debt deferred from v3.1 and carried through v4.0
@@ -298,7 +302,8 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 | 48. Pre-Push Regression Fixes | v4.1 | 1/1 | Complete    | 2026-06-02 |
 | 49. Push v4.0-Integration PR | v4.1 | 1/1 | Complete   | 2026-06-03 |
 | 50. CLEANUP-04 Readiness Gate | v4.1 | 1/1 | Complete   | 2026-06-03 |
-| 51. Live Readiness UATs | v4.1 | 0/TBD | Not started | - |
+| 51. Live Readiness UATs | v4.1 | 1/1 | Complete | 2026-06-03 |
+| 51.1. Required-Check Trigger Hotfix | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |
 | 53. auto-fix:partial-verified Semantics | v4.1 | 0/TBD | Not started | - |
 | 54. Multi-Model A/B | v4.1 | 0/TBD | Not started | - |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Readiness Gate + Push
 status: executing
-stopped_at: Phase 51 closed
-last_updated: "2026-06-03T05:42:00Z"
-last_activity: 2026-06-03 -- Phase 51 marked complete (1 FAIL + 3 deferrals; Phase 56 enqueued)
+stopped_at: Phase 51.1 closed
+last_updated: "2026-06-03T17:50:00Z"
+last_activity: 2026-06-03 -- Phase 51.1 marked complete (REGRESSION-51-01 closed; Phase 50 SC-2 restored; verification PR #14 captured both checks firing)
 progress:
-  total_phases: 8
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 50
+  total_phases: 9
+  completed_phases: 5
+  total_plans: 5
+  completed_plans: 5
+  percent: 56
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 51 — COMPLETE (1 FAIL + 3 deferrals; Phase 56 follow-up enqueued)
+Phase: 51.1 — COMPLETE (REGRESSION-51-01 closed; 5/5 SCs PASS; Phase 50 SC-1+SC-2 preserved)
 Plan: 1 of 1
-Status: Phase 51 complete; Wave-2 ready to advance (Phase 52 next; Phase 53 can also begin)
-Last activity: 2026-06-03 -- Phase 51 marked complete
+Status: Phase 51.1 complete; PR pipeline unjammed; Wave-2 fully unblocked (Phase 52 next; Phase 53 can also begin)
+Last activity: 2026-06-03 -- Phase 51.1 marked complete
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 56%
 
 ## Performance Metrics
 
@@ -63,10 +63,11 @@ Progress: [█████░░░░░] 50%
 - v4.1-roadmap: Phase 55 (dashboard) depends on Phase 54 (model field in ledger). Phase 53 benefits from Phase 51 UAT-47-a evidence but can start in parallel.
 - [Phase 50]: Closure (2026-06-03): ruleset 17086676 hardened — 5 rules including required_status_checks for verifier-gate+deps-update-gate (integration_id=15368), bypass_actors=[], current_user_can_bypass→never. Two PUTs in audit log. Test PR proved enforcement (Method A+B); break-glass runbook (docs §7) live-tested idempotent BEFORE bypass removal. Vitest D11+D12 pin jobid strings. 6 atomic commits 79d5415→9c3b016→fab8d2a→d455b32→b57d3a9→bcaa89c.
 - [Phase 51]: Closure (2026-06-03): 0 PASS / 1 FAIL / 1 AUTO-DEFERRED / 1 STILL-DEFERRED / 1 BLOCKED-BY-PHASE-50. UAT-47-e FAILED — v40-verifier-gate.yml's pull_request.branches:['auto-fix/*'] targets BASE ref not HEAD; the gate cannot fire on PRs into main. UAT-47-a AUTO-DEFERRED per D-13 (sequence-gate). UAT-47-b STILL-DEFERRED (fixture-mutator authoring required). UAT-47-d BLOCKED-BY-PHASE-50 (ruleset blocks ledger-commit push to main). 5 atomic commits 3cb821a→24b4f08→aedafa0→5121c39→(final). Phase 56 follow-up enqueued (see Pending Todos) folding all four UATs into one v4.2 work unit covering verifier-gate trigger patch + ledger-commit refactor + deps-update audit + fixture-mutator. $0 API spent; no destructive mutations on origin; 2 transient test PRs (#12, #13) opened+closed with --delete-branch.
+- [Phase 51.1]: Closure (2026-06-03): REGRESSION-51-01 resolved — v40-verifier-gate.yml BASE-ref filter `branches:['auto-fix/*']` REMOVED + v40-deps-update.yml `pull_request:` trigger ADDED + verbatim scope-decision fast-path step prepended to 4 PR-gate jobs (verifier-gate/regression-suite/ready-flip in verifier-gate.yml; deps-update-gate in deps-update.yml); diff-guard + dep-scan jobs unguarded by design (universal LOCKED-path check + PR-creator). Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline on {rules, bypass_actors, current_user_can_bypass}). Break-glass §7 runbook live-tested end-to-end with one extra cycle to land closure commits after planned in-task push was blocked by its own bypass removal. Verification PR #14 captured BOTH required contexts firing (verifier-gate + deps-update-gate both SUCCESS via scope-decision fast-path), then CLOSED+branch-deleted. 8 atomic chore(51.1) commits cfb0951→a5a791c→583346e→ea45a47→9d388ad→59546dd→1aa226e→(T7 closure). Phase 56 pending-todo line amended in-place with [NOTE 2026-06-03] annotation per D-16.
 
 ### Pending Todos
 
-- Phase 56 (v4.2 backlog): refactor v40-cost-ledger-snapshot.yml + v40-auto-fix.yml ledger-commit-to-main pattern (UAT-47-d structurally blocked by Phase 50 ruleset; UAT-47-a's ledger commit also affected — both need PR-then-merge or branch-redirect)
+- Phase 56 (v4.2 backlog): refactor v40-cost-ledger-snapshot.yml + v40-auto-fix.yml ledger-commit-to-main pattern (UAT-47-d structurally blocked by Phase 50 ruleset; UAT-47-a's ledger commit also affected — both need PR-then-merge or branch-redirect) [NOTE 2026-06-03: trigger-fix sub-item closed by Phase 51.1 (commit ea45a47 + verification PR #14); ledger-commit refactor + fixture-mutator authoring + 4-UAT re-sweep remain pending v4.2.]
 
 ### Blockers/Concerns
 
@@ -92,6 +93,6 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 ## Session Continuity
 
-Last session: 2026-06-03T05:42:00Z
-Stopped at: Phase 51 closed
-Resume file: .planning/phases/51-live-readiness-uats/51-01-SUMMARY.md (next: Phase 52 context-gather)
+Last session: 2026-06-03T17:50:00Z
+Stopped at: Phase 51.1 closed (REGRESSION-51-01 resolved)
+Resume file: .planning/phases/51.1-required-check-trigger-hotfix/51.1-01-SUMMARY.md (next: Phase 52 context-gather)

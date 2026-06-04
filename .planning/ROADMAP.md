@@ -176,7 +176,10 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
   2. Running `node scripts/auto-fix.mjs` locally outside CI throws a contract error (from `safeAppendLedger`) before touching the committed ledger — `appendLedgerEntry` body is byte-unchanged and all 33 existing llm-ledger tests pass
   3. `npm test` exits 0 even after live auto-fix runs have appended entries; Test 48's "exactly 1 bootstrap entry" assertion is relaxed to "≥1 entry with `phase='39-bootstrap'`"
   4. `grep -c 'safeAppendLedger' scripts/auto-fix.mjs` returns 7; zero direct `appendLedgerEntry` calls remain in `scripts/auto-fix.mjs`
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 56-00-PLAN.md — Wave 0 verification: inspect tests/setup/chrome-stub.js + confirm vi.mock hoisting baseline
+  - [ ] 56-01-PLAN.md — safeAppendLedger wrapper + 7 call-site rewrites (errorClass) + LEDGER-04 integration test (LEDGER-01, LEDGER-02, LEDGER-04)
+  - [ ] 56-02-PLAN.md — Test 48 cardinality relaxation (LEDGER-03)
 
 ### Phase 57: Ledger-Commit Branch Redirect
 **Goal**: The daily cost-ledger-snapshot workflow pushes to a `ledger-snapshots/daily-*` branch instead of `main`; the diff-guard fast-paths non-auto-fix PRs; `v40-auto-fix.yml`'s direct-to-main ledger commit remains byte-unchanged

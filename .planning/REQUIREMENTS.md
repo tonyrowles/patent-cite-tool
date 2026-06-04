@@ -20,16 +20,16 @@ Three concrete blocking test fixes that must clear before the v4.0-integration P
 
 The single serialization point in v4.1 — all downstream features depend on these commits being live on `origin/main`. Source: v4.0 handoff (`~777 local commits ahead of origin/main`), PROJECT.md "Current Milestone" goal #1.
 
-- [ ] **PUSH-01**: A `v4.0-integration` PR is opened from local main with the ~777 commits; merge-strategy is `--merge` (NOT squash — the commit history is the audit trail for a legal-filing tool)
-- [ ] **PUSH-02**: CI passes green on the integration PR on origin (full test suite + lint + build + 6 V40 workflows confirmed present); the merged commit produces at least one complete check-suite run
+- [x] **PUSH-01**: A `v4.0-integration` PR is opened from local main with the ~777 commits; merge-strategy is `--merge` (NOT squash — the commit history is the audit trail for a legal-filing tool)
+- [x] **PUSH-02**: CI passes green on the integration PR on origin (full test suite + lint + build + 6 V40 workflows confirmed present); the merged commit produces at least one complete check-suite run
 
 ### Readiness Gate (post-push ruleset)
 
 CLEANUP-04 + `bypass_actors=1` remediation. Must run AFTER push (to resolve `integration_id` from a live CI run) but BEFORE any new `triage`-labeled issue fires (which could otherwise be auto-fix-promoted via the still-open bypass). Source: STATE.md tech_debt entries, PROJECT.md "Next Milestone Goals" #1.
 
-- [ ] **GATE-01**: Ruleset 17086676 is PATCHed via `gh api -X PUT --input` to add `verifier-gate` + `deps-update-gate` job names to `required_status_checks`; verification via subsequent `gh api GET` + Vitest static-grep guard pinning both context names
-- [ ] **GATE-02**: `bypass_actors=1` (owner-self `bypass_mode=always`) is removed from ruleset 17086676 (set to empty array); a committed break-glass procedure documents the recovery path (`gh api PATCH` to re-add temporarily) BEFORE removal lands
-- [ ] **GATE-03**: A test PR opened immediately after GATE-01 + GATE-02 confirms both required status checks are correctly enforced (PR cannot merge until both pass)
+- [x] **GATE-01**: Ruleset 17086676 is PATCHed via `gh api -X PUT --input` to add `verifier-gate` + `deps-update-gate` job names to `required_status_checks`; verification via subsequent `gh api GET` + Vitest static-grep guard pinning both context names
+- [x] **GATE-02**: `bypass_actors=1` (owner-self `bypass_mode=always`) is removed from ruleset 17086676 (set to empty array); a committed break-glass procedure documents the recovery path (`gh api PATCH` to re-add temporarily) BEFORE removal lands
+- [x] **GATE-03**: A test PR opened immediately after GATE-01 + GATE-02 confirms both required status checks are correctly enforced (PR cannot merge until both pass)
 
 ### Live Readiness UATs
 
@@ -44,34 +44,34 @@ The 4 DEFERRED runbook stubs from `47-UAT-DEFERRED.md` — re-stamped to PASS wi
 
 11 carryover items from v3.1 close + 8 v4.0 close items (per STATE.md Deferred Items table). Substance was closed live in v3.1 Phase 38-03; this is bookkeeping debt. Source: STATE.md Deferred Items.
 
-- [ ] **BOOKS-01**: Frontmatter is re-stamped on 5 carryover VERIFICATION/UAT files (`32-UAT-EVIDENCE.md`, `35-HUMAN-UAT.md`, `36-HUMAN-UAT.md`, `37-HUMAN-UAT.md`, `38-UAT-EVIDENCE.md`); each gains `status: passed` reflecting the live Phase 38-03 closure; forward-only new commits (no `git commit --amend`)
-- [ ] **BOOKS-02**: 3 orphan quick-task slug references are removed from STATE.md Deferred Items table (`1-fix-off-by-2-error-in-patent-column-line`, `2-fix-ci-commit-package-lock-json-currentl`, `260412-fde-fix-spurious-results-reporting-impossibl`); each was already substantively closed
+- [x] **BOOKS-01**: Frontmatter is re-stamped on 5 carryover VERIFICATION/UAT files (`32-UAT-EVIDENCE.md`, `35-HUMAN-UAT.md`, `36-HUMAN-UAT.md`, `37-HUMAN-UAT.md`, `38-UAT-EVIDENCE.md`); each gains `status: passed` reflecting the live Phase 38-03 closure; forward-only new commits (no `git commit --amend`)
+- [x] **BOOKS-02**: 3 orphan quick-task slug references are removed from STATE.md Deferred Items table (`1-fix-off-by-2-error-in-patent-column-line`, `2-fix-ci-commit-package-lock-json-currentl`, `260412-fde-fix-spurious-results-reporting-impossibl`); each was already substantively closed
 
 ### `auto-fix:partial-verified` Semantics
 
 Forward-looking gate state for when verifier passes N/M cases (not all-or-nothing). The single most load-bearing architectural decision in v4.1 — the existing `assertTripleGate` trust invariant MUST NOT be widened. Source: PROJECT.md "Current Milestone" goal #5.
 
-- [ ] **PARTIAL-01**: A new `assertPartialGate` function is exported from `scripts/auto-fix-promote.mjs` as a SEPARATE entry point (not a widened `assertTripleGate`); it does NOT call `runPromote({_skipCiGuard:true})`; the existing `assertTripleGate` body is byte-unchanged
-- [ ] **PARTIAL-02**: `.github/workflows/v40-verifier-gate.yml` `ready-flip` job gains a conditional step that produces an `auto-fix:partial-verified` label when at least 4/5 (≥80%) of affected cases pass; the full-pass `auto-fix:verified` path is byte-unchanged
-- [ ] **PARTIAL-03**: `.github/workflows/v40-auto-promote.yml` job-level `if:` filter widens to include `auto-fix:partial-verified`; partial-pass promotion mutates the corpus only for the PASSING case subset (failing cases stay in quarantine)
-- [ ] **PARTIAL-04**: A Vitest assertion `assertTripleGate` throws on `auto-fix:partial-verified` (proves the trust invariant boundary holds); the test ships in the SAME commit as the new label / `assertPartialGate` function
+- [x] **PARTIAL-01**: A new `assertPartialGate` function is exported from `scripts/auto-fix-promote.mjs` as a SEPARATE entry point (not a widened `assertTripleGate`); it does NOT call `runPromote({_skipCiGuard:true})`; the existing `assertTripleGate` body is byte-unchanged
+- [x] **PARTIAL-02**: `.github/workflows/v40-verifier-gate.yml` `ready-flip` job gains a conditional step that produces an `auto-fix:partial-verified` label when at least 4/5 (≥80%) of affected cases pass; the full-pass `auto-fix:verified` path is byte-unchanged
+- [x] **PARTIAL-03**: `.github/workflows/v40-auto-promote.yml` job-level `if:` filter widens to include `auto-fix:partial-verified`; partial-pass promotion mutates the corpus only for the PASSING case subset (failing cases stay in quarantine)
+- [x] **PARTIAL-04**: A Vitest assertion `assertTripleGate` throws on `auto-fix:partial-verified` (proves the trust invariant boundary holds); the test ships in the SAME commit as the new label / `assertPartialGate` function
 
 ### Multi-Model A/B
 
 Deterministic routing by ERROR_CLASS (not random) — sonnet 4.6 default; opus 4.7 for `GOOGLE_DOM_DRIFT` + `LLM_HALLUCINATED_SELECTION`. Source: PROJECT.md "Current Milestone" goal #6, FEATURES.md research §Multi-model.
 
-- [ ] **AB-01**: A new pure-function module `tests/e2e/lib/llm-router.js` exports a frozen `MODEL_ROUTES` table + `routeModel(errorClass)` helper; no I/O; defaults all classes to `claude-sonnet-4-6` except `GOOGLE_DOM_DRIFT` + `LLM_HALLUCINATED_SELECTION` → `claude-opus-4-7`
-- [ ] **AB-02**: `tests/e2e/lib/fix-prompt-builder.js:buildFixPrompt` return is extended additively with a `model` field sourced from `routeModel(errorClass)`; existing return fields are unchanged
-- [ ] **AB-03**: `scripts/auto-fix.mjs` replaces the module-level hardcoded `MODEL` const with a per-call `model` passed from `buildFixPrompt`; the ledger entry's `model` field reflects the actually-invoked model
-- [ ] **AB-04**: A new `scripts/a-b-winner.mjs` operator-triggered script queries the committed ledger and computes per-class pass rates per model; outputs a markdown table to stdout; outputs `NO_WINNER_YET` when N < `N_PER_ARM_REQUIRED` (committed constant, default 20) — this is a code constant, not a prose note
+- [x] **AB-01**: A new pure-function module `tests/e2e/lib/llm-router.js` exports a frozen `MODEL_ROUTES` table + `routeModel(errorClass)` helper; no I/O; defaults all classes to `claude-sonnet-4-6` except `GOOGLE_DOM_DRIFT` + `LLM_HALLUCINATED_SELECTION` → `claude-opus-4-7`
+- [x] **AB-02**: `tests/e2e/lib/fix-prompt-builder.js:buildFixPrompt` return is extended additively with a `model` field sourced from `routeModel(errorClass)`; existing return fields are unchanged
+- [x] **AB-03**: `scripts/auto-fix.mjs` replaces the module-level hardcoded `MODEL` const with a per-call `model` passed from `buildFixPrompt`; the ledger entry's `model` field reflects the actually-invoked model
+- [x] **AB-04**: A new `scripts/a-b-winner.mjs` operator-triggered script queries the committed ledger and computes per-class pass rates per model; outputs a markdown table to stdout; outputs `NO_WINNER_YET` when N < `N_PER_ARM_REQUIRED` (committed constant, default 20) — this is a code constant, not a prose note
 
 ### Auto-Fix Dashboard
 
 Additive `<details>` collapsible section in the existing weekly digest. SUMMARY_KEYS frozen contract (7 entries) is preserved. Source: PROJECT.md "Current Milestone" goal #4.
 
-- [ ] **DASH-01**: `scripts/e2e-weekly-digest.mjs` gains an `aggregateAutoFixMetrics` helper that reads the committed ledger + `gh pr` query results; computes 7 observable metrics (auto_fix_attempted, verified_merged, success_rate, cost_per_fix, time_to_merge_p50, fix_attempts_p50, flake_escalation_count); ALL metrics are NaN/Infinity-guarded
-- [ ] **DASH-02**: A new `renderAutoFixSection` is appended after the existing digest sections inside a `<details>` collapsible markdown block; the frozen 7-element `SUMMARY_KEYS` array is byte-unchanged (Vitest assertion `SUMMARY_KEYS.length === 7` must pass)
-- [ ] **DASH-03**: `cost_per_fix` uses `combinedMonthlyTotalByTransport` (not raw sum) to avoid double-counting subscription + SDK invocations for the same issue; `time_to_merge` filters `mergedAt !== null`
+- [x] **DASH-01**: `scripts/e2e-weekly-digest.mjs` gains an `aggregateAutoFixMetrics` helper that reads the committed ledger + `gh pr` query results; computes 7 observable metrics (auto_fix_attempted, verified_merged, success_rate, cost_per_fix, time_to_merge_p50, fix_attempts_p50, flake_escalation_count); ALL metrics are NaN/Infinity-guarded
+- [x] **DASH-02**: A new `renderAutoFixSection` is appended after the existing digest sections inside a `<details>` collapsible markdown block; the frozen 7-element `SUMMARY_KEYS` array is byte-unchanged (Vitest assertion `SUMMARY_KEYS.length === 7` must pass)
+- [x] **DASH-03**: `cost_per_fix` uses `combinedMonthlyTotalByTransport` (not raw sum) to avoid double-counting subscription + SDK invocations for the same issue; `time_to_merge` filters `mergedAt !== null`
 
 ## v2 Requirements (Deferred)
 

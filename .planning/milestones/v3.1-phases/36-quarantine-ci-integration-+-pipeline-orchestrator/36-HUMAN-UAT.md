@@ -1,5 +1,5 @@
 ---
-status: partial
+status: passed
 phase: 36-quarantine-ci-integration-+-pipeline-orchestrator
 source: [36-VERIFICATION.md]
 started: 2026-05-28

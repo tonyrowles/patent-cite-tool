@@ -1,5 +1,5 @@
 ---
-status: partial
+status: passed
 phase: 37-weekly-analytics-digest
 source: [37-VERIFICATION.md]
 started: 2026-05-28

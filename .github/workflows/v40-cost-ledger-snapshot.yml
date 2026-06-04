@@ -78,8 +78,16 @@ jobs:
 
       - name: Commit daily ledger snapshot
         # [skip ci] is LOAD-BEARING — prevents this bot push from re-triggering
-        # ci.yml. Mirrors e2e-weekly-digest.yml:98-110 VERBATIM (byte-identical
-        # modulo the git add path + commit message; S13 test gate enforces this).
+        # ci.yml. The four `git config`/`git add`/idempotent-guard/`git commit`
+        # lines below (the body up to but NOT including the final `git push`)
+        # mirror e2e-weekly-digest.yml:98-110 VERBATIM (byte-identical modulo
+        # the git add path + commit message; S13 test gate enforces this).
+        # The final `git push` line is the Phase-57 divergence point: pushes
+        # to ledger-snapshots/daily-${SNAPSHOT_DATE} instead of bare
+        # `git push` to main, to comply with Phase 50 ruleset 17086676 which
+        # blocks direct-to-main pushes for the github-actions[bot] actor.
+        # The main-branch ledger is updated only by v40-auto-fix.yml's
+        # direct-to-main commit (LOAD-BEARING Pitfall 1).
         # Idempotent guard pattern below: no-op if the ledger is unchanged.
         # \$ (escaped dollar) prevents YAML from treating $${{...}} as a shell var;
         # the literal $ in the commit message reads as "$0.47 spent".

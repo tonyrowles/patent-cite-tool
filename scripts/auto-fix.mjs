@@ -350,10 +350,40 @@ export function changedPathsFromDiff(diff) {
  * must see `transport: 'subscription'` on these rows so dashboard transport-
  * filtering counts them under the right bucket.
  *
+ * Phase 56 WR-02 (REVIEW.md): pre-flight the safeAppendLedger CI/override
+ * guard at the TOP of this helper so the FLAKE_ESCALATION branch does not
+ * issue `gh label create`, `gh issue create`, atomicWriteJson(suppression),
+ * and `quarantine-append.mjs --escalate-stable-runs-reset` BEFORE its
+ * terminal safeAppendLedger() throws on a local non-CI run. Without this
+ * pre-flight, a developer testing the FLAKE branch with `--force-api`
+ * locally would create a GitHub issue + write a suppression entry to disk
+ * + reset the quarantine corpus, then fail to record the ledger row —
+ * auditability gap. Failing fast at the top is the minimal fix.
+ *
  * @param {{caseId: string|null, fingerprint: string, issueNumber: number, transport?: string, now?: () => Date}} opts
  * @returns {Promise<number|null>}
  */
 export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, transport = DEFAULT_TRANSPORT, now = () => new Date() }) {
+  // Phase 56 WR-02 — pre-flight the safeAppendLedger CI/override guard so
+  // the FLAKE_ESCALATION side effects (gh label, gh issue, suppression
+  // write, quarantine reset) never land without a corresponding ledger row.
+  // Use the same canonical strict form as safeAppendLedger (CR-02) for
+  // semantic parity — `CI=false` MUST NOT pass either check.
+  const __wr02_inCi =
+    process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  const __wr02_hasOverride =
+    typeof process.env.E2E_LEDGER_PATH_OVERRIDE === 'string' &&
+    process.env.E2E_LEDGER_PATH_OVERRIDE.trim().length > 0;
+  if (!__wr02_inCi && !__wr02_hasOverride) {
+    throw new Error(
+      'dispatchFlakeState refused outside CI/override — same gate as ' +
+        'safeAppendLedger (Phase 56 WR-02). The FLAKE_ESCALATION branch ' +
+        'produces gh issue + suppression + quarantine-reset side effects ' +
+        'BEFORE its terminal ledger write; we fail fast at entry so those ' +
+        'side effects never land without an audit row. Set ' +
+        'process.env.CI=true or E2E_LEDGER_PATH_OVERRIDE=/path/to/tmp.json.',
+    );
+  }
   let ringBuffer;
   let suppressionsFile;
   try {

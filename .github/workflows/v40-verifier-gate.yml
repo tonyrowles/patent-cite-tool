@@ -192,6 +192,14 @@ jobs:
     needs: diff-guard
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # Phase 53 PARTIAL-02 (D-09): expose per-case PASS/FAIL outputs so the
+    # ready-flip job can compute the >=4/5 partial-verified threshold. The
+    # full-pass success contract is PRESERVED: FAILED_CASES empty -> existing
+    # behavior unchanged; partial-pass triggers the new conditional label step.
+    outputs:
+      passing_cases:  ${{ steps.verify.outputs.passing_cases }}
+      failing_cases:  ${{ steps.verify.outputs.failing_cases }}
+      affected_count: ${{ steps.verify.outputs.affected_count }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PR_NUM: ${{ github.event.pull_request.number }}
@@ -268,11 +276,19 @@ jobs:
           done
 
       - name: Verify affected cases 3x consecutively
+        id: verify
         if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         # 41-RESEARCH Pattern 5 verbatim. PR_BODY via env-hop (CWE-94 defense)
         # then piped via stdin to parse-affected-cases.mjs (regex-only parser).
         # Empty CASES is a HARD FAIL per Pitfall C (would otherwise silently
         # pass with zero verification runs).
+        #
+        # Phase 53 PARTIAL-02 (D-09..D-13): the hard-fail on any failing case
+        # is RELAXED for the partial-pass branch. Three outcomes now:
+        #   1. FAILED_CASES empty                              -> existing full-pass; no comment, no exit; ready-flip applies auto-fix:verified (D-10 UNCHANGED).
+        #   2. partial-pass eligible (>=5 cases, >=80% pass,   -> log NOTICE; do NOT add human-review-required; do NOT exit 1.
+        #      no FLAKE in failing cases)                         ready-flip computes + applies auto-fix:partial-verified.
+        #   3. full-fail / below-threshold / FLAKE present     -> existing hard-fail path (human-review-required + comment + exit 1).
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -287,6 +303,7 @@ jobs:
 
           mkdir -p playwright-report
           FAILED_CASES=""
+          PASSING_CASES=""
           for case_id in $CASES; do
             echo "::group::Verify $case_id (3 consecutive runs)"
             ALL_PASS=true
@@ -307,16 +324,68 @@ jobs:
             done
             if [ "$ALL_PASS" != "true" ]; then
               FAILED_CASES="$FAILED_CASES $case_id"
+            else
+              PASSING_CASES="$PASSING_CASES $case_id"
             fi
             echo "::endgroup::"
           done
 
-          if [ -n "$FAILED_CASES" ]; then
-            echo "::error::Cases failed 3x verification:$FAILED_CASES"
-            gh pr edit "$PR_NUMBER" --add-label "human-review-required" 2>&1 || true
-            gh pr comment "$PR_NUMBER" --body "Verifier-gate FAIL -- cases$FAILED_CASES did not pass 3 consecutive Tier A/B runs. PR stays draft for human review."
-            exit 1
+          # Compute outputs (Phase 53 PARTIAL-02 D-09): ready-flip consumes
+          # these to evaluate the >=4/5 partial-verified threshold + FLAKE
+          # masquerade check. Empty PASSING_CASES on full-fail; empty
+          # FAILING_CASES on full-pass.
+          AFFECTED_COUNT=$(echo "$CASES" | wc -w | xargs)
+          PASSING_CSV=$(echo "$PASSING_CASES" | xargs | tr ' ' ',')
+          FAILING_CSV=$(echo "$FAILED_CASES"  | xargs | tr ' ' ',')
+          {
+            echo "passing_cases=$PASSING_CSV"
+            echo "failing_cases=$FAILING_CSV"
+            echo "affected_count=$AFFECTED_COUNT"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ -z "$FAILED_CASES" ]; then
+            echo "Full-pass: all $AFFECTED_COUNT affected cases passed 3x Tier A/B"
+            exit 0
           fi
+
+          # Partial-pass eligibility check (D-09..D-13). FLAKE-masquerade
+          # mitigation: any FLAKE in failing cases disqualifies the partial
+          # path (1 flake cannot mask 4 real fails).
+          FAIL_COUNT=$(echo "$FAILED_CASES" | wc -w | xargs)
+          PASS_COUNT=$((AFFECTED_COUNT - FAIL_COUNT))
+          FLAKE_PRESENT=0
+          for case_id in $FAILED_CASES; do
+            for report in playwright-report/single-case-${case_id}-run-*.json; do
+              [ -f "$report" ] || continue
+              if jq -e '.runs[]? | select(.errorClass == "FLAKE")' "$report" >/dev/null 2>&1; then
+                FLAKE_PRESENT=1
+                break 2
+              fi
+            done
+          done
+
+          # D-12: abstain for <5 cases (4/5 threshold meaningless on small sets).
+          # D-11: PARTIAL_THRESHOLD = 0.80 = 4/5. awk-based ratio (no bc).
+          PARTIAL_OK=0
+          if [ "$AFFECTED_COUNT" -ge 5 ] && [ "$FLAKE_PRESENT" = "0" ]; then
+            RATIO_OK=$(awk -v p="$PASS_COUNT" -v a="$AFFECTED_COUNT" 'BEGIN { print (a > 0 && p / a >= 0.80) ? 1 : 0 }')
+            if [ "$RATIO_OK" = "1" ]; then
+              PARTIAL_OK=1
+            fi
+          fi
+
+          if [ "$PARTIAL_OK" = "1" ]; then
+            echo "::notice::Partial-pass detected — ${PASS_COUNT}/${AFFECTED_COUNT} affected cases passed (>= 0.80; no FLAKE). Handing off to ready-flip for partial-label decision."
+            echo "PASSING_CASES:$PASSING_CASES"
+            echo "FAILING_CASES:$FAILED_CASES"
+            exit 0
+          fi
+
+          # Full-fail OR below-threshold OR FLAKE present -> existing hard-fail.
+          echo "::error::Cases failed 3x verification:$FAILED_CASES (FLAKE_PRESENT=$FLAKE_PRESENT, ratio ${PASS_COUNT}/${AFFECTED_COUNT})"
+          gh pr edit "$PR_NUMBER" --add-label "human-review-required" 2>&1 || true
+          gh pr comment "$PR_NUMBER" --body "Verifier-gate FAIL -- cases$FAILED_CASES did not pass 3 consecutive Tier A/B runs. PR stays draft for human review."
+          exit 1
 
       - name: Upload per-case verifier reports
         if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && always()
@@ -435,6 +504,11 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PR_NUM: ${{ github.event.pull_request.number }}
+      # Phase 53 PARTIAL-02 (D-09..D-13) — wire verifier-gate outputs for the
+      # conditional partial-verified label step below.
+      PASSING_CASES:  ${{ needs.verifier-gate.outputs.passing_cases }}
+      FAILING_CASES:  ${{ needs.verifier-gate.outputs.failing_cases }}
+      AFFECTED_COUNT: ${{ needs.verifier-gate.outputs.affected_count }}
 
     steps:
       - name: Scope decision (auto-fix/* PRs only; fast-path SUCCESS otherwise)
@@ -491,3 +565,68 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: gh pr edit "$PR_NUMBER" --add-label "auto-fix:verified"
+
+      - name: Conditional partial-verified label (>=4/5, FLAKE-aware)
+        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
+        # Phase 53 PARTIAL-02 (D-09..D-13). Fires ONLY when verifier-gate
+        # produced partial outputs AND all 4 conditions hold:
+        #   1. affected_count >= 5             (D-12 — abstain for small sets)
+        #   2. passing/affected >= 0.80        (D-11 — PARTIAL_THRESHOLD)
+        #   3. passing < affected              (D-09 — NOT a full pass; full pass took the auto-fix:verified path above)
+        #   4. no failing case has errorClass=='FLAKE' (D-13 — FLAKE masquerade mitigation)
+        # The existing auto-fix:verified label step above is BYTE-UNCHANGED
+        # (D-10). On full-pass branch, FAILING_CASES is empty and this step
+        # exits 0 without action.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$PASSING_CASES" ] || [ -z "$FAILING_CASES" ]; then
+            echo "Full-pass or full-fail (no partial outputs) — partial-label step abstains"
+            exit 0
+          fi
+          PASS_COUNT=$(echo "$PASSING_CASES" | tr ',' '\n' | grep -c .)
+          FAIL_COUNT=$(echo "$FAILING_CASES" | tr ',' '\n' | grep -c .)
+          AFFECTED=$AFFECTED_COUNT
+          if [ "$AFFECTED" -lt 5 ]; then
+            echo "affected_count=$AFFECTED < 5 — abstaining per D-12"
+            exit 0
+          fi
+          if [ "$PASS_COUNT" -ge "$AFFECTED" ]; then
+            echo "full pass — handled by auto-fix:verified step above"
+            exit 0
+          fi
+          # Threshold check via awk (no bc dependency required on ubuntu-latest)
+          RATIO_OK=$(awk -v p="$PASS_COUNT" -v a="$AFFECTED" 'BEGIN { print (a > 0 && p / a >= 0.80) ? 1 : 0 }')
+          if [ "$RATIO_OK" != "1" ]; then
+            echo "ratio $PASS_COUNT/$AFFECTED < 0.80 — abstaining"
+            exit 0
+          fi
+          # FLAKE-masquerade check (D-13): inspect per-case JSON outputs from
+          # the verifier-gate uploaded artifact directory. The verifier-gate
+          # job ran in a separate runner; we re-download via gh run download.
+          mkdir -p /tmp/verifier-reports
+          gh run download "$GITHUB_RUN_ID" \
+            --name "verifier-gate-reports-$GITHUB_RUN_ID" \
+            --dir /tmp/verifier-reports 2>/dev/null || true
+          FLAKE_PRESENT=0
+          for case_id in $(echo "$FAILING_CASES" | tr ',' ' '); do
+            for report in /tmp/verifier-reports/single-case-${case_id}-run-*.json; do
+              [ -f "$report" ] || continue
+              if jq -e '.runs[]? | select(.errorClass == "FLAKE")' "$report" >/dev/null 2>&1; then
+                FLAKE_PRESENT=1
+                break 2
+              fi
+            done
+          done
+          if [ "$FLAKE_PRESENT" = "1" ]; then
+            echo "FLAKE present in failing cases — abstaining per D-13 (1 flake cannot mask 4 real fails)"
+            exit 0
+          fi
+          # All 4 conditions met — apply the partial-verified label.
+          gh label create auto-fix:partial-verified \
+            --color FBCA04 \
+            --description "Verifier-gate passed >=4/5 of affected cases; failing cases stay quarantined" \
+            --force 2>/dev/null || true
+          gh pr edit "$PR_NUMBER" --add-label "auto-fix:partial-verified"
+          gh pr comment "$PR_NUMBER" --body "Verifier-gate PARTIAL PASS — ${PASS_COUNT}/${AFFECTED} affected cases passed. Failing case(s): ${FAILING_CASES}. Promotion will mutate the corpus only for the passing subset on merge."

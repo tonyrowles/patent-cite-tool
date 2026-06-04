@@ -58,6 +58,28 @@ import { fileURLToPath } from 'node:url';
 import { runPromote } from './promote-from-quarantine.mjs';
 
 // ---------------------------------------------------------------------------
+// Phase 53 — auto-fix:partial-verified semantics (PARTIAL-01 + PARTIAL-04).
+//
+// PARTIAL_LABEL: the GitHub label string that the verifier-gate workflow
+// (v40-verifier-gate.yml) emits when >=4/5 of affected cases pass a 3x
+// consecutive verifier-gate run AND no failing case is a FLAKE. This label
+// is the cross-workflow signal that auto-promote (v40-auto-promote.yml) keys
+// off to enter the PARTIAL path. Declared HERE (D-18) so the Vitest pin in
+// tests/unit/auto-fix-promote-gate.test.js can reference the symbol — and
+// thus ships in the SAME COMMIT as both the assertPartialGate definition
+// and the trust-invariant assertion that assertTripleGate continues to
+// reject this label (PARTIAL-04).
+//
+// PARTIAL_THRESHOLD: the >=4/5 ratio (0.80). Single source of truth (D-11);
+// also referenced numerically by the partial-label step in
+// v40-verifier-gate.yml. Changing this constant is a deliberate test-update,
+// pinned by tests/unit/auto-fix-promote-gate.test.js T_thresh_1.
+// ---------------------------------------------------------------------------
+
+export const PARTIAL_LABEL = 'auto-fix:partial-verified';
+export const PARTIAL_THRESHOLD = 0.80;
+
+// ---------------------------------------------------------------------------
 // assertTripleGate — PURE; no I/O; no gh calls; no process exit.
 // Throws on the first failing leg with TRIPLE_GATE_FAILED: <leg> — <details>.
 // The caller (main / Vitest) handles the throw. This makes T1-T4 trivially
@@ -78,6 +100,140 @@ export function assertTripleGate({ prLabels, merged, sourceIssueLabels } = {}) {
   if (!Array.isArray(sourceIssueLabels) || !sourceIssueLabels.includes('triage')) {
     throw new Error("TRIPLE_GATE_FAILED: sourceIssueLabels — source issue missing 'triage'");
   }
+}
+
+// ---------------------------------------------------------------------------
+// assertPartialGate — Phase 53 PARTIAL-01 (D-01..D-05).
+//
+// A SEPARATE entry point from assertTripleGate. Does NOT widen the triple-
+// gate (D-05: assertTripleGate body lines 67-81 byte-unchanged). Trust
+// invariant: the partial path runs WITHOUT the Phase 35 _skipCiGuard:true
+// exemption — partial promotes re-enter normal CI semantics on the
+// auto-promote follow-up PR (assertPartialGate's caller, runPartialPromote,
+// calls runPromote with _skipCiGuard:false).
+//
+// Contract (D-01): { prLabels, merged, sourceIssueLabels, passingCases }.
+// First 3 args mirror assertTripleGate for symmetry; passingCases is the
+// case IDs the verifier confirmed PASS (CSV-decoded by parseArgv from the
+// --passing-cases flag; sourced from a verifier-gate PR comment marker).
+//
+// Three legs (D-02), error prefix PARTIAL_GATE_FAILED for diagnostic
+// uniformity with TRIPLE_GATE_FAILED (D-03):
+//   Leg 1 — PR carries 'auto-fix:partial-verified' (NOT 'auto-fix:verified'
+//           — that is assertTripleGate's job; the trust invariant boundary
+//           PARTIAL-04 pins this in Vitest)
+//   Leg 2 — merged === true
+//   Leg 3 — source-issue carries 'triage'
+//
+// passingCases validation (D-04): empty/non-array → throw; non-string entry
+// → throw. assertPartialGate never calls runPromote at all — it is a pure
+// gate that returns { passingCaseIds } for the caller to act on. The defensive
+// copy on return prevents callers mutating the input through the return value.
+//
+// PURE function: no I/O, no gh, no process.exit (mirrors assertTripleGate).
+// ---------------------------------------------------------------------------
+
+export function assertPartialGate({ prLabels, merged, sourceIssueLabels, passingCases } = {}) {
+  // Leg 1 — auto-fix:partial-verified label on the merged PR.
+  if (!Array.isArray(prLabels) || !prLabels.includes(PARTIAL_LABEL)) {
+    throw new Error("PARTIAL_GATE_FAILED: prLabels — missing 'auto-fix:partial-verified'");
+  }
+  // Leg 2 — merged === true (mirrors assertTripleGate Leg 2 semantics).
+  if (merged !== true) {
+    throw new Error('PARTIAL_GATE_FAILED: merged — pull request not merged');
+  }
+  // Leg 3 — source-issue carries triage (mirrors assertTripleGate Leg 3).
+  if (!Array.isArray(sourceIssueLabels) || !sourceIssueLabels.includes('triage')) {
+    throw new Error("PARTIAL_GATE_FAILED: sourceIssueLabels — source issue missing 'triage'");
+  }
+  // D-04 amendment: passingCases must be a non-empty array of non-empty
+  // strings. Empty/non-array → "empty (no cases to promote)" (T-53-05
+  // mitigation — prevents silent no-op promote). Mixed-type array → "non-
+  // string entry" (defense against argv tampering — T-53-04 mitigation).
+  if (!Array.isArray(passingCases) || passingCases.length === 0) {
+    throw new Error('PARTIAL_GATE_FAILED: passingCases — empty (no cases to promote)');
+  }
+  for (const entry of passingCases) {
+    if (typeof entry !== 'string' || entry.length === 0) {
+      throw new Error('PARTIAL_GATE_FAILED: passingCases — non-string entry');
+    }
+  }
+  // Defensive copy so callers cannot mutate the input array through the
+  // returned reference. Vitest P8 pins this.
+  return { passingCaseIds: passingCases.slice() };
+}
+
+// ---------------------------------------------------------------------------
+// runPartialPromote — Phase 53 PARTIAL-01 (D-06..D-08).
+//
+// Loops over passingCaseIds and invokes the per-case promote primitive
+// (runPromote from ./promote-from-quarantine.mjs) WITHOUT the _skipCiGuard
+// exemption — i.e., the partial path re-enters normal Phase 35 CI semantics.
+//
+// IMPLEMENTATION NOTE (Phase 53 inline deviation, Rule 1):
+// The plan's <interfaces> block references an export named
+// `promoteFromQuarantine` from ./promote-from-quarantine.mjs. That export
+// does not exist — only `runPromote` and `appendToGoldenCorpus` are
+// exported. `runPromote` IS the per-case primitive (its signature is
+// `{ id, confirm, _skipCiGuard }`; one case per invocation). We use it
+// here with `_skipCiGuard: false`, which preserves the D-04/D-06/D-07
+// trust invariant verbatim: "_skipCiGuard:true" never appears in this
+// function's body. The grep gate (count == 1 in the file) holds because
+// only main()'s existing verified-branch retains the `_skipCiGuard: true`
+// literal.
+//
+// Atomic-per-case semantics (D-07): on the first runPromote failure
+// (exitCode !== 0 OR a thrown error), emit
+//   PARTIAL_PROMOTE_HALTED: case=<id>, reason=<msg>
+// to console.error and return { promoted, halted: true, error } where
+// `promoted` holds the case IDs successfully promoted BEFORE the halt.
+// No rollback — matches existing runPromote semantics for the full-pass
+// path. Failing cases (not in passingCaseIds) stay quarantined per D-08;
+// the workflow-side comment hook posts a notice on each failing source
+// issue (Task 3 territory).
+//
+// dryRun (D-19, Claude's Discretion): when true, returns the no-op shape
+// WITHOUT invoking runPromote. Used for Vitest mockability; the workflow
+// always passes dryRun:false implicitly.
+// ---------------------------------------------------------------------------
+
+export async function runPartialPromote(passingCaseIds, { dryRun = false } = {}) {
+  // Defense-in-depth: re-validate the array shape for direct CLI callers
+  // (the workflow's main() call path already runs assertPartialGate, but
+  // direct invocations from a future test harness or REPL must not
+  // silently no-op).
+  if (!Array.isArray(passingCaseIds) || passingCaseIds.length === 0) {
+    throw new Error('PARTIAL_GATE_FAILED: passingCases — empty (no cases to promote)');
+  }
+
+  if (dryRun === true) {
+    return { promoted: passingCaseIds.slice(), halted: false, dryRun: true };
+  }
+
+  const promoted = [];
+  for (const caseId of passingCaseIds) {
+    try {
+      const result = await runPromote({
+        id: caseId,
+        confirm: true,
+        _skipCiGuard: false,
+      });
+      if (result && result.exitCode !== 0) {
+        const haltMsg = 'PARTIAL_PROMOTE_HALTED: case=' + caseId +
+          ', reason=runPromote exitCode=' + result.exitCode;
+        console.error(haltMsg);
+        return { promoted, halted: true, error: haltMsg };
+      }
+      promoted.push(caseId);
+    } catch (err) {
+      const haltMsg = 'PARTIAL_PROMOTE_HALTED: case=' + caseId +
+        ', reason=' + (err && err.message ? err.message : String(err));
+      console.error(haltMsg);
+      return { promoted, halted: true, error: haltMsg };
+    }
+  }
+
+  return { promoted, halted: false };
 }
 
 // ---------------------------------------------------------------------------

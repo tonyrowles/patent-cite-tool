@@ -12,10 +12,10 @@ Six categories, derived from the v4.2 research synthesis (`.planning/research/SU
 
 Wires `errorClass` into the auto-fix ledger entry shape, adds the call-site guard that closes the auto-fix-api leak vector, and fixes the pre-existing Test 48 failure that surfaced during v4.1.
 
-- [ ] **LEDGER-01**: `errorClass` field populated on all 7 `appendLedgerEntry` call sites in `scripts/auto-fix.mjs` (lines ~295, ~391, ~546, ~589, ~685, ~707, ~744) — additive only; `appendLedgerEntry` body byte-unchanged
-- [ ] **LEDGER-02**: `safeAppendLedger(entry)` wrapper in `scripts/auto-fix.mjs` enforces `CI || E2E_LEDGER_PATH_OVERRIDE` and replaces all 7 direct `appendLedgerEntry` invocations — guard does NOT go into `appendLedgerEntry` body (Pitfall 7)
-- [ ] **LEDGER-03**: `tests/unit/llm-ledger.test.js` Test 48 assertion relaxed from "exactly 1 bootstrap entry" to "≥1 entry with `phase='39-bootstrap'`" so live auto-fix runs on origin/main do not fail the regression suite
-- [ ] **LEDGER-04**: Integration Vitest case asserts `runDispatcher()` in mocked mode emits a ledger entry carrying `errorClass` — catches partial-wiring (Pitfall 3); `grep -c 'errorClass' scripts/auto-fix.mjs` ≥ 7
+- [x] **LEDGER-01**: `errorClass` field populated on all 7 `appendLedgerEntry` call sites in `scripts/auto-fix.mjs` (lines ~295, ~391, ~546, ~589, ~685, ~707, ~744) — additive only; `appendLedgerEntry` body byte-unchanged
+- [x] **LEDGER-02**: `safeAppendLedger(entry)` wrapper in `scripts/auto-fix.mjs` enforces `CI || E2E_LEDGER_PATH_OVERRIDE` and replaces all 7 direct `appendLedgerEntry` invocations — guard does NOT go into `appendLedgerEntry` body (Pitfall 7)
+- [x] **LEDGER-03**: `tests/unit/llm-ledger.test.js` Test 48 assertion relaxed from "exactly 1 bootstrap entry" to "≥1 entry with `phase='39-bootstrap'`" so live auto-fix runs on origin/main do not fail the regression suite
+- [x] **LEDGER-04**: Integration Vitest case asserts `runDispatcher()` in mocked mode emits a ledger entry carrying `errorClass` — catches partial-wiring (Pitfall 3); `grep -c 'errorClass' scripts/auto-fix.mjs` ≥ 7
 
 ### Ledger-Commit Branch Redirect
 
@@ -101,10 +101,10 @@ Populated by the v4.2 roadmapper (2026-06-04).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LEDGER-01 | 56 | Pending |
-| LEDGER-02 | 56 | Pending |
-| LEDGER-03 | 56 | Pending |
-| LEDGER-04 | 56 | Pending |
+| LEDGER-01 | 56 | Complete |
+| LEDGER-02 | 56 | Complete |
+| LEDGER-03 | 56 | Complete |
+| LEDGER-04 | 56 | Complete |
 | COMMIT-01 | 57 | Pending |
 | COMMIT-02 | 57 | Pending |
 | COMMIT-03 | 57 | Pending |

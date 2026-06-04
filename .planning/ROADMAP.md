@@ -159,7 +159,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 
 **Parallelization:** Phase 56 and Phase 57 touch disjoint files and can ship in either order. Phase 56 recommended first so UAT-47-a (Phase 59 SWEEP-03) populates `errorClass` from the first live run.
 
-- [ ] **Phase 56: Ledger Schema Extension + Leak Guard** - Wire `errorClass` into all 7 `auto-fix.mjs` call sites; add `safeAppendLedger` wrapper enforcing CI/override guard; relax Test 48; Vitest coverage
+- [x] **Phase 56: Ledger Schema Extension + Leak Guard** - Wire `errorClass` into all 7 `auto-fix.mjs` call sites; add `safeAppendLedger` wrapper enforcing CI/override guard; relax Test 48; Vitest coverage (completed 2026-06-04)
 - [ ] **Phase 57: Ledger-Commit Branch Redirect** - Refactor `v40-cost-ledger-snapshot.yml` to push `ledger-snapshots/daily-*` branch; update diff-guard scope-decision; update S13 YAML contract test; pin `v40-auto-fix.yml` direct-to-main as anti-feature
 - [ ] **Phase 58: Promote Outcome Ledger Entry** - Narrow IMPORTS POLICY in `auto-fix-promote.mjs`; write event-sourced outcome entries on promotion success/failure; Vitest coverage
 - [ ] **Phase 59: Fixture-Mutator + 4-UAT Re-Sweep** - Ship `inject-defect.mjs`; execute UAT-47-e → UAT-47-d → UAT-47-a → UAT-47-b in D-13 cost discipline order; produce `56-UAT-EVIDENCE.md`; post-UAT cleanup
@@ -177,9 +177,9 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
   3. `npm test` exits 0 even after live auto-fix runs have appended entries; Test 48's "exactly 1 bootstrap entry" assertion is relaxed to "≥1 entry with `phase='39-bootstrap'`"
   4. `grep -c 'safeAppendLedger' scripts/auto-fix.mjs` returns 7; zero direct `appendLedgerEntry` calls remain in `scripts/auto-fix.mjs`
 **Plans**: 3 plans
-  - [ ] 56-00-PLAN.md — Wave 0 verification: inspect tests/setup/chrome-stub.js + confirm vi.mock hoisting baseline
-  - [ ] 56-01-PLAN.md — safeAppendLedger wrapper + 7 call-site rewrites (errorClass) + LEDGER-04 integration test (LEDGER-01, LEDGER-02, LEDGER-04)
-  - [ ] 56-02-PLAN.md — Test 48 cardinality relaxation (LEDGER-03)
+  - [x] 56-00-PLAN.md — Wave 0 verification: inspect tests/setup/chrome-stub.js + confirm vi.mock hoisting baseline
+  - [x] 56-01-PLAN.md — safeAppendLedger wrapper + 7 call-site rewrites (errorClass) + LEDGER-04 integration test (LEDGER-01, LEDGER-02, LEDGER-04)
+  - [x] 56-02-PLAN.md — Test 48 cardinality relaxation (LEDGER-03)
 
 ### Phase 57: Ledger-Commit Branch Redirect
 **Goal**: The daily cost-ledger-snapshot workflow pushes to a `ledger-snapshots/daily-*` branch instead of `main`; the diff-guard fast-paths non-auto-fix PRs; `v40-auto-fix.yml`'s direct-to-main ledger commit remains byte-unchanged
@@ -246,7 +246,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 | 53. auto-fix:partial-verified Semantics | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 54. Multi-Model A/B | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 55. Auto-Fix Dashboard | v4.1 | 1/1 | Complete | 2026-06-04 |
-| 56. Ledger Schema Extension + Leak Guard | v4.2 | 0/TBD | Not started | - |
+| 56. Ledger Schema Extension + Leak Guard | v4.2 | 3/3 | Complete    | 2026-06-04 |
 | 57. Ledger-Commit Branch Redirect | v4.2 | 0/TBD | Not started | - |
 | 58. Promote Outcome Ledger Entry | v4.2 | 0/TBD | Not started | - |
 | 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/TBD | Not started | - |

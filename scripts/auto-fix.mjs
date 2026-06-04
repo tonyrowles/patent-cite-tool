@@ -360,10 +360,20 @@ export function changedPathsFromDiff(diff) {
  * + reset the quarantine corpus, then fail to record the ledger row —
  * auditability gap. Failing fast at the top is the minimal fix.
  *
- * @param {{caseId: string|null, fingerprint: string, issueNumber: number, transport?: string, now?: () => Date}} opts
+ * Phase 56 WR-04 (REVIEW.md): `errorClass` is now threaded through the
+ * signature so both ledger entries written here (FLAKE_SUPPRESSED + the
+ * flake-dispatched summary) carry the correct errorClass instead of
+ * hardcoded `null`. The current caller dispatches this helper only on
+ * `errorClass === 'FLAKE'` so the value is effectively a constant in
+ * practice, but threading it through preserves the contract for future
+ * call sites and unblocks downstream consumers (dashboards, audit
+ * queries) that filter by errorClass — the Phase 47 WARNING-01 pattern
+ * (threading `transport`) applied symmetrically to errorClass.
+ *
+ * @param {{caseId: string|null, fingerprint: string, issueNumber: number, transport?: string, errorClass?: string|null, now?: () => Date}} opts
  * @returns {Promise<number|null>}
  */
-export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, transport = DEFAULT_TRANSPORT, now = () => new Date() }) {
+export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, transport = DEFAULT_TRANSPORT, errorClass = null, now = () => new Date() }) {
   // Phase 56 WR-02 — pre-flight the safeAppendLedger CI/override guard so
   // the FLAKE_ESCALATION side effects (gh label, gh issue, suppression
   // write, quarantine reset) never land without a corresponding ledger row.
@@ -416,7 +426,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
       transport,
       issueId: `issue-${issueNumber}`,
       fingerprint,
-      errorClass: null,                 // LEDGER-01 — dispatchFlakeState body has no errorClass in scope
+      errorClass: errorClass ?? null,   // LEDGER-01 — threaded from runDispatcher per WR-04
       source: 'flake-suppressed',
       flakeState: 'FLAKE_SUPPRESSED',
       suppressedUntil: decision.until,
@@ -513,7 +523,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
     transport,
     issueId: `issue-${issueNumber}`,
     fingerprint,
-    errorClass: null,                 // LEDGER-01 — dispatchFlakeState body has no errorClass in scope
+    errorClass: errorClass ?? null,   // LEDGER-01 — threaded from runDispatcher per WR-04
     source: 'flake-dispatched',
     flakeState: decision.state,
     flakeAction: decision.action,
@@ -698,6 +708,9 @@ export async function runDispatcher({
         issueNumber: issue,
         transport,   // WARNING-01: thread runtime transport so flake-suppressed
                      // and flake-dispatched ledger rows carry the correct tag
+        errorClass,  // Phase 56 WR-04 — thread errorClass so the FLAKE_SUPPRESSED
+                     // and flake-dispatched ledger rows carry 'FLAKE' instead of
+                     // a hardcoded null (downstream dashboards filter on this).
       });
       if (exitCode !== null) return exitCode;
       // Defensive fall-through: helper returned null only on unexpected

@@ -647,7 +647,7 @@ export async function runDispatcher({
     sdkResult = await invokeAnthropicSdkWithLedger({
       systemBlocks,
       userPrompt,
-      model: MODEL,
+      model: built.model,
       phase: PHASE,
       issueId: `issue-${issue}`,
       forceApi,

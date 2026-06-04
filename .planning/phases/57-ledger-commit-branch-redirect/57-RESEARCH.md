@@ -480,22 +480,20 @@ describe('Phase 57 invariants', () => {
 | A2 | `ledger-snapshots/*` branch creation has no ruleset blocking it | "Pattern 1" + "Step 8 in Bash audit below" | LOW — directly verified via `gh api repos/:owner/:repo/rulesets/17086676`: conditions are `ref_name.include: ["~DEFAULT_BRANCH"]` only. No other rulesets exist (single-entry array from `gh api .../rulesets`). |
 | A3 | The `actions/checkout@v4` default `persist-credentials: true` + workflow `permissions: contents: write` is sufficient to push to a NEW branch | "Standard Stack" + Example 1 | LOW — same auth pattern that currently pushes (failingly) to `main` in line 91 has `contents: write` granted; branch creation requires the same permission level. Confirmed by GitHub Actions docs and by the fact that `actions/checkout@v4` line 42 already has no explicit `persist-credentials:` override (default `true`). |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the planner add a NEW Vitest test for the diff-guard scope-decision step in `v40-verifier-gate.yml`?**
+   **RESOLVED:** Plan 57-01 Task 3 adopts the recommendation — the new diff-guard scope-decision pin lives in `tests/e2e/scripts/v40-cost-ledger-snapshot-yaml.test.js` as a cross-workflow assertion (safer than touching `v40-verifier-gate-yaml.test.js` while it has pre-existing failures Phase 60 CLEAN-02 will fix).
+
    - What we know: COMMIT-02 adds the step; without a pin, a future refactor could remove it.
    - What's unclear: Whether the test belongs in the existing `v40-verifier-gate-yaml.test.js` file (which has pre-existing failures per Phase 51.1 closure) or a new file.
    - Recommendation: Add the assertion to the existing file. Phase 60 CLEAN-02 will fix that file's pre-existing failures; pinning the diff-guard step is a single `expect(yaml).toMatch(/Scope decision \(auto-fix\/\* PRs only/)` that should not interact with the pre-existing failures. Alternative: add the pin to the snapshot YAML test file as a cross-workflow assertion — slightly unusual but contained.
 
 2. **Should COMMIT-03 also add a positive assertion that the NEW `git push origin HEAD:...` includes `${{ env.SNAPSHOT_DATE }}` (not a literal date)?**
-   - What we know: The intent is per-day branches.
-   - What's unclear: Whether to pin only the prefix or the full templated form.
-   - Recommendation: Pin the prefix `'git push origin HEAD:ledger-snapshots/daily-${{ env.SNAPSHOT_DATE }}'` exactly (as shown in Example 3). This catches both regression directions (constant date AND missing prefix).
+   **RESOLVED:** Plan 57-01 Task 3 pins the full templated form `'git push origin HEAD:ledger-snapshots/daily-${{ env.SNAPSHOT_DATE }}'` per the Example 3 recommendation. This catches both regression directions (constant date AND missing prefix).
 
 3. **Will the operator manually merge ledger-snapshot PRs, or will accumulating dangling branches be the steady state?**
-   - What we know: CONTEXT.md says periodic cleanup is OOS; ROADMAP success criterion 1 says branches accumulate.
-   - What's unclear: Whether the snapshot is ALSO supposed to be reachable from `main` (e.g., for the dashboard to consume historical entries).
-   - Recommendation: For Phase 57, treat branches as terminal artifacts (never merged). The committed ledger on the branch is itself queryable via `git show ledger-snapshots/daily-YYYY-MM-DD:tests/e2e/.llm-spend-ledger.json`. UAT-47-d in Phase 59 can validate this assumption empirically. The dashboard regenerates from the most-recent ledger at snapshot time and writes to `docs/v40-ledger-dashboard.md` — but that file also lives on the branch, NOT on main. **The planner should flag this for the operator** — if the dashboard is supposed to be visible on main, an additional PR-back-to-main step is needed (different scope; not COMMIT-01..04).
+   **CARRIED FORWARD:** Plan 57-01 treats branches as terminal artifacts (per CONTEXT.md scope and ROADMAP success criterion 1) and explicitly flags the dashboard-reachability question in the plan's `<output>` block for the operator to decide. Phase 59 UAT-47-d will validate the assumption empirically. Not in COMMIT-01..04 scope; intentionally left as an operator decision rather than silently resolved.
 
 ## Environment Availability
 

@@ -1,5 +1,20 @@
 # Milestones
 
+## v4.1 Readiness Gate + Push (Shipped: 2026-06-04)
+
+**Phases completed:** 9 phases, 9 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Commit:
+- Code & docs (4 files):
+- Primary discovery:
+- 1. [Rule 1 — Bug] Plan `<interfaces>` block referenced a non-existent `promoteFromQuarantine` export
+- One-liner:
+- One-liner:
+
+---
+
 ## v4.0 Self-Healing Test Suite (Shipped: 2026-06-02)
 
 **Phases completed:** 9 phases, 26 plans, 53 tasks

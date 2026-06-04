@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Readiness Gate + Push
-status: completed
-stopped_at: Phase 55 closed (DASH-01..03 — renderAutoFixPipelineSection + fetchAutoFixPrs + runDigest step 6.5 wiring; v4.1 ready for milestone-close batch PR)
-last_updated: "2026-06-04T12:00:00Z"
-last_activity: 2026-06-04 -- Phase 55 marked complete; v4.1 milestone ready for closure batch PR
+status: Awaiting next milestone
+stopped_at: "Phase 55 closed (DASH-01..03 complete; 3 atomic commits LOCAL: 82a49dd → 704284e → <T3 hash>; renderAutoFixPipelineSection + fetchAutoFixPrs + runDigest step 6.5 wiring); v4.1 milestone has all 9 phases LOCAL — ready for operator's milestone-close batch PR"
+last_updated: "2026-06-04T19:22:11.784Z"
+last_activity: 2026-06-04 — Milestone v4.1 completed and archived
 progress:
   total_phases: 9
   completed_phases: 9
@@ -25,12 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 55 — COMPLETE / milestone v4.1 ready for audit→complete→cleanup
-Plan: 1 of 1
-Status: Phase 55 complete — v4.1 ready for milestone-close batch PR (Phases 52-55 + any deferred Phase 49 commits LOCAL → push)
-Last activity: 2026-06-04 -- Phase 55 marked complete
-
-Progress: [██████████] 100%
+Phase: Milestone v4.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-04 — Milestone v4.1 completed and archived
 
 ## Performance Metrics
 
@@ -98,3 +96,16 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 Last session: 2026-06-04T12:00:00Z
 Stopped at: Phase 55 closed (DASH-01..03 complete; 3 atomic commits LOCAL: 82a49dd → 704284e → <T3 hash>; renderAutoFixPipelineSection + fetchAutoFixPrs + runDigest step 6.5 wiring); v4.1 milestone has all 9 phases LOCAL — ready for operator's milestone-close batch PR
 Resume file: .planning/phases/55-auto-fix-dashboard/55-01-SUMMARY.md (next: v4.1 milestone closure — operator batch PR pushing Phases 52-55 + any deferred Phase 49 commits to origin/main)
+
+## Deferred Items (acknowledged at v4.1 milestone close 2026-06-04)
+
+| Category | Item | Status | Resolution |
+|----------|------|--------|------------|
+| verification_gap | Phase 51: 51-VERIFICATION.md | gaps_found | 4 UATs deferred to Phase 56 v4.2; documented in 51-UAT-EVIDENCE.md + STATE.md Pending Todos |
+| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Substantively closed pre-v4.1; orphan-row removed from STATE.md Deferred Items by Phase 52 BOOKS-02; directory retained as historical record |
+| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Substantively closed pre-v4.1; same as above |
+| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Substantively closed pre-v4.1; same as above |
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

@@ -125,7 +125,23 @@ import {
  * @throws {Error} when neither process.env.CI nor process.env.E2E_LEDGER_PATH_OVERRIDE is set
  */
 function safeAppendLedger(entry) {
-  if (!process.env.CI && !process.env.E2E_LEDGER_PATH_OVERRIDE) {
+  // Phase 56 CR-02 (REVIEW.md): align the CI predicate with the canonical
+  // form used by tests/e2e/lib/llm-driver.js:387,518 and the
+  // tests/e2e/lib/llm-ledger.js:86 LEDGER_PATH IIFE. A bare !process.env.CI
+  // truthy check accepts the strings 'false', '0', 'no', etc. as truthy,
+  // so a developer who has `export CI=false` in their shell to opt OUT of
+  // CI-tagged behavior elsewhere would PASS this guard and leak entries to
+  // the committed ledger. The strict form also recognizes GITHUB_ACTIONS
+  // as a CI signal (a CI runner that exports only GITHUB_ACTIONS was
+  // previously refused). The trim-and-length check on the override mirrors
+  // llm-ledger.js:74-98 so a stray whitespace-only override does not
+  // accidentally opt in.
+  const inCi =
+    process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  const hasOverride =
+    typeof process.env.E2E_LEDGER_PATH_OVERRIDE === 'string' &&
+    process.env.E2E_LEDGER_PATH_OVERRIDE.trim().length > 0;
+  if (!inCi && !hasOverride) {
     throw new Error(
       `safeAppendLedger refused: cannot write to ${LEDGER_PATH} ` +
         `outside CI. Set process.env.CI=true (CI invocation) or ` +

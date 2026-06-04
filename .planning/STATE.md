@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.1
-milestone_name: Readiness Gate + Push
-status: Awaiting next milestone
-stopped_at: "Phase 55 closed (DASH-01..03 complete; 3 atomic commits LOCAL: 82a49dd → 704284e → <T3 hash>; renderAutoFixPipelineSection + fetchAutoFixPrs + runDigest step 6.5 wiring); v4.1 milestone has all 9 phases LOCAL — ready for operator's milestone-close batch PR"
-last_updated: "2026-06-04T19:22:11.784Z"
-last_activity: 2026-06-04 — Milestone v4.1 completed and archived
+milestone: v4.2
+milestone_name: Auto-Fix Loop Live
+status: planning
+last_updated: "2026-06-04T19:37:57.483Z"
+last_activity: 2026-06-04
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: Milestone v4.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-04 — Milestone v4.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-04 — Milestone v4.2 started
 
 ## Performance Metrics
 

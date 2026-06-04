@@ -8,18 +8,24 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: Planning v4.2 (Phase 56 Backlog)
+## Current Milestone: v4.2 Auto-Fix Loop Live
 
-**Status:** Between milestones. v4.1 shipped 2026-06-04; v4.2 planning starts via `/gsd:new-milestone`.
+**Goal:** Take the v4.0/v4.1 auto-fix infrastructure from "wired but unexercised" to operationally validated on origin/main with at least one real production fix shipped through the loop end-to-end.
 
-**Phase 56 (v4.2) consolidated backlog from v4.1 close** (per STATE.md Pending Todos):
-- 4-UAT re-sweep against origin (47-a end-to-end auto-fix; 47-b deps-update-gate synthetic regression; 47-d ledger snapshot post-refactor; 47-e diff-guard rejection re-test)
-- Ledger schema extension (per-entry `errorClass` + `outcome` / `pr_merged` fields) to unblock AB-04 winner declaration + Phase 55 dashboard real values
-- `v40-cost-ledger-snapshot.yml` + `v40-auto-fix.yml` ledger-commit-to-main pattern refactor (Phase 50 ruleset blocks direct push to main; PR-then-merge or `ledger-snapshots/*` branch redirect needed)
-- Dead `MODEL` const cleanup in `scripts/auto-fix.mjs`
-- `tests/e2e/scripts/v40-verifier-gate-yaml.test.js` V2 test update — DONE in Phase 51.2
-- `tests/unit/llm-ledger.test.js` Test 48 working-copy ledger fix (auto-fix-api leak vector per `project_auto_fix_ledger_leak_vector.md` memory file)
-- `auto-fix-api` ledger-leak guard hardening (covers the path PRE-02's `invokeAnthropicSdkWithLedger` guard does not)
+**Target features:**
+- Ledger-commit refactor — convert `v40-cost-ledger-snapshot.yml` + `v40-auto-fix.yml` from direct-push-to-main to PR-then-merge or `ledger-snapshots/*` branch redirect (unblocks UAT-47-a and UAT-47-d under Phase 50's ruleset)
+- Ledger schema extension — per-entry `errorClass` + `outcome`/`pr_merged` fields across all `appendLedgerEntry` call sites; unblocks A/B winner exit from abstention + populates real values on the Phase 55 dashboard
+- Fixture-mutator (UAT-47-b) — synthetic-regression mutator that injects a controlled defect into a golden case; serves as deterministic end-to-end proof-of-life through the rerun → triage → issue → auto-fix → verifier → merge → promote loop
+- 4-UAT re-sweep against origin — execute UAT-47-a, 47-b, 47-d, 47-e on pushed state once the ledger refactor lands
+- Trust/safety hardening — close the `auto-fix-api` ledger-leak vector that PRE-02's `invokeAnthropicSdkWithLedger` guard does not cover; fix `tests/unit/llm-ledger.test.js` Test 48 working-copy mutation
+- First real production fix shipped — leave the cron + LLM exploratory mode running on origin and capture the first real anomaly through the full loop (deterministic mutator first; real fix may carry past milestone close)
+- Carry-along cleanup — remove dead `MODEL` const in `scripts/auto-fix.mjs`; finish Phase 51.1's `tests/e2e/scripts/v40-verifier-gate-yaml.test.js` V2 update
+
+**Key context:**
+- Continues phase numbering from v4.1 (next phase = Phase 56)
+- DoD: pipeline operational + at least one production fix shipped through it (deterministic mutator + real anomaly)
+- Phase 53's trust-invariant rule remains load-bearing: `assertTripleGate` body byte-unchanged; ledger schema additions must be additive-only
+- Zero new npm dependencies target (fourth consecutive milestone if held)
 
 ## Last Shipped: v4.1 Readiness Gate + Push (Shipped 2026-06-04)
 
@@ -250,4 +256,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-02 — v4.1 milestone started (Readiness Gate + Push)*
+*Last updated: 2026-06-04 — v4.2 milestone started (Auto-Fix Loop Live)*

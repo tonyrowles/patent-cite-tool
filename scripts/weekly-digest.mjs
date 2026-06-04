@@ -41,6 +41,7 @@ import {
   monthlyTotal,
   HARD_CAP_USD,
   LEDGER_PATH,
+  combinedMonthlyTotalByTransport,
 } from '../tests/e2e/lib/llm-ledger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -489,6 +490,214 @@ async function resolvePublishMode(publishMode, ghClient) {
     return hasDiscussions ? 'discussion' : 'issue';
   }
   return publishMode;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 55 DASH-02 — Auto-Fix Pipeline section
+//
+// Pure-function markdown renderer (D-14) — caller supplies ledger + ghPrs;
+// the function performs ZERO I/O. Emits a `<details>` collapsible section with
+// the 7 LOCKED-order metric rows (D-03..D-09). NaN/Infinity guards collapse to
+// the literal `n/a` per D-05..D-08; D-09 keeps integer 0 (count semantics).
+//
+// cost_per_fix uses combinedMonthlyTotalByTransport(ledger, month).combined —
+// `.combined` reflects the appendLedgerEntry-time de-duplication discipline
+// that satisfies D-06 / SC-3 ("not raw sum") at the upstream insertion point.
+//
+// time_to_merge_p50 filters to PRs with `mergedAt !== null` BEFORE computing
+// the median (D-07).
+// ---------------------------------------------------------------------------
+
+// Internal helper: median of a numeric array (returns null on empty).
+// Kept module-private (NOT exported) because it has no callers beyond
+// renderAutoFixPipelineSection and adding it to the public surface would
+// invite drift.
+function _median(nums) {
+  if (!Array.isArray(nums) || nums.length === 0) return null;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+/**
+ * Render the Auto-Fix Pipeline `<details>` section.
+ *
+ * @param {{
+ *   ledger: object,
+ *   ghPrs: Array<object>,
+ *   now: Date,
+ * }} opts
+ * @returns {string} markdown string opening with `<details>...` and closing `</details>`
+ */
+export function renderAutoFixPipelineSection({ ledger, ghPrs, now }) {
+  const prs = Array.isArray(ghPrs) ? ghPrs : [];
+  const nowDate = now instanceof Date ? now : new Date(now);
+  const month = nowDate.toISOString().slice(0, 7);
+
+  // (1) auto_fix_attempted — D-03
+  //     count of PRs labeled auto-fix:verified OR auto-fix:partial-verified,
+  //     regardless of merge state.
+  const autoFixAttempted = prs.filter((p) => {
+    const names = (p?.labels ?? []).map((l) => l?.name).filter(Boolean);
+    return names.includes('auto-fix:verified') || names.includes('auto-fix:partial-verified');
+  }).length;
+
+  // (2) verified_merged — D-04
+  //     count of PRs labeled auto-fix:verified AND mergedAt !== null.
+  const verifiedMerged = prs.filter((p) => {
+    const names = (p?.labels ?? []).map((l) => l?.name).filter(Boolean);
+    return names.includes('auto-fix:verified') && p?.mergedAt !== null && p?.mergedAt !== undefined;
+  }).length;
+
+  // (3) success_rate — D-05
+  //     (verified_merged / auto_fix_attempted) * 100, formatted XX.X%.
+  //     n/a (literal) when auto_fix_attempted === 0 (NOT 0% — distinct semantics).
+  let successRate;
+  if (autoFixAttempted === 0) {
+    successRate = 'n/a';
+  } else {
+    const pct = (verifiedMerged / autoFixAttempted) * 100;
+    successRate = Number.isFinite(pct) ? `${pct.toFixed(1)}%` : 'n/a';
+  }
+
+  // (4) cost_per_fix — D-06 / SC-3
+  //     combinedMonthlyTotalByTransport(ledger, month).combined / auto_fix_attempted.
+  //     n/a when auto_fix_attempted === 0 OR combined is NaN/Infinity.
+  let costPerFix;
+  if (autoFixAttempted === 0) {
+    costPerFix = 'n/a';
+  } else {
+    const transportTotals = combinedMonthlyTotalByTransport(ledger ?? { months: {} }, month);
+    const combined = transportTotals?.combined;
+    if (!Number.isFinite(combined)) {
+      costPerFix = 'n/a';
+    } else {
+      const per = combined / autoFixAttempted;
+      costPerFix = Number.isFinite(per) ? `$${per.toFixed(4)}` : 'n/a';
+    }
+  }
+
+  // (5) time_to_merge_p50 — D-07
+  //     median(mergedAt - createdAt) over PRs with mergedAt !== null ONLY.
+  //     Xh Ym for p50 ≥ 60min; Xm for p50 < 60min; n/a when filtered set is empty.
+  const mergedPrs = prs.filter((p) => p?.mergedAt !== null && p?.mergedAt !== undefined);
+  let timeToMergeP50;
+  if (mergedPrs.length === 0) {
+    timeToMergeP50 = 'n/a';
+  } else {
+    const deltasMs = mergedPrs
+      .map((p) => {
+        const merged = new Date(p.mergedAt).getTime();
+        const created = new Date(p.createdAt).getTime();
+        return merged - created;
+      })
+      .filter((d) => Number.isFinite(d) && d >= 0);
+    const medianMs = _median(deltasMs);
+    if (medianMs === null || !Number.isFinite(medianMs)) {
+      timeToMergeP50 = 'n/a';
+    } else {
+      const totalMinutes = Math.round(medianMs / 60000);
+      if (totalMinutes >= 60) {
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        timeToMergeP50 = `${hours}h ${mins}m`;
+      } else {
+        timeToMergeP50 = `${totalMinutes}m`;
+      }
+    }
+  }
+
+  // (6) fix_attempts_p50 — D-08
+  //     median count of distinct auto-fix PRs per `<!-- source_issue: N -->` body marker.
+  //     PRs without a parseable marker are excluded from the sample set.
+  //     n/a when no parseable markers exist.
+  const issueCounts = new Map();
+  for (const p of prs) {
+    const body = typeof p?.body === 'string' ? p.body : '';
+    const match = body.match(/<!--\s*source_issue:\s*(\d+)\s*-->/);
+    if (match) {
+      const issueId = match[1];
+      issueCounts.set(issueId, (issueCounts.get(issueId) ?? 0) + 1);
+    }
+  }
+  let fixAttemptsP50;
+  if (issueCounts.size === 0) {
+    fixAttemptsP50 = 'n/a';
+  } else {
+    const counts = Array.from(issueCounts.values());
+    const med = _median(counts);
+    fixAttemptsP50 = med === null || !Number.isFinite(med) ? 'n/a' : String(med);
+  }
+
+  // (7) flake_escalation_count — D-09
+  //     count of PRs with BOTH `human-review-required` AND `auto-fix:partial-verified`.
+  //     integer 0 (NOT n/a) when zero — count semantics tolerate empty.
+  const flakeEscalationCount = prs.filter((p) => {
+    const names = (p?.labels ?? []).map((l) => l?.name).filter(Boolean);
+    return names.includes('human-review-required') && names.includes('auto-fix:partial-verified');
+  }).length;
+
+  // Assemble markdown (D-11 structure)
+  const lines = [];
+  lines.push('<details>');
+  lines.push('<summary>Auto-Fix Pipeline</summary>');
+  lines.push('');
+  lines.push(`_fetched ${nowDate.toISOString()}_`);
+  lines.push('');
+  lines.push('| Metric | Value |');
+  lines.push('| --- | --- |');
+  lines.push(`| auto_fix_attempted | ${autoFixAttempted} |`);
+  lines.push(`| verified_merged | ${verifiedMerged} |`);
+  lines.push(`| success_rate | ${successRate} |`);
+  lines.push(`| cost_per_fix | ${costPerFix} |`);
+  lines.push(`| time_to_merge_p50 | ${timeToMergeP50} |`);
+  lines.push(`| fix_attempts_p50 | ${fixAttemptsP50} |`);
+  lines.push(`| flake_escalation_count | ${flakeEscalationCount} |`);
+  lines.push('');
+  lines.push('</details>');
+
+  return lines.join('\n');
+}
+
+/**
+ * Fetch auto-fix PRs via a single read-only `gh search prs` invocation.
+ *
+ * Per D-15: errors are RETURNED (never thrown). On non-zero exit, JSON.parse
+ * throw, missing `gh`, or non-array payload → returns `{prs: [], fetchedAt, error}`.
+ * Per D-16: this function MUST NOT process.stderr.write — that is the caller's
+ * (runDigest's) responsibility.
+ *
+ * The `execFn` parameter is an injectable seam for Vitest determinism — the
+ * default closure wraps child_process.execSync so production behavior is
+ * unchanged when callers omit it.
+ *
+ * @param {{ now: Date, execFn?: (cmd: string, opts: object) => string }} opts
+ * @returns {{ prs: Array<object>, fetchedAt: Date, error: string|null }}
+ */
+export function fetchAutoFixPrs({ now, execFn } = {}) {
+  const fetchedAt = now instanceof Date ? now : new Date(now ?? Date.now());
+  const cmd =
+    'gh search prs --label auto-fix:verified --label auto-fix:partial-verified ' +
+    '--json number,state,mergedAt,createdAt,labels,body --limit 100';
+  const runner = execFn ?? ((c, o) => execSync(c, o));
+  let raw;
+  try {
+    raw = runner(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (err) {
+    return { prs: [], fetchedAt, error: String(err?.message ?? err) };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return { prs: [], fetchedAt, error: String(err?.message ?? err) };
+  }
+  if (!Array.isArray(parsed)) {
+    return { prs: [], fetchedAt, error: 'gh search prs returned non-array payload' };
+  }
+  return { prs: parsed, fetchedAt, error: null };
 }
 
 // ---------------------------------------------------------------------------

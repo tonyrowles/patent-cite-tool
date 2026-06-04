@@ -93,9 +93,14 @@ describe('v40-cost-ledger-snapshot.yml contract (Phase 40-01)', () => {
     expect(yaml).toContain('[skip ci]');
   });
 
-  it('S8 — git push present, bare (no --force, no remote arg)', () => {
-    expect(yaml).toContain('git push');
+  it('S8 — git push to ledger-snapshots/* branch (NO --force, NO bare push)', () => {
+    // Phase 57 COMMIT-01: pushes land on ledger-snapshots/daily-${SNAPSHOT_DATE}
+    // to comply with Phase 50 ruleset 17086676 which blocks direct-to-main pushes
+    // for the github-actions[bot] actor. Positive pin on the new refspec; negative
+    // pin on bare `git push` (regression) and any forced push.
+    expect(yaml).toContain('git push origin HEAD:ledger-snapshots/daily-${{ env.SNAPSHOT_DATE }}');
     expect(yaml).not.toMatch(/git push\s+--force/);
+    expect(yaml).not.toMatch(/^\s*git push\s*$/m);
   });
 
   it('S9 — github-actions[bot] identity EXACT (verbatim copy from e2e-weekly-digest.yml:106-107)', () => {
@@ -172,19 +177,24 @@ describe('v40-cost-ledger-snapshot.yml contract (Phase 40-01)', () => {
     expect(yaml).not.toMatch(/^\s*id-token:\s*/m);
   });
 
-  it('S13 — verbatim-block parity with e2e-weekly-digest.yml (modulo git add path + commit message)', () => {
+  it('S13 — verbatim-block parity with e2e-weekly-digest.yml (modulo git add path + commit message + git push refspec)', () => {
     // Promotes must_haves.truth#3 from documentation to an automated gate
     // (plan-checker WARNING). Use sed to extract the `git config user.name`
-    // ... `git push` block from BOTH workflows, then diff. Expected differences:
-    //   - the `git add <path>` line (snapshot: ledger; digest: weekly-digest md)
+    // ... `git push` block from BOTH workflows, then diff. Expected differences
+    // post Phase 57:
+    //   - the `git add <path>` line (snapshot: ledger + dashboard; digest: weekly-digest md)
     //   - the `git commit -m "..."` line (different messages)
+    //   - the `git push ...` line (snapshot: `git push origin HEAD:ledger-snapshots/daily-${{ env.SNAPSHOT_DATE }}`
+    //     to comply with Phase 50 ruleset 17086676; digest: bare `git push`).
     // All other lines (git config user.name, git config user.email, the idempotent
-    // git diff guard wrapper, the final git push) MUST be byte-identical.
+    // git diff guard wrapper) MUST be byte-identical.
     //
     // diff unified-output prepends a header (---/+++/@@) and prefixes each
-    // changed line with -/+. With 2 changed lines on each side we expect <=4
-    // changed lines in the body (2 from -, 2 from +). Header lines (---, +++,
-    // @@) and unchanged context lines (space-prefix) are filtered out.
+    // changed line with -/+. With 3 changed lines on each side we expect <=6
+    // changed lines in the body (3 from -, 3 from +). Header lines (---, +++,
+    // @@) and unchanged context lines (space-prefix) are filtered out. The
+    // ceiling is intentionally tight — any drift in the 3 byte-mirrored lines
+    // (git config user.name, git config user.email, git diff guard) trips this.
     const sedCmd = "sed -n '/git config user.name/,/git push/p'";
     let diffOutput = '';
     try {
@@ -203,8 +213,68 @@ describe('v40-cost-ledger-snapshot.yml contract (Phase 40-01)', () => {
     const changedLines = diffOutput
       .split('\n')
       .filter((line) => /^[-+][^-+]/.test(line));
-    // Allow up to 4 changed lines: 2 lines × 2 sides of diff (git add path + commit message).
-    expect(changedLines.length).toBeLessThanOrEqual(4);
+    // Allow up to 6 changed lines: 3 lines × 2 sides of diff (git add path + commit message + git push refspec).
+    expect(changedLines.length).toBeLessThanOrEqual(6);
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// Phase 57 invariants — cross-workflow assertions added by Phase 57 Plan 01.
+//
+// These tests pin two LOAD-BEARING invariants the Phase 57 commit established
+// in OTHER workflow files:
+//   (a) COMMIT-02 — v40-verifier-gate.yml diff-guard job has its own Scope
+//       decision fast-path step (count >= 4 across the four jobs:
+//       diff-guard, verifier-gate, regression-suite, ready-flip).
+//   (b) COMMIT-04 — v40-auto-fix.yml retains EXACTLY ONE `git push origin main`
+//       line (Pitfall 1 LOAD-BEARING two-commit-split anti-feature).
+//
+// The Phase 57 plan deliberately placed these here (rather than in
+// v40-verifier-gate-yaml.test.js) because that file has pre-existing failures
+// from Phase 51.1 that Phase 60 CLEAN-02 will resolve; adding pins to it now
+// would entangle Phase 57 with that pre-existing failure mode. The snapshot
+// YAML test file is the safest landing zone — it already imports execSync and
+// has no pre-existing failures.
+// ---------------------------------------------------------------------------
+
+describe('Phase 57 invariants', () => {
+  const VERIFIER_YAML_PATH = path.resolve(PROJECT_ROOT, '.github/workflows/v40-verifier-gate.yml');
+  let verifierYaml;
+
+  beforeAll(() => {
+    verifierYaml = fs.readFileSync(VERIFIER_YAML_PATH, 'utf8');
+  });
+
+  it('COMMIT-02 — v40-verifier-gate.yml has Scope decision step in diff-guard job (count >= 4)', () => {
+    // Phase 51.1 added the Scope decision pattern to three jobs (verifier-gate,
+    // regression-suite, ready-flip). Phase 57 COMMIT-02 adds the FOURTH instance
+    // to the diff-guard job. Without it, ledger-snapshot PRs (head_ref not
+    // matching auto-fix/*) would hit the Diff-guard regex bank step and trip
+    // FORBIDDEN_PATHS regex 5 (`tests/e2e/.llm-spend-ledger.json`).
+    //
+    // Hygiene-compliant per Nyquist rule: filter comment lines first so a
+    // commented-out reference doesn't inflate the count, then count by regex
+    // match across the cleaned text.
+    const cleaned = verifierYaml
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+    const matches = cleaned.match(/Scope decision \(auto-fix\/\* PRs only/g) || [];
+    expect(matches.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('COMMIT-04 — v40-auto-fix.yml retains EXACTLY ONE `git push origin main` (Pitfall 1)', () => {
+    // The two-commit split in v40-auto-fix.yml is LOAD-BEARING: the direct-to-
+    // main commit lands the ledger entry on main BEFORE the auto-fix PR branch
+    // is created, ensuring the PR diff is clean against FORBIDDEN_PATHS regex 5
+    // (tests/e2e/.llm-spend-ledger.json). Phase 57 explicitly does NOT touch
+    // this file; any future refactor that adds a second `git push origin main`
+    // (or removes the one at ~line 170) collapses Pitfall 1's defense.
+    const out = execSync(
+      "grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml",
+      { encoding: 'utf8', cwd: PROJECT_ROOT },
+    ).trim();
+    expect(out).toBe('1');
+  });
 });

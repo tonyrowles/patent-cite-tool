@@ -104,6 +104,12 @@ jobs:
 
       - name: Diff-size cap (src/ <= 200 LOC, tests/ <= 50 LOC)
         id: diff_size
+        # Phase 51.2: scope-gated to auto-fix/* branches only. The size cap is
+        # an auto-fix-specific defense (LLM-proposed surgical fixes should be
+        # small); applying it universally jams human-driven milestone-close
+        # PRs (REGRESSION-51.2-01 from v4.1-milestone-close PR #15). The
+        # LOCKED-path step below remains unguarded — universal trust check.
+        if: startsWith(github.head_ref, 'auto-fix/') || github.event_name != 'pull_request'
         # 41-RESEARCH Pattern 2. parse_shortstat is defensive: missing
         # insertions OR deletions lines are treated as zero. Renames count
         # as both ins+del (conservative — large renames trip the cap).
@@ -137,6 +143,11 @@ jobs:
           git diff --name-only origin/main..HEAD | node scripts/check-diff-guard.mjs
 
       - name: Test-count invariant (TEST_CASES length never decreases)
+        # Phase 51.2: scope-gated to auto-fix/* branches only. This is an
+        # auto-fix-specific defense-in-depth (Layer 5 to LOCKED-path Layer 2).
+        # Outside the auto-fix flow, TEST_CASES is mutated by quarantine
+        # promotion + corpus expansion — applying universally jams milestones.
+        if: startsWith(github.head_ref, 'auto-fix/') || github.event_name != 'pull_request'
         # Layer 5 defense (Pitfall 3 Defense 5) — defense-in-depth on top of
         # Layer 2 (diff-guard already forbids modifying tests/test-cases.js).
         # The path is forbidden so this should never trip, but a redundant

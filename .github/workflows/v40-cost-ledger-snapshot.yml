@@ -88,6 +88,18 @@ jobs:
         # blocks direct-to-main pushes for the github-actions[bot] actor.
         # The main-branch ledger is updated only by v40-auto-fix.yml's
         # direct-to-main commit (LOAD-BEARING Pitfall 1).
+        # Empty-day behavior (ACCEPTED, by-design): the idempotent guard on
+        # the line below suppresses `git commit` when the ledger is unchanged,
+        # but the final `git push` then runs unconditionally against an
+        # unchanged HEAD. That push is a no-op against the ref's existing
+        # tip — it either creates ledger-snapshots/daily-${SNAPSHOT_DATE}
+        # pointing at main's tip (no Phase-57 commit on it) OR fast-forward-
+        # updates a same-day branch to its existing ref. Both are valid
+        # audit artifacts; the no-op branch is hygiene-only noise, not a
+        # correctness defect. Adding a conditional around the push would
+        # break the S13 byte-mirror invariant (the push line is part of the
+        # 6-line ceiling against e2e-weekly-digest.yml), so the no-op push
+        # is accepted as the trade-off cost of S13 byte-mirror discipline.
         # Idempotent guard pattern below: no-op if the ledger is unchanged.
         # \$ (escaped dollar) prevents YAML from treating $${{...}} as a shell var;
         # the literal $ in the commit message reads as "$0.47 spent".

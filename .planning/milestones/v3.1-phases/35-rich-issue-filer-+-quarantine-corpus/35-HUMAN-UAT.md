@@ -1,5 +1,5 @@
 ---
-status: testing
+status: passed
 phase: 35-rich-issue-filer-+-quarantine-corpus
 source: [35-VERIFICATION.md]
 started: 2026-05-27

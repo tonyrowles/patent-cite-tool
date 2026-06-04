@@ -161,7 +161,7 @@ Full details: `.planning/milestones/v4.0-ROADMAP.md`
 - [x] **Phase 51.1: Required-Check Trigger Hotfix** - REGRESSION-51-01 resolved (completed 2026-06-03): v40-verifier-gate.yml BASE-ref filter removed + v40-deps-update.yml pull_request trigger added + scope-decision fast-path step on 4 PR-gate jobs; verification PR #14 captured both required contexts firing then CLOSED; Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline)
 - [x] **Phase 52: v3.1 Bookkeeping Cleanup** - Re-stamp 5 stale HUMAN-UAT/VERIFICATION frontmatter files; remove 3 orphan quick-task slug rows from STATE.md (completed 2026-06-03)
 - [x] **Phase 53: auto-fix:partial-verified Semantics** - Implement assertPartialGate (separate from assertTripleGate); partial label producer in verifier-gate; widened auto-promote filter (completed 2026-06-04; 3 atomic feat(53) commits: 0aa8202 -> 0489305 -> 3d4db45; all 4 PARTIAL-* CLOSED; assertTripleGate body byte-unchanged; _skipCiGuard:true count=1)
-- [ ] **Phase 54: Multi-Model A/B** - llm-router.js static routing table; fix-prompt-builder model field; auto-fix.mjs model routing; a-b-winner.mjs winner script
+- [x] **Phase 54: Multi-Model A/B** - llm-router (frozen MODEL_ROUTES) + buildFixPrompt model field + auto-fix.mjs wire + a-b-winner abstention-mode (completed 2026-06-04; 4 atomic feat(54) commits LOCAL: d744caa → 1efbb4c → 09809fd → 6014368 + closure chore; AB-04 in abstention mode per D-20 schema gap; Phase 56 follow-up enqueued for ledger schema extension)
 - [ ] **Phase 55: Auto-Fix Dashboard** - aggregateAutoFixMetrics + renderAutoFixSection in weekly-digest.mjs; 7 observable metrics in collapsible section
 
 ## Phase Details
@@ -283,7 +283,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 54-01-PLAN.md — 5-task plan in LOCKED D-24 order: (a) feat(54) AB-01 llm-router.js + Vitest → (b) feat(54) AB-02 buildFixPrompt top-level model field + Vitest → (c) feat(54) AB-03 auto-fix.mjs wires built.model → (d) feat(54) AB-04 a-b-winner.mjs (N_PER_ARM_REQUIRED=20, abstention mode per D-20) + Vitest → (T5) chore(54) closure (SUMMARY + STATE + ROADMAP); LOCAL commits only per D-25; autonomous per D-26
+- [x] 54-01-PLAN.md — 5-task plan completed 2026-06-04 in LOCKED D-24 order: (a) d744caa feat(54) AB-01 llm-router.js + Vitest → (b) 1efbb4c feat(54) AB-02 buildFixPrompt top-level model field + Vitest → (c) 09809fd feat(54) AB-03 auto-fix.mjs wires built.model → (d) 6014368 feat(54) AB-04 a-b-winner.mjs (N_PER_ARM_REQUIRED=20, abstention mode per D-20) + Vitest → (T5) chore(54) closure (SUMMARY + STATE + ROADMAP). 43 new Vitest tests; AB-04 abstention-mode pinned by Test 4; Phase 56 follow-up enqueued for ledger schema extension. LOCAL commits only per D-25; fully autonomous per D-26.
 
 ### Phase 55: Auto-Fix Dashboard
 **Goal**: The weekly digest gains a collapsible auto-fix performance section with 7 observable metrics; the frozen 7-element SUMMARY_KEYS contract is preserved byte-for-byte; no new npm dependencies are introduced
@@ -311,5 +311,5 @@ Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel
 | 51.1. Required-Check Trigger Hotfix | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |
 | 53. auto-fix:partial-verified Semantics | v4.1 | 1/1 | Complete | 2026-06-04 |
-| 54. Multi-Model A/B | v4.1 | 0/1 | Planned | - |
+| 54. Multi-Model A/B | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 55. Auto-Fix Dashboard | v4.1 | 0/TBD | Not started | - |

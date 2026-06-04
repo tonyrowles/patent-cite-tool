@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Readiness Gate + Push
 status: completed
-stopped_at: Phase 53 closed (PARTIAL-01..04 — assertPartialGate + runPartialPromote + Vitest pin)
-last_updated: "2026-06-04T02:01:56Z"
-last_activity: 2026-06-04 -- Phase 53 marked complete
+stopped_at: Phase 54 closed (AB-01..04 — llm-router + buildFixPrompt model field + auto-fix wire + a-b-winner abstention-mode)
+last_updated: "2026-06-04T09:35:00Z"
+last_activity: 2026-06-04 -- Phase 54 marked complete
 progress:
   total_phases: 9
-  completed_phases: 7
-  total_plans: 7
-  completed_plans: 7
-  percent: 78
+  completed_phases: 8
+  total_plans: 8
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Phase 54 — Multi-Model A/B
+**Current focus:** Phase 55 — Auto-Fix Dashboard
 
 ## Current Position
 
-Phase: 53 — COMPLETE
+Phase: 54 — COMPLETE
 Plan: 1 of 1
-Status: Phase 53 complete
-Last activity: 2026-06-04 -- Phase 53 marked complete
+Status: Phase 54 complete
+Last activity: 2026-06-04 -- Phase 54 marked complete
 
-Progress: [███████░░░] 78%
+Progress: [████████░░] 89%
 
 ## Performance Metrics
 
@@ -65,10 +65,11 @@ Progress: [███████░░░] 78%
 - [Phase 51]: Closure (2026-06-03): 0 PASS / 1 FAIL / 1 AUTO-DEFERRED / 1 STILL-DEFERRED / 1 BLOCKED-BY-PHASE-50. UAT-47-e FAILED — v40-verifier-gate.yml's pull_request.branches:['auto-fix/*'] targets BASE ref not HEAD; the gate cannot fire on PRs into main. UAT-47-a AUTO-DEFERRED per D-13 (sequence-gate). UAT-47-b STILL-DEFERRED (fixture-mutator authoring required). UAT-47-d BLOCKED-BY-PHASE-50 (ruleset blocks ledger-commit push to main). 5 atomic commits 3cb821a→24b4f08→aedafa0→5121c39→(final). Phase 56 follow-up enqueued (see Pending Todos) folding all four UATs into one v4.2 work unit covering verifier-gate trigger patch + ledger-commit refactor + deps-update audit + fixture-mutator. $0 API spent; no destructive mutations on origin; 2 transient test PRs (#12, #13) opened+closed with --delete-branch.
 - [Phase 51.1]: Closure (2026-06-03): REGRESSION-51-01 resolved — v40-verifier-gate.yml BASE-ref filter `branches:['auto-fix/*']` REMOVED + v40-deps-update.yml `pull_request:` trigger ADDED + verbatim scope-decision fast-path step prepended to 4 PR-gate jobs (verifier-gate/regression-suite/ready-flip in verifier-gate.yml; deps-update-gate in deps-update.yml); diff-guard + dep-scan jobs unguarded by design (universal LOCKED-path check + PR-creator). Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline on {rules, bypass_actors, current_user_can_bypass}). Break-glass §7 runbook live-tested end-to-end with one extra cycle to land closure commits after planned in-task push was blocked by its own bypass removal. Verification PR #14 captured BOTH required contexts firing (verifier-gate + deps-update-gate both SUCCESS via scope-decision fast-path), then CLOSED+branch-deleted. 8 atomic chore(51.1) commits cfb0951→a5a791c→583346e→ea45a47→9d388ad→59546dd→1aa226e→(T7 closure). Phase 56 pending-todo line amended in-place with [NOTE 2026-06-03] annotation per D-16.
 - [Phase 53]: Closure (2026-06-04): all 4 PARTIAL-* REQs CLOSED. assertPartialGate + runPartialPromote added as SEPARATE entry points in scripts/auto-fix-promote.mjs (assertTripleGate body byte-unchanged vs HEAD~3 baseline; verified after each of the 3 commits). `_skipCiGuard:\s*true` grep count (non-comment) holds at 1 across all 3 commits (only the existing main() verified-branch call). PARTIAL-04 Vitest trust-invariant pin (T5: assertTripleGate throws on auto-fix:partial-verified) ships in the SAME COMMIT as PARTIAL_LABEL + assertPartialGate (D-18). v40-verifier-gate.yml ready-flip emits auto-fix:partial-verified label conditional on >=4/5 + FLAKE-absent (D-09..D-13); existing verified-label step byte-unchanged (D-10). v40-auto-promote.yml job-level if-filter widened to OR-branch (verified clause preserved verbatim); cross-workflow data path uses `<!-- partial_passing_cases: c1,c2 -->` PR-comment HTML marker. Rule 1 deviation: plan referenced non-existent `promoteFromQuarantine` export — used existing `runPromote` with `_skipCiGuard:false` (same per-case primitive, preserves trust invariant). Documented Task 3 file-list deviation: commit (c) re-touches v40-verifier-gate.yml for additive marker-tail only (PARTIAL-02 bytes unchanged). 3 atomic feat(53) commits in D-20 locked order: (a) 0aa8202 PARTIAL-01+04 → (b) 0489305 PARTIAL-02 → (c) 3d4db45 PARTIAL-03. Vitest delta: +18 unit tests (8→26 in tests/unit/auto-fix-promote-gate.test.js). Commits stay LOCAL; operator will batch-push all v4.1 phases (52-55) in single milestone-close PR. Pre-existing failures noted (NOT Phase 53): v40-verifier-gate-yaml.test.js V2 (Phase 51.1 unfinished test update); llm-ledger.test.js Test 48 (runtime-mutated working copy).
+- [Phase 54]: Closure (2026-06-04): all 4 AB-* REQs CLOSED. 4 atomic feat(54) commits in D-24 LOCKED order: (a) d744caa AB-01 llm-router.js + Vitest (12 cases) → (b) 1efbb4c AB-02 buildFixPrompt top-level model field + Vitest (9 new cases; 44 total in file) → (c) 09809fd AB-03 auto-fix.mjs single-token swap MODEL→built.model (2-line diff exactly) → (d) 6014368 AB-04 a-b-winner.mjs + Vitest (22 cases). MODEL_ROUTES table contains GOOGLE_DOM_DRIFT + LLM_HALLUCINATED_SELECTION → claude-opus-4-7; all other classes default to claude-sonnet-4-6 via routeModel's `??`. Object.isFrozen(MODEL_ROUTES) pinned (D-02 freeze invariant). llm-router.js zero-imports purity invariant pinned by source-grep test (D-04). AB-04 ships in ABSTENTION MODE per D-20 LOCKED design — current ledger schema lacks both `errorClass` and outcome field, so script always emits NO_WINNER_YET; forward-compat post-schema-extension behavior pinned by Tests 5+6 via synthetic outcome fixtures. Rule 1 deviation: AB-02's literal return-line rewrite shows 1 `^-` line in git diff (plan's verify expected 0); the SEMANTIC additive-only invariant (D-08 — existing fields {ok, systemPrompt, userPrompt} byte-unchanged in shape + value) is preserved and pinned programmatically by Test E. Cleanup-debt: module-level MODEL const in scripts/auto-fix.mjs now dead code (intentionally NOT removed per additive-only scope_lock; Phase 56 cleanup). Phase 54 commits stay LOCAL per D-25 — operator's v4.1 milestone-close batch push (52-55 in single PR). 43 new Vitest tests; npm test green except 2 pre-existing failures (llm-ledger Test 48 + v40-verifier-gate-yaml V2) byte-identical to Phase 53 baseline. Phase 56 follow-up enqueued in Pending Todos: ledger schema extension (errorClass + pr_merged) so a-b-winner.mjs exits abstention without code edits.
 
 ### Pending Todos
 
-- Phase 56 (v4.2 backlog): refactor v40-cost-ledger-snapshot.yml + v40-auto-fix.yml ledger-commit-to-main pattern (UAT-47-d structurally blocked by Phase 50 ruleset; UAT-47-a's ledger commit also affected — both need PR-then-merge or branch-redirect) [NOTE 2026-06-03: trigger-fix sub-item closed by Phase 51.1 (commit ea45a47 + verification PR #14); ledger-commit refactor + fixture-mutator authoring + 4-UAT re-sweep remain pending v4.2.]
+- Phase 56 (v4.2 backlog): refactor v40-cost-ledger-snapshot.yml + v40-auto-fix.yml ledger-commit-to-main pattern (UAT-47-d structurally blocked by Phase 50 ruleset; UAT-47-a's ledger commit also affected — both need PR-then-merge or branch-redirect) [NOTE 2026-06-03: trigger-fix sub-item closed by Phase 51.1 (commit ea45a47 + verification PR #14); ledger-commit refactor + fixture-mutator authoring + 4-UAT re-sweep remain pending v4.2.] [NOTE 2026-06-04: ADDED ledger-schema-extension sub-item — extend tests/e2e/.llm-spend-ledger.json entry shape with (a) `errorClass` field (sourced from auto-fix.mjs Step 7's errorClass var; wire into all 7 appendLedgerEntry call sites in auto-fix.mjs + the 2 in invokeAnthropicSdkWithLedger) and (b) `pr_merged` boolean or `outcome` string field (sourced from auto-fix-promote.mjs verified-promotion event; write follow-up entry with source:'auto-fix-promoted'+outcome='pass' on promotion success or source:'auto-fix-failed'+outcome='fail' on label-flap-to-failure). Once both fields populate ≥20 entries per ERROR_CLASS per model arm, scripts/a-b-winner.mjs automatically exits abstention and emits the markdown winner-decision table — no code edit needed (Phase 54's forward-compat outcome probe handles transparently). Phase 56 ALSO carries the cleanup todo to remove the now-dead module-level MODEL const in scripts/auto-fix.mjs (Phase 54 left it per additive-only scope_lock).]
 
 ### Blockers/Concerns
 
@@ -93,6 +94,6 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 ## Session Continuity
 
-Last session: 2026-06-04T02:01:56Z
-Stopped at: Phase 53 closed (PARTIAL-01..04 complete; 3 atomic feat(53) commits LOCAL)
-Resume file: .planning/phases/53-auto-fix-partial-verified-semantics/53-01-SUMMARY.md (next: Phase 54 context-gather — Multi-Model A/B)
+Last session: 2026-06-04T09:35:00Z
+Stopped at: Phase 54 closed (AB-01..04 complete; 4 atomic feat(54) commits LOCAL: d744caa → 1efbb4c → 09809fd → 6014368; a-b-winner.mjs in ABSTENTION MODE per D-20)
+Resume file: .planning/phases/54-multi-model-a-b/54-01-SUMMARY.md (next: Phase 55 — Auto-Fix Dashboard, which depends on Phase 54's `model` field in ledger)

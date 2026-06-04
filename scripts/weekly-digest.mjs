@@ -417,7 +417,8 @@ function makeRealGhClient(repo) {
  *   publishMode?: string,
  *   repo?: string,
  *   ledgerPath?: string,
- *   reportsDir?: string
+ *   reportsDir?: string,
+ *   fetchAutoFixPrs?: (opts: object) => { prs: Array, fetchedAt: Date, error: string|null }
  * }} opts
  */
 export async function runDigest(opts = {}) {
@@ -427,6 +428,10 @@ export async function runDigest(opts = {}) {
   const ghClient = opts.ghClient ?? makeRealGhClient(repo);
   const now = opts.now ?? (() => new Date());
   const reportsDir = opts.reportsDir ?? path.join(PROJECT_ROOT, 'reports');
+  // Phase 55 D-16 injected-deps hook — mirrors opts.ghClient pattern.
+  // Vitest passes a fake; production callers omit it (defaults to the real
+  // child_process.execSync-backed fetchAutoFixPrs exported below).
+  const fetchAutoFixPrsImpl = opts.fetchAutoFixPrs ?? fetchAutoFixPrs;
 
   // (1) Read both label sets unconditionally (never short-circuit — Pitfall 3 / D-03)
   const nightlyIssues = ghClient.listOpenIssuesByLabel('e2e-nightly');
@@ -462,20 +467,44 @@ export async function runDigest(opts = {}) {
   // (6) Render markdown
   const md = renderDigest({ weekLabel, agg, costLine, now: nowDate });
 
+  // (6.5) Phase 55 DASH-01 + DASH-03 — append Auto-Fix Pipeline section AFTER
+  // renderDigest returns (so its ≤50-line budget at line 290 is preserved) and
+  // BEFORE the file write below. fetchAutoFixPrs errors are RETURNED (D-15);
+  // when present, emit a single stderr warning here (D-16) and degrade the
+  // section to all-`n/a` values (the rest of the digest still ships). The
+  // ledger is re-read inline so the cost_per_fix numerator
+  // (combinedMonthlyTotalByTransport(...).combined) is sourced from the same
+  // file the cost line at step (3) reads — single source of truth.
+  const ghPrsResult = fetchAutoFixPrsImpl({ now: nowDate });
+  if (ghPrsResult.error !== null) {
+    process.stderr.write(
+      `weekly-digest: auto-fix section degraded — ${ghPrsResult.error}\n`,
+    );
+  }
+  const autoFixLedger = fs.existsSync(ledgerPath)
+    ? readLedger(ledgerPath)
+    : { months: {} };
+  const autoFixSection = renderAutoFixPipelineSection({
+    ledger: autoFixLedger,
+    ghPrs: ghPrsResult.prs,
+    now: nowDate,
+  });
+  const finalMd = md + '\n\n' + autoFixSection;
+
   // (7) Write report file (idempotent overwrite, D-11)
   fs.mkdirSync(reportsDir, { recursive: true });
   const reportPath = path.join(reportsDir, `weekly-digest-${weekLabel}.md`);
-  fs.writeFileSync(reportPath, md);
+  fs.writeFileSync(reportPath, finalMd);
 
   // (8) Publish via DIGEST_PUBLISH_MODE
   const effectiveMode = await resolvePublishMode(publishMode, ghClient);
   const title = `[e2e-digest] Weekly analytics ${weekLabel}`;
 
   if (effectiveMode === 'discussion') {
-    ghClient.createDiscussion(title, md);
+    ghClient.createDiscussion(title, finalMd);
   } else {
     // issue (active path, D-05)
-    ghClient.createDigestIssue(title, md);
+    ghClient.createDigestIssue(title, finalMd);
   }
 
   return { weekLabel, reportPath, mode: effectiveMode };

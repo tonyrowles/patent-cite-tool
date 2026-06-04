@@ -669,7 +669,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
-      errorClass,                       // LEDGER-01 — in scope from Step 4 (line 495)
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       branchExisted: true,
     });
@@ -713,7 +713,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
-      errorClass,                       // LEDGER-01 — in scope from Step 4 (line 495)
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       escalate: built.escalate,
     });
@@ -810,7 +810,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
-      errorClass,                       // LEDGER-01 — in scope from Step 4 (line 495)
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       errorReason: `malformed-diff:${parsed.reason}`,
     });
@@ -833,7 +833,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
-      errorClass,                       // LEDGER-01 — in scope from Step 4 (line 495); LEDGER-04 test asserts on this site
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4; LEDGER-04 test asserts on this site
       source: 'auto-fix-api',
       errorReason: `diff-guard-violation:${violationList}`,
     });
@@ -871,7 +871,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
-      errorClass,                       // LEDGER-01 — in scope from Step 4 (line 495)
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       errorReason: 'apply-check-failed',
       errorMessage: stderrSnip,

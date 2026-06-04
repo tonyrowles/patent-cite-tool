@@ -1293,7 +1293,7 @@ describe('Phase 46 — subscription transport routing + --push', () => {
 //
 // Asserts that runDispatcher() in mocked mode emits a ledger entry whose
 // errorClass field equals the issue's ERROR_CLASS label. Exercises the
-// line 707 call site (Step 12 — diff-guard violation) because that path
+// Step 12 (diff-guard violation) call site because that path
 // has the fewest mock prerequisites: just feed back a fenced diff that
 // touches a forbidden path and the dispatcher writes the violation entry
 // and exits with code 1.
@@ -1323,7 +1323,7 @@ describe('LEDGER-04: errorClass wired into ledger entries (Phase 56)', () => {
     ]);
     vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
       ok: true,
-      llmText: makeFencedDiff('tests/test-cases.js'), // FORBIDDEN path triggers diff-guard at line 707
+      llmText: makeFencedDiff('tests/test-cases.js'), // FORBIDDEN path triggers diff-guard at the Step 12 call site
       modelId: 'claude-sonnet-4-6',
       costUsd: 0.05,
       rawJson: {},

@@ -996,7 +996,7 @@ describe('Phase 39 LEDGER-03: checkIssueCap and checkPrCap binary boundaries', (
 // integration-shaped checks that the commit landing matches the contract.
 // ---------------------------------------------------------------------------
 describe('Phase 39 LEDGER-04: committed ledger flip', () => {
-  it('Test 48: committed tests/e2e/.llm-spend-ledger.json is valid v1 with bootstrap entry', () => {
+  it('Test 48: committed tests/e2e/.llm-spend-ledger.json is valid v1 with ≥1 bootstrap entry', () => {
     const REAL_LEDGER_PATH = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),
       '..',
@@ -1007,19 +1007,20 @@ describe('Phase 39 LEDGER-04: committed ledger flip', () => {
     const text = fs.readFileSync(REAL_LEDGER_PATH, 'utf8');
     const j = JSON.parse(text);
     expect(j.version).toBe(1);
-    // Exactly one bootstrap entry — fresh-start per CONTEXT seed policy.
-    const months = Object.keys(j.months);
-    expect(months.length).toBe(1);
-    const bucket = j.months[months[0]];
-    expect(bucket.invocations).toBe(1);
-    expect(bucket.total_usd).toBe(0);
-    expect(bucket.iterations.length).toBe(1);
-    const it = bucket.iterations[0];
-    expect(it.phase).toBe('39-bootstrap');
-    expect(it.transport).toBe('sdk');
-    expect(it.cost_usd).toBe(0);
-    expect(it.source).toBe('phase-39-flip');
-    expect(it.model).toBe('claude-sonnet-4-6');
+    // Phase 56 LEDGER-03: relaxed from "exactly 1 bootstrap entry" to
+    // "≥1 entry with phase='39-bootstrap'" because live auto-fix runs on
+    // origin/main append additional entries (post-Phase 56 errorClass-wired
+    // entries land in this file after every CI run). The per-entry shape
+    // check on the bootstrap entry below is unchanged.
+    const allIterations = Object.values(j.months).flatMap((m) => m.iterations ?? []);
+    const bootstraps = allIterations.filter((e) => e?.phase === '39-bootstrap');
+    expect(bootstraps.length).toBeGreaterThanOrEqual(1);
+    const boot = bootstraps[0];
+    expect(boot.phase).toBe('39-bootstrap');
+    expect(boot.transport).toBe('sdk');
+    expect(boot.cost_usd).toBe(0);
+    expect(boot.source).toBe('phase-39-flip');
+    expect(boot.model).toBe('claude-sonnet-4-6');
   });
 
   it('Test 49: .gitignore does NOT contain tests/e2e/.llm-spend-ledger.json (LEDGER-04 commitment)', () => {

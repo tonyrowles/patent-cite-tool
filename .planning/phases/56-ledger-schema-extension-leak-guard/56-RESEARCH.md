@@ -842,9 +842,11 @@ The project CLAUDE.md instructs Claude to verify `AskUserQuestion` results. This
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`grep -c 'safeAppendLedger'` interpretation in the acceptance gate.**
+   **RESOLVED:** Plan 56-01 (Task 01) uses the precise gate `grep -c 'safeAppendLedger({' scripts/auto-fix.mjs` = 7 (call sites only). The ROADMAP's looser `grep -c 'safeAppendLedger' = 7` is documented as ambiguous (would equal 8 with the inline declaration); the plan's verify step uses the stricter pattern.
+
    - What we know: ROADMAP locks `grep -c 'safeAppendLedger' scripts/auto-fix.mjs` to equal **7**. After Phase 56 lands, the identifier appears 8 times: 1 in the function declaration + 7 at call sites.
    - What's unclear: is the gate counting unique line occurrences (8) or call sites only (7)?
    - Recommendation: planner uses the more precise grep `grep -c 'safeAppendLedger({' scripts/auto-fix.mjs` = 7 (call sites only) as the verification gate. The looser `grep -c 'safeAppendLedger'` would equal 8 — the planner should document this in the verify step to avoid a false-fail on a successful commit. CONTEXT.md success criterion #4 ("`grep -c 'safeAppendLedger'` returns 7") was likely written assuming the wrapper is exported from `llm-ledger.js` (= 7 call sites + 0 declaration in this file). The locked-in design has the declaration INSIDE `auto-fix.mjs`, so the count is 8.
@@ -852,12 +854,12 @@ The project CLAUDE.md instructs Claude to verify `AskUserQuestion` results. This
 2. **chrome-stub.js setup file content.**
    - What we know: Vitest config points to `./tests/setup/chrome-stub.js` as `setupFiles`. The file name suggests it stubs Chrome browser globals for non-Vite tests, not env-var manipulation.
    - What's unclear: does it set or unset `process.env.CI`?
-   - Recommendation: planner reads chrome-stub.js in Wave 0; if it does NOT touch `process.env.CI`, no action. If it does, planner adjusts the LEDGER-04 test pattern.
+   - **RESOLVED:** Plan 56-00 Task W0a (Wave 0 inspection) verifies `tests/setup/chrome-stub.js` does NOT touch `process.env.CI`. If it does, Wave 0 SUMMARY signals plan 56-01-03 to add `delete process.env.CI` in `beforeEach`. Confirmed during plan-check pre-flight: chrome-stub.js does not reference `process.env`.
 
 3. **Negative-path verification of safeAppendLedger (throw behavior).**
    - What we know: the only path to verify "safeAppendLedger throws outside CI" through Vitest would require either (a) exporting `safeAppendLedger` (rejected — wrapper is module-internal by design), or (b) spawning `node scripts/auto-fix.mjs` outside CI and expecting non-zero exit (works, but adds child_process to the unit test surface).
    - What's unclear: should the planner add a child_process-based negative test, or accept the operator-manual smoke?
-   - Recommendation: manual operator smoke documented in the verify step. Adding `child_process.spawnSync(node, ['scripts/auto-fix.mjs', '--issue', '1'])` to the unit suite would add ~3s to the test run and require `gh` mocking — not worth it for one negative case. Document a manual `unset CI && node scripts/auto-fix.mjs --issue 1 2>&1 | grep -q 'safeAppendLedger refused'` in the verify checklist.
+   - **RESOLVED:** Manual operator smoke is the accepted path. Recorded in `56-VALIDATION.md` "Manual-Only Verifications" table: `unset CI && unset E2E_LEDGER_PATH_OVERRIDE && node scripts/auto-fix.mjs --issue 1 2>&1 | grep -q 'safeAppendLedger refused'`. Operator records evidence in 56-VERIFICATION.md at phase verify time.
 
 ---
 

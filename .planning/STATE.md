@@ -119,3 +119,7 @@ Resume file: .planning/ROADMAP.md (next: /gsd:plan-phase 56 — Ledger Schema Ex
 - Run `/gsd:plan-phase 56` to begin Phase 56 planning (Ledger Schema Extension + Leak Guard)
 - Note: Phase 56 and Phase 57 are parallelizable (disjoint files). Phase 56 recommended first.
 - Critical: Phases 56+57+58 must all land on origin/main before Phase 59 UATs begin.
+
+### Ruleset Decision (2026-06-06, post-v4.2)
+
+**Decision:** Reversed Phase 50 CLEANUP-04's `bypass_actors=[]` configuration. Re-added `@tonyrowles` (actor_id `254599900`) as permanent bypass actor on ruleset 17086676 with `bypass_mode: always`. Rationale: sole-maintainer project; the approval requirement was theoretical purity without practical security benefit since the only CODEOWNER is also the only PR author. CI required-checks (`verifier-gate` + `deps-update-gate`) remain unchanged as the load-bearing trust boundary. Auto-fix bot PRs continue to flow through the draft→ready→human-review path because the bot is a distinct identity (`github-actions[bot]`), not the maintainer. Bypass usage: `gh pr merge <n> --admin` (or direct `git push` to main if the change set warrants it). Phase 50 D-08 (`current_user_can_bypass=never`) is hereby superseded for the sole-maintainer phase of the project; if a second maintainer joins, the bypass should be removed and the original posture restored.

@@ -87,6 +87,90 @@ import {
   FLAKE_SUPPRESSION_DAYS,
 } from '../tests/e2e/lib/triage-classifier.js';
 
+// ---------------------------------------------------------------------------
+// Phase 56 LEDGER-02 — call-site leak guard for direct ledger writes.
+// ---------------------------------------------------------------------------
+/**
+ * safeAppendLedger — leak-guarded wrapper around appendLedgerEntry for the 7
+ * direct ledger-write call sites in this file.
+ *
+ * Refuses to append to the committed ledger unless the caller is running in
+ * CI (process.env.CI === 'true' or GITHUB_ACTIONS === 'true' per CR-02) OR
+ * has explicitly opted in via E2E_LEDGER_PATH_OVERRIDE (integration-test
+ * escape hatch defined in tests/e2e/lib/llm-ledger.js:74-98 — WR-05 IIFE).
+ *
+ * IMPORTANT — runtime-opt-in caveat (Phase 56 WR-01, REVIEW.md):
+ * E2E_LEDGER_PATH_OVERRIDE is checked here at CALL time, but the actual
+ * write target — LEDGER_PATH, imported from tests/e2e/lib/llm-ledger.js —
+ * is resolved at MODULE LOAD time by the WR-05 IIFE (llm-ledger.js:74-98).
+ * Setting E2E_LEDGER_PATH_OVERRIDE AFTER auto-fix.mjs has already loaded
+ * will pass this guard BUT the write still lands on the canonical
+ * tests/e2e/.llm-spend-ledger.json (the committed file). To actually
+ * redirect the write target, set E2E_LEDGER_PATH_OVERRIDE in the shell
+ * env BEFORE the Node process imports auto-fix.mjs (or any transitive
+ * import of llm-ledger.js). The tests/unit/auto-fix.test.js suite avoids
+ * this trap because it uses vi.mock to stub BOTH appendLedgerEntry AND
+ * LEDGER_PATH, so the wrapper's LEDGER_PATH is the mocked '/tmp/...'
+ * constant — not the real path resolved by the IIFE. Any future
+ * INTEGRATION test (no vi.mock on llm-ledger.js) that imports auto-fix.mjs
+ * first and then sets the env var will hit the trap.
+ *
+ * Why this wrapper exists: the 7 direct appendLedgerEntry call sites in
+ * scripts/auto-fix.mjs (pre-Phase-56) bypass the PRE-02 guard inside
+ * invokeAnthropicSdkWithLedger (Phase 48). A local `--force-api` run outside
+ * CI could therefore pollute the committed ledger. This wrapper closes that
+ * leak vector at call-site scope.
+ *
+ * Why the guard lives HERE (auto-fix.mjs) and NOT inside appendLedgerEntry's
+ * body in llm-ledger.js: Pitfall 7 (LOAD-BEARING) — adding the guard to
+ * appendLedgerEntry would fail 56+ existing Vitest tests in
+ * tests/unit/llm-ledger.test.js that call appendLedgerEntry with a tmp path
+ * outside CI. See .planning/research/PITFALLS.md Pitfall 7.
+ *
+ * Why this wrapper is NOT exported: keeping it module-internal preserves the
+ * existing vi.mock('../e2e/lib/llm-ledger.js', ...) factory in
+ * tests/unit/auto-fix.test.js. The mocked appendLedgerEntry is called
+ * transparently from inside this un-mocked wrapper body, so the wrapper's
+ * process.env.CI check executes in tests while the mocked appendLedgerEntry
+ * still records calls for assertion. See RESEARCH §2 "Why NOT exported".
+ *
+ * Defense-in-depth: the WR-05 LEDGER_PATH IIFE (module-load-time) and this
+ * call-time wrapper cover NON-OVERLAPPING failure modes; both must coexist.
+ *
+ * @param {object} entry — passed verbatim to the underlying ledger append (LEDGER_PATH closed over)
+ * @throws {Error} when neither process.env.CI nor process.env.E2E_LEDGER_PATH_OVERRIDE is set
+ */
+function safeAppendLedger(entry) {
+  // Phase 56 CR-02 (REVIEW.md): align the CI predicate with the canonical
+  // form used by tests/e2e/lib/llm-driver.js:387,518 and the
+  // tests/e2e/lib/llm-ledger.js:86 LEDGER_PATH IIFE. A bare !process.env.CI
+  // truthy check accepts the strings 'false', '0', 'no', etc. as truthy,
+  // so a developer who has `export CI=false` in their shell to opt OUT of
+  // CI-tagged behavior elsewhere would PASS this guard and leak entries to
+  // the committed ledger. The strict form also recognizes GITHUB_ACTIONS
+  // as a CI signal (a CI runner that exports only GITHUB_ACTIONS was
+  // previously refused). The trim-and-length check on the override mirrors
+  // llm-ledger.js:74-98 so a stray whitespace-only override does not
+  // accidentally opt in.
+  const inCi =
+    process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  const hasOverride =
+    typeof process.env.E2E_LEDGER_PATH_OVERRIDE === 'string' &&
+    process.env.E2E_LEDGER_PATH_OVERRIDE.trim().length > 0;
+  if (!inCi && !hasOverride) {
+    throw new Error(
+      `safeAppendLedger refused: cannot write to ${LEDGER_PATH} ` +
+        `outside CI. Set process.env.CI=true (CI invocation) or ` +
+        `process.env.E2E_LEDGER_PATH_OVERRIDE=/path/to/tmp.json ` +
+        `(local integration test). This guard protects the committed ` +
+        `ledger from local --force-api runs leaking entries ` +
+        `(Phase 48 leak vector + Phase 56 LEDGER-02 hardening; see ` +
+        `.planning/research/PITFALLS.md Pitfall 7).`,
+    );
+  }
+  appendLedgerEntry(LEDGER_PATH, entry);
+}
+
 const PHASE = '42-auto-fix';
 // DEFAULT_TRANSPORT is the fall-through if runDispatcher is called WITHOUT a
 // transport opt (back-compat with pre-Phase-46 callers). All 7 ledger-write
@@ -266,10 +350,50 @@ export function changedPathsFromDiff(diff) {
  * must see `transport: 'subscription'` on these rows so dashboard transport-
  * filtering counts them under the right bucket.
  *
- * @param {{caseId: string|null, fingerprint: string, issueNumber: number, transport?: string, now?: () => Date}} opts
+ * Phase 56 WR-02 (REVIEW.md): pre-flight the safeAppendLedger CI/override
+ * guard at the TOP of this helper so the FLAKE_ESCALATION branch does not
+ * issue `gh label create`, `gh issue create`, atomicWriteJson(suppression),
+ * and `quarantine-append.mjs --escalate-stable-runs-reset` BEFORE its
+ * terminal safeAppendLedger() throws on a local non-CI run. Without this
+ * pre-flight, a developer testing the FLAKE branch with `--force-api`
+ * locally would create a GitHub issue + write a suppression entry to disk
+ * + reset the quarantine corpus, then fail to record the ledger row —
+ * auditability gap. Failing fast at the top is the minimal fix.
+ *
+ * Phase 56 WR-04 (REVIEW.md): `errorClass` is now threaded through the
+ * signature so both ledger entries written here (FLAKE_SUPPRESSED + the
+ * flake-dispatched summary) carry the correct errorClass instead of
+ * hardcoded `null`. The current caller dispatches this helper only on
+ * `errorClass === 'FLAKE'` so the value is effectively a constant in
+ * practice, but threading it through preserves the contract for future
+ * call sites and unblocks downstream consumers (dashboards, audit
+ * queries) that filter by errorClass — the Phase 47 WARNING-01 pattern
+ * (threading `transport`) applied symmetrically to errorClass.
+ *
+ * @param {{caseId: string|null, fingerprint: string, issueNumber: number, transport?: string, errorClass?: string|null, now?: () => Date}} opts
  * @returns {Promise<number|null>}
  */
-export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, transport = DEFAULT_TRANSPORT, now = () => new Date() }) {
+export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, transport = DEFAULT_TRANSPORT, errorClass = null, now = () => new Date() }) {
+  // Phase 56 WR-02 — pre-flight the safeAppendLedger CI/override guard so
+  // the FLAKE_ESCALATION side effects (gh label, gh issue, suppression
+  // write, quarantine reset) never land without a corresponding ledger row.
+  // Use the same canonical strict form as safeAppendLedger (CR-02) for
+  // semantic parity — `CI=false` MUST NOT pass either check.
+  const __wr02_inCi =
+    process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  const __wr02_hasOverride =
+    typeof process.env.E2E_LEDGER_PATH_OVERRIDE === 'string' &&
+    process.env.E2E_LEDGER_PATH_OVERRIDE.trim().length > 0;
+  if (!__wr02_inCi && !__wr02_hasOverride) {
+    throw new Error(
+      'dispatchFlakeState refused outside CI/override — same gate as ' +
+        'safeAppendLedger (Phase 56 WR-02). The FLAKE_ESCALATION branch ' +
+        'produces gh issue + suppression + quarantine-reset side effects ' +
+        'BEFORE its terminal ledger write; we fail fast at entry so those ' +
+        'side effects never land without an audit row. Set ' +
+        'process.env.CI=true or E2E_LEDGER_PATH_OVERRIDE=/path/to/tmp.json.',
+    );
+  }
   let ringBuffer;
   let suppressionsFile;
   try {
@@ -292,7 +416,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
 
   // FLAKE_SUPPRESSED — respect the existing suppression; no side effects
   if (decision.state === 'FLAKE_SUPPRESSED') {
-    appendLedgerEntry(LEDGER_PATH, {
+    safeAppendLedger({
       iso: now().toISOString(),
       model: MODEL,
       cost_usd: 0,
@@ -302,6 +426,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
       transport,
       issueId: `issue-${issueNumber}`,
       fingerprint,
+      errorClass: errorClass ?? null,   // LEDGER-01 — threaded from runDispatcher per WR-04
       source: 'flake-suppressed',
       flakeState: 'FLAKE_SUPPRESSED',
       suppressedUntil: decision.until,
@@ -388,7 +513,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
   }
 
   // Ledger entry summarizing the dispatch decision
-  appendLedgerEntry(LEDGER_PATH, {
+  safeAppendLedger({
     iso: now().toISOString(),
     model: MODEL,
     cost_usd: 0,
@@ -398,6 +523,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
     transport,
     issueId: `issue-${issueNumber}`,
     fingerprint,
+    errorClass: errorClass ?? null,   // LEDGER-01 — threaded from runDispatcher per WR-04
     source: 'flake-dispatched',
     flakeState: decision.state,
     flakeAction: decision.action,
@@ -543,7 +669,7 @@ export async function runDispatcher({
     return 2;
   }
   if (lsRemoteOut.trim().length > 0) {
-    appendLedgerEntry(LEDGER_PATH, {
+    safeAppendLedger({
       iso: new Date().toISOString(),
       model: MODEL,
       cost_usd: 0,
@@ -553,6 +679,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       branchExisted: true,
     });
@@ -581,12 +708,15 @@ export async function runDispatcher({
         issueNumber: issue,
         transport,   // WARNING-01: thread runtime transport so flake-suppressed
                      // and flake-dispatched ledger rows carry the correct tag
+        errorClass,  // Phase 56 WR-04 — thread errorClass so the FLAKE_SUPPRESSED
+                     // and flake-dispatched ledger rows carry 'FLAKE' instead of
+                     // a hardcoded null (downstream dashboards filter on this).
       });
       if (exitCode !== null) return exitCode;
       // Defensive fall-through: helper returned null only on unexpected
       // state-read failure — preserve Phase 42 ledger entry below for audit.
     }
-    appendLedgerEntry(LEDGER_PATH, {
+    safeAppendLedger({
       iso: new Date().toISOString(),
       model: MODEL,
       cost_usd: 0,
@@ -596,6 +726,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       escalate: built.escalate,
     });
@@ -682,7 +813,7 @@ export async function runDispatcher({
   // ─── Step 11 — parseFencedDiff ────────────────────────────────────────
   const parsed = parseFencedDiff(sdkResult.llmText);
   if (!parsed.ok) {
-    appendLedgerEntry(LEDGER_PATH, {
+    safeAppendLedger({
       iso: new Date().toISOString(),
       model: MODEL,
       cost_usd: 0,
@@ -692,6 +823,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       errorReason: `malformed-diff:${parsed.reason}`,
     });
@@ -704,7 +836,7 @@ export async function runDispatcher({
   const guard = checkDiffGuard(changedPaths);
   if (!guard.ok) {
     const violationList = guard.violations.join(', ');
-    appendLedgerEntry(LEDGER_PATH, {
+    safeAppendLedger({
       iso: new Date().toISOString(),
       model: MODEL,
       cost_usd: 0,
@@ -714,6 +846,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4; LEDGER-04 test asserts on this site
       source: 'auto-fix-api',
       errorReason: `diff-guard-violation:${violationList}`,
     });
@@ -741,7 +874,7 @@ export async function runDispatcher({
     });
   } catch (err) {
     const stderrSnip = String(err.stderr ?? err.message ?? '').slice(0, 500);
-    appendLedgerEntry(LEDGER_PATH, {
+    safeAppendLedger({
       iso: new Date().toISOString(),
       model: MODEL,
       cost_usd: 0,
@@ -751,6 +884,7 @@ export async function runDispatcher({
       transport,
       issueId: `issue-${issue}`,
       fingerprint,
+      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
       source: 'auto-fix-api',
       errorReason: 'apply-check-failed',
       errorMessage: stderrSnip,

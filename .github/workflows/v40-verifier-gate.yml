@@ -73,17 +73,31 @@ jobs:
       PR_NUM: ${{ github.event.pull_request.number }}
 
     steps:
+      - name: Scope decision (auto-fix/* PRs only; fast-path SUCCESS otherwise)
+        id: scope
+        if: github.event_name == 'pull_request'
+        run: |
+          if [[ "${{ github.head_ref }}" == auto-fix/* ]]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+            echo "Fast-path SUCCESS — non-auto-fix PR (head=${{ github.head_ref }})"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0   # needed for origin/main pin (Pitfall B)
 
       - uses: actions/setup-node@v4
+        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           node-version: 22
           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
+        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -92,6 +106,7 @@ jobs:
           fi
 
       - name: Ensure human-review-required label exists
+        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         # Idempotent label create (mirrors e2e-nightly.yml:97-102). The label
         # is added by the rejection step below. --force updates if exists;
         # || true makes the step safe if gh rejects --force. Color: gh CLI
@@ -137,6 +152,7 @@ jobs:
           fi
 
       - name: Diff-guard regex bank (forbidden paths)
+        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         # Pipes git diff --name-only into Plan 41-01's pure-function helper.
         # The helper exits 1 on any violation with violations printed to stderr.
         run: |
@@ -169,7 +185,7 @@ jobs:
           fi
 
       - name: Label + comment on rejection
-        if: failure()
+        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && failure()
         # env-hop pattern (Phase 40-03 CR-02): never interpolate user-controlled
         # values directly into a run: block. PR_NUM/SRC_LOC/TESTS_LOC are all
         # workflow-trusted but the discipline generalizes.

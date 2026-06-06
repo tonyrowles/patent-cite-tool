@@ -78,8 +78,28 @@ jobs:
 
       - name: Commit daily ledger snapshot
         # [skip ci] is LOAD-BEARING — prevents this bot push from re-triggering
-        # ci.yml. Mirrors e2e-weekly-digest.yml:98-110 VERBATIM (byte-identical
-        # modulo the git add path + commit message; S13 test gate enforces this).
+        # ci.yml. The four `git config`/`git add`/idempotent-guard/`git commit`
+        # lines below (the body up to but NOT including the final `git push`)
+        # mirror e2e-weekly-digest.yml:98-110 VERBATIM (byte-identical modulo
+        # the git add path + commit message; S13 test gate enforces this).
+        # The final `git push` line is the Phase-57 divergence point: pushes
+        # to ledger-snapshots/daily-${SNAPSHOT_DATE} instead of bare
+        # `git push` to main, to comply with Phase 50 ruleset 17086676 which
+        # blocks direct-to-main pushes for the github-actions[bot] actor.
+        # The main-branch ledger is updated only by v40-auto-fix.yml's
+        # direct-to-main commit (LOAD-BEARING Pitfall 1).
+        # Empty-day behavior (ACCEPTED, by-design): the idempotent guard on
+        # the line below suppresses `git commit` when the ledger is unchanged,
+        # but the final `git push` then runs unconditionally against an
+        # unchanged HEAD. That push is a no-op against the ref's existing
+        # tip — it either creates ledger-snapshots/daily-${SNAPSHOT_DATE}
+        # pointing at main's tip (no Phase-57 commit on it) OR fast-forward-
+        # updates a same-day branch to its existing ref. Both are valid
+        # audit artifacts; the no-op branch is hygiene-only noise, not a
+        # correctness defect. Adding a conditional around the push would
+        # break the S13 byte-mirror invariant (the push line is part of the
+        # 6-line ceiling against e2e-weekly-digest.yml), so the no-op push
+        # is accepted as the trade-off cost of S13 byte-mirror discipline.
         # Idempotent guard pattern below: no-op if the ledger is unchanged.
         # \$ (escaped dollar) prevents YAML from treating $${{...}} as a shell var;
         # the literal $ in the commit message reads as "$0.47 spent".
@@ -88,4 +108,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tests/e2e/.llm-spend-ledger.json docs/v40-ledger-dashboard.md
           git diff --cached --quiet || git commit -m "[skip ci] ledger snapshot ${{ env.SNAPSHOT_DATE }}: ${{ env.INVOCATIONS }} invocations, \$${{ env.SPEND_USD }} spent"
-          git push
+          git push origin HEAD:ledger-snapshots/daily-${{ env.SNAPSHOT_DATE }}

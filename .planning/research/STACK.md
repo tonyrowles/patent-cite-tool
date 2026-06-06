@@ -1,320 +1,231 @@
-# Technology Stack — v4.1 Readiness Gate + Push
+# Technology Stack
 
-**Project:** Patent Citation Tool
-**Milestone:** v4.1 (Readiness Gate + Push, building on shipped v4.0)
-**Researched:** 2026-06-02
-**Confidence:** HIGH — all findings grounded in direct codebase reads + verified docs; zero speculation
-
-> This file covers NEW additions only. The v4.0 locked stack (Chrome/Firefox MV3, esbuild, PDF.js v5,
-> Shadow DOM, IndexedDB, Cloudflare Workers + KV, Vitest, web-ext, sharp, Playwright, `@anthropic-ai/sdk@0.100.1`
-> EXACT, `peter-evans/create-pull-request@v8`, GitHub Actions) is treated as IMMUTABLE.
-> See `.planning/research-v4.0-archive/STACK.md` for those decisions.
+**Project:** patent-cite-tool — v4.2 Auto-Fix Loop Live
+**Researched:** 2026-06-04
+**Scope:** NEW work only — existing shipped stack is not re-researched
 
 ---
 
-## Executive Summary
+## Current Pinned Versions (Verified)
 
-**Add zero new npm dependencies.** v4.1 is the third consecutive milestone to ship with no new npm deps
-(v3.1: zero, v4.0: zero new after the `@anthropic-ai/sdk` addition). Every v4.1 feature maps cleanly onto
-existing primitives:
+| Dependency | Pinned In `package.json` | Current Latest | Status | Source |
+|------------|--------------------------|----------------|--------|--------|
+| `@anthropic-ai/sdk` | `0.100.1` (EXACT, no caret) | `0.100.1` | **Current** — pinned at latest | npm registry (WebSearch, 2026-06-04) |
+| `peter-evans/create-pull-request` | `@v8` | `v8.0.0` (latest major) | **Current** — already on v8 | GitHub releases, Context7 (2026-06-04) |
+| `@playwright/test` | `1.60.0` (exact) | `1.60.0` | **Current** — last published ~23 days ago | npm/playwright.dev (2026-06-04) |
+| `pdfjs-dist` | `^5.5.207` (caret), `verifierDeps.pdfjs-dist: "5.5.207"` (exact pin) | `5.7.284` | Behind by 2 minor versions — caret allows auto-bump; verifierDeps pin holds verifier at 5.5.207 | npm (2026-06-04) |
+| `vitest` | `^3.0.0` (caret) | `4.1.8` (stable), `5.0.0-beta.1` | Behind major — vitest 4.x available; currently running 3.x | npm (2026-06-04) |
+| `web-ext` | Not in package.json (used via `npx web-ext lint`) | `10.1.0` | Not pinned; invoked via npx | npm (2026-06-04) |
 
-| v4.1 Feature | Existing primitive it uses | New dep needed? |
-|---|---|---|
-| Multi-model A/B (sonnet vs opus) | `invokeAnthropicSdkWithLedger` `model:` param + `PRICING_BY_MODEL` | NO — already parameterized |
-| Auto-fix dashboard metrics | `build-ledger-dashboard.mjs` + `weekly-digest.mjs` | NO — plain markdown tables |
-| `auto-fix:partial-verified` semantics | `v40-verifier-gate.yml` label output + `assertTripleGate()` | NO — new label string + YAML step |
-| CLEANUP-04 ruleset patch | `gh api -X PUT` (gh CLI, pre-installed) | NO |
-| Test regression fixes | Vitest `vi.setSystemTime` (already used) | NO |
-| v3.1 bookkeeping cleanup | Frontmatter text edits | NO |
+**Confidence:** HIGH for `@anthropic-ai/sdk` (npm registry confirmed), HIGH for `peter-evans/create-pull-request` (Context7 + GitHub releases), MEDIUM for others (WebSearch confirmed, not CLI-verified).
 
----
+### Version notes for v4.2
 
-## Recommended Stack Changes
-
-### npm Dependencies
-
-**Net change: zero.**
-
-`@anthropic-ai/sdk@0.100.1` remains pinned EXACT. npm confirms this is still the latest published version as of
-2026-06-02. No version bump is warranted mid-milestone — the Anthropic SDK minor-bumps have historically
-broken API surfaces (v3.1→v4.0 research found 30+ minor releases in 2026-Q2 with the 0.97→0.98 batch
-namespace shape breakage). Pin holds.
-
-No new packages required. Rationale per feature below.
-
-### GitHub Actions — No New Actions
-
-All v4.1 workflow changes reuse actions already in the stack:
-- `actions/checkout@v4`, `actions/setup-node@v4`, `actions/cache@v4` — already pinned at v4
-- `peter-evans/create-pull-request@v8` — already in `v40-auto-fix.yml`, `v40-auto-promote.yml`, `v40-deps-update.yml`
-- `gh` CLI (`gh api`, `gh pr edit --add-label`, `gh pr ready`) — pre-installed on `ubuntu-latest`
+- `@anthropic-ai/sdk@0.100.1` — the EXACT pin remains current as of research date. No upgrade needed or wanted: the ESLint single-entry-point guard + lockfile pin are load-bearing supply-chain defenses. SDK 0.100.0 introduced `claude-opus-4-8` support; 0.100.1 is the patch. Context7 changelog shows no breaking changes between 0.100.0 and 0.100.1.
+- `peter-evans/create-pull-request@v8` — already at latest major version. The `@v8` floating tag is used throughout the codebase (not pinned to `v8.0.0` SHA). v8 introduced Node 24 runtime support; existing usage in v40-auto-fix.yml, v40-auto-promote.yml, and v40-deps-update.yml is current.
+- `@playwright/test@1.60.0` — current latest stable. No upgrade required for v4.2 work (no new E2E browser features needed).
+- `pdfjs-dist` — the `^5.5.207` caret and the frozen `verifierDeps.pdfjs-dist: "5.5.207"` exact pin are intentional per the pdfjs-frame-shift workflow design (v40-pdfjs-frame-shift.yml). v4.2 does NOT touch pdfjs version pinning. Latest 5.7.284 is handled by the existing v40-deps-update.yml watchlist process.
+- `vitest@^3.0.0` — vitest 4.x is the current stable major. The project is on 3.x (will resolve to latest 3.x patch via caret). v4.2 adds Vitest tests for schema extension + ledger-leak guard + fixture-mutator, but no vitest version upgrade is needed for these tests to work.
 
 ---
 
-## Per-Feature Technical Analysis
+## v4.2 New Work: Stack Requirements
 
-### 1. Multi-Model A/B (sonnet vs opus) for Difficult ERROR_CLASSES
+### 1. Ledger-Commit Refactor (UAT-47-a and UAT-47-d)
 
-**Decision: Pure config in `auto-fix.mjs` + `PRICING_BY_MODEL` update. Zero new deps.**
+**Problem:** `v40-cost-ledger-snapshot.yml` and the "Commit ledger update to main" step in `v40-auto-fix.yml` both do `git push origin main` directly. Phase 50 ruleset 17086676 blocks all direct pushes to main (required_status_checks for verifier-gate + deps-update-gate; bypass_actors=[]).
 
-The `invokeAnthropicSdkWithLedger` function in `tests/e2e/lib/llm-driver.js` already accepts `model:` as
-a named parameter (line 510: `model = 'claude-sonnet-4-6'`). `auto-fix.mjs` already has a module-level
-`const MODEL = 'claude-sonnet-4-6'` (line 105). The only work is a decision function that maps ERROR_CLASS
-to model selection — this is 20-30 lines of pure JS, no library.
+**Two viable approaches — choose one per workflow:**
 
-**Model selection logic (no A/B framework library needed):**
+**Option A: `ledger-snapshots/*` branch redirect (recommended for cost-ledger-snapshot.yml)**
 
-There is no need for a frequentist or Bayesian A/B library. The v4.1 A/B is not a statistical inference
-problem — it is an escalation heuristic: try Sonnet first (cheap), escalate to Opus on verifier failure.
-This mirrors the existing v3.1 "heuristic-first, LLM-second" pattern already in `triage-classifier.js`.
+Push the ledger commit to `ledger-snapshots/YYYY-MM-DD` instead of main. No PR opened. The snapshot is captured on a side branch that is NOT protected. A human or a periodic "merge ledger branches" workflow can land these on main via PR when convenient. Simpler than opening a PR per snapshot.
 
-The right implementation is:
+Implementation: Replace `git push` in the snapshot step with:
+```bash
+BRANCH="ledger-snapshots/$(date -u +%Y-%m-%d)"
+git checkout -b "$BRANCH" || git checkout "$BRANCH"
+git push origin "$BRANCH"
+```
+No new actions required. Uses only `git` CLI already available. The `contents: write` permission currently in the workflow covers pushing to a non-protected branch.
 
-```js
-// In auto-fix.mjs — replaces the module-level MODEL constant
-const MODEL_BY_ERROR_CLASS = {
-  WRONG_CITATION:              'claude-sonnet-4-6',   // well-scoped, Sonnet handles
-  WORKER_FALLBACK_FAILED:      'claude-sonnet-4-6',   // deterministic fix (Worker config)
-  HARNESS_ERROR:               'claude-sonnet-4-6',   // narrow scope
-  GOOGLE_DOM_DRIFT:            'claude-opus-4-7',     // layout reasoning, needs Opus
-  LLM_HALLUCINATED_SELECTION:  'claude-opus-4-7',     // meta-reasoning about LLM, needs Opus
-  _default:                    'claude-sonnet-4-6',
-};
+**Option B: PR-then-merge via `peter-evans/create-pull-request@v8` (recommended for v40-auto-fix.yml)**
+
+The auto-fix workflow already uses `peter-evans/create-pull-request@v8` for the auto-fix branch PR. The two-commit split (ledger commit → main, then auto-fix branch → PR) is the load-bearing pattern that isolates the ledger change from the diff-guard. Under the Phase 50 ruleset, the direct `git push origin main` for the ledger commit fails.
+
+The cleanest fix: push the ledger commit to the `ledger-snapshots/*` branch (Option A) rather than to main, then let the auto-fix branch PR contain only the source-code fix (which is what the diff-guard requires). The `git rebase main` step that follows currently assumes the ledger is committed to main first; with the branch redirect, the rebase target is already clean.
+
+**No new npm dependencies** for either option. Pure git CLI + existing workflow plumbing.
+
+**Confidence:** HIGH — both patterns use capabilities already present in the codebase and verified via Context7/github releases.
+
+---
+
+### 2. Ledger Schema Extension (`errorClass` + `outcome`/`pr_merged` fields)
+
+**Problem:** `a-b-winner.mjs` is in abstention mode because the current ledger entry shape has no `errorClass` or outcome field. `appendLedgerEntry` uses a spread-entry pattern (`m.iterations.push(entry)`) that already passes any caller-supplied fields verbatim to disk — no function-body changes needed, only call-site additions.
+
+**Additive-only approach — no breaking change to existing 9+ call sites:**
+
+Two new optional fields on the entry object:
+
+```
+errorClass?: string   — one of the ERROR_CLASSES values ('WRONG_CITATION', etc.)
+                        sourced from auto-fix.mjs Step 7's `errorClass` local var
+                        added to ALL auto-fix.mjs appendLedgerEntry calls (7 sites)
+                        NOT added to llm-driver.js (those are transport-level, not class-level)
+                        NOT added to e2e-explore.mjs (subscription exploratory mode, no errorClass concept)
+
+outcome?: 'pass' | 'fail'    OR
+pr_merged?: boolean           — sourced from auto-fix-promote.mjs verified-promotion event
+                               written as a follow-up ledger entry (source: 'auto-fix-promoted')
+                               on promotion success (outcome='pass' | pr_merged=true)
+                               or on label-flap-to-failure (outcome='fail')
 ```
 
-Cost tracking by model works automatically: `invokeAnthropicSdkWithLedger` writes `model: response.model`
-into each ledger entry (line 613 in `llm-driver.js`), and `PRICING_BY_MODEL` in `llm-pricing.js` already
-has entries for both `'claude-sonnet-4-6'` and `'claude-opus-4-7'` (lines 38-39). No schema changes.
+The `a-b-winner.mjs` forward-compat probe (Tests 5+6 per Phase 54 AB-04) already handles both `outcome:'pass'|'fail'` and `pr_merged:boolean` — no code changes needed to a-b-winner.mjs itself.
 
-**PRICING_BY_MODEL already correct (verified by direct read of `llm-pricing.js`):**
+**Call site audit for `errorClass` field addition:**
 
-| Model key | input_per_mtok | output_per_mtok |
-|---|---|---|
-| `claude-opus-4-7[1m]` | 15 | 75 |
-| `claude-opus-4-7` | 15 | 75 |
-| `claude-sonnet-4-5` | 3 | 15 |
-| `claude-sonnet-4-6` | 3 | 15 |
+| Call site | File | Line | errorClass available? |
+|-----------|------|------|----------------------|
+| FLAKE_SUPPRESSED short-circuit | auto-fix.mjs | ~295 | YES — `errorClass` is in scope at Step 7+ |
+| FLAKE_ESCALATION summary | auto-fix.mjs | ~391 | YES |
+| Idempotency hit (branch existed) | auto-fix.mjs | ~546 | YES — extracted before Step 6 |
+| Skip-class (LLM_API_ERROR / PASS) | auto-fix.mjs | ~589 | YES |
+| Malformed-diff | auto-fix.mjs | ~685 | YES |
+| Diff-guard violation | auto-fix.mjs | ~707 | YES |
+| Apply-check failed | auto-fix.mjs | ~744 | YES |
+| SDK error (catch block) | llm-driver.js | ~588 | NO — not in scope; skip |
+| SDK success | llm-driver.js | ~620 | NO — not in scope; skip |
+| subscription success | llm-driver.js | ~421 | NO — not in scope; skip |
 
-No new pricing entries needed for v4.1 unless Opus 4.8 is introduced (deferred — see What NOT to Use).
+The 7 auto-fix.mjs call sites can each gain `errorClass` with a 1-line addition. No refactoring. The 3 llm-driver.js call sites are transport-level (not issue-class-level) and should NOT gain errorClass.
 
-**ESLint impact:** None. The `model:` param flows through the existing `invokeAnthropicSdkWithLedger` path,
-which is already gated by the `no-restricted-imports` guard to `llm-driver.js`. No new entry-point guard
-needed.
+**No new npm dependencies.** Pure field addition on existing call sites.
 
-**Confidence:** HIGH — confirmed by direct read of `llm-driver.js` lines 506-517, `auto-fix.mjs` line 105,
-`llm-pricing.js` lines 36-39.
-
----
-
-### 2. Auto-Fix Dashboard — `e2e-weekly-digest.mjs` Extension
-
-**Decision: Plain markdown tables. Zero new deps.**
-
-The existing `weekly-digest.mjs` renders a ≤50-line markdown document. The existing `build-ledger-dashboard.mjs`
-renders three ledger tables. Both are plain string construction — no template engine, no charting lib.
-
-The v4.1 additions (auto-fix success rate, cost-per-fix, time-to-merge) are numeric aggregations from the
-committed `tests/e2e/.llm-spend-ledger.json` ledger. The ledger already has per-entry `transport: 'sdk'`
-tags (written by `invokeAnthropicSdkWithLedger` at line 586 in `llm-driver.js`) and `issueId` fields.
-Time-to-merge requires reading PR merge timestamps — available via `gh pr view <n> --json mergedAt` (gh CLI).
-
-**No charting or sparklines library.** The project's established dashboard pattern is:
-1. GitHub Discussions or issues for the live digest (text-only renderer)
-2. Committed `.md` files in `reports/` (plaintext, git-diffable)
-
-Sparklines would require either ASCII art (hand-rolled, ~15 lines) or a library. Given the existing
-two-milestone precedent of zero new deps and the fact that the dashboard consumers are GitHub Discussions
-(markdown renderer, no interactive charts), sparklines add no value. If sparklines are ever wanted, the
-right choice is a 10-line ASCII sparkline helper inline in `build-ledger-dashboard.mjs` — not a dep.
-
-**Confidence:** HIGH — confirmed by reading `build-ledger-dashboard.mjs` (lines 1-35, output format),
-`weekly-digest.mjs` (line 287, 50-line limit contract), and the `SUMMARY_KEYS` contract in
-`tests/e2e/lib/llm-report.js`.
+**Confidence:** HIGH — verified against the actual call sites in the codebase.
 
 ---
 
-### 3. `gh api -X PUT` for CLEANUP-04 Ruleset Patching
+### 3. Fixture-Mutator (UAT-47-b proof-of-life)
 
-**Decision: Raw `gh api -X PUT` with a JSON file input. Zero new helpers.**
+**Problem:** Need a deterministic way to inject a controlled regression into a golden case so the full loop (rerun → triage → issue → auto-fix → verifier → merge → promote) can be exercised end-to-end without waiting for a real production anomaly.
 
-The CLEANUP-04 task patches ruleset `17086676` to add `verifier-gate` + `deps-update-gate` to
-`required_status_checks` and resolve `bypass_actors=1`.
+**Approach: single-file ESM script, no new dependencies**
 
-The GitHub REST API endpoint is `PUT /repos/{owner}/{repo}/rulesets/{ruleset_id}`. The `gh` CLI supports
-this natively: `gh api -X PUT /repos/OWNER/REPO/rulesets/17086676 --input ruleset-patch.json`.
+Pattern matches `scripts/check-deps-and-pr.mjs` — a self-contained, zero-dep ESM CLI that uses only Node built-ins (`node:fs`, `node:path`, `node:child_process`). Prior art in the codebase: `scripts/capture-observed-citations.mjs` (recalibration via mutation), `scripts/verify-single-case.mjs` (case-level exercise of the verifier path).
 
-**Important: use `--input` with a JSON file, not inline `-F` flags.** The community discussion at
-`github.com/orgs/community/discussions/139808` documents that inline `-F` with nested arrays like
-`required_status_checks` produces 422 errors reliably. The JSON file approach is the documented workaround
-and matches the `v40-repo-config.md` audit pattern already in this project.
+**What the mutator does:**
+1. Read a target case from `tests/test-cases.js` (or accept `--case-id` CLI arg)
+2. Read the golden baseline from `tests/golden/baseline.json`
+3. Write a temporary mutation: corrupt the `selectedText` in test-cases.js for the target case (e.g., prepend a known-bad character sequence) OR swap the expected citation in baseline.json to a wrong value
+4. Return exit 0 with the mutation fingerprint so the caller can verify the triage issue is opened for the right case
 
-**No library or helper needed.** The gh CLI's `--input` flag handles nested JSON correctly. The JSON
-payload needs:
+**Why NOT a mutation-testing library (Stryker, fast-check, schemath):**
+- Mutation-testing frameworks are designed for code mutation (mutating source AST), not data fixture mutation
+- Zero-new-deps is the fourth-consecutive milestone target — adding Stryker would violate it
+- The fixture-mutator is deterministic by design: it injects a KNOWN defect, not random mutations. The goal is a controlled proof-of-life, not property-based testing
+- The entire mutation surface is 2-3 lines of JSON field replacement in the fixture files
 
-```json
-{
-  "name": "main-protection",
-  "target": "branch",
-  "enforcement": "active",
-  "bypass_actors": [],
-  "rules": [
-    {
-      "type": "required_status_checks",
-      "parameters": {
-        "required_status_checks": [
-          { "context": "verifier-gate" },
-          { "context": "deps-update-gate" }
-        ],
-        "strict_required_status_checks_policy": false
-      }
-    }
-  ]
-}
+**Recommended implementation:** `scripts/fixture-mutator.mjs` (~100-150 LOC), exports `mutateCase({ caseId, mutationType, restore })` as a named export for Vitest testability plus a thin CLI shim at the file end. Pattern is identical to `runDispatcher` in `auto-fix.mjs`.
+
+**restore mode:** `--restore` flag rewrites the original values back from a `.fixture-mutator-state.json` sidecar file written at mutation time. Sidecar gitignored. Prevents the mutation from accidentally committing to origin.
+
+**No new npm dependencies.** Pure Node 22 built-ins.
+
+**Confidence:** HIGH — pattern established by 3 prior zero-dep scripts in the codebase.
+
+---
+
+### 4. Ledger-Leak Hardening (auto-fix-api source vector)
+
+**Problem:** `scripts/auto-fix.mjs` has 7 direct `appendLedgerEntry(LEDGER_PATH, ...)` calls (lines 295, 391, 546, 589, 685, 707, 744). These bypass PRE-02's guard (which lives inside `invokeAnthropicSdkWithLedger` in `llm-driver.js` and only covers THAT function's call sites). Running `npm test` locally while auto-fix.mjs is importable can produce `source: 'auto-fix-api'` entries in the working-tree ledger.
+
+**Fix: add a chokepoint guard at `appendLedgerEntry` itself, OR scope-gate the auto-fix.mjs imports in tests**
+
+The memory file (`project_auto_fix_ledger_leak_vector.md`) recommends a single-chokepoint guard at `appendLedgerEntry` rather than guarding individual call sites. This is the correct structural fix.
+
+**Chokepoint guard approach:**
+
+Add a CI-guard check at the TOP of `appendLedgerEntry` in `tests/e2e/lib/llm-ledger.js`:
+
+```javascript
+// Guard: if running in CI and the entry source is 'auto-fix-api' but
+// E2E_LEDGER_PATH_OVERRIDE is not set, throw — prevents npm test from
+// polluting the committed ledger via auto-fix.mjs imports in unit tests.
 ```
 
-Note: the `integration_id` field is optional when omitted — GitHub matches by context string. Research
-found no reliable authoritative value for the GitHub Actions `integration_id`; the context-string-only
-form is more portable and is what the GitHub Docs `curl` example shows.
+**Problem with this approach:** `appendLedgerEntry` is the shared write path used by ALL callers including the legitimate CI nightly run of `auto-fix.mjs` itself. A blanket CI guard on `appendLedgerEntry` would break the actual production workflow.
 
-**Procedure to standardize on:** read current ruleset first (`gh api GET /repos/OWNER/REPO/rulesets/17086676`),
-merge the `required_status_checks` additions into the exported JSON, PUT the full object back. Do not
-construct the payload from scratch — the ruleset may have other rules (code-owner review, PR requirement)
-that must be preserved verbatim.
+**Better approach: E2E_LEDGER_PATH_OVERRIDE enforcement in unit tests**
 
-**Confidence:** HIGH for the `gh api -X PUT --input` mechanics (GitHub REST API docs verified), MEDIUM for
-the `integration_id`-omission behavior (community convention, not explicitly documented in official docs).
+The `tests/unit/auto-fix.test.js` file (which unit-tests `runDispatcher`) must set `E2E_LEDGER_PATH_OVERRIDE` to a tmpdir path before importing auto-fix.mjs. This redirects all 7 auto-fix.mjs `appendLedgerEntry` calls to a throwaway file. The existing LEDGER_PATH IIFE in `llm-ledger.js` already supports this pattern (the `E2E_LEDGER_PATH_OVERRIDE` env var is read at module-load time).
 
----
+**Why this is the right fix:** The leak only occurs when `auto-fix.mjs` is imported in a test context WITHOUT `E2E_LEDGER_PATH_OVERRIDE` set. The fix is: every test file that imports `auto-fix.mjs` (or any module that calls `appendLedgerEntry` with the real LEDGER_PATH) MUST set `E2E_LEDGER_PATH_OVERRIDE` before import. This is already the documented pattern per `llm-ledger.js` lines 59-65.
 
-### 4. `auto-fix:partial-verified` Semantics
+Check which test files import auto-fix.mjs without setting the override — those are the leak surfaces.
 
-**Decision: New label string + new YAML step in `v40-verifier-gate.yml` + `assertTripleGate()` update.
-Zero new deps. Zero new CI gate frameworks.**
+**No new npm dependencies.** The fix is a test setup pattern, not a new library.
 
-The current gate is binary: all 3 consecutive Tier A/B runs on affected cases pass → `auto-fix:verified`
-label applied → draft flipped to ready. The `partial-verified` state (e.g., 3/5 cases pass, 2 fail) is
-not currently modeled.
-
-The right implementation is a new label `auto-fix:partial-verified` plus a conditional YAML step in the
-`ready-flip` job of `v40-verifier-gate.yml`. No framework needed — the existing job structure already has
-the verdict as a step output (the for-loop over affected cases in the bash step). The partial verdict is:
-"some cases passed Tier A/B, but not all."
-
-**Why no existing CI gate framework is worth studying.** There is no npm ecosystem for "partial gate"
-semantics in GitHub Actions workflows. The two closest patterns are:
-1. GitHub Actions `continue-on-error: true` on individual jobs — but this causes the overall workflow to
-   report success even on failure, which would defeat the gate entirely.
-2. GitHub Actions matrix strategies with `fail-fast: false` + downstream aggregation — but affected cases
-   are not in a matrix (they are a dynamic bash loop reading the PR HTML comment). The existing design
-   uses a serial bash for-loop and is the right approach.
-
-The `assertTripleGate()` function in `auto-fix-promote.mjs` needs a third valid label path: accept
-`auto-fix:partial-verified` as a non-`auto-fix:verified` path that routes to a separate "human review
-required" outcome rather than failing the gate entirely. This is a 15-line change to `assertTripleGate()`.
-
-**Vitest contract:** The Vitest test for `assertTripleGate` in `tests/unit/` needs a new test case for
-the partial-verified label. No test framework change needed — same pure-function test pattern.
-
-**Confidence:** HIGH — confirmed by reading `v40-verifier-gate.yml` job structure (lines 181-295),
-`auto-fix-promote.mjs` `assertTripleGate()` (lines 67-90).
+**Confidence:** HIGH — the existing E2E_LEDGER_PATH_OVERRIDE mechanism is designed exactly for this use case.
 
 ---
 
-### 5. Pre-Push Test Regression Fixes
+## Alternatives Considered
 
-**Decision: Pure code fixes, zero new deps.**
-
-Three regression items:
-
-**Test 48 ledger leak:** The Vitest test at index 48 in the ledger test suite. The "leak" indicates test
-state pollution — a ledger file from a previous test not cleaned up. Fix pattern: ensure `afterEach` in
-the relevant test file writes a fresh ledger, or uses a temp directory. This is the same isolation pattern
-already used in `e2e-weekly-digest.test.js` (lines 385-397 use `runDir` temp directories). No dep needed.
-
-**Calendar-rollover flake in `e2e-weekly-digest.test.js`:** The file uses `const PIN_NOW = () => new Date('2026-05-25T00:00:00Z')` at line 64. Tests that use `PIN_NOW` for time-pinning are fine; any test that calls
-`new Date()` directly without injecting `PIN_NOW` will produce a different ISO week label now that
-`2026-06` is the current month. The fix is to audit every `renderDigest` and `aggregate` call in the test
-file and ensure they inject `now: PIN_NOW` or update the pin date. Vitest's `vi.setSystemTime()` is the
-right tool (already used in `select-cron-cases.test.js` lines 39-77). No dep needed.
-
-**`package-lock.json` EXACT-pin verification:** The existing `package.json` has `"@anthropic-ai/sdk": "0.100.1"` 
-(no caret — confirmed by direct read). The lockfile verification is a static-grep guard: read the lockfile
-and assert `"version": "0.100.1"` appears for the SDK entry. This is the same approach used by the
-existing `tests/unit/eslint-sdk-guard.test.js`. Add one Vitest assertion in the existing lock-file guard
-test, or create a new 5-line test. No dep.
-
-**Confidence:** HIGH — confirmed by direct reads of `e2e-weekly-digest.test.js` line 64 (`PIN_NOW`),
-`package.json` (`@anthropic-ai/sdk` exact pin), `select-cron-cases.test.js` (`vi.setSystemTime` usage).
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Ledger-commit refactor | `ledger-snapshots/*` branch + existing git CLI | GitHub App token bypass for main | App setup is a new OAuth surface; ZERO value over branch redirect for a daily snapshot |
+| Ledger-commit refactor | `peter-evans/create-pull-request@v8` for auto-fix ledger | Direct push with bypass actor | Phase 50 ruleset explicitly disallows bypass actors; adding one would reopen the trust boundary |
+| Fixture-mutator | Hand-rolled ESM script | Stryker mutation testing | New dependency, wrong abstraction level (code AST vs data fixture) |
+| Fixture-mutator | Hand-rolled ESM script | fast-check property testing | Wrong problem domain; deterministic injection needed, not random |
+| Ledger-leak fix | E2E_LEDGER_PATH_OVERRIDE in test setup | Chokepoint guard in appendLedgerEntry | A CI guard in appendLedgerEntry would break the nightly auto-fix workflow itself |
+| Ledger-leak fix | E2E_LEDGER_PATH_OVERRIDE in test setup | Guard in auto-fix.mjs imports | 7 call sites to guard vs 1 test-setup line per test file |
+| Schema extension | Additive fields on existing call sites | New appendLedgerEntryV2 function | Breaks the single-surface contract; existing callers continue to spread entries verbatim without change |
 
 ---
 
-## What NOT to Use
+## Zero New npm Dependencies — Status
 
-| Avoid | Why | Use Instead |
-|---|---|---|
-| Bayesian/frequentist A/B test library (`bayes`, `jstat`, `simple-statistics`) | The v4.1 "A/B" is a deterministic model-escalation heuristic, not a statistical inference problem. No sample-size calculation or p-value is required. | 20-line `MODEL_BY_ERROR_CLASS` map in `auto-fix.mjs` |
-| ASCII sparkline library (`sparkline`, `sparklines-cli`) | Dashboard consumers are GitHub Discussions markdown (no TTY); the 50-line digest limit leaves no room; existing pattern is pure tables | Inline 10-line ASCII helper if ever needed |
-| `actions/github-script@v7` (Octokit wrapper) | Adds dependency; v4.0 decision already rejected it; `gh` CLI is sufficient for all v4.1 operations | `gh api -X PUT`, `gh pr edit --add-label` |
-| `renovate` or `dependabot` for ruleset patching | Wrong tool category — these are dep-update bots, not admin API clients | `gh api -X PUT --input ruleset.json` |
-| `claude-opus-4-8` ("NextOpus") | No production stability data in this codebase; same pricing as Opus 4.7; reserve for v4.2 evaluation | `claude-opus-4-7` for difficult ERROR_CLASSES (already in `PRICING_BY_MODEL`) |
-| Caret pin on `@anthropic-ai/sdk` | Minor-bump breaking change risk is empirically established (v4.0 research); three-milestone streak of supply-chain discipline | Exact pin `0.100.1`; evaluate bump at v4.2 |
+**Target:** ZERO new npm dependencies (fourth consecutive milestone: v3.1, v4.0, v4.1, v4.2)
 
----
+| Work item | New deps? | Rationale |
+|-----------|-----------|-----------|
+| Ledger-commit refactor | None | Pure git CLI + existing workflow plumbing |
+| Ledger schema extension | None | `appendLedgerEntry` spread-entry pattern already handles arbitrary fields |
+| Fixture-mutator | None | Node 22 built-ins (fs, path, child_process) + existing test-cases.js / baseline.json access |
+| Ledger-leak hardening | None | E2E_LEDGER_PATH_OVERRIDE pattern already exists in llm-ledger.js |
 
-## ESLint Impact
-
-No new ESLint rules needed. The existing `no-restricted-imports` guard in `eslint.config.js` already:
-1. Restricts direct `@anthropic-ai/sdk` imports to `tests/e2e/lib/llm-driver.js`
-2. Restricts `src/` imports in `tests/e2e/lib/pdf-verifier.js`
-
-The `MODEL_BY_ERROR_CLASS` map lives in `auto-fix.mjs`, which already calls through `invokeAnthropicSdkWithLedger`
-(verified at line 66 of `auto-fix.mjs`). No new import paths are introduced.
+**Verdict: ZERO new npm dependencies is achievable for all four v4.2 work items.**
 
 ---
 
-## Version Pin Summary
+## Existing Stack (Not Re-Researched — Already Shipped)
 
-| Item | Pin | File | Status |
-|---|---|---|---|
-| `@anthropic-ai/sdk` | `0.100.1` (exact, no caret) | `package.json` | LOCKED — do not bump |
-| `peter-evans/create-pull-request` | `@v8` | `.github/workflows/*.yml` | LOCKED |
-| `actions/checkout` | `@v4` | `.github/workflows/*.yml` | LOCKED |
-| `actions/setup-node` | `@v4` | `.github/workflows/*.yml` | LOCKED |
-| `actions/cache` | `@v4` | `.github/workflows/*.yml` | LOCKED |
-| Model: auto-fix default | `claude-sonnet-4-6` | `auto-fix.mjs` const | LOCKED |
-| Model: difficult classes | `claude-opus-4-7` | `MODEL_BY_ERROR_CLASS` (new) | v4.1 addition |
+The following are confirmed-shipped and not the subject of v4.2 research:
 
----
-
-## Integration Points
-
-| v4.0 primitive | v4.1 usage | Change |
-|---|---|---|
-| `tests/e2e/lib/llm-driver.js` `invokeAnthropicSdkWithLedger` | Multi-model A/B: pass `model: selectModel(errorClass)` instead of hardcoded `MODEL` constant | `auto-fix.mjs`: replace `MODEL` const with `MODEL_BY_ERROR_CLASS` map + `selectModel(errorClass)` helper |
-| `tests/e2e/lib/llm-pricing.js` `PRICING_BY_MODEL` | Already has `claude-opus-4-7` entries; cost-by-model works automatically from `response.model` in ledger entries | No change |
-| `scripts/build-ledger-dashboard.mjs` | Add auto-fix success rate, cost-per-fix, time-to-merge section (new table at bottom) | Extend `buildDashboard()` with an `autoFixMetrics(entries)` helper; pure string construction |
-| `scripts/weekly-digest.mjs` | Consume auto-fix metrics from ledger; add to ≤50-line digest | Extend `renderDigest()` with one new optional section; guard behind `SUMMARY_KEYS` frozen contract |
-| `.github/workflows/v40-verifier-gate.yml` | `partial-verified` label application when some but not all affected cases pass | Add conditional step in `ready-flip` job; emit `auto-fix:partial-verified` label; ensure label-create idempotent bootstrap (mirrors existing `auto-fix:verified` pattern at lines 409-423) |
-| `scripts/auto-fix-promote.mjs` `assertTripleGate()` | Accept `auto-fix:partial-verified` as a valid (but human-review-routed) leg-1 path | Extend the leg-1 check; add corresponding Vitest case |
+- `@anthropic-ai/sdk@0.100.1` EXACT — ESLint guard, lockfile pin, `llm-driver.js` single entry point
+- `peter-evans/create-pull-request@v8` — used in v40-auto-fix.yml, v40-auto-promote.yml, v40-deps-update.yml
+- `@playwright/test@1.60.0` — E2E harness, 76-case golden regression
+- `pdfjs-dist@^5.5.207` + `verifierDeps.pdfjs-dist: "5.5.207"` — pdf-verifier EXACT pin + frame-shift pre-flight
+- `vitest@^3.0.0` — 1134+ tests across 70 files
+- `esbuild@^0.27.3` — Chrome + Firefox extension build pipeline
+- `eslint@10.4.0` — flat config with `no-restricted-imports` guard
+- `sharp@^0.34.5` — icon generation + PDF snippet rendering
+- `@napi-rs/canvas@1.0.0` — canvas support for icon pipeline
+- Node 22 LTS built-ins: `node:fs`, `node:path`, `node:util`, `node:child_process` — used throughout scripts
 
 ---
 
 ## Sources
 
-- Direct read: `/home/fatduck/patent-cite-tool/tests/e2e/lib/llm-driver.js` — `invokeAnthropicSdkWithLedger` signature, `model:` param, transport tag (HIGH confidence)
-- Direct read: `/home/fatduck/patent-cite-tool/tests/e2e/lib/llm-pricing.js` — `PRICING_BY_MODEL` entries for `claude-sonnet-4-6` and `claude-opus-4-7` (HIGH confidence)
-- Direct read: `/home/fatduck/patent-cite-tool/scripts/auto-fix.mjs` — module-level `MODEL = 'claude-sonnet-4-6'` constant (HIGH confidence)
-- Direct read: `/home/fatduck/patent-cite-tool/.github/workflows/v40-verifier-gate.yml` — current all-or-nothing gate structure, `auto-fix:verified` label bootstrap pattern (HIGH confidence)
-- Direct read: `/home/fatduck/patent-cite-tool/scripts/auto-fix-promote.mjs` — `assertTripleGate()` leg-1 check (HIGH confidence)
-- Direct read: `/home/fatduck/patent-cite-tool/tests/e2e/scripts/e2e-weekly-digest.test.js` — `PIN_NOW` at line 64, dynamic `new Date()` at line 389 (HIGH confidence)
-- Direct read: `/home/fatduck/patent-cite-tool/package.json` — `@anthropic-ai/sdk: "0.100.1"` exact pin confirmed (HIGH confidence)
-- `npm outdated` output — confirms `@anthropic-ai/sdk` is still at latest `0.100.1` (HIGH confidence)
-- [GitHub REST API — Rulesets endpoints](https://docs.github.com/en/rest/repos/rules) — PUT `/repos/{owner}/{repo}/rulesets/{ruleset_id}` endpoint verified, `required_status_checks` JSON structure (HIGH confidence)
-- [GitHub community discussion #139808](https://github.com/orgs/community/discussions/139808) — `--input` JSON file preferred over inline `-F` flags for nested arrays (MEDIUM confidence — community workaround, not official docs)
-- [DEV.to — GitHub Rule Sets with Status Checks](https://dev.to/domderrien/github-rule-sets-enforcing-quality-through-status-checks-18nd) — JSON payload structure confirmation (MEDIUM confidence)
-- npm search for Bayesian/frequentist A/B libs — no relevant lightweight libs found; confirms hand-rolled solution is correct (MEDIUM confidence)
-
----
-
-*Stack research for: v4.1 Readiness Gate + Push (additive to v4.0 self-healing suite)*
-*Researched: 2026-06-02*
+- npm registry / WebSearch: `@anthropic-ai/sdk` at 0.100.1 confirmed current (2026-06-04)
+- Context7 `/anthropics/anthropic-sdk-typescript` CHANGELOG: 0.100.0 released 2026-05-28 (claude-opus-4-8 support + mid-conversation system blocks); 0.100.1 is patch on top — HIGH confidence
+- Context7 `/peter-evans/create-pull-request`: v8.0.0 is current latest; `add-paths` input pattern confirmed for selective staging — HIGH confidence
+- WebSearch: `@playwright/test@1.60.0` confirmed current latest as of 2026-06-04 — MEDIUM confidence
+- WebSearch: `pdfjs-dist` latest is 5.7.284 (April 2026); project pinned at 5.5.207 per frame-shift workflow design — MEDIUM confidence
+- WebSearch: `vitest` latest stable is 4.1.8; project on `^3.0.0` caret — MEDIUM confidence
+- WebSearch: `web-ext` latest is 10.1.0; not pinned in package.json — LOW confidence (not critical for v4.2)
+- WebSearch: GitHub Actions branch protection bypass patterns — MEDIUM confidence (GitHub docs referenced)
+- Direct code reading: all call-site counts verified against live source files

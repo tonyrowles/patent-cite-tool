@@ -177,6 +177,73 @@ jobs:
             --jq '[.labels[].name] | join(",")')
           echo "source_issue_labels=$SOURCE_LABELS_CSV" >> "$GITHUB_OUTPUT"
 
+      - name: Pre-resolve source-issue fingerprint
+        id: fp
+        # Phase 58 PROMOTE-02/03 (Decision A): the source-issue body's line 1
+        # carries `<!-- fp: <12-hex> -->` (Phase 35 issue-payload-builder
+        # convention). We extract the 12-hex value and pass it to
+        # scripts/auto-fix-promote.mjs via --fingerprint. The sed regex
+        # restricts the captured group to 12-hex characters; downstream argv
+        # validation (Plan 01: /^[0-9a-f]{12}$/) re-validates. Defense in depth
+        # against issue-body injection (T-58-A1).
+        env:
+          SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
+        run: |
+          FP=$(gh issue view "$SOURCE_ISSUE" --json body --jq '.body' \
+            | grep -oE '<!-- fp: [0-9a-f]{12} -->' \
+            | head -1 \
+            | sed -E 's/<!-- fp: ([0-9a-f]{12}) -->/\1/')
+          if [ -z "$FP" ]; then
+            echo "::error::Could not extract fingerprint from issue #$SOURCE_ISSUE (expected <!-- fp: ([0-9a-f]{12}) --> marker in issue body line 1)"
+            exit 1
+          fi
+          echo "fingerprint=$FP" >> "$GITHUB_OUTPUT"
+
+      - name: Pre-resolve source-issue errorClass
+        id: ec
+        # Phase 58 PROMOTE-02/03 (Decision A): filter the source-issue labels
+        # against the 5 known ERROR_CLASSES whitelist. Shell string-equality
+        # match against a fixed whitelist — no globbing, no command
+        # substitution, no eval. Label values reaching the ledger are
+        # guaranteed to be one of these 5 fixed strings (T-58-A2 mitigation).
+        env:
+          SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
+          SOURCE_ISSUE_LABELS: ${{ steps.source.outputs.source_issue_labels }}
+        run: |
+          KNOWN_CLASSES="WRONG_CITATION LLM_HALLUCINATED_SELECTION WORKER_FALLBACK_FAILED GOOGLE_DOM_DRIFT HARNESS_ERROR"
+          EC=""
+          for L in ${SOURCE_ISSUE_LABELS//,/ }; do
+            for C in $KNOWN_CLASSES; do
+              if [ "$L" = "$C" ]; then
+                EC="$C"
+                break 2
+              fi
+            done
+          done
+          if [ -z "$EC" ]; then
+            echo "::error::Could not extract errorClass label from issue #$SOURCE_ISSUE (expected one of: $KNOWN_CLASSES; got labels: $SOURCE_ISSUE_LABELS)"
+            exit 1
+          fi
+          echo "error_class=$EC" >> "$GITHUB_OUTPUT"
+
+      - name: Pre-resolve upstream-ledger model
+        id: ml
+        # Look up the upstream auto-fix ledger entry's model by fingerprint match.
+        # Phase 54 wired model on each source:'auto-fix-api' entry; Phase 56 wired
+        # fingerprint on the same. We match on both to defend against fingerprint
+        # reuse across phases. Hard-fail if no match — silent default to sonnet
+        # would break a-b-winner.mjs per-arm attribution for the opus arm
+        # (a-b-winner.mjs:178-189). See RESEARCH §A1 + 2026-06-05 scope expansion.
+        env:
+          FINGERPRINT: ${{ steps.fp.outputs.fingerprint }}
+        run: |
+          MODEL=$(jq -r --arg fp "$FINGERPRINT" '[.months[].iterations[] | select(.fingerprint == $fp and .source == "auto-fix-api")] | last | .model // empty' tests/e2e/.llm-spend-ledger.json)
+          if [ -z "$MODEL" ]; then
+            echo "::error::Could not resolve model from upstream auto-fix ledger entry for fingerprint=$FINGERPRINT (no .months[].iterations[] entry with source=auto-fix-api and matching fingerprint in tests/e2e/.llm-spend-ledger.json — workflow refuses to silent-default to sonnet because that would break per-arm attribution for the opus arm; see RESEARCH §A1)"
+            exit 1
+          fi
+          echo "model=$MODEL" >> "$GITHUB_OUTPUT"
+
       - name: Triple-gate + runPromote (per affected case)
         id: promote
         # Loop runPromote once per case-id (Open Question 3 lock — research
@@ -195,19 +262,36 @@ jobs:
           SOURCE_ISSUE_LABELS: ${{ steps.source.outputs.source_issue_labels }}
           CASE_IDS: ${{ steps.parse.outputs.case_ids }}
           PARTIAL_PASSING_CASES: ${{ steps.parse.outputs.partial_passing_cases }}
+          FINGERPRINT: ${{ steps.fp.outputs.fingerprint }}
+          ERROR_CLASS: ${{ steps.ec.outputs.error_class }}
+          MODEL: ${{ steps.ml.outputs.model }}
         run: |
           PR_COMMIT_MSG=$(cat /tmp/pr-commit-message.txt)
+          # Phase 58 REVIEW-FIX WR-01: --passing-cases is appended ONLY when
+          # PARTIAL_PASSING_CASES is non-empty. The verified-only path leaves
+          # PARTIAL_PASSING_CASES="" (workflow line 151), and parseArgv's
+          # takeValue rejects an empty-string flag value with exit 2 — which
+          # would hard-fail every verified-only auto-promote run BEFORE the
+          # Phase 58 outcome ledger writes ever fire. Pinned by
+          # tests/e2e/scripts/v40-auto-promote-yaml.test.js PHASE-58-Y11.
           for CASE_ID in ${CASE_IDS//,/ }; do
-            node scripts/auto-fix-promote.mjs \
-              --pr "$PR_NUMBER" \
-              --pr-labels "$PR_LABELS" \
-              --pr-merged true \
-              --pr-body /tmp/pr-body.txt \
-              --pr-commit-message "$PR_COMMIT_MSG" \
-              --source-issue "$SOURCE_ISSUE" \
-              --source-issue-labels "$SOURCE_ISSUE_LABELS" \
-              --case-id "$CASE_ID" \
-              --passing-cases "$PARTIAL_PASSING_CASES"
+            ARGS=(
+              --pr "$PR_NUMBER"
+              --pr-labels "$PR_LABELS"
+              --pr-merged true
+              --pr-body /tmp/pr-body.txt
+              --pr-commit-message "$PR_COMMIT_MSG"
+              --source-issue "$SOURCE_ISSUE"
+              --source-issue-labels "$SOURCE_ISSUE_LABELS"
+              --case-id "$CASE_ID"
+              --fingerprint "$FINGERPRINT"
+              --error-class "$ERROR_CLASS"
+              --model "$MODEL"
+            )
+            if [ -n "$PARTIAL_PASSING_CASES" ]; then
+              ARGS+=(--passing-cases "$PARTIAL_PASSING_CASES")
+            fi
+            node scripts/auto-fix-promote.mjs "${ARGS[@]}"
           done
 
       - name: Build auto-promote PR body

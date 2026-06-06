@@ -44,7 +44,7 @@
 //     19. missing --issue → exit 2
 //     20. body missing fingerprint → exit 2
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 
 // -----------------------------------------------------------------------
 // Mocks — hoisted by Vitest BEFORE any imports below resolve.
@@ -215,6 +215,47 @@ const ghIssueCommentOkRule = () => ({
 function countCalls(predicate) {
   return vi.mocked(execFileSync).mock.calls.filter(([cmd, args]) => predicate(cmd, args)).length;
 }
+
+// -----------------------------------------------------------------------
+// Phase 56 CR-01 fix — file-level CI env guard so safeAppendLedger passes.
+// -----------------------------------------------------------------------
+// scripts/auto-fix.mjs:safeAppendLedger (LEDGER-02) refuses to call the
+// (mocked) appendLedgerEntry unless process.env.CI === 'true' (or the
+// E2E_LEDGER_PATH_OVERRIDE escape hatch is set). Vitest does NOT implicitly
+// set CI=true, and package.json's `test:src` script is bare `vitest run`
+// with no cross-env wrapper, so a developer running `npm test` on a
+// workstation without CI exported in their shell would hit 18 pre-existing
+// failures (every test that reaches a safeAppendLedger call site:
+// 2/3/4/7/8/9/10/12, G2, D1-D6, I1-I3, 46.9, etc.). The LEDGER-04 test
+// originally fixed this in-test with a try/finally per assertion, but that
+// pattern does not scale.
+//
+// We snapshot CI here at file scope (beforeAll) and restore it at file
+// end (afterAll). Tests that need to exercise the safeAppendLedger
+// refusal path can still toggle process.env.CI off inside their own
+// try/finally — the file-level beforeAll only establishes the default.
+//
+// Why we chose this over widening tests/setup/chrome-stub.js (the other
+// option in the REVIEW.md fix suggestion): chrome-stub.js is a GLOBAL
+// vitest setupFile shared by chrome / firefox / node test suites. Adding
+// process.env.CI='true' there would leak the env override into every
+// unrelated test file (lint-guard tests, llm-ledger tests, etc.), and
+// the llm-ledger LEDGER_PATH IIFE explicitly THROWS when both CI and
+// E2E_LEDGER_PATH_OVERRIDE are set (llm-ledger.js:86-93) — chrome-stub
+// load order vs. llm-ledger.js module load order is exactly the kind of
+// non-local interaction that bit the leak vector in the first place.
+// Localizing to auto-fix.test.js keeps the override surface area small
+// and contained to the exact file that consumes the safeAppendLedger
+// wrapper.
+let __savedCI;
+beforeAll(() => {
+  __savedCI = process.env.CI;
+  process.env.CI = 'true';
+});
+afterAll(() => {
+  if (__savedCI === undefined) delete process.env.CI;
+  else process.env.CI = __savedCI;
+});
 
 // -----------------------------------------------------------------------
 // beforeEach — clean slate for every test
@@ -1243,5 +1284,59 @@ describe('Phase 46 — subscription transport routing + --push', () => {
     // And the CI guard at the top of the function is preserved
     expect(fnBody).toContain("process.env.CI === 'true'");
     expect(fnBody).toContain('subscription-local invariant (CI detected)');
+  });
+});
+
+// =======================================================================
+// Phase 56 LEDGER-04: errorClass wired into ledger entries
+// =======================================================================
+//
+// Asserts that runDispatcher() in mocked mode emits a ledger entry whose
+// errorClass field equals the issue's ERROR_CLASS label. Exercises the
+// Step 12 (diff-guard violation) call site because that path
+// has the fewest mock prerequisites: just feed back a fenced diff that
+// touches a forbidden path and the dispatcher writes the violation entry
+// and exits with code 1.
+//
+// Why CI=true is set inside the test (per RESEARCH §4 + Wave 0 W0a):
+//   safeAppendLedger (auto-fix.mjs LEDGER-02 wrapper) reads process.env.CI
+//   directly. The wrapper is defined INSIDE auto-fix.mjs (not in the
+//   mocked llm-ledger.js module), so the vi.mock factory does NOT replace
+//   it — the wrapper's guard executes on every call site. Without
+//   process.env.CI = 'true', the wrapper throws and the test fails with
+//   "safeAppendLedger refused" instead of an errorClass assertion miss.
+//   The try/finally cleanup is hermetic because vitest.config.js sets
+//   fileParallelism:false (Wave 0 §A1 verified that
+//   tests/setup/chrome-stub.js does not touch process.env.CI).
+//
+// Why we do NOT add safeAppendLedger to the vi.mock factory at lines
+// 62-67 (Pitfall A from RESEARCH § Common Pitfalls): adding it as
+// vi.fn() would silently bypass the guard in tests, hiding any future
+// regression that breaks the leak-prevention contract. The
+// un-mocked-wrapper / mocked-appendLedgerEntry split is the point.
+describe('LEDGER-04: errorClass wired into ledger entries (Phase 56)', () => {
+  it('runDispatcher mocked-mode emits a ledger entry carrying errorClass="WRONG_CITATION"', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'WRONG_CITATION'] }),
+      lsRemoteEmptyRule(),
+      ghIssueCommentOkRule(),
+    ]);
+    vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('tests/test-cases.js'), // FORBIDDEN path triggers diff-guard at the Step 12 call site
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0.05,
+      rawJson: {},
+    });
+    try {
+      process.env.CI = 'true';
+      const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+      expect(exit).toBe(1); // diff-guard violation → exit 1
+      const entries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+      expect(entries.length).toBeGreaterThan(0);
+      expect(entries.some((e) => e.errorClass === 'WRONG_CITATION')).toBe(true);
+    } finally {
+      delete process.env.CI;
+    }
   });
 });

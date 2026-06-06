@@ -40,6 +40,9 @@
 //   M4 — parseSourceIssue throws when neither body nor commit-msg yields an id
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 import {
   assertTripleGate,
@@ -50,6 +53,19 @@ import {
   PARTIAL_THRESHOLD,
   PARTIAL_LABEL,
 } from '../../scripts/auto-fix-promote.mjs';
+
+// ---------------------------------------------------------------------------
+// Phase 58 — shared helper for source-file inspection tests (PROMOTE-01,
+// PROMOTE-04, _skipCiGuard count pin, outcome-write structural fallback).
+// Resolves the script path once at module-load.
+// ---------------------------------------------------------------------------
+const __PROMOTE_SRC_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../scripts/auto-fix-promote.mjs',
+);
+function readPromoteSource() {
+  return readFileSync(__PROMOTE_SRC_PATH, 'utf8');
+}
 
 describe('assertTripleGate (Phase 44)', () => {
 
@@ -317,6 +333,209 @@ describe('parseArgv --passing-cases (Phase 53)', () => {
   it('PA3 — --passing-cases CSV with whitespace + trailing comma trims + filters', () => {
     const result = parseArgv([...REQUIRED, '--passing-cases', 'c1, c2 , c3,']);
     expect(result.passingCases).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  // Phase 58 PROMOTE-02/03 — argv extensions for the outcome ledger entry
+  // shape. --fingerprint and --error-class are threaded into args; both
+  // default to null when absent.
+  it('PA4 — Phase 58: --fingerprint and --error-class are captured into args', () => {
+    const result = parseArgv([
+      ...REQUIRED,
+      '--fingerprint', 'abc123def456',
+      '--error-class', 'WRONG_CITATION',
+    ]);
+    expect(result.fingerprint).toBe('abc123def456');
+    expect(result.errorClass).toBe('WRONG_CITATION');
+  });
+
+  it('PA5 — Phase 58: missing --fingerprint and --error-class default to null', () => {
+    const result = parseArgv([...REQUIRED]);
+    expect(result.fingerprint).toBeNull();
+    expect(result.errorClass).toBeNull();
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 58 PROMOTE-01 — IMPORTS POLICY narrowing enforcement.
+//
+// The policy comment block at scripts/auto-fix-promote.mjs:21-30 declares
+// the ALLOWED list as exactly three patterns: node:* AND
+// ./promote-from-quarantine.mjs AND ../tests/e2e/lib/llm-ledger.js.
+// IP1 enforces the audit grep returns zero forbidden lines (T-58-01
+// mitigation). IP2 asserts the appendLedgerEntry import is present in
+// the locked verbatim shape so that any rename or path drift fails fast.
+// ---------------------------------------------------------------------------
+describe('IMPORTS POLICY (Phase 58 PROMOTE-01)', () => {
+
+  it("IP1 — only allows node:*, ./promote-from-quarantine.mjs, ../tests/e2e/lib/llm-ledger.js", () => {
+    const source = readPromoteSource();
+    const importLines = source.match(/^import .+$/gm) || [];
+    const allowed = /from 'node:|from '\.\/promote-from-quarantine\.mjs'|from '\.\.\/tests\/e2e\/lib\/llm-ledger\.js'/;
+    const forbidden = importLines.filter((line) => !allowed.test(line));
+    expect(forbidden).toEqual([]);
+  });
+
+  it('IP2 — positive: the appendLedgerEntry import is present with the locked verbatim shape', () => {
+    const source = readPromoteSource();
+    const matches = source.match(/import \{ appendLedgerEntry, LEDGER_PATH \} from '\.\.\/tests\/e2e\/lib\/llm-ledger\.js'/g) || [];
+    expect(matches.length).toBe(1);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 58 PROMOTE-02/03 — main() outcome ledger writes (structural).
+//
+// Mock-based behavioural testing of main() proves brittle for this CLI
+// shim (top-level isMain guard + module-scoped argv/process.exit; vi.mock
+// of process.exit collides with the throw-sentinel-and-await pattern when
+// the SUT also catches in main().catch). The structural fallback
+// described in the plan's Task 1.2 (n) acceptance note is used here:
+// regex-assert the source contains exactly one auto-fix-promoted entry
+// (success path) AND exactly one auto-fix-failed entry (failure path)
+// at the single insertion sites, with errorClass / fingerprint /
+// issueId / prNumber / reason fields all present. The argv-extension
+// behaviour (PA4/PA5) covers the parseArgv side of the same wiring.
+// ---------------------------------------------------------------------------
+describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
+
+  it('O1 — success path: source contains exactly one appendLedgerEntry call with auto-fix-promoted + outcome:pass + errorClass + fingerprint + issueId + prNumber', () => {
+    const source = readPromoteSource();
+    // Find the success-entry block: appendLedgerEntry(LEDGER_PATH, { ... source: 'auto-fix-promoted' ... outcome: 'pass' ... })
+    // Match a single contiguous block. Use a non-greedy match capped at ~800 chars.
+    const blockRe = /appendLedgerEntry\(LEDGER_PATH,\s*\{[\s\S]{0,800}?source:\s*'auto-fix-promoted'[\s\S]{0,400}?\}\)/g;
+    const matches = source.match(blockRe) || [];
+    expect(matches.length).toBe(1);
+    const block = matches[0];
+    expect(block).toMatch(/outcome:\s*'pass'/);
+    expect(block).toMatch(/errorClass:\s*args\.errorClass/);
+    expect(block).toMatch(/fingerprint:\s*args\.fingerprint/);
+    // Phase 58 REVIEW-FIX WR-02: issueId sources from the validated
+    // resolvedSourceIssue (not the raw args.sourceIssue which may be null
+    // when --source-issue is omitted). Pre-fix shape would have landed
+    // `issue-null` in the ledger for direct CLI callers; CI masked the
+    // bug because the workflow always passes --source-issue.
+    expect(block).toMatch(/issueId:\s*`issue-\$\{resolvedSourceIssue\}`/);
+    expect(block).toMatch(/prNumber:\s*args\.pr/);
+    expect(block).toMatch(/iso:\s*new Date\(\)\.toISOString\(\)/);
+    expect(block).toMatch(/phase:\s*'58-promote'/);
+    expect(block).toMatch(/transport:\s*'subscription'/);
+    // model is args.model with a default fallback — must NOT be a bare literal
+    expect(block).toMatch(/model:\s*args\.model/);
+  });
+
+  it('O2 — failure path: source contains exactly one appendLedgerEntry call with auto-fix-failed + outcome:fail + reason runPromote exitCode', () => {
+    const source = readPromoteSource();
+    const blockRe = /appendLedgerEntry\(LEDGER_PATH,\s*\{[\s\S]{0,800}?source:\s*'auto-fix-failed'[\s\S]{0,400}?\}\)/g;
+    const matches = source.match(blockRe) || [];
+    expect(matches.length).toBe(1);
+    const block = matches[0];
+    expect(block).toMatch(/outcome:\s*'fail'/);
+    expect(block).toMatch(/errorClass:\s*args\.errorClass/);
+    expect(block).toMatch(/fingerprint:\s*args\.fingerprint/);
+    // Phase 58 REVIEW-FIX WR-02: see O1 comment above.
+    expect(block).toMatch(/issueId:\s*`issue-\$\{resolvedSourceIssue\}`/);
+    expect(block).toMatch(/prNumber:\s*args\.pr/);
+    expect(block).toMatch(/reason:\s*\(?`runPromote exitCode=\$\{result\.exitCode\}`/);
+    expect(block).toMatch(/model:\s*args\.model/);
+  });
+
+  it('O3 — triple-gate failure paths do NOT write outcome entries: total appendLedgerEntry(LEDGER_PATH, ...) count equals 2 (success + failure only for the verified path)', () => {
+    // Phase 58 REVIEW-FIX WR-03 (deferred-by-design clarification):
+    //
+    // The exactly-2 count is intentional and applies to the VERIFIED PATH
+    // ONLY. The partial path (main() lines 537-583) deliberately writes
+    // ZERO outcome ledger entries on either success or failure — this is
+    // a Phase 58 scope decision, NOT a bug.
+    //
+    // Rationale: the partial-promote capability is a Phase 53 feature
+    // (assertPartialGate + runPartialPromote, _skipCiGuard:false). Phase
+    // 58's scope is wiring outcome attribution for the VERIFIED auto-fix
+    // path (the path that exercises _skipCiGuard:true and therefore
+    // carries the human-gate trust invariant). Threading per-case outcome
+    // attribution onto the partial path belongs to a follow-up phase
+    // because (a) the partial path runs through normal CI semantics so
+    // the safeAppendLedger leak-vector analysis differs, and (b)
+    // per-case granularity on the partial branch requires plumbing
+    // through runPartialPromote's per-case loop rather than the single
+    // verified-branch invocation. See
+    // .planning/phases/58-promote-outcome-ledger-entry/58-REVIEW-FIX.md
+    // "Deferred" section for the durable design-decision record.
+    //
+    // Concrete a-b-winner impact: until the future partial-path phase
+    // lands, partial-verified promotions are under-represented in the
+    // ledger relative to verified-only promotions. This biases per-
+    // (class, arm) pass-rate estimates toward verified-only outcomes
+    // (which are >=5/5); partial outcomes are 4/5. The bias is bounded
+    // by the partial-PR rate and is acceptable for the Phase 58 milestone.
+    const source = readPromoteSource();
+    const matches = source.match(/\bappendLedgerEntry\(LEDGER_PATH,/g) || [];
+    expect(matches.length).toBe(2);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 58 PROMOTE-04 — assertTripleGate body byte-unchanged.
+//
+// The function body (15 lines starting at `export function
+// assertTripleGate(`) is the Phase 53 trust invariant. Any drift in
+// the gate logic erodes the _skipCiGuard:true exemption boundary. This
+// test pins the body verbatim using a dynamic findIndex so the test
+// remains valid as the function moves line-wise in the file (Phase 58
+// shifted it by ~9 lines due to the IMPORTS POLICY block growth).
+// On assertion failure the Vitest diff shows the exact line that drifted.
+// ---------------------------------------------------------------------------
+describe('assertTripleGate body byte-unchanged (Phase 58 PROMOTE-04)', () => {
+
+  it('PROMOTE-04 — body lines match the locked Phase 58 baseline verbatim string', () => {
+    const source = readPromoteSource();
+    const lines = source.split(/\r?\n/);
+    const startIdx = lines.findIndex((l) => l.startsWith('export function assertTripleGate'));
+    expect(startIdx).not.toBe(-1);
+    const body = lines.slice(startIdx, startIdx + 15).join('\n');
+    const EXPECTED_BODY = [
+      'export function assertTripleGate({ prLabels, merged, sourceIssueLabels } = {}) {',
+      '  // Leg 1 — auto-fix:verified label on the merged PR.',
+      "  if (!Array.isArray(prLabels) || !prLabels.includes('auto-fix:verified')) {",
+      '    throw new Error("TRIPLE_GATE_FAILED: prLabels — missing \'auto-fix:verified\'");',
+      '  }',
+      '  // Leg 2 — merged === true (the GitHub close webhook also fires for',
+      '  // close-without-merge; this leg is what distinguishes them).',
+      '  if (merged !== true) {',
+      "    throw new Error('TRIPLE_GATE_FAILED: merged — pull request not merged');",
+      '  }',
+      '  // Leg 3 — source-issue carries triage (Phase 34 triage-classifier verdict).',
+      "  if (!Array.isArray(sourceIssueLabels) || !sourceIssueLabels.includes('triage')) {",
+      '    throw new Error("TRIPLE_GATE_FAILED: sourceIssueLabels — source issue missing \'triage\'");',
+      '  }',
+      '}',
+    ].join('\n');
+    expect(body).toBe(EXPECTED_BODY);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 58 _skipCiGuard:true non-comment count invariant.
+//
+// Promotes Phase 53's manual close-note check to an executable test. The
+// Phase 35 _skipCiGuard:true exemption MUST appear exactly once in
+// scripts/auto-fix-promote.mjs — at the verified-branch runPromote call
+// inside main(). Any second non-comment occurrence widens the exemption
+// boundary and erodes the trust invariant. Phase 58's outcome-entry
+// insertions explicitly avoid the literal pattern in comments AND code
+// to keep this count at 1.
+// ---------------------------------------------------------------------------
+describe('_skipCiGuard:true non-comment grep-count invariant (Phase 58 trust pin)', () => {
+
+  it('exactly one non-comment occurrence of _skipCiGuard:\\s*true (line 434-ish only)', () => {
+    const source = readPromoteSource();
+    const lines = source.split(/\r?\n/);
+    const codeLines = lines.filter((l) => !/^\s*\/\//.test(l));
+    const hits = codeLines.filter((l) => /_skipCiGuard:\s*true/.test(l));
+    expect(hits.length).toBe(1);
   });
 
 });

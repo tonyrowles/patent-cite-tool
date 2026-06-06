@@ -13,6 +13,7 @@
 - ✅ **v3.1 LLM-Driven Product Improvement Loop** — Phases 32-38 (shipped 2026-05-30)
 - ✅ **v4.0 Self-Healing Test Suite** — Phases 39-47 (shipped 2026-06-02)
 - ✅ **v4.1 Readiness Gate + Push** — Phases 48-55 + emergent 51.1 + 51.2 hotfixes (shipped 2026-06-04)
+- 🚧 **v4.2 Auto-Fix Loop Live** — Phases 56-60 (in progress)
 
 ## Phases
 
@@ -150,182 +151,107 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 
 </details>
 
-<!-- Original v4.1 detail section (collapsed at milestone close):
+### v4.2 Auto-Fix Loop Live (Phases 56-60)
 
-### 🚧 v4.1 Readiness Gate + Push (In Progress)
+**Milestone Goal:** Take the v4.0/v4.1 auto-fix infrastructure from "wired but unexercised" to operationally validated on origin/main with at least one production fix shipped through the loop end-to-end.
 
-**Milestone Goal:** Land v4.0's ~777 local commits on origin/main, exercise the self-healing loop live against real GitHub Actions, close v4.0's deferred UATs and v3.1's bookkeeping debt, and ship 3 forward-looking auto-fix improvements (dashboard, partial-verified semantics, multi-model A/B).
+**Critical path:** Phase 56 (schema + leak guard) → Phase 57 (branch redirect) → Phase 58 (promote outcome entry) → Phase 59 (fixture-mutator + 4-UAT sweep) → Phase 60 (cleanup)
 
-**Wave structure:**
-- Wave-0 (Phase 48): Pre-push regression fixes — BLOCKS ALL subsequent phases
-- Wave-1 (Phase 49): Push v4.0-integration PR — single serialization point; blocks Phases 50, 51, 53
-- Wave-2 (Phases 50, 51, 52): Parallelizable post-push; Phase 52 has no push dependency
-- Wave-3 (Phases 53, 54): Parallelizable with Wave-2; Phase 53 benefits from Phase 51 UAT evidence; Phase 54 is independent
-- Wave-4 (Phase 55): Depends on Phase 54 (reads `model` field from ledger)
+**Parallelization:** Phase 56 and Phase 57 touch disjoint files and can ship in either order. Phase 56 recommended first so UAT-47-a (Phase 59 SWEEP-03) populates `errorClass` from the first live run.
 
-- [x] **Phase 48: Pre-Push Regression Fixes** - Fix Test 48 ledger leak, calendar-rollover flake, and @anthropic-ai/sdk EXACT pin before CI can pass on the integration PR (completed 2026-06-02)
-- [x] **Phase 49: Push v4.0-Integration PR** - Create, self-approve, and admin-merge the v4.0-integration PR; confirm CI green on origin/main (completed 2026-06-03)
-- [x] **Phase 50: CLEANUP-04 Readiness Gate** - Patch ruleset 17086676 required_status_checks + remove bypass_actors; confirm gate enforced on test PR (completed 2026-06-03)
-- [x] **Phase 51: Live Readiness UATs** - 4 DEFERRED runbook stubs re-stamped against live GitHub Actions (completed 2026-06-03): UAT-47-e FAIL (surfaced v40-verifier-gate trigger bug), UAT-47-a AUTO-DEFERRED per D-13, UAT-47-b STILL-DEFERRED, UAT-47-d BLOCKED-BY-PHASE-50; all four folded into Phase 56 follow-up (v4.2 backlog)
-- [x] **Phase 51.1: Required-Check Trigger Hotfix** - REGRESSION-51-01 resolved (completed 2026-06-03): v40-verifier-gate.yml BASE-ref filter removed + v40-deps-update.yml pull_request trigger added + scope-decision fast-path step on 4 PR-gate jobs; verification PR #14 captured both required contexts firing then CLOSED; Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline)
-- [x] **Phase 52: v3.1 Bookkeeping Cleanup** - Re-stamp 5 stale HUMAN-UAT/VERIFICATION frontmatter files; remove 3 orphan quick-task slug rows from STATE.md (completed 2026-06-03)
-- [x] **Phase 53: auto-fix:partial-verified Semantics** - Implement assertPartialGate (separate from assertTripleGate); partial label producer in verifier-gate; widened auto-promote filter (completed 2026-06-04; 3 atomic feat(53) commits: 0aa8202 -> 0489305 -> 3d4db45; all 4 PARTIAL-* CLOSED; assertTripleGate body byte-unchanged; _skipCiGuard:true count=1)
-- [x] **Phase 54: Multi-Model A/B** - llm-router (frozen MODEL_ROUTES) + buildFixPrompt model field + auto-fix.mjs wire + a-b-winner abstention-mode (completed 2026-06-04; 4 atomic feat(54) commits LOCAL: d744caa → 1efbb4c → 09809fd → 6014368 + closure chore; AB-04 in abstention mode per D-20 schema gap; Phase 56 follow-up enqueued for ledger schema extension)
-- [x] **Phase 55: Auto-Fix Dashboard** - renderAutoFixPipelineSection + fetchAutoFixPrs in scripts/weekly-digest.mjs; 7 observable metrics in `<details>` collapsible section; runDigest step (6.5) appends section AFTER renderDigest (preserves ≤50-line budget); SUMMARY_KEYS byte-unchanged (D-12) (completed 2026-06-04; 3 atomic commits LOCAL: 82a49dd feat(55) DASH-02 → 704284e feat(55) DASH-01+03 → chore(55) closure; +5 Vitest assertions; all 3 DASH-* CLOSED)
+- [x] **Phase 56: Ledger Schema Extension + Leak Guard** - Wire `errorClass` into all 7 `auto-fix.mjs` call sites; add `safeAppendLedger` wrapper enforcing CI/override guard; relax Test 48; Vitest coverage (completed 2026-06-04)
+- [x] **Phase 57: Ledger-Commit Branch Redirect** - Refactor `v40-cost-ledger-snapshot.yml` to push `ledger-snapshots/daily-*` branch; update diff-guard scope-decision; update S13 YAML contract test; pin `v40-auto-fix.yml` direct-to-main as anti-feature (completed 2026-06-04)
+- [x] **Phase 58: Promote Outcome Ledger Entry** - Narrow IMPORTS POLICY in `auto-fix-promote.mjs`; write event-sourced outcome entries on promotion success/failure; Vitest coverage (completed 2026-06-06)
+- [ ] **Phase 59: Fixture-Mutator + 4-UAT Re-Sweep** - Ship `inject-defect.mjs`; execute UAT-47-e → UAT-47-d → UAT-47-a → UAT-47-b in D-13 cost discipline order; produce `56-UAT-EVIDENCE.md`; post-UAT cleanup
+- [ ] **Phase 60: Carry-Along Cleanup** - Remove dead `MODEL` const from `auto-fix.mjs`; complete Phase 51.1's unfinished `v40-verifier-gate-yaml.test.js` V2 update; milestone closure artifacts
 
 ## Phase Details
 
-### Phase 48: Pre-Push Regression Fixes
-**Goal**: npm test exits 0 with a clean committed ledger, epoch-relative digest test fixtures, and an EXACT-pinned lockfile — enabling CI to pass green on the v4.0-integration PR
-**Wave**: Wave-0 — blocks all subsequent phases
-**Depends on**: Nothing (first v4.1 phase)
-**Requirements**: PRE-01, PRE-02, PRE-03, PRE-04
+### Phase 56: Ledger Schema Extension + Leak Guard
+**Goal**: Every `auto-fix.mjs` call site writes `errorClass` into the ledger entry; a `safeAppendLedger` wrapper enforces the CI/override guard at call-site scope; `npm test` exits 0 on a working copy that has had live auto-fix runs
+**Depends on**: Nothing (first v4.2 phase; parallelizable with Phase 57)
+**Requirements**: LEDGER-01, LEDGER-02, LEDGER-03, LEDGER-04
 **Success Criteria** (what must be TRUE):
-  1. `npm test` exits 0 locally with zero failures (Test 48 and e2e-weekly-digest.test.js:395 both green)
-  2. `tests/e2e/.llm-spend-ledger.json` contains exactly 1 entry (the phase='39-bootstrap' sentinel); `jq '.months | keys | length'` returns 1
-  3. `invokeAnthropicSdkWithLedger` with `forceApi:true` outside CI throws a contract-error when `E2E_LEDGER_PATH_OVERRIDE` is unset, preventing future local SDK calls from polluting the committed ledger
-  4. `package-lock.json` retains `"version": "0.100.1"` for `@anthropic-ai/sdk` with no caret; a Vitest static-grep assertion pins this
-  5. The calendar-rollover fix uses epoch-relative fixture dates derived from a single `PIN_NOW_ISO` constant — changing that constant re-calibrates the whole test without requiring updates to individual fixture dates
+  1. `grep -c 'errorClass' scripts/auto-fix.mjs` returns at least 7 after the commit; `a-b-winner.mjs` in mocked mode reads `errorClass` from a ledger entry emitted by `runDispatcher()`
+  2. Running `node scripts/auto-fix.mjs` locally outside CI throws a contract error (from `safeAppendLedger`) before touching the committed ledger — `appendLedgerEntry` body is byte-unchanged and all 33 existing llm-ledger tests pass
+  3. `npm test` exits 0 even after live auto-fix runs have appended entries; Test 48's "exactly 1 bootstrap entry" assertion is relaxed to "≥1 entry with `phase='39-bootstrap'`"
+  4. `grep -c 'safeAppendLedger' scripts/auto-fix.mjs` returns 7; zero direct `appendLedgerEntry` calls remain in `scripts/auto-fix.mjs`
+**Plans**: 3 plans
+  - [x] 56-00-PLAN.md — Wave 0 verification: inspect tests/setup/chrome-stub.js + confirm vi.mock hoisting baseline
+  - [x] 56-01-PLAN.md — safeAppendLedger wrapper + 7 call-site rewrites (errorClass) + LEDGER-04 integration test (LEDGER-01, LEDGER-02, LEDGER-04)
+  - [x] 56-02-PLAN.md — Test 48 cardinality relaxation (LEDGER-03)
+
+### Phase 57: Ledger-Commit Branch Redirect
+**Goal**: The daily cost-ledger-snapshot workflow pushes to a `ledger-snapshots/daily-*` branch instead of `main`; the diff-guard fast-paths non-auto-fix PRs; `v40-auto-fix.yml`'s direct-to-main ledger commit remains byte-unchanged
+**Depends on**: Nothing (parallelizable with Phase 56; recommended after Phase 56)
+**Requirements**: COMMIT-01, COMMIT-02, COMMIT-03, COMMIT-04
+**Success Criteria** (what must be TRUE):
+  1. `v40-cost-ledger-snapshot.yml` pushes to `ledger-snapshots/daily-${SNAPSHOT_DATE}` — `git log --oneline` on origin after the first post-merge cron run shows a commit on a `ledger-snapshots/` branch, not on `main`
+  2. A ledger-snapshot PR (non-`auto-fix/*` head ref) opened against main gets a SUCCESS verdict from all verifier-gate jobs via the diff-guard scope-decision fast-path — no FORBIDDEN_PATHS rejection
+  3. `grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml` equals 1 after the refactor commit — the two-commit split in `v40-auto-fix.yml` is byte-unchanged
+  4. The S13 Vitest YAML contract case in `tests/e2e/scripts/v40-cost-ledger-snapshot-yaml.test.js` passes with a positive assertion pinning the `ledger-snapshots/` branch prefix
 **Plans**: 1 plan
+  - [x] 57-01-PLAN.md — Workflow edits (COMMIT-01 push refspec + COMMIT-02 diff-guard scope step) + test updates (COMMIT-03 S8/S13 + COMMIT-04 v40-auto-fix.yml byte-unchanged pin) in single atomic feat(57) commit
 
-Plans:
-- [x] 48-01-PLAN.md — Four PRE-* fixes (guard, reset, epoch, lockfile) as sequential atomic commits per D-11
-
-### Phase 49: Push v4.0-Integration PR
-**Goal**: All 208 v4.0+Phase-48 commits land on origin/main via an admin-bypass merge-commit PR (NOT squash); CI passes green on the merged commit; all 6 v40-* workflows are confirmed present on origin
-**Wave**: Wave-1 — single serialization point; blocks Phases 50, 51, 53
-**Depends on**: Phase 48
-**Requirements**: PUSH-01, PUSH-02
+### Phase 58: Promote Outcome Ledger Entry
+**Goal**: Promotion success and failure events are durably recorded in the ledger as event-sourced entries; `a-b-winner.mjs` can exit abstention automatically once entries accumulate without any code edit
+**Depends on**: Phase 56 (safeAppendLedger available), Phase 57 (branch-redirect pattern established)
+**Requirements**: PROMOTE-01, PROMOTE-02, PROMOTE-03, PROMOTE-04
 **Success Criteria** (what must be TRUE):
-  1. Operator can confirm v4.0 commits are visible at `git log origin/main` with full 777-commit history (merge-commit strategy, NOT squash)
-  2. `gh workflow list | grep v40` shows all 6 v40-* workflows on origin (v40-auto-fix, v40-verifier-gate, v40-auto-promote, v40-deps-update, v40-pdfjs-frame-shift, v40-cost-ledger-snapshot)
-  3. `gh pr view <integration-pr-n> --json statusCheckRollup` shows all required CI checks as PASS on the merged commit
-  4. The integration PR merge event is recorded as a merge commit (not a squash commit) in the GitHub audit log
-**Plans**: 1 plan
+  1. After a successful auto-fix promotion, the committed ledger contains an entry `{source: 'auto-fix-promoted', outcome: 'pass', fingerprint, issueId, prNumber}` — readable via `jq '[.[] | select(.source=="auto-fix-promoted")]' tests/e2e/.llm-spend-ledger.json`
+  2. After a label-flap-to-failure event, the committed ledger contains an entry `{source: 'auto-fix-failed', outcome: 'fail', fingerprint, issueId, prNumber, reason}` — the two entry shapes are mutually exclusive per event
+  3. `assertTripleGate` body is byte-unchanged vs the Phase 53 baseline — `git diff HEAD~N -- scripts/auto-fix-promote.mjs | grep 'assertTripleGate'` shows zero body-line changes; the Vitest delta assertion passes
+  4. The existing grep-based IMPORTS POLICY assertion in `tests/unit/auto-fix-promote-gate.test.js` passes after `llm-ledger.js` is added to the IMPORTS POLICY allow-list in the SAME commit
+**Plans**: 3 plans
+  - [x] 58-00-PLAN.md — Wave 0 baseline snapshot (PHASE_58_BASELINE + assertTripleGate sha256 + _skipCiGuard count + llm-ledger sha256)
+  - [x] 58-01-PLAN.md — Script + tests for PROMOTE-01..04 + _skipCiGuard pin (single atomic commit; depends on 58-00)
+  - [x] 58-02-PLAN.md — Workflow YAML pre-resolution + argv threading (--fingerprint + --error-class; depends on 58-01)
 
-Plans:
-- [x] 49-01-PLAN.md — 8-task release-engineering sequence: env probe → preflight bypass test → push+open PR → wait for CI → admin-bypass merge → SC harness → post-merge CI → INTEGRATION.md handoff
-
-### Phase 50: CLEANUP-04 Readiness Gate
-**Goal**: Ruleset 17086676 enforces both required status checks and has no bypass actors; a committed break-glass procedure is tested before removal lands; a test PR confirms enforcement
-**Wave**: Wave-2a — runs after Phase 49; parallelizable with Phases 51 and 52
-**Depends on**: Phase 49 (requires a live CI run to resolve context names)
-**Requirements**: GATE-01, GATE-02, GATE-03
+### Phase 59: Fixture-Mutator + 4-UAT Re-Sweep
+**Goal**: A deterministic synthetic-defect injector exists and is proven safe; the auto-fix loop is confirmed end-to-end on origin/main with captured evidence; post-UAT state is clean
+**Depends on**: Phase 56 (errorClass schema live), Phase 57 (branch redirect live), Phase 58 (promote entries live) — all must be on origin/main before UATs run
+**Requirements**: MUTATOR-01, MUTATOR-02, MUTATOR-03, MUTATOR-04, MUTATOR-05, SWEEP-01, SWEEP-02, SWEEP-03, SWEEP-04, SWEEP-05, SWEEP-06
+**UAT Sequencing** (D-13 cost discipline, locked):
+  - SWEEP-01 (UAT-47-e, ~3 min, $0) FIRST — halt-on-fail before spending API budget
+  - SWEEP-02 (UAT-47-d, ~5 min) SECOND
+  - SWEEP-03 (UAT-47-a, ~$0.50-2, ~10 min) THIRD — primary DoD evidence
+  - SWEEP-04 (UAT-47-b) FOURTH — requires MUTATOR-01..05 complete
 **Success Criteria** (what must be TRUE):
-  1. `gh api GET /repos/tonyrowles/patent-cite-tool/rulesets/17086676 --jq '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'` returns both `"verifier-gate"` and `"deps-update-gate"`
-  2. `gh api GET /repos/tonyrowles/patent-cite-tool/rulesets/17086676 --jq '.bypass_actors'` returns an empty array `[]`
-  3. A test PR opened after the patch cannot merge until both `verifier-gate` and `deps-update-gate` checks report success; the break-glass PATCH command is committed to docs and confirmed functional before bypass removal
-  4. A Vitest static-grep assertion pins both job name context strings (`verifier-gate`, `deps-update-gate`) against their YAML job definitions, so drift is caught at `npm test`
-**Plans**: 1 plan
-
-Plans:
-- [x] 50-01-PLAN.md — Six-task sequential: break-glass docs §7 → GATE-01 PUT + Vitest pins → GATE-03 test PR cycle → break-glass live add-then-remove → GATE-02 PUT bypass_actors=[] → final snapshot + INDEX + SUMMARY
-
-### Phase 51: Live Readiness UATs
-**Goal**: All 4 DEFERRED runbook stubs from 47-UAT-DEFERRED.md are re-stamped PASS with captured evidence artifacts; the self-healing loop is confirmed end-to-end on real GitHub infrastructure
-**Wave**: Wave-2b — runs after Phase 49; parallelizable with Phases 50 and 52
-**Depends on**: Phase 49 (requires v40-* workflows live on origin)
-**Note on Phase 53 dependency**: Phase 53's partial-verified threshold calibration (4/5 floor) benefits from UAT-47-a evidence; Phase 53 can start in parallel but should incorporate UAT-47-a results before finalising the threshold constant
-**Success Criteria** (what must be TRUE):
-  1. UAT-47-a: A draft PR opens on branch `auto-fix/3-139f821b` with LLM-proposed fix for issue #3 (`US11427642-spec-short-1`, fingerprint `139f821b3bb1`); verifier-gate runs 3x affected case + 76-case regression + diff-guard; runbook includes the remove-then-add `triage` label step and a pre-run branch-absence check
-  2. UAT-47-b: The `deps-update-gate` job appears in a dep-update PR's checks and blocks the PR from merging while the smoke + regression suite fails; a captured `gh pr checks` output confirms the gate fired
-  3. UAT-47-d: The `cost-ledger-snapshot` workflow commits a `[skip ci]`-tagged snapshot to main at 02:00 UTC; `git log origin/main --oneline -1` confirms the commit hash and `[skip ci]` message format
-  4. UAT-47-e: The verifier-gate diff-guard rejects a crafted PR that touches one of the 6 LOCKED paths; the test branch is named `test-only/diff-guard-*`; the PR is CLOSED (not merged) immediately after the gate fires; captured `gh pr checks` output shows the diff-guard failure
-**Plans**: 1 plan
-
-Plans:
-- [x] 51-01-PLAN.md — Execute UAT-47-e + UAT-47-a LIVE on canonical; document UAT-47-b + UAT-47-d as deferred with sharper runbooks; close phase with STATE.md Phase 56 follow-up + ROADMAP update
-
-### Phase 51.1: Required-Check Trigger Hotfix
-**Goal**: `v40-verifier-gate.yml` and `v40-deps-update.yml` actually fire on PRs into main so Phase 50's required_status_checks rule has a reporting provider; the repo's PR pipeline is unjammed; a verification test PR (CLOSED, not merged) confirms both checks now appear on a real PR
-**Wave**: Wave-2b.1 — emergency hotfix inserted after Phase 51 discovered REGRESSION-51-01
-**Depends on**: Phase 51 (which surfaced the regression)
-**Requirements**: REGRESSION-51-01 (HIGH-severity discovered defect)
-**Success Criteria** (what must be TRUE):
-  1. `.github/workflows/v40-verifier-gate.yml` `pull_request:` trigger fires on PRs whose base is `main` (the `branches: ['auto-fix/*']` BASE-ref filter is removed or rewritten so the trigger condition is satisfied for normal PRs)
-  2. `.github/workflows/v40-deps-update.yml` gains a `pull_request:` trigger so the `deps-update-gate` job actually runs as a check provider on dep-update PRs
-  3. A verification test PR opened against `main` after the fix lands shows BOTH `verifier-gate` AND `deps-update-gate` contexts present in `gh pr checks` output (whether they pass or fail is secondary — what matters is they FIRE)
-  4. The verification PR is CLOSED + branch deleted immediately after evidence capture (mirrors UAT-47-e / GATE-03 convention); no live LOCKED-path touch
-  5. Ruleset 17086676 ends Phase 51.1 with `bypass_actors=[]` (Phase 50 SC-2 preserved); the bypass actor is added via break-glass for the duration of the fix-commit + verification PR window, then removed
-**Plans**: 1 plan
-
-Plans:
-- [x] 51.1-01-PLAN.md — 7 sequential tasks: baselines → break-glass add → YAML edits → direct push → verification PR → break-glass remove → SUMMARY+STATE+ROADMAP (completed 2026-06-03)
-
-### Phase 52: v3.1 Bookkeeping Cleanup
-**Goal**: All stale planning-file frontmatter is corrected and orphan reference rows are removed — completing the bookkeeping debt deferred from v3.1 and carried through v4.0
-**Wave**: Wave-2c — fully independent; parallelizable with Phases 50, 51, 53, 54
-**Depends on**: Nothing (pure planning-file text edits; no push dependency)
-**Requirements**: BOOKS-01, BOOKS-02
-**Success Criteria** (what must be TRUE):
-  1. All 5 carry-over files (`32-UAT-EVIDENCE.md`, `35-HUMAN-UAT.md`, `36-HUMAN-UAT.md`, `37-HUMAN-UAT.md`, `38-UAT-EVIDENCE.md`) have `status: passed` in their frontmatter; the change lands as a NEW forward commit (no `git commit --amend` on historical commits)
-  2. The 3 orphan quick-task slug rows (`1-fix-off-by-2-error-in-patent-column-line`, `2-fix-ci-commit-package-lock-json-currentl`, `260412-fde-fix-spurious-results-reporting-impossibl`) are removed from the STATE.md Deferred Items table
+  1. `tests/e2e/scripts/inject-defect.mjs` creates a synthetic GitHub issue via `gh issue create`; `git status` is clean after execution (zero FORBIDDEN_PATHS files touched); a fingerprint collision causes hard abort (not warning)
+  2. Synthetic quarantine entries carrying `source: 'fixture-mutator-uat-47b'` never receive `quarantine:ready-for-promotion` label — confirmed by inspecting the quarantine file after mutator execution
+  3. UAT-47-e PASS: diff-guard rejects a crafted PR touching a LOCKED path; the test branch is CLOSED + deleted after evidence capture; $0 API cost
+  4. UAT-47-a PASS: a draft `auto-fix/*` PR opens with an LLM-proposed fix; `v40-verifier-gate.yml` runs 3x affected case + 76-case regression + diff-guard; a merged PR exists with `auto-fix:verified` label; the committed ledger contains an entry with `errorClass` and `outcome: 'pass'` — this is the primary DoD evidence
+  5. `56-UAT-EVIDENCE.md` exists with PASS/FAIL status per UAT, JSON snapshots from `gh api` + `gh run`, and all UAT ledger entries carrying `phase: '56-uat'`; post-UAT cleanup is confirmed complete (test branches deleted, synthetic issues closed, synthetic quarantine entries reverted)
 **Plans**: TBD
 
-### Phase 53: auto-fix:partial-verified Semantics
-**Goal**: A separate gate state machine entry point (`assertPartialGate`) handles the partial-pass case without widening `assertTripleGate`; the trust invariant boundary is hardened by a Vitest assertion that ships in the same commit as the new label
-**Wave**: Wave-3a — can start in parallel with Wave-2; benefits from Phase 51 UAT-47-a evidence for threshold calibration
-**Depends on**: Phase 49 (v40-* workflows must be live); benefits from Phase 51 (UAT-47-a baseline data)
-**Requirements**: PARTIAL-01, PARTIAL-02, PARTIAL-03, PARTIAL-04
-**LOAD-BEARING NOTE**: PARTIAL-04 is the single most load-bearing requirement in v4.1. The Vitest assertion that `assertTripleGate` THROWS on `auto-fix:partial-verified` MUST ship in the SAME commit as the new label and `assertPartialGate` function. The `assertTripleGate` body must remain byte-unchanged. `assertPartialGate` must NOT call `runPromote({_skipCiGuard:true})`.
+### Phase 60: Carry-Along Cleanup
+**Goal**: All deferred carry-along items from Phase 54 and Phase 51.1 are closed; `npm test` exits 0 with zero pre-existing failures; milestone closure artifacts are committed
+**Depends on**: Nothing (fully independent; runs last to avoid noise in critical phases)
+**Requirements**: CLEAN-01, CLEAN-02
 **Success Criteria** (what must be TRUE):
-  1. `assertPartialGate` is exported from `scripts/auto-fix-promote.mjs` as a separate function that does NOT call `runPromote({_skipCiGuard:true})`; grep confirms the original `assertTripleGate` body is byte-unchanged
-  2. A Vitest test (shipped in the same commit as the new label) asserts `assertTripleGate` throws when given only `auto-fix:partial-verified` label — proving the trust invariant boundary holds
-  3. `v40-verifier-gate.yml` `ready-flip` job produces `auto-fix:partial-verified` when at least 4/5 (>=80%) of affected cases pass; the full-pass `auto-fix:verified` path is unchanged; the two labels are mutually exclusive on any given PR
-  4. `v40-auto-promote.yml` job-level `if:` filter accepts `auto-fix:partial-verified`; partial-pass promotion mutates the corpus ONLY for passing case subset; failing cases remain in quarantine
-**Plans**: 1 plan
-
-Plans:
-- [ ] 53-01-PLAN.md — assertPartialGate + runPartialPromote + Vitest trust-invariant pin (PARTIAL-01 + PARTIAL-04) + ready-flip partial-label producer (PARTIAL-02) + auto-promote filter widening + main() label branch (PARTIAL-03); 3 atomic feat(53) commits in locked D-20 order
-
-### Phase 54: Multi-Model A/B
-**Goal**: Auto-fix model routing is deterministic by ERROR_CLASS via a pure-function router; the ledger records which model was actually invoked per fix; a winner-declaration script prevents premature conclusions
-**Wave**: Wave-3b — fully independent at the code level; parallelizable with Phase 53 and all Wave-2 phases
-**Depends on**: Phase 49 (live pipeline context for meaningful model attribution in ledger)
-**Requirements**: AB-01, AB-02, AB-03, AB-04
-**Note on Phase 55 dependency**: Phase 55 reads the `model` field written by Phase 54; Phase 55 must run after Phase 54 is complete
-**Success Criteria** (what must be TRUE):
-  1. `tests/e2e/lib/llm-router.js` exports a frozen `MODEL_ROUTES` table and `routeModel(errorClass)` helper; it contains zero I/O and is a pure function; `GOOGLE_DOM_DRIFT` and `LLM_HALLUCINATED_SELECTION` route to `claude-opus-4-7`; all other classes default to `claude-sonnet-4-6`
-  2. `fix-prompt-builder.js:buildFixPrompt` return value includes a `model` field sourced from `routeModel(errorClass)`; existing return fields are unchanged; the field is optional (existing callers that ignore it continue to work)
-  3. `auto-fix.mjs` passes the `model` from `buildFixPrompt` into `invokeAnthropicSdkWithLedger`; the committed ledger's `model` field reflects the actually-invoked model (not a hardcoded default)
-  4. `scripts/a-b-winner.mjs` outputs `NO_WINNER_YET` when per-model-per-class sample count is below `N_PER_ARM_REQUIRED` (committed constant, default 20); this constant is in code, not a prose note; when N >= 20 per arm per class it outputs a markdown table to stdout
-**Plans**: 1 plan
-
-Plans:
-- [x] 54-01-PLAN.md — 5-task plan completed 2026-06-04 in LOCKED D-24 order: (a) d744caa feat(54) AB-01 llm-router.js + Vitest → (b) 1efbb4c feat(54) AB-02 buildFixPrompt top-level model field + Vitest → (c) 09809fd feat(54) AB-03 auto-fix.mjs wires built.model → (d) 6014368 feat(54) AB-04 a-b-winner.mjs (N_PER_ARM_REQUIRED=20, abstention mode per D-20) + Vitest → (T5) chore(54) closure (SUMMARY + STATE + ROADMAP). 43 new Vitest tests; AB-04 abstention-mode pinned by Test 4; Phase 56 follow-up enqueued for ledger schema extension. LOCAL commits only per D-25; fully autonomous per D-26.
-
-### Phase 55: Auto-Fix Dashboard
-**Goal**: The weekly digest gains a collapsible auto-fix performance section with 7 observable metrics; the frozen 7-element SUMMARY_KEYS contract is preserved byte-for-byte; no new npm dependencies are introduced
-**Wave**: Wave-4 — depends on Phase 54 (reads `model` field populated by Phase 54)
-**Depends on**: Phase 54 (model field must be in ledger entries for per-model breakdown)
-**Requirements**: DASH-01, DASH-02, DASH-03
-**UI hint**: yes
-**Success Criteria** (what must be TRUE):
-  1. The Monday weekly digest contains a `<details>` collapsible section labeled "Auto-Fix Pipeline" with a markdown table of 7 metrics (auto_fix_attempted, verified_merged, success_rate, cost_per_fix, time_to_merge_p50, fix_attempts_p50, flake_escalation_count); all metrics are NaN/Infinity-guarded
-  2. The Vitest assertion `SUMMARY_KEYS.length === 7` passes; the frozen 7-key array is byte-unchanged; auto-fix metrics appear in a SEPARATE section, not as SUMMARY_KEYS entries
-  3. `cost_per_fix` uses `combinedMonthlyTotalByTransport` (not raw sum) to avoid double-counting subscription + SDK invocations for the same issue; `time_to_merge` filters to `mergedAt !== null` entries only
-**Plans**: 1 plan
-
-Plans:
-- [x] 55-01-PLAN.md — 3-task plan completed 2026-06-04 in LOCKED D-22 order: (a) 82a49dd feat(55) DASH-02 renderAutoFixPipelineSection + fetchAutoFixPrs + Vitest pins (SUMMARY_KEYS byte-unchanged) → (b) 704284e feat(55) DASH-01 + DASH-03 runDigest wires Auto-Fix Pipeline section (combinedMonthlyTotalByTransport.combined, mergedAt!==null filter, NaN-guarded) → (c) chore(55) closure. All 3 DASH-* CLOSED. SUMMARY_KEYS byte-unchanged across all 3 commits (`git diff HEAD~3 -- tests/e2e/lib/llm-report.js | wc -l` = 0; D-12 enforced). 5 new Vitest assertions in tests/unit/weekly-digest-auto-fix.test.js (Tests 2-6). T-55-05 INFO acknowledged: most metric VALUES display `n/a` at ship time (wiring ships, data populates from Phase 56 ledger schema extension). autonomous: true; LOCAL only per D-23.
-
--->
+  1. The dead `MODEL` const is absent from `scripts/auto-fix.mjs` — `grep 'const MODEL' scripts/auto-fix.mjs` returns 0; `npm test` exits 0 after the deletion
+  2. `tests/e2e/scripts/v40-verifier-gate-yaml.test.js` passes `npm test` with zero failures — the V2 update that Phase 51.1 left incomplete is finished; no pre-existing failures remain in this file
+**Plans**: TBD
 
 ## Progress
 
 **v4.1 shipped 2026-06-04** — see `.planning/MILESTONES.md` + `.planning/milestones/v4.1-ROADMAP.md` for archived details.
 
-**Execution Order (v4.1 historical):**
-Wave-0: 48 → Wave-1: 49 → Wave-2 (parallel): 50, 51, 52 → Wave-3 (parallel): 53, 54 → Wave-4: 55 + emergent 51.1, 51.2 hotfixes
+**v4.2 phase order:** Phase 56 → Phase 57 → Phase 58 → Phase 59 → Phase 60 (Phase 56 and 57 parallelizable; all of 56+57+58 must be on origin/main before Phase 59 UATs)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 48. Pre-Push Regression Fixes | v4.1 | 1/1 | Complete    | 2026-06-02 |
-| 49. Push v4.0-Integration PR | v4.1 | 1/1 | Complete   | 2026-06-03 |
-| 50. CLEANUP-04 Readiness Gate | v4.1 | 1/1 | Complete   | 2026-06-03 |
+| 48. Pre-Push Regression Fixes | v4.1 | 1/1 | Complete | 2026-06-02 |
+| 49. Push v4.0-Integration PR | v4.1 | 1/1 | Complete | 2026-06-03 |
+| 50. CLEANUP-04 Readiness Gate | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 51. Live Readiness UATs | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 51.1. Required-Check Trigger Hotfix | v4.1 | 1/1 | Complete | 2026-06-03 |
 | 52. v3.1 Bookkeeping Cleanup | v4.1 | 0/TBD | Not started | - |
 | 53. auto-fix:partial-verified Semantics | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 54. Multi-Model A/B | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 55. Auto-Fix Dashboard | v4.1 | 1/1 | Complete | 2026-06-04 |
+| 56. Ledger Schema Extension + Leak Guard | v4.2 | 3/3 | Complete    | 2026-06-04 |
+| 57. Ledger-Commit Branch Redirect | v4.2 | 1/1 | Complete    | 2026-06-04 |
+| 58. Promote Outcome Ledger Entry | v4.2 | 3/3 | Complete    | 2026-06-06 |
+| 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/TBD | Not started | - |
+| 60. Carry-Along Cleanup | v4.2 | 0/TBD | Not started | - |

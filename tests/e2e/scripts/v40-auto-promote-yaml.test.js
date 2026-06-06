@@ -207,3 +207,101 @@ describe('v40-auto-promote.yml contract (Phase 44)', () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// Phase 58 PROMOTE-02/03 (Decision A + B) — workflow-side pre-resolution of
+// fingerprint, errorClass, and model + threading into scripts/auto-fix-promote.mjs
+// argv. Together with Plan 01's parseArgv validation (PA4/PA5) and Plan 01's
+// entry-shape pins (O1/O2/O3), this Vitest contract closes the end-to-end pin
+// at three layers — parseArgv, entry shape, and workflow YAML.
+//
+// PHASE-58-Y6 + PHASE-58-Y9 + PHASE-58-Y10 jointly form the regression gate
+// against any future silent revert to hardcoded sonnet (which would break
+// a-b-winner.mjs:isAttributable per-arm attribution for the opus arm and
+// re-introduce indefinite abstention on that arm).
+// ---------------------------------------------------------------------------
+
+describe('v40-auto-promote.yml Phase 58 contract — fingerprint + errorClass + model plumbing', () => {
+
+  it('PHASE-58-Y1 — Pre-resolve source-issue fingerprint step exists', () => {
+    expect(yaml).toContain('Pre-resolve source-issue fingerprint');
+  });
+
+  it('PHASE-58-Y2 — Pre-resolve source-issue errorClass step exists', () => {
+    expect(yaml).toContain('Pre-resolve source-issue errorClass');
+  });
+
+  it('PHASE-58-Y3 — Pre-resolve upstream-ledger model step exists', () => {
+    expect(yaml).toContain('Pre-resolve upstream-ledger model');
+  });
+
+  it('PHASE-58-Y4 — --fingerprint argv plumbed', () => {
+    // The fingerprint pre-resolved by step `fp` is threaded into the per-case
+    // scripts/auto-fix-promote.mjs invocation via the --fingerprint argv flag
+    // accepted by Plan 01's parseArgv (validated against /^[0-9a-f]{12}$/).
+    expect(yaml).toMatch(/--fingerprint\s+"\$FINGERPRINT"/);
+  });
+
+  it('PHASE-58-Y5 — --error-class argv plumbed', () => {
+    // The errorClass pre-resolved by step `ec` is threaded via --error-class
+    // (validated by Plan 01's parseArgv against /^[A-Z_][A-Z0-9_]*$/).
+    expect(yaml).toMatch(/--error-class\s+"\$ERROR_CLASS"/);
+  });
+
+  it('PHASE-58-Y6 — --model argv plumbed (PIN: must not regress to hardcoded sonnet on script side)', () => {
+    // The model pre-resolved by step `ml` (jq lookup against the upstream
+    // auto-fix-api ledger entry) is threaded via --model. This pin defends
+    // against any future silent revert to hardcoded sonnet on either side
+    // (script via Plan 01 grep gates; workflow via THIS assertion).
+    expect(yaml).toMatch(/--model\s+"\$MODEL"/);
+  });
+
+  it('PHASE-58-Y7 — model lookup uses parameterized jq (jq -r --arg fp)', () => {
+    // Parameterized argument (--arg fp) — NOT string interpolation into the
+    // jq filter expression. jq treats $fp as a string variable; no jq-expression
+    // evaluation against the fingerprint value (T-58-A3 mitigation).
+    expect(yaml).toContain('jq -r --arg fp');
+  });
+
+  it('PHASE-58-Y8 — jq filter matches fingerprint AND source==auto-fix-api (defensive against fingerprint reuse)', () => {
+    // Defensive AND-of-two-fields match: even if a fingerprint gets reused
+    // across phases, the source=='auto-fix-api' constraint pins the lookup
+    // to the upstream auto-fix entry (Phase 54+56 wiring). See RESEARCH §A1.
+    expect(yaml).toContain('select(.fingerprint == $fp and .source == "auto-fix-api")');
+  });
+
+  it('PHASE-58-Y9 — no silent-default-to-sonnet fallback (anti-pattern guard)', () => {
+    // If a future PR added either:
+    //   MODEL=${MODEL:-claude-sonnet-4-6}       (shell parameter expansion default)
+    //   MODEL="claude-sonnet-4-6"               (literal hardcode)
+    // it would silently mask a missing upstream ledger entry and re-introduce
+    // the per-arm attribution gap for the opus arm. This assertion trips.
+    expect(yaml).not.toMatch(/MODEL=\$\{MODEL:-claude-sonnet-4-6\}/);
+    expect(yaml).not.toMatch(/MODEL="claude-sonnet-4-6"/);
+  });
+
+  it('PHASE-58-Y10 — model pre-resolution hard-fails on no match (clear ::error:: + exit 1)', () => {
+    // The hard-fail clause MUST appear, AND `exit 1` MUST appear within the
+    // same step block (after the step name). Non-greedy [\s\S]*? bounds the
+    // search to a small window.
+    expect(yaml).toMatch(/::error::Could not resolve model from upstream auto-fix ledger entry/);
+    expect(yaml).toMatch(/Pre-resolve upstream-ledger model[\s\S]*?exit 1/);
+  });
+
+  it('PHASE-58-Y11 — --passing-cases is gated by conditional, NOT unconditionally emitted (WR-01 regression pin)', () => {
+    // Phase 58 REVIEW-FIX WR-01: The verified-only path leaves
+    // PARTIAL_PASSING_CASES="", and scripts/auto-fix-promote.mjs's
+    // parseArgv -> takeValue rejects empty-string flag values with exit 2.
+    // The workflow MUST guard --passing-cases behind `if [ -n
+    // "$PARTIAL_PASSING_CASES" ]` (bash array conditional-append pattern)
+    // so the flag never reaches argv with an empty value. This regression
+    // pin asserts both halves: (a) the conditional exists; (b) the literal
+    // `--passing-cases "$PARTIAL_PASSING_CASES"` line on a continuation
+    // backslash (the pre-fix shape) is absent. (a) and (b) together prevent
+    // a silent revert to the broken shape.
+    expect(yaml).toMatch(/if\s+\[\s+-n\s+"\$PARTIAL_PASSING_CASES"\s+\]/);
+    expect(yaml).toMatch(/ARGS\+=\(--passing-cases "\$PARTIAL_PASSING_CASES"\)/);
+    expect(yaml).not.toMatch(/--passing-cases "\$PARTIAL_PASSING_CASES"\s*\\\n/);
+  });
+
+});

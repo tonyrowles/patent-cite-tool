@@ -1,333 +1,227 @@
-# Feature Research — v4.1 Readiness Gate + Push
+# Feature Research
 
-**Domain:** LLM-CI / autonomous code-fix pipeline — readiness gating, observability, and trust hardening layered on a shipped v4.0 self-healing loop
-**Researched:** 2026-06-02
-**Confidence:** HIGH (v4.0 source + PROJECT.md read directly; Renovate docs, GitHub branch-protection docs, LLM benchmark sources, Anthropic model guidance verified current)
+**Domain:** LLM-CI auto-fix loop — operational validation (v4.2)
+**Researched:** 2026-06-04
+**Confidence:** HIGH (primary sources: codebase + 51-UAT-EVIDENCE.md + a-b-winner.mjs + STATE.md)
 
 ---
 
-## Scope Note
+## Scope note
 
-This document covers ONLY the six v4.1 feature areas. The v4.0 self-healing pipeline (`v40-auto-fix.yml`, triple-gate `_skipCiGuard`, diff-guard, 5-state FLAKE classifier, cost ledger v2, dual LLM transport, dep-update watchlist) is treated as stable. Internals of those systems are not re-researched. The trust invariant — draft-PR-by-default + human-merge required + auto-promote opens SEPARATE follow-up PR + CODEOWNERS on locked paths — is the non-negotiable constraint every v4.1 feature must preserve or harden, not erode.
+This document covers ONLY the v4.2 NEW capabilities. Everything already shipped
+(pipeline structure, 5 ERROR_CLASS scaffolds, MODEL_ROUTES, FLAKE classifier,
+weekly digest wiring, partial-verified semantics, trust invariants, cost controls)
+is NOT re-researched here.
+
+The four capability categories the roadmap needs to sequence are:
+
+1. **Operator experience — first real fix shipped**
+2. **Fixture-mutator (UAT-47-b)**
+3. **Ledger schema extension** (`errorClass` + `outcome`)
+4. **4-UAT re-sweep against origin**
+
+Each category is analyzed as Table Stakes / Differentiators / Anti-Features below,
+with an explicit complexity note and dependency on v4.0/v4.1 assets.
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes (Pipeline Operators Expect These)
+### Table Stakes
 
-Features that any mature LLM-CI system ships before live production use. Missing these makes the pipeline feel untrustworthy or unoperatable.
+Features required for v4.2's DoD: "at least one production fix shipped through the
+loop end-to-end." Missing any of these = DoD not met.
 
-| Feature | Why Expected | Complexity | Pipeline Module Touched |
-|---------|--------------|------------|------------------------|
-| **Live readiness UAT — auto-fix end-to-end** | You cannot claim the loop works until you have run it against a real GitHub issue on the real infrastructure. v4.0 shipped local-only; UAT-47-a runbook stub exists but was never fired. Operators expect "it works on remote" as a basic claim before any v4.1 forward work. | M | `v40-auto-fix.yml`, `v40-verifier-gate.yml`, `v40-auto-promote.yml`, issue #3 `auto-fix/3-139f821b` branch |
-| **Live readiness UAT — dep-update pre-flight gate** | The `v40-deps-update.yml` workflow was also never run on remote. Regression-gate blocking is the primary trust item; confirming it blocks correctly is table stakes. | S | `v40-deps-update.yml`, `deps-update-gate` job |
-| **Live readiness UAT — daily ledger snapshot** | `[skip ci]` commit pattern exists in YAML; operator needs proof it fires, commits, and doesn't contaminate CI. | S | `v40-cost-ledger-snapshot.yml` |
-| **Live readiness UAT — diff-guard bypass test** | Diff-guard is the verifier-gate gaming defense. Operators need evidence it fires on a crafted bypass attempt. This is not exercisable locally. | S | `v40-verifier-gate.yml` FORBIDDEN_PATHS bank, test needs crafted branch on remote |
-| **Branch-protection `required_status_checks` patched** | The two deferred tech-debt items from v4.0 (`verifier-gate` + `deps-update-gate` job names missing from ruleset 17086676, `bypass_actors=1 bypass_mode=always`) are known holes in the protection envelope. Mature CI-as-code requires these closed before advertising "self-healing" capability. | S | GitHub ruleset 17086676, `gh api -X PUT` |
-| **Bookkeeping cleanup — frontmatter re-stamp** | Five carry-over VERIFICATION.md / HUMAN-UAT.md files have stale `status` fields whose human_verification items were confirmed live in Phase 38-03 but never re-stamped. Three orphan quick-task slug references remain. Standard housekeeping; any credible phase history system is expected to be in-sync. | S | `.planning/phases/` — 32-UAT-EVIDENCE.md, 35/36/37-HUMAN-UAT.md, 38-UAT-EVIDENCE.md |
+| Feature | Why Required | Complexity | v4.0/v4.1 Dependency |
+|---------|--------------|------------|----------------------|
+| Verifier-gate trigger fix | v40-verifier-gate.yml uses `pull_request.branches:['auto-fix/*']` which matches BASE not HEAD — gate NEVER fires on PRs into main (UAT-47-e FAIL, 51-UAT-EVIDENCE.md deviation #2). Without this fix UAT-47-a and any real auto-fix run cannot produce gate evidence. | LOW (YAML patch: replace `branches:` filter with job-level `if: startsWith(github.head_ref,'auto-fix/')`) | Depends on: Phase 50 ruleset (enforcement=active, bypass_actors=[]); must NOT widen assertTripleGate |
+| Ledger-commit refactor (both workflows) | `v40-cost-ledger-snapshot.yml` and `v40-auto-fix.yml` both push directly to `main`. Phase 50 ruleset blocks these pushes (no bypass actors). UAT-47-d is structurally blocked without this fix. Option B (push to `ledger-snapshots/*` branch, no merge to main) is the recommended path per 51-UAT-EVIDENCE.md — avoids diff-guard/locked-path entanglement and is independent of the verifier-gate trigger patch. | MEDIUM (two YAML edits + weekly-digest aggregation update to read from `ledger-snapshots/*` refs) | Depends on: Phase 50 ruleset state; additive-only constraint on SUMMARY_KEYS |
+| Ledger schema extension (`errorClass` + `outcome`) | `a-b-winner.mjs` is in abstention mode because no ledger entry carries `errorClass` or an outcome field. The weekly digest auto-fix section shows `n/a` for all 7 metrics because the ledger lacks these fields. STATE.md Pending Todos (Phase 54 closure note) specifies exact wiring: `errorClass` from auto-fix.mjs Step 7 var; `pr_merged` / `outcome` from auto-fix-promote.mjs verified-promotion event. | MEDIUM (7 appendLedgerEntry call sites in auto-fix.mjs + 2 in invokeAnthropicSdkWithLedger + 1 post-promote follow-up entry; `auto-fix-api` source entries are the known ledger-leak vector per MEMORY.md) | Depends on: additive-only ledger schema constraint (Phase 53 D-08); a-b-winner.mjs forward-compat probe handles transparently once fields present |
+| Fixture-mutator (`regression-fixture-mutator.mjs`) | UAT-47-b requires a script that injects a controlled citation-text defect into a known-good golden case, then confirms the full loop (rerun → triage → issue → auto-fix → verifier-gate → merge → promote) fires and closes. Without the mutator there is no deterministic end-to-end proof-of-life — waiting for a real anomaly is non-deterministic. | MEDIUM (new script: read golden case, apply text mutation, write back, record mutation log; must be idempotent and reversible) | Depends on: verifier-gate trigger fix (mutator-triggered PR must fire the gate) + ledger schema extension (outcome field needed to confirm promotion completes) |
+| UAT-47-a live execution (end-to-end auto-fix on issue #3) | Issue #3 (`US11427642-spec-short-1`, fingerprint `139f821b3bb1`) has `triage` label and is still OPEN as of v4.1 close. UAT-47-a exercises the label-cycle → auto-fix → verifier-gate → (manual merge) loop end-to-end. Was AUTO-DEFERRED in Phase 51 because verifier-gate trigger was broken. Re-attempt is the primary DoD evidence artifact. | MEDIUM (~$0.50–$2 API spend; ~10 min CI; label-cycle + watch + evidence capture) | Depends on: verifier-gate trigger fix; ledger-commit refactor (auto-fix.mjs ledger push must succeed) |
+| UAT-47-d live execution (ledger-snapshot workflow) | Confirms the refactored `v40-cost-ledger-snapshot.yml` pushes to `ledger-snapshots/YYYY-MM-DD` instead of `main`. Evidence: branch exists, ledger file updated, no locked-path violation. | LOW (workflow_dispatch + observe + evidence capture) | Depends on: ledger-commit refactor shipped |
+| UAT-47-e re-execution (verifier-gate diff-guard) | Confirms the trigger patch made the gate fire on `auto-fix/*` PRs into main; tests the diff-guard LOCKED-path rejection. Was FAIL in Phase 51 because the gate never fired. After the trigger fix this is a ~3-min cheap smoke test. | LOW (test PR, observe, close) | Depends on: verifier-gate trigger fix shipped |
+| UAT-47-b live execution (dep-PR synthetic regression) | Confirms the deps-update-gate fires and rejects a dep-PR that carries a synthetic regression. Requires the fixture-mutator as the regression-injection primitive. Pre-step: audit `v40-deps-update.yml` for same BASE/HEAD confusion as verifier-gate. | MEDIUM (workflow_dispatch + mutation push + observe + rollback) | Depends on: fixture-mutator + verifier-gate trigger audit of deps-update.yml |
+| Trust/safety hardening: `auto-fix-api` ledger-leak vector | `scripts/auto-fix.mjs` writes ledger entries via a path that `invokeAnthropicSdkWithLedger`'s PRE-02 guard does NOT cover (entries with `source: 'auto-fix-api'`). MEMORY.md flags this. Must be closed before any real production run, otherwise cost-cap enforcement is bypassable. | LOW (add source-check guard or route all entries through the guarded wrapper) | Depends on: ledger schema extension (additive change to existing call sites) |
+| Trust/safety hardening: Test 48 working-copy mutation | `tests/unit/llm-ledger.test.js` Test 48 mutates the working copy of the ledger file during test runs. This is a pre-existing failure noted at Phase 53 and 54 closures as non-scope. It must be fixed before any live run writes real ledger entries, otherwise a test run after a live run may corrupt ledger state. | LOW (fix test to write to a temp file, not the real ledger) | None beyond existing Vitest harness |
+| Remove dead `MODEL` const in auto-fix.mjs | Phase 54 left the module-level `MODEL` const as dead code per additive-only scope lock. Cleanup-debt carry-along. | LOW (2-line deletion) | None |
 
-### Differentiators (v4.1 Competitive Advantage)
+### Differentiators
 
-Features that go beyond "it works" into "it's observable, calibrated, and confidently expandable."
+Features that make the v4.2 loop trustworthy and observable beyond the bare DoD.
 
-| Feature | Value Proposition | Complexity | Pipeline Module Touched |
-|---------|-------------------|------------|------------------------|
-| **Auto-fix dashboard in weekly digest** | Renovate's Dependency Dashboard (issue-based) is the industry baseline: lists pending PRs, tracks auto-merge successes and CI failures. The v4.1 differentiator is embedding the same signal *inside the existing Monday digest* rather than creating a separate dashboard issue — co-location with the triage digest means operators see triage + fix + dependency state in one place. The 7-key `SUMMARY_KEYS` contract and the `aggregateBySummaryKey` helper already constrain the schema; the dashboard extends it without breaking it. | M | `scripts/e2e-weekly-digest.mjs`, `.llm-spend-ledger.json` reader, `triage-report.json` reader |
-| **`auto-fix:partial-verified` semantics** | All existing systems (OpenHands, Aider, Copilot Coding Agent) use all-or-nothing gate: the test either passes or it doesn't. A configurable N/M partial pass gate is novel — it allows "3 out of 5 affected cases pass the verifier → promote the patch as partial fix, file follow-up issue for remaining cases." This is the canary-deployment pattern applied to test corpora rather than traffic. | M | `v40-verifier-gate.yml`, `auto-fix-promote.mjs`, quarantine corpus schema |
-| **Multi-model A/B (sonnet vs opus)** | No off-the-shelf system (Renovate, Sweep, Aider) instruments ERROR_CLASS-pinned model routing with unified cost-ledger tracking. The v4.1 approach — route by issue complexity (ERROR_CLASS + fix_attempts count), record model attribution per ledger entry, and declare winner after N=10 runs per class — closes the loop that the v4.0 cost ledger opened. External benchmarks (15-model comparison, 2026) confirm Sonnet 4.6 == Opus 4.7 on small code patches at 3x cheaper; the A/B rig lets this hypothesis be validated against *this* codebase's actual ERROR_CLASS distribution. | M | `auto-fix.mjs` model selector, `llm-ledger.js` `model_id` field, `build-ledger-dashboard.mjs` |
-| **Push readiness gate — single v4.0-integration PR** | ~777 local commits need to land on a branch-protected `main` with an auditable record. The approach of a single `v4.0-integration` PR with `gh pr merge --admin` (owner self-merge via `bypass_actors=1` that is being closed in CLEANUP-04) preserves the full merge commit history and creates a single, navigable PR record. This is the merge-commit strategy advantage: complete audit trail, all 777 commits traceable, no history squash that would make `git bisect` harder on a legal-filing tool. | S | `gh pr merge --admin`, GitHub ruleset bypass, branch `v4.0-integration` |
+| Feature | Value Proposition | Complexity | v4.0/v4.1 Dependency |
+|---------|-------------------|------------|----------------------|
+| A/B winner exit from abstention | Once `errorClass` + `outcome` fields populate ledger entries (≥20 per ERROR_CLASS per model arm), `a-b-winner.mjs` automatically emits the markdown winner table with no code changes. This is the forward-compat probe Phase 54 built. The roadmap phases just need to ship the ledger schema extension and run the loop enough times. | LOW (schema extension unlocks it; no new code needed) | Depends on: ledger schema extension; sufficient live runs |
+| Observability: fix-rate per ERROR_CLASS | After ledger schema lands, `cost_per_fix` in the weekly digest becomes non-`n/a`. The 7-metric SUMMARY_KEYS section populates with real values. This confirms the loop is operational to any reader of Monday digests. | LOW (automatic from schema extension + existing renderAutoFixPipelineSection) | Depends on: ledger schema extension + at least one merged auto-fix PR |
+| Observability: time-to-merge P50 | `time_to_merge_p50` metric (already wired in renderAutoFixPipelineSection, filters `mergedAt !== null` before median) becomes meaningful once real PRs merge. This is the primary "pipeline health" signal operators can watch week-over-week. | LOW (automatic from schema extension + merged PRs) | Depends on: ledger schema extension + first real merge |
+| Observability: flake-to-real-bug ratio | The FLAKE 5-state machine (classifyRerunOutcomes, ring buffer, 30-day suppression) already tracks this. Once real runs accumulate, the classification breakdown in the weekly digest shows FLAKE vs CONFIRMED ratio. No new code needed — just need live data. | LOW (no new code; live data accumulation) | Depends on: live loop running |
+| Observability: abandonment rate | Ledger entries with `source: 'auto-fix-api'` and `fix_attempts` at cap (3) without a merged outcome indicate abandoned fixes. Adding a `fix_abandoned` outcome field would surface this explicitly. This is a DIFFERENTIATOR (not table stakes) because the loop can be minimally operational without it. | MEDIUM (one extra outcome value in schema; no dashboard changes needed until A/B winner uses it) | Depends on: ledger schema extension |
+| Fixture-mutator safety: idempotent + reversible + case-scoped | A well-built mutator must be (a) deterministic given the same case-id (re-running produces the same diff), (b) reversible via `git checkout` or explicit `--restore` flag, (c) scoped to a single case so it never mutates the full baseline. The UAT-47-b runbook (51-UAT-EVIDENCE.md §UAT-47-b step 2) specifies idempotency. The key primitive is: read the case's `expectedCitation` from `tests/golden/baseline.json`, apply a repeatable text transformation (e.g., increment column number by 1), write back, log mutation summary. | MEDIUM | Depends on: golden baseline schema (already known from Phase 33 rerun-validator work) |
+| Promotion observability: `auto-fix-promoted` ledger entry | When `auto-fix-promote.mjs` successfully promotes a case from quarantine to golden, writing a follow-up ledger entry with `source: 'auto-fix-promoted'` and `outcome: 'pass'` creates an audit trail that closes the loop in the ledger. This is how the A/B winner script determines the per-model pass-rate. | LOW (2–3 lines added to auto-fix-promote.mjs post-promote event path) | Depends on: ledger schema extension; assertTripleGate byte-unchanged constraint |
 
-### Anti-Features (Things That Erode the v4.0 Trust Invariant)
+### Anti-Features
 
-These features are commonly requested or "obvious next steps" in LLM-CI systems. Each one specifically undermines the trust invariant built across v3.1 and v4.0.
+These are features the pipeline MUST NOT have. They are explicit design invariants.
 
-| Anti-Feature | Why Requested | Why It Erodes Trust Invariant | What to Do Instead |
-|--------------|---------------|-------------------------------|-------------------|
-| **Auto-merge the v4.0-integration PR** | "CI will be green after push, why wait?" | The `bypass_actors=1 bypass_mode=always` that enables admin self-merge is simultaneously being closed by CLEANUP-04. Using it for the integration push is the last-ever use of the escape hatch before it is sealed. Auto-merging anything via that bypass after the ruleset is patched circumvents CODEOWNERS review for all LOCKED paths. | Use `gh pr merge --admin` exactly once for `v4.0-integration`, then immediately patch ruleset 17086676 to remove `bypass_actors`. |
-| **Partial-verified with a threshold below 3/5** | "If 2/5 cases pass the verifier, at least we fixed something." | 2/5 = 40% pass rate means the patch is more likely to introduce regressions than fix the filing. Trust-erosion failure mode A: operators see "partial-verified" PRs merging at 40% and begin to conflate "partial" with "good enough," raising the merge rate of unvalidated code touching `src/shared/matching.js` — which produces legal-filing citations. Trust-erosion failure mode B: a 2/5 "partial" fix may be covering up a FLAKE — if 2 of the 5 re-runs happened to land on good timing, the patch didn't fix anything. | Minimum threshold for partial-verified is 4/5 (80%). 3/5 requires explicit human override label. Anything below 3/5 is all-or-nothing FAIL. |
-| **Including model ID in the weekly digest markdown** | "Visibility into which model fixed which issue." | Model IDs committed to the weekly digest markdown file appear in git history permanently. The v4.0 privacy audit (Phase 46) confirmed the committed `.llm-spend-ledger.json` contains model IDs; adding them to public-facing digest markdown compounds the PII surface. If Anthropic deprecates a model ID, the git-committed model name becomes a stale, confusing artifact in perpetuity. | Track model attribution in `.llm-spend-ledger.json` only. The digest reports aggregate stats (e.g., "sonnet: 7 fixes, opus: 2 fixes") without embedding model IDs in prose. |
-| **`workflow_dispatch` trigger on auto-fix workflow for UAT** | "Let me manually trigger the auto-fix workflow to test it." | `workflow_dispatch` on `v40-auto-fix.yml` bypasses the `issues.labeled('triage')` guard that is the canonical input sanitization fence. Allowing manual dispatch means the workflow can be triggered with arbitrary inputs that haven't gone through the v3.1 triage pipeline's `<issue_body_untrusted>` envelope, reopening the prompt-injection surface closed in v4.0. | Use UAT-47-a's prescribed runbook: add the `triage` label to a real quarantine-corpus issue and let the workflow trigger naturally. Never add `workflow_dispatch` to `v40-auto-fix.yml`. |
-| **Squash-merge for v4.0-integration PR** | "Keep main history clean — 777 commits is a lot of noise." | Squash removes the ability to `git bisect` the v4.0 implementation for regressions. Given citations go into legal filings, the ability to identify the exact commit that changed citation behavior is a first-class operational requirement. The v3.1 audit trail decision "Continue phase numbering across milestones" was made precisely to keep cross-milestone traceability. Squash destroys per-phase commit attribution. | Merge commit only. The 777 commits ARE the audit trail. Use `gh pr merge --merge` (not `--squash`). |
-| **Adding `workflow_dispatch` to `v40-verifier-gate.yml` for diff-guard UAT** | "Easier to test diff-guard manually." | Verifier-gate is a PR-triggered workflow. Allowing manual dispatch means the gate can be run against arbitrary branches not associated with real PRs, potentially creating phantom-verification artifacts (verified labels applied to branches that never had a PR). This is the phantom-verification anti-pattern from the v4.0 FEATURES research applied to the gate itself. | For diff-guard UAT (UAT-47-e), push a crafted branch and open a DRAFT PR against a test fork or against main as a closed-immediately PR. The PR trigger is the only safe path. |
-| **Retroactive commits for bookkeeping cleanup** | "Just amend the old planning files with the correct status in-place." | Amending historical planning commits breaks `git log` linearity and makes it impossible to determine what the state was at any point in time — the exact audit property that protects against "this was wrong but we said it was right." | Patch as NEW commits to `main` with clear messages like `chore(bookkeeping): re-stamp 35-HUMAN-UAT.md status passed (confirmed Phase 38-03)`. Forward-only. |
+| Anti-Feature | Why It Seems Attractive | Why It Is Prohibited | What to Do Instead |
+|--------------|------------------------|---------------------|--------------------|
+| Auto-merge auto-fix PRs | Speeds up loop; removes human latency | Destroys the human-gated trust invariant that is the ENTIRE POINT of the pipeline for citation-accuracy code (legal filing core value). Phase 53 D-18 and the triple-gate invariant are load-bearing. Any attempt to add `--auto` to the auto-fix PR create step or to add the auto-fix bot to CODEOWNERS bypass actors violates this invariant. | Human reviews and merges the auto-fix PR. The pipeline signals readiness via the `auto-fix:verified` label; humans act on the label. |
+| Direct-to-main auto-promote | Removes the separate follow-up PR step | `v40-auto-promote.yml` MUST open a SEPARATE follow-up PR, never push directly. The `_skipCiGuard:true` triple-gate reconstruction is the only exception and is guarded by assertTripleGate throwing on any leg failure. Any shortcut here (e.g., `gh api repos/.../git/refs` direct update) bypasses CODEOWNERS and the verifier-gate. | Keep auto-promote as a separate follow-up PR. The operator merges the follow-up after reviewing the promotion diff. |
+| Widening `assertTripleGate` to accept `auto-fix:partial-verified` | Partial-verified cases are not fully validated; accepting them in the main gate would allow partially-validated fixes to promote to golden via the standard path. | Phase 53's load-bearing decision: `assertPartialGate` is a SEPARATE entry point. `assertTripleGate` body is byte-unchanged. Vitest Test 5 (auto-fix-promote-gate.test.js) pins that assertTripleGate throws on the partial-verified label. | Use `assertPartialGate` + `runPartialPromote` for partially-verified cases. Never route partial cases through assertTripleGate. |
+| Bypassing Phase 50 ruleset (bypass_actor re-add) | Simplifies the ledger-commit and test UAT workflows | Phase 50 spent an entire phase removing bypass actors. Re-adding even temporarily for automation defeats GATE-02. The break-glass §7 runbook exists for one-off human operator use only, not for CI automation. | Fix the workflows to not need main-branch pushes: Option B (ledger-snapshots/* branch) for ledger commits; PR-then-merge for anything that needs to land on main. |
+| Polling the real ledger file in Vitest tests | Allows tests to use real production data | Tests that read or write the real `tests/e2e/.llm-spend-ledger.json` create cross-contamination between test runs and live runs. Test 48 in llm-ledger.test.js already does this and is a known pre-existing failure. New tests MUST use temp files or injected-path overrides. | Use the `--ledger <path>` CLI override (already built into a-b-winner.mjs) or the injected-deps pattern (already used in weekly-digest.mjs runDigest). |
+| Extending `MODEL_ROUTES` during v4.2 | Fine-tuning routing during live loop operation looks beneficial | `MODEL_ROUTES` is frozen (Object.isFrozen). Changing routing mid-experiment invalidates the A/B comparison. The whole point of the abstention mode is to let data accumulate under a STABLE routing table before declaring a winner. | Run the loop with the current frozen routes. After A/B winner declares (≥20 entries per arm per class), THEN update MODEL_ROUTES in a separate deliberate change. |
+| Adding new npm dependencies | Extending capabilities during the operational validation milestone | This would be the fourth consecutive zero-new-npm-deps milestone if held. Supply-chain risk and dependency maintenance cost grow with each addition. | Use Node 22 built-ins. All current v4.2 features (YAML edits, JSON schema extension, shell script) can be built without new packages. |
+| Running the fixture-mutator without a `--dry-run` guard | Faster to omit the guard | If the mutator writes without first verifying the case exists in baseline.json, a typo in the case-id creates a silent no-op that looks like a pass but proves nothing. Worse, if the script has a bug in the restore path, it permanently corrupts a golden case. | Require the mutator to validate the case-id exists in baseline.json before mutating, and require `git status --short` to confirm only the expected file is dirty after the mutation. Explicit `--restore` flag to revert. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[UAT-47-a: end-to-end auto-fix on real issue]
-    └──requires──> [v4.0 workflows on origin/main (post-push)]
-                       └──requires──> [Push readiness gate — v4.0-integration PR merged]
+[Verifier-gate trigger fix]
+    └──required-by──> [UAT-47-e re-execution]    (gate must fire for UAT to pass)
+    └──required-by──> [UAT-47-a live execution]   (gate run is success evidence)
+    └──required-by──> [UAT-47-b execution]        (deps-update-gate likely same bug)
 
-[Push readiness gate]
-    └──requires──> [Pre-push test fixes: Test 48 ledger leak, calendar-rollover flake, @anthropic-ai/sdk EXACT pin]
-    └──requires──> [CLEANUP-04 ruleset patch] (should follow immediately after push)
+[Ledger-commit refactor]
+    └──required-by──> [UAT-47-d live execution]   (workflow must not push to main)
+    └──required-by──> [UAT-47-a live execution]   (auto-fix.mjs ledger push must not fail ruleset)
 
-[Auto-fix dashboard in weekly digest]
-    └──requires──> [UAT-47-a confirms at least 1 real auto-fix entry in .llm-spend-ledger.json]
-    └──requires──> [aggregateBySummaryKey helper (v4.0, exists)]
-    └──extends──> [SUMMARY_KEYS contract (v3.1, frozen — must add new keys additively)]
+[Ledger schema extension (errorClass + outcome)]
+    └──required-by──> [A/B winner exit from abstention]   (filterAttributableEntries drops entries without errorClass)
+    └──required-by──> [Promotion observability entry]     (outcome field must exist to write pass/fail)
+    └──required-by──> [Meaningful weekly digest metrics]  (cost_per_fix, time_to_merge_p50, fix_rate)
+    └──enabled-by──>  [auto-fix-api ledger-leak fix]      (same call sites, fix together)
 
-[`auto-fix:partial-verified` semantics]
-    └──requires──> [UAT-47-a provides empirical calibration data (first live auto-fix run)]
-    └──extends──> [v40-verifier-gate.yml 3× affected-case gate]
-    └──extends──> [auto-fix-promote.mjs triple-gate]
+[Fixture-mutator]
+    └──required-by──> [UAT-47-b execution]
+    └──enhanced-by──> [Verifier-gate trigger fix]  (mutator injects regression; gate must fire on dep-PR branch)
 
-[Multi-model A/B]
-    └──requires──> [At least 1 live auto-fix run (UAT-47-a) for baseline cost/quality data]
-    └──requires──> [model_id field in llm-ledger.js (v4.0, already exists as part of ledger entry)]
-    └──extends──> [auto-fix.mjs model selector (currently hardcoded to sonnet-4-6)]
-    └──extends──> [build-ledger-dashboard.mjs A/B attribution view]
+[Trust/safety hardening (both items)]
+    └──prerequisite-for──> [Any live loop run]    (corrupted ledger or bypassed cost cap invalidates all evidence)
 
-[Bookkeeping cleanup]
-    └──independent of all other v4.1 features]
-    └──conflicts with──> [retroactive commit anti-feature — must be new forward commits]
-
-[CLEANUP-04 ruleset patch]
-    └──requires──> [Push completed (required_status_checks need real job run IDs to validate canonical names)]
-    └──resolves──> [bypass_actors=1 tech debt from v4.0 STATE.md]
+[Test 48 fix]
+    └──prerequisite-for──> [Any live loop run]    (working-copy mutation during test would corrupt live ledger)
 ```
 
 ### Dependency Notes
 
-- **UAT-47-a requires push:** All four deferred UAT items (a/b/d/e) require the workflows to exist on `origin/main`. This is the hard sequencing constraint for all of v4.1's forward features. Push is not just "nice to have first" — it is the prerequisite.
-- **Partial-verified semantics requires empirical data:** The threshold question (3/5 vs 4/5 vs configurable) was explicitly flagged as "default all-or-nothing for v4.0" and "revisit post-UAT-47-a." Do not define the threshold in code before the first live run provides calibration data. Locking in a number before evidence = guess.
-- **Multi-model A/B requires at least one live run:** The A/B rig instruments something that has never produced real output yet. You cannot run A/B analysis on zero data points. The model selector logic can be written before live runs, but winner declaration requires N=10 per class minimum.
-- **Dashboard new keys must be additive:** `SUMMARY_KEYS` is a frozen contract with 7 keys. New auto-fix keys (`auto_fix_success_rate`, `cost_per_fix_usd`, `time_to_merge_hours`) must be appended, not inserted, and the v3.1 digest consumers must degrade gracefully when the new keys are absent.
-- **CLEANUP-04 must follow push quickly:** The `bypass_actors=1 bypass_mode=always` that enables `gh pr merge --admin` is also what was used to set up the ruleset in Phase 39. After the integration push, this bypass is the only remaining v4.0 security hole. Every day it remains open is a day an admin push can bypass CODEOWNERS review.
+- **Verifier-gate trigger fix blocks three UATs:** UAT-47-e, UAT-47-a, UAT-47-b all depend on the gate firing. This is the single most critical unblock. It is a YAML-only change (job-level `if:` instead of `on:`-level `branches:` filter), no logic changes required.
 
----
+- **Ledger-commit refactor is independent of verifier-gate trigger fix:** Option B (push to `ledger-snapshots/*`, no merge to main) ships independently without waiting for the trigger patch. This is the recommended ordering: ship Option B first, then the trigger patch, then run UATs in sequence.
 
-## Per-Feature Analysis
+- **Ledger schema extension has a safe-by-construction constraint:** All additions must be additive-only (Phase 53 D-08 / load-bearing from assertTripleGate byte-unchanged invariant). Adding `errorClass` + `outcome` to appendLedgerEntry call sites is purely additive. The `auto-fix-api` ledger-leak vector (MEMORY.md) must be fixed as part of this work because the same call sites are being touched.
 
-### Feature 1: Live Readiness UATs
+- **Fixture-mutator design constraints (from mutation testing literature and UAT-47-b runbook):** The three non-negotiable primitives are: (1) case-scoped read from `tests/golden/baseline.json`, (2) deterministic transformation given case-id (e.g., citation column +1 or substring replacement of first 20 chars of selectedText), (3) explicit restore path (`git checkout -- tests/golden/baseline.json` or `--restore` flag). The mutator MUST log what it changed to stdout so the UAT evidence file can include the exact mutation applied.
 
-**What mature systems do:** UAT against a live pipeline is structured as a runbook with observable artifacts, not an interactive session. The canonical pattern (seen in both self-healing DevOps research and GitHub's own Copilot agent docs) is: define the trigger condition → describe the expected artifact → execute trigger → assert artifact. The artifact must be independently verifiable (e.g., a GitHub comment, a committed JSON diff, a PR state change) rather than relying on log output alone.
-
-**Table-stakes behaviors:**
-- UAT-47-a: Trigger = add `triage` label to issue #3 (fingerprint `139f821b3bb1`). Expected artifacts = new branch `auto-fix/3-139f821b` on `origin`, draft PR opened, verifier-gate workflow queued. No manual `workflow_dispatch`. The label trigger IS the UAT input sanitization fence.
-- UAT-47-b: Trigger = inspect first dep-update PR after Monday 09:00 UTC. Expected artifact = `deps-update-gate` job appeared in PR checks, regression suite ran.
-- UAT-47-d: Trigger = wait for 02:00 UTC daily snapshot. Expected artifact = `[skip ci]` commit with `llm-spend-ledger.json` diff in `main` commit history.
-- UAT-47-e: Diff-guard bypass test: Push a branch that modifies `tests/test-cases.js` (a LOCKED path) and open a PR. Expected artifact = verifier-gate fails with FORBIDDEN_PATHS sentinel. Assert label `diff-guard-blocked` applied. Then close the PR and delete the branch (no merge). This is the isolation contract: the branch is never merged, so no golden contamination.
-
-**Critical safety constraint for UAT-47-e:** The crafted bypass branch must be opened as a PR and immediately closed (not merged) after the gate fires. The branch should have a naming prefix `test-only/diff-guard-*` to visually distinguish it from real `auto-fix/*` branches. NEVER give it the `triage` label. If it gets the `triage` label by accident, `v40-auto-fix.yml` would trigger and waste API budget on a deliberately-broken commit.
-
-**Complexity: M (UAT-47-a) + S each (b/d/e)**
-
-### Feature 2: Auto-Fix Dashboard
-
-**What mature systems surface:** Renovate's Dependency Dashboard tracks: pending updates, auto-merge decisions, CI failure rate per PR, `minimumReleaseAge` status. The GitHub blog study ("Agent PRs are everywhere") found 45.1% of agent PRs require human revision — the primary metric operators want is *not* "how many PRs opened" but "what percentage closed without human correction."
-
-**Recommended metrics for the weekly digest extension (beyond existing 7 SUMMARY_KEYS):**
-
-| Metric Key | Type | Source | Rationale |
-|-----------|------|--------|-----------|
-| `auto_fix_attempted` | count (weekly) | `.llm-spend-ledger.json` entries with `phase=auto-fix` | Volume signal |
-| `auto_fix_verified_merged` | count (weekly) | PRs with `auto-fix:verified` label merged | Success count |
-| `auto_fix_success_rate` | percentage | `verified_merged / attempted` | Table-stakes KPI; 45% is the industry baseline for agent PRs |
-| `cost_per_fix_usd` | float | `combinedMonthlyTotal / auto_fix_verified_merged` | Budget health |
-| `time_to_merge_hours` | float (avg) | PR open timestamp → merge timestamp | Pipeline efficiency |
-| `fix_attempts_p50` | integer | Median `fix_attempts` across all auto-fix PRs | Prompt quality signal; rising p50 = deteriorating prompt scaffolds |
-| `flake_escalation_count` | count (weekly) | FLAKE_ESCALATION entries in quarantine corpus | Signal for underlying infrastructure problems vs real bugs |
-
-**Presentation recommendation:** Markdown table inside the existing weekly digest, NOT a sparkline (sparklines require image hosting or base64 inline in GitHub markdown; GitHub Discussion markdown doesn't render them reliably). Use a `<details>` collapsible block so the digest stays within the 50-line visual contract while the dashboard data is accessible:
-
-```markdown
-<details>
-<summary>Auto-Fix Pipeline (week of 2026-06-02)</summary>
-
-| Metric | Value |
-|--------|-------|
-| Attempted | 3 |
-| Verified+Merged | 2 (67%) |
-| Cost/Fix | $0.38 |
-| Avg Time-to-Merge | 14.2h |
-| Fix Attempts p50 | 1 |
-| FLAKE Escalations | 0 |
-
-</details>
-```
-
-**Differentiator vs Renovate:** Renovate only tracks dep-update PRs. This dashboard unifies auto-fix + dep-update + FLAKE escalation in one operator view.
-
-**Complexity: M** — requires reading both the spend ledger and the GitHub PRs API (already available via `GITHUB_TOKEN`); extending `aggregateBySummaryKey`; adding 7 new keys to the contract file.
-
-**Pipeline modules touched:** `scripts/e2e-weekly-digest.mjs` (new dashboard section), `tests/e2e/lib/llm-ledger.js` (new aggregate helper), `tests/e2e/scripts/e2e-weekly-digest.test.js` (contract test for new keys), `SUMMARY_KEYS` array (additive only).
-
-### Feature 3: `auto-fix:partial-verified` Semantics
-
-**What mature systems do:** No direct precedent in Renovate, Aider, or OpenHands — they all use binary pass/fail. The closest analogy is the canary deployment pattern: start with 1-5% traffic, gate at defined error-rate thresholds, promote or roll back. Applied to test corpora: if N of M affected cases pass the verifier, the patch fixed N cases and left M-N unresolved.
-
-**Trust-erosion failure modes (named explicitly per quality gate):**
-
-1. **Threshold anchor drag:** If the initial threshold is set to 3/5 (60%) and one quarter's worth of fixes average 3/5, operators normalize to 60% as "good enough." The next quarter someone proposes lowering to 2/5 "because the cases are harder." The ratchet only moves downward. Mitigation: the threshold must be EXPLICITLY configurable in `verifier-gate` config, with the default hard-coded to 4/5 and a required human-override label (`partial-verified:human-approved`) to merge anything below 4/5.
-
-2. **FLAKE masquerade:** A 3/5 pass may not mean "3 cases fixed, 2 not." It may mean "5 intermittent cases, 3 happened to pass this run." The FLAKE 5-state machine from v4.0 is the mitigation: each affected case must have `stable_runs >= 2` in the quarantine corpus before it counts toward the M in N/M. A case with `stable_runs = 0` does not count as a genuine "pass" regardless of the verifier result.
-
-3. **Partial-verified becoming a bypass:** If an operator merges a 4/5 partial fix and the fifth case remains in quarantine, then two weeks later a second operator sees `quarantine:ready-for-promotion` on the fifth case and promotes it, the net result is that a case was promoted without the new (fixed) code being re-verified against it. The promotion must re-run the verifier against the HEAD of `main` (which now includes the partial fix), not against the HEAD at the time of partial-fix merge.
-
-4. **Human override label inflation:** If `partial-verified:human-approved` is applied liberally because "it's just one case," the CODEOWNERS protection becomes theater. Mitigation: the override label requires a CODEOWNER (i.e., @tonyrowles), not just any reviewer. Enforce via the CODEOWNERS file on the label-protected verifier workflow.
-
-**Recommended threshold calibration schedule:**
-- v4.1 default: all-or-nothing (5/5) until UAT-47-a provides empirical calibration data.
-- After 10 live auto-fix runs: introduce 4/5 as partial-verified threshold with the FLAKE masquerade mitigation above.
-- After 25 live runs: revisit whether 3/5 is appropriate for specific ERROR_CLASSes only (e.g., HARNESS_ERROR, where the fix surface is narrow and false positives are less consequential than for `src/shared/matching.js`).
-
-**Complexity: M** — extends `v40-verifier-gate.yml` to output `cases_passed / cases_total`; extends `auto-fix-promote.mjs` to accept partial promotion with a `--partial` flag; extends quarantine schema with `partial_fix_pr` reference field.
-
-### Feature 4: Multi-Model A/B (Sonnet vs Opus)
-
-**What the evidence shows:** Independent LLM benchmarks (15-model comparison across 38 real coding tasks, 2026-04) found Sonnet 4.6 and Opus 4.7 perform identically on small code patches while Sonnet costs 3x less. A common production routing pattern is "Sonnet for generation, Opus for escalation on failures." The SWE-bench literature confirms the same: OpenHands uses Sonnet 4.5 as default and shows ~77% solve rate; switching to Opus does not significantly improve solve rate on single-file patches.
-
-**Recommended v4.1 A/B rig design:**
-
-- **Default model:** `claude-sonnet-4-6` (current v4.0 default). Do not change.
-- **Escalation trigger:** After 2 failed `fix_attempts` on the same issue (loop iteration cap is 3), escalate to `claude-opus-4-7` for the third attempt. This is ERROR_CLASS-aware escalation, not random routing.
-- **NOT hash-based routing:** Hash-based deterministic routing (routing based on `issue_number % 2`) is appropriate for A/B testing where you want equal traffic splits. For a legal-filing tool with a small daily volume (1-5 issues/night), hash-based routing would mean some issue numbers always get Sonnet and others always get Opus — the sample is too small to be meaningful and the operator cannot decide "try Opus on this hard one." The right approach is attempt-count escalation, which is deterministic but responsive.
-- **Model attribution in ledger:** `llm-ledger.js` already has a model field. Add `model_id: "claude-sonnet-4-6"` or `"claude-opus-4-7"` to every `appendLedgerEntry` call in `auto-fix.mjs`.
-- **Winner declaration:** After 10 verified-merged auto-fix PRs per model, compare `auto_fix_success_rate` (verified+merged / attempted) and `cost_per_fix_usd`. Declare winner in the weekly digest as a one-line note. Do not auto-update the default model in code — operator manually updates `DEFAULT_MODEL` const in `auto-fix.mjs` after reviewing the A/B report.
-- **No model ID in PR body or issue comments:** The privacy audit from Phase 46 applies here. Model IDs appear in the ledger only, not in user-visible artifacts.
-
-**External reference:** Ian L. Paterson, "I Tested 15 LLMs on 38 Real Coding Tasks" (2026) — deterministic pass/fail scoring on actual code tasks, not LLM-as-judge. Core finding: "the routing decision is worth more than picking the 'best' model." Applied to v4.1: the attempt-count escalation IS the routing decision.
-
-**Complexity: M** — changes `auto-fix.mjs` model selector (add `fix_attempts` threshold check), adds `model_id` emission to `appendLedgerEntry` calls, adds A/B view to `build-ledger-dashboard.mjs`, adds contract test asserting model field is present in ledger entries.
-
-### Feature 5: Bookkeeping Cleanup
-
-**What this is:** Re-stamping `status` fields in 5 planning files (32-UAT-EVIDENCE.md, 35/36/37-HUMAN-UAT.md, 38-UAT-EVIDENCE.md) to `passed` from `partial`/`unknown`, and removing 3 orphan quick-task slug references from STATE.md. The substantive validation was done in Phase 38-03 (8/8 human_verification items confirmed); only the metadata is stale.
-
-**Pattern:** New forward commits only. Never amend historical commits. Commit message format: `chore(bookkeeping): re-stamp [filename] status=passed (confirmed Phase 38-03 live UAT)`. This is not an anti-feature when done correctly (forward-only new commits); it becomes an anti-feature if done via `git commit --amend` on historical commits (which breaks `git log` linearity).
-
-**Complexity: S** — pure text edits to `.planning/phases/` files.
-
-### Feature 6: Push Readiness Gate
-
-**What mature teams do:** Large feature branches that have been developed locally and need to land on a branch-protected main are merged via a single PR, not a series of cherry-picks. The merge commit strategy (not squash) is the right choice when audit trail matters — all 777 commits remain addressable via `git bisect`, per-phase attribution is preserved, and the merge commit itself is the permanent record of "v4.0 landed on main at commit X."
-
-**Three pre-push blockers (must fix before opening PR):**
-1. Test 48 ledger regression (`llm-ledger.test.js:1012`) — asserts committed ledger has exactly 1 bootstrap entry, but real SDK calls are in it. Either update the assertion to allow real entries OR investigate which executor leaked SDK calls.
-2. Calendar-rollover flake (`e2e-weekly-digest.test.js:395`) — `2026-05` hardcoded in assertion, clock is now June 2026.
-3. `@anthropic-ai/sdk` EXACT pin verification — confirm `npm install` does not reintroduce caret.
-
-**Integration PR strategy:**
-- Branch name: `v4.0-integration`
-- PR title: "feat: v4.0 Self-Healing Test Suite — 9 phases (39-47)"
-- Merge strategy: `gh pr merge --merge` (not `--squash`)
-- Self-merge: `gh pr merge --admin` (uses `bypass_actors=1` escape hatch; this is the last authorized use)
-- CI gate: all existing CI checks must be green (the pre-push fixes above are the blocker)
-
-**Post-push required actions (in order, within same v4.1 session):**
-1. Confirm GitHub Actions green on the merged commit.
-2. Run UAT-47-a through UAT-47-e using the runbook stubs.
-3. Patch ruleset 17086676: add `verifier-gate` + `deps-update-gate` to `required_status_checks`, set `bypass_actors` to empty array.
-4. The `bypass_actors=1 bypass_mode=always` must be removed BEFORE any new auto-fix PR can open — otherwise the next auto-fix PR could theoretically self-merge without CODEOWNERS review.
-
-**Complexity: S (the push itself) + M (pre-push test fixes)**
+- **UAT sequencing (inherited from 51-CONTEXT.md D-13 pattern):** UAT-47-e first (cheap, ~3 min, $0), UAT-47-a second (~$0.50–$2, ~10 min). If 47-e fails again after the trigger patch, halt and diagnose before spending on 47-a. UAT-47-b and UAT-47-d can run in parallel or after 47-a — they are cheaper and do not require API spend.
 
 ---
 
 ## MVP Definition
 
-### v4.1 Launch With (minimum to call v4.1 "shipped")
+### Phase 56 must ship (v4.2 DoD)
 
-- [ ] Pre-push test fixes (Test 48 ledger, calendar-rollover flake, EXACT pin) — must be green CI before PR
-- [ ] Push v4.0 to origin via `v4.0-integration` PR + `gh pr merge --merge --admin`
-- [ ] Confirm CI green on remote
-- [ ] UAT-47-a: live auto-fix end-to-end against issue #3
-- [ ] UAT-47-b: dep-update pre-flight gate
-- [ ] UAT-47-d: daily ledger snapshot
-- [ ] UAT-47-e: diff-guard bypass test
-- [ ] CLEANUP-04: ruleset 17086676 patched (`verifier-gate` + `deps-update-gate` required status checks, `bypass_actors` removed)
-- [ ] Bookkeeping cleanup (5 VERIFICATION.md / HUMAN-UAT.md re-stamps, 3 orphan slug removals)
+These are the features the downstream requirement-definer must scope as REQUIRED for v4.2 closure.
 
-### Add After Push + UATs Confirmed (v4.1 forward features)
+- [ ] **Verifier-gate trigger fix** — YAML patch, unblocks all three UATs, no logic changes, ~15 min implementation
+- [ ] **Ledger-commit refactor (Option B)** — modifies `v40-cost-ledger-snapshot.yml` and `v40-auto-fix.yml` to push to `ledger-snapshots/*` branch; unblocks UAT-47-d and fixes the auto-fix ledger-push structural block
+- [ ] **Ledger schema extension** — adds `errorClass` + `outcome`/`pr_merged` to all 9+ appendLedgerEntry call sites; simultaneously fixes the `auto-fix-api` ledger-leak vector (MEMORY.md); unblocks A/B winner from abstention
+- [ ] **Fixture-mutator script** — new `tests/e2e/uat-helpers/regression-fixture-mutator.mjs` (prefer .mjs for consistency with existing scripts); case-scoped, idempotent, reversible, logs mutation to stdout; enables UAT-47-b
+- [ ] **Trust hardening: Test 48 fix** — fix Vitest test to not mutate working-copy ledger; prerequisite for safe live runs
+- [ ] **Trust hardening: `auto-fix-api` ledger-leak** — close the PRE-02 guard gap (fold into ledger schema extension phase since same call sites)
+- [ ] **4-UAT re-sweep** — execute UAT-47-e, UAT-47-a, UAT-47-b, UAT-47-d against origin; produce `56-UAT-EVIDENCE.md`; DoD requires at least UAT-47-a PASS as first real production fix
+- [ ] **Cleanup: dead `MODEL` const removal** — 2-line deletion in auto-fix.mjs; carry-along from Phase 54
+- [ ] **v40-verifier-gate-yaml.test.js V2 update** — finish Phase 51.1's unfinished test update (pre-existing failure noted at Phase 53 + 54 closures)
 
-- [ ] Auto-fix dashboard in weekly digest — trigger: UAT-47-a confirms at least one live ledger entry
-- [ ] `auto-fix:partial-verified` semantics — trigger: UAT-47-a provides empirical calibration data; implement 4/5 threshold with FLAKE masquerade mitigation
-- [ ] Multi-model A/B rig — trigger: first 10 live auto-fix runs produce ledger data; add attempt-count escalation (sonnet → opus at fix_attempts=3)
+### After UAT-47-a passes (auto-populate from live data)
 
-### Future Consideration (v4.2+)
+These become meaningful automatically once the schema extension lands and UAT-47-a succeeds.
 
-- [ ] Sparkline-style trend charts in weekly digest — defer until GitHub natively supports chart rendering in markdown
-- [ ] Automated winner declaration for A/B — requires 25+ runs per model per ERROR_CLASS; likely v4.3+
-- [ ] Per-ERROR_CLASS partial-verified thresholds (e.g., 3/5 for HARNESS_ERROR, 5/5 for WRONG_CITATION) — defer until 25+ auto-fix runs per class provide empirical basis
+- [ ] **A/B winner activation** — no code change; requires ≥20 live entries per ERROR_CLASS per model arm; track as a metric milestone, not a code deliverable
+- [ ] **Weekly digest metrics populated** — `cost_per_fix`, `time_to_merge_p50`, `fix_rate`, `abandonment_rate` all show real values after first merged auto-fix PR; this is the "pipeline operational" signal for future operators
+
+### Defer to v4.3+
+
+- [ ] **`fix_abandoned` outcome field** — useful for observability but not needed for DoD; add when abandonment rate becomes a meaningful operational concern
+- [ ] **A/B winner routing table update** — only after abstention ends and the data actually points to a winner; not a v4.2 task
+- [ ] **Fork-based UAT environment** — the operator deferred this in Phase 51 (D-01 accepted canonical-repo risk); revisit if UAT-47-a causes issues on canonical
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Pre-push test fixes | HIGH (blocks everything) | S | P0 |
-| Push v4.0-integration PR | HIGH (blocks UATs + forward features) | S | P0 |
-| CI green confirmation + UAT-47-a/b/d/e | HIGH (validates the self-healing claim) | M (UAT-47-a), S (b/d/e) | P1 |
-| CLEANUP-04 ruleset patch | HIGH (closes trust invariant hole) | S | P1 |
-| Bookkeeping cleanup | MEDIUM (audit hygiene, no functional impact) | S | P1 |
-| Auto-fix dashboard in weekly digest | HIGH (operator observability) | M | P2 |
-| `auto-fix:partial-verified` semantics | MEDIUM (nuanced gate behavior, requires live data) | M | P2 |
-| Multi-model A/B rig | MEDIUM (cost optimization, requires live data) | M | P2 |
-
-**Priority key:**
-- P0: Must complete before v4.1 can start (blockers)
-- P1: Must have for v4.1 milestone close
-- P2: Ship after P0/P1 validated; within v4.1 milestone scope if time permits
+| Feature | Operator Value | Implementation Cost | Priority |
+|---------|----------------|---------------------|----------|
+| Verifier-gate trigger fix | HIGH (unblocks 3 UATs) | LOW (YAML edit only) | P1 |
+| Ledger schema extension + leak fix | HIGH (unblocks A/B winner + dashboard) | MEDIUM (9+ call sites, additive) | P1 |
+| Test 48 fix | HIGH (safety prerequisite for live runs) | LOW (test isolation) | P1 |
+| Ledger-commit refactor (Option B) | HIGH (unblocks UAT-47-d + auto-fix ledger push) | MEDIUM (2 YAML files + digest aggregation) | P1 |
+| Fixture-mutator | HIGH (enables UAT-47-b, deterministic DoD) | MEDIUM (new script with safety guards) | P1 |
+| 4-UAT re-sweep (including UAT-47-a) | HIGH (DoD evidence) | MEDIUM (operator time + API spend) | P1 |
+| Dead MODEL const removal | LOW (cleanup) | LOW (2 lines) | P2 |
+| verifier-gate-yaml test V2 update | LOW (pre-existing failure, non-blocking) | LOW (test update) | P2 |
+| Promotion observability entry | MEDIUM (closes ledger audit trail) | LOW (2–3 lines in promote path) | P2 |
+| A/B winner routing update | LOW (data not available yet) | LOW (when data arrives) | P3 |
+| `fix_abandoned` outcome field | LOW (monitoring enhancement) | LOW | P3 |
 
 ---
 
-## Trust Invariant Impact Analysis
+## What "Operational" Means for Each UAT
 
-The v4.0 trust invariant has four load-bearing legs. Each v4.1 feature is assessed against all four.
+These are not CI tests — they are live operational tests against origin. The distinction matters for evidence shape.
 
-| v4.1 Feature | Draft-PR-default | Human-merge required | Auto-promote SEPARATE PR | CODEOWNERS on locked paths |
-|-------------|-----------------|---------------------|--------------------------|---------------------------|
-| Live UATs (a/b/d/e) | Preserved (UAT-47-a opens draft PRs only) | Preserved (UAT exercises the draft state) | Preserved (promotes via follow-up PR per v4.0 design) | Preserved (CODEOWNERS not bypassed) |
-| Push v4.0-integration | N/A (single admin merge) | N/A (admin merge is the last use of bypass_actors) | N/A | At risk if push happens before CLEANUP-04 |
-| CLEANUP-04 ruleset patch | HARDENED (closes bypass_actors) | HARDENED | N/A | HARDENED |
-| Dashboard in digest | Preserved | Preserved | N/A | N/A |
-| Partial-verified (4/5 default) | Preserved | Preserved — still requires human merge | Preserved — partial fix opens partial-promotion follow-up PR | Preserved |
-| Partial-verified (below 3/5) | ERODED | ERODED (pressure to merge partial) | ERODED | ERODED |
-| Multi-model A/B | Preserved | Preserved | Preserved | Preserved |
-| Bookkeeping cleanup | Preserved | Preserved | N/A | N/A |
+| UAT | Operational Signal | Evidence Shape | Confirms |
+|-----|--------------------|----------------|---------|
+| UAT-47-e | `diff-guard` check appears on PR and shows FAILURE; `human-review-required` label applied | `gh pr checks`, `gh pr view --json labels,comments` captured to JSON files | Verifier-gate trigger patch worked; diff-guard fires on `auto-fix/*` PRs into main |
+| UAT-47-a | Draft PR opens on `auto-fix/3-139f821b`; verifier-gate run exists (3× affected case + 76-case regression + diff-guard); ledger entry written with `errorClass` + (after merge) `outcome` | `gh pr list`, `gh pr view --json body`, `gh run list --workflow=v40-verifier-gate.yml`, ledger JSON diff | Full loop fires end-to-end; ledger schema extension is wired; first real production fix candidate |
+| UAT-47-b | `deps-update-gate` check shows FAILURE after regression push onto dep-PR branch | `gh pr checks --json bucket,name,state` showing `deps-update-gate` with `bucket: fail` | Deps-update workflow trigger not affected by same BASE/HEAD bug; fixture-mutator produces a regression the gate catches |
+| UAT-47-d | `ledger-snapshots/YYYY-MM-DD` branch exists on origin; branch contains updated `.llm-spend-ledger.json`; NO new commit on `main` | `git ls-remote origin 'ledger-snapshots/*'`, `git show refs/remotes/origin/ledger-snapshots/...` | Ledger-commit refactor is live and working; daily snapshot workflow no longer blocked by ruleset |
 
-**Critical ordering constraint:** Push must happen, then CLEANUP-04 must happen, before any new auto-fix PR opens on `origin/main`. If a new issue gets the `triage` label before `bypass_actors` is removed, the auto-fix PR that opens could theoretically be self-merged via the still-open bypass. This is not a theoretical risk — the bypass is currently `bypass_mode=always`.
+The difference between these and CI tests: CI tests run on every push and can be faked with synthetic fixtures. These UATs exercise LIVE GitHub API interactions, real workflow triggers, real ledger file mutations, and real API spend. Evidence is captured as JSON files and committed, not asserted by Vitest.
 
 ---
 
-## Competitor Feature Baseline
+## Phase Sequencing Recommendations
 
-| Feature | Renovate | Aider | OpenHands | Copilot Coding Agent | v4.1 Approach |
-|---------|----------|-------|-----------|---------------------|---------------|
-| Dashboard / digest | Dependency Dashboard issue (separate) | None | None | None | Unified Monday digest (extends v3.1 SUMMARY_KEYS) |
-| Partial pass gate | N/A (all-or-nothing) | N/A | N/A | N/A | 4/5 threshold with FLAKE masquerade mitigation |
-| Multi-model routing | N/A | LiteLLM (model config) | LiteLLM (provider-portable) | Cloud-managed | Attempt-count escalation (sonnet → opus at fix_attempts=3) |
-| A/B winner declaration | N/A | N/A | N/A | N/A | Manual, after N=10 per model per class |
-| Audit trail on push | N/A | N/A | N/A | N/A | Merge commit (777 commits preserved) |
-| Live readiness UAT | N/A (automated) | N/A | N/A | N/A | Explicit runbook stubs (UAT-47-a through e) |
-| Bookkeeping cleanup | N/A | N/A | N/A | N/A | Forward-only new commits (never amend) |
+The roadmap author should sequence phases as follows, based on the dependency graph above:
+
+**Wave 0 (unblocking infrastructure — must ship before any UAT):**
+- Verifier-gate trigger fix (YAML patch)
+- Ledger-commit refactor (Option B)
+- Ledger schema extension + `auto-fix-api` leak fix + Test 48 fix (these touch the same call sites; ship together)
+- Cleanup: dead MODEL const + verifier-gate-yaml V2 test update (carry-alongs, bundle into Wave 0)
+
+**Wave 1 (fixture-mutator — enables UAT-47-b):**
+- `regression-fixture-mutator.mjs` authoring + tests
+
+**Wave 2 (UAT re-sweep — against origin, requires Wave 0 shipped):**
+- UAT-47-e first (cheap smoke test of trigger fix, ~3 min)
+- UAT-47-d (ledger-snapshot confirm, ~5 min)
+- UAT-47-a (full end-to-end, ~$0.50–$2 + 10 min; DoD evidence)
+- UAT-47-b (dep-PR synthetic regression; requires fixture-mutator from Wave 1)
+
+These can compress to 2 phases (infrastructure + UAT sweep) or expand to 4 if the changes need granular separation. The constraint is Wave 0 must be pushed to origin before Wave 2 can execute.
 
 ---
 
 ## Sources
 
-- `.planning/PROJECT.md` (v4.1 milestone definition, Key Decisions table, v4.0 tech debt deferred items) — direct read, HIGH confidence
-- `.planning/STATE.md` (8 deferred items table from v4.0 close) — direct read, HIGH confidence
-- `.planning/v4.0-SESSION-HANDOFF-2026-06-01.md` (pre-push blockers, UAT runbook stubs) — direct read, HIGH confidence
-- `.planning/research-v4.0-archive/FEATURES.md` (v4.0 anti-features catalogue, trust invariant analysis, competitor table) — direct read, HIGH confidence
-- `.planning/research-v4.0-archive/SUMMARY.md` (v4.0 architecture decisions, pitfall defenses) — direct read, HIGH confidence
-- [Renovate Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) — what mature dep-update pipelines surface as operator visibility — HIGH
-- [Renovate Merge Confidence](https://docs.renovatebot.com/merge-confidence/) — auto-merge success rate / CI failure rate tracking pattern — HIGH
-- [Ian L. Paterson: I Tested 15 LLMs on 38 Real Coding Tasks (2026)](https://ianlpaterson.com/blog/llm-benchmark-2026-38-actual-tasks-15-models-for-2-29/) — Sonnet 4.6 == Opus 4.7 on small code patches at 3x cost difference; routing beats model selection — HIGH (independent deterministic scoring)
-- [GitHub blog: Agent PRs are everywhere — how to review them](https://github.blog/ai-and-ml/generative-ai/agent-pull-requests-are-everywhere-heres-how-to-review-them/) — 45.1% of agent PRs require human revision; key KPI for dashboard — MEDIUM
-- [GitHub Docs: Managing a branch protection rule](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule) — bypass_actors, required_status_checks, admin merge behavior — HIGH
-- [GitHub Docs: Creating rulesets for a repository](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository) — ruleset patch approach for CLEANUP-04 — HIGH
-- [Graphite: What's the best GitHub PR merge strategy](https://graphite.com/blog/pull-request-merge-strategy) — merge commit vs squash for audit trail on large feature branches — MEDIUM
-- [WarpFix: Autonomous CI Repair Agent](https://warpfix.org/) — CI pass rate 63%, 83% developer-confirmed accuracy on successful fixes; RepairAgent token cost pattern — MEDIUM
-- [Autonomous Quality Gates: AI-Powered Code Review (Augment Code)](https://www.augmentcode.com/learn/autonomous-quality-gates-ai-powered-code-review) — threshold evolution pattern, "keep thresholds realistic and evolving" — MEDIUM
-- [Self-Healing DevOps with Copilot and Actions (Colin's ALM Corner)](https://colinsalmcorner.com/self-healing-devops-with-copilot-and-actions/) — UAT-triggering-via-label pattern (not workflow_dispatch) — MEDIUM
-- [AI Agent Failure Modes Beyond Hallucination (DEV Community)](https://dev.to/maximsaplin/ai-agent-failure-modes-beyond-hallucination-208g) — partial failure, feedback loops, invisible state mutations as named failure modes — MEDIUM
+- `/home/fatduck/patent-cite-tool/.planning/milestones/v4.1-phases/51-live-readiness-uats/51-UAT-EVIDENCE.md` — UAT outcomes, deviation #2 (trigger bug), sharper runbooks for Phase 56
+- `/home/fatduck/patent-cite-tool/.planning/milestones/v4.1-phases/51-live-readiness-uats/51-CONTEXT.md` — sequencing decisions (D-13), deferral reasoning
+- `/home/fatduck/patent-cite-tool/.planning/milestones/v4.0-phases/47-v4-0-cleanup/47-UAT-DEFERRED.md` — original runbook stubs
+- `/home/fatduck/patent-cite-tool/.planning/STATE.md` — Phase 54 closure note (exact wiring spec for ledger schema), Phase 55 closure (dashboard metrics), Pending Todos
+- `/home/fatduck/patent-cite-tool/.planning/PROJECT.md` — Key Decisions table, trust invariants
+- `/home/fatduck/patent-cite-tool/scripts/a-b-winner.mjs` — abstention mode design, PHASE_56_TODO annotations, forward-compat outcome probe
+- `/home/fatduck/patent-cite-tool/scripts/weekly-digest.mjs` — existing metrics, SUMMARY_KEYS contract, injected-deps hook pattern
+- `/home/fatduck/patent-cite-tool/tests/e2e/lib/triage-classifier.js` — FLAKE 5-state machine, classifyRerunOutcomes, ring buffer semantics
+- MEMORY.md — `auto-fix-api` ledger-leak vector documentation
+- Stryker Mutator (https://stryker-mutator.io/docs/) — mutation operator determinism principles
+- GoldenTransformer fault injection framework (https://arxiv.org/html/2509.10790v1) — reversible fault injection via reversion method
+- Braintrust LLM monitoring (https://www.braintrust.dev/articles/what-is-llm-monitoring) — cost attribution, quality metrics in CI/CD
 
 ---
-*Feature research for: Patent Citation Tool v4.1 — Readiness Gate + Push*
-*Researched: 2026-06-02*
+*Feature research for: v4.2 Auto-Fix Loop Live*
+*Researched: 2026-06-04*

@@ -19,15 +19,23 @@
 //   - FALLBACK : Fix #N or Fixes #N pattern in the squash-merge commit msg
 //
 // IMPORTS POLICY (Pitfall 6 — keep boundary clean):
-//   ALLOWED:   node:*  AND  ./promote-from-quarantine.mjs
-//   FORBIDDEN: tests/e2e/lib/*  (transport-confusion risk on the v3.1
-//              subscription-vs-SDK boundary)
+//   ALLOWED:   node:*
+//              ./promote-from-quarantine.mjs
+//              ../tests/e2e/lib/llm-ledger.js
+//                (Phase 58 PROMOTE-01: appendLedgerEntry + LEDGER_PATH;
+//                 function body byte-unchanged by Phase 56;
+//                 auto-fix-promote.mjs runs only in CI per
+//                 v40-auto-promote.yml — no leak surface)
+//   FORBIDDEN: tests/e2e/lib/*  EXCEPT llm-ledger.js (transport-confusion
+//              risk on the v3.1 subscription-vs-SDK boundary)
 //              src/*  (browser code)
 //              any LLM driver
-// Audit (Plan 44-01 Audit 4):
+// Audit (Plan 44-01 Audit 4, extended by Phase 58 PROMOTE-01):
 //   grep -nE "^import" scripts/auto-fix-promote.mjs |
-//     grep -vE "from 'node:|from './promote-from-quarantine\\.mjs'"
+//     grep -vE "from 'node:|from './promote-from-quarantine\\.mjs'|from '\\.\\./tests/e2e/lib/llm-ledger\\.js'"
 //   MUST return zero matches.
+// Enforced by tests/unit/auto-fix-promote-gate.test.js (Phase 58-added
+// describe block 'IMPORTS POLICY (Phase 58 PROMOTE-01)').
 //
 // CLI:
 //   node scripts/auto-fix-promote.mjs \
@@ -56,6 +64,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runPromote } from './promote-from-quarantine.mjs';
+import { appendLedgerEntry, LEDGER_PATH } from '../tests/e2e/lib/llm-ledger.js';
 
 // ---------------------------------------------------------------------------
 // Phase 53 — auto-fix:partial-verified semantics (PARTIAL-01 + PARTIAL-04).
@@ -269,6 +278,11 @@ export function parseSourceIssue({ body = '', commitMessage = '' } = {}) {
 const KNOWN_FLAGS = new Set([
   '--pr', '--pr-labels', '--pr-merged', '--pr-body', '--pr-commit-message',
   '--source-issue', '--source-issue-labels', '--case-id',
+  // Phase 58 PROMOTE-02/03 (D-02): --fingerprint (12-hex), --error-class
+  // (ERROR_CLASS naming convention), --model (one of the two a-b-winner
+  // arms). Threaded onto the outcome ledger entry shape so a-b-winner's
+  // isAttributable filter accepts the entry once entries accumulate.
+  '--fingerprint', '--error-class', '--model',
   // Phase 53 PARTIAL-03 (D-16): --passing-cases CSV for the partial path.
   // Ignored by the verified path; consumed by assertPartialGate +
   // runPartialPromote on the partial branch of main().
@@ -299,6 +313,16 @@ export function parseArgv(argv) {
   // assertPartialGate({ passingCases }). Empty default mirrors the
   // existing labels-CSV pattern.
   let passingCasesCsv = '';
+  // Phase 58 PROMOTE-02/03: threaded onto the outcome ledger entry shape
+  // (a-b-winner.mjs:isAttributable requires errorClass + model on the
+  // entry itself for abstention exit). fingerprint defaults to null and
+  // is validated as 12-hex; errorClass defaults to null and is validated
+  // against the ERROR_CLASS naming convention; model defaults to the
+  // sonnet arm but may be overridden to the opus arm (both arms must
+  // accumulate entries for a-b-winner to converge).
+  let fingerprint = null;
+  let errorClass = null;
+  let model = null;
 
   for (let i = 2; i < argv.length; i++) {
     const tok = argv[i];
@@ -326,12 +350,40 @@ export function parseArgv(argv) {
       case '--source-issue-labels':  sourceIssueLabelsCsv = takeValue(argv, i, tok); i++; break;
       case '--case-id':              caseId = takeValue(argv, i, tok); i++; break;
       case '--passing-cases':        passingCasesCsv = takeValue(argv, i, tok); i++; break;
+      case '--fingerprint':          fingerprint = takeValue(argv, i, tok); i++; break;
+      case '--error-class':          errorClass  = takeValue(argv, i, tok); i++; break;
+      case '--model':                model       = takeValue(argv, i, tok); i++; break;
     }
   }
 
   if (!pr || prMerged === null || !caseId) {
     process.stderr.write(
       '[auto-fix-promote] required flags: --pr, --pr-merged, --case-id\n',
+    );
+    process.exit(2);
+  }
+
+  // Phase 58 PROMOTE-02/03 — defensive validation of optional flags.
+  // Mirrors a-b-winner.mjs:isAttributable (lines 178-189) so that any
+  // malformed value fails fast at argv-parse time rather than landing
+  // a malformed ledger entry that the downstream filter silently drops.
+  if (fingerprint !== null && !/^[0-9a-f]{12}$/.test(fingerprint)) {
+    process.stderr.write(
+      '[auto-fix-promote] malformed --fingerprint (expected 12-hex)\n',
+    );
+    process.exit(2);
+  }
+  if (errorClass !== null && !/^[A-Z_][A-Z0-9_]*$/.test(errorClass)) {
+    process.stderr.write(
+      '[auto-fix-promote] malformed --error-class (expected ERROR_CLASS naming convention)\n',
+    );
+    process.exit(2);
+  }
+  if (model !== null &&
+      !model.startsWith('claude-sonnet-4-6') &&
+      !model.startsWith('claude-opus-4-7')) {
+    process.stderr.write(
+      "[auto-fix-promote] malformed --model (expected to start with 'claude-sonnet-4-6' or 'claude-opus-4-7')\n",
     );
     process.exit(2);
   }
@@ -347,6 +399,9 @@ export function parseArgv(argv) {
       ? sourceIssueLabelsCsv.split(',').map((s) => s.trim()).filter(Boolean)
       : [],
     caseId,
+    fingerprint,
+    errorClass,
+    model,
     passingCases: passingCasesCsv
       ? passingCasesCsv.split(',').map((s) => s.trim()).filter(Boolean)
       : [],
@@ -437,9 +492,42 @@ async function main(argv = process.argv) {
       process.stderr.write(
         `[auto-fix-promote] runPromote returned exitCode ${result.exitCode} for case ${args.caseId}\n`,
       );
+      // PHASE 58 PROMOTE-03 — outcome entry on promote failure (line 440 path only — see RESEARCH §8)
+      appendLedgerEntry(LEDGER_PATH, {
+        iso: new Date().toISOString(),
+        model: args.model || 'claude-sonnet-4-6',
+        cost_usd: 0,
+        tokens_in: 0,
+        tokens_out: 0,
+        phase: '58-promote',
+        transport: 'subscription',
+        issueId: `issue-${args.sourceIssue}`,
+        prNumber: args.pr,
+        fingerprint: args.fingerprint,
+        errorClass: args.errorClass,
+        source: 'auto-fix-failed',
+        outcome: 'fail',
+        reason: (`runPromote exitCode=${result.exitCode}`).slice(0, 200),
+      });
       process.exit(1);
     }
 
+    // PHASE 58 PROMOTE-02 — outcome entry on promote success
+    appendLedgerEntry(LEDGER_PATH, {
+      iso: new Date().toISOString(),
+      model: args.model || 'claude-sonnet-4-6',
+      cost_usd: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+      phase: '58-promote',
+      transport: 'subscription',
+      issueId: `issue-${args.sourceIssue}`,
+      prNumber: args.pr,
+      fingerprint: args.fingerprint,
+      errorClass: args.errorClass,
+      source: 'auto-fix-promoted',
+      outcome: 'pass',
+    });
     process.stdout.write(
       `[auto-fix-promote] promoted ${args.caseId} (source issue #${resolvedSourceIssue})\n`,
     );

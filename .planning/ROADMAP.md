@@ -202,7 +202,10 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
   2. After a label-flap-to-failure event, the committed ledger contains an entry `{source: 'auto-fix-failed', outcome: 'fail', fingerprint, issueId, prNumber, reason}` — the two entry shapes are mutually exclusive per event
   3. `assertTripleGate` body is byte-unchanged vs the Phase 53 baseline — `git diff HEAD~N -- scripts/auto-fix-promote.mjs | grep 'assertTripleGate'` shows zero body-line changes; the Vitest delta assertion passes
   4. The existing grep-based IMPORTS POLICY assertion in `tests/unit/auto-fix-promote-gate.test.js` passes after `llm-ledger.js` is added to the IMPORTS POLICY allow-list in the SAME commit
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 58-00-PLAN.md — Wave 0 baseline snapshot (PHASE_58_BASELINE + assertTripleGate sha256 + _skipCiGuard count + llm-ledger sha256)
+  - [ ] 58-01-PLAN.md — Script + tests for PROMOTE-01..04 + _skipCiGuard pin (single atomic commit; depends on 58-00)
+  - [ ] 58-02-PLAN.md — Workflow YAML pre-resolution + argv threading (--fingerprint + --error-class; depends on 58-01)
 
 ### Phase 59: Fixture-Mutator + 4-UAT Re-Sweep
 **Goal**: A deterministic synthetic-defect injector exists and is proven safe; the auto-fix loop is confirmed end-to-end on origin/main with captured evidence; post-UAT state is clean
@@ -249,6 +252,6 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 | 55. Auto-Fix Dashboard | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 56. Ledger Schema Extension + Leak Guard | v4.2 | 3/3 | Complete    | 2026-06-04 |
 | 57. Ledger-Commit Branch Redirect | v4.2 | 1/1 | Complete    | 2026-06-04 |
-| 58. Promote Outcome Ledger Entry | v4.2 | 0/TBD | Not started | - |
+| 58. Promote Outcome Ledger Entry | v4.2 | 0/3 | Not started | - |
 | 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/TBD | Not started | - |
 | 60. Carry-Along Cleanup | v4.2 | 0/TBD | Not started | - |

@@ -161,7 +161,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 
 - [x] **Phase 56: Ledger Schema Extension + Leak Guard** - Wire `errorClass` into all 7 `auto-fix.mjs` call sites; add `safeAppendLedger` wrapper enforcing CI/override guard; relax Test 48; Vitest coverage (completed 2026-06-04)
 - [x] **Phase 57: Ledger-Commit Branch Redirect** - Refactor `v40-cost-ledger-snapshot.yml` to push `ledger-snapshots/daily-*` branch; update diff-guard scope-decision; update S13 YAML contract test; pin `v40-auto-fix.yml` direct-to-main as anti-feature (completed 2026-06-04)
-- [ ] **Phase 58: Promote Outcome Ledger Entry** - Narrow IMPORTS POLICY in `auto-fix-promote.mjs`; write event-sourced outcome entries on promotion success/failure; Vitest coverage
+- [x] **Phase 58: Promote Outcome Ledger Entry** - Narrow IMPORTS POLICY in `auto-fix-promote.mjs`; write event-sourced outcome entries on promotion success/failure; Vitest coverage (completed 2026-06-06)
 - [ ] **Phase 59: Fixture-Mutator + 4-UAT Re-Sweep** - Ship `inject-defect.mjs`; execute UAT-47-e → UAT-47-d → UAT-47-a → UAT-47-b in D-13 cost discipline order; produce `56-UAT-EVIDENCE.md`; post-UAT cleanup
 - [ ] **Phase 60: Carry-Along Cleanup** - Remove dead `MODEL` const from `auto-fix.mjs`; complete Phase 51.1's unfinished `v40-verifier-gate-yaml.test.js` V2 update; milestone closure artifacts
 
@@ -203,9 +203,9 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
   3. `assertTripleGate` body is byte-unchanged vs the Phase 53 baseline — `git diff HEAD~N -- scripts/auto-fix-promote.mjs | grep 'assertTripleGate'` shows zero body-line changes; the Vitest delta assertion passes
   4. The existing grep-based IMPORTS POLICY assertion in `tests/unit/auto-fix-promote-gate.test.js` passes after `llm-ledger.js` is added to the IMPORTS POLICY allow-list in the SAME commit
 **Plans**: 3 plans
-  - [ ] 58-00-PLAN.md — Wave 0 baseline snapshot (PHASE_58_BASELINE + assertTripleGate sha256 + _skipCiGuard count + llm-ledger sha256)
-  - [ ] 58-01-PLAN.md — Script + tests for PROMOTE-01..04 + _skipCiGuard pin (single atomic commit; depends on 58-00)
-  - [ ] 58-02-PLAN.md — Workflow YAML pre-resolution + argv threading (--fingerprint + --error-class; depends on 58-01)
+  - [x] 58-00-PLAN.md — Wave 0 baseline snapshot (PHASE_58_BASELINE + assertTripleGate sha256 + _skipCiGuard count + llm-ledger sha256)
+  - [x] 58-01-PLAN.md — Script + tests for PROMOTE-01..04 + _skipCiGuard pin (single atomic commit; depends on 58-00)
+  - [x] 58-02-PLAN.md — Workflow YAML pre-resolution + argv threading (--fingerprint + --error-class; depends on 58-01)
 
 ### Phase 59: Fixture-Mutator + 4-UAT Re-Sweep
 **Goal**: A deterministic synthetic-defect injector exists and is proven safe; the auto-fix loop is confirmed end-to-end on origin/main with captured evidence; post-UAT state is clean
@@ -252,6 +252,6 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 | 55. Auto-Fix Dashboard | v4.1 | 1/1 | Complete | 2026-06-04 |
 | 56. Ledger Schema Extension + Leak Guard | v4.2 | 3/3 | Complete    | 2026-06-04 |
 | 57. Ledger-Commit Branch Redirect | v4.2 | 1/1 | Complete    | 2026-06-04 |
-| 58. Promote Outcome Ledger Entry | v4.2 | 0/3 | Not started | - |
+| 58. Promote Outcome Ledger Entry | v4.2 | 3/3 | Complete    | 2026-06-06 |
 | 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/TBD | Not started | - |
 | 60. Carry-Along Cleanup | v4.2 | 0/TBD | Not started | - |

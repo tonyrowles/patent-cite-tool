@@ -419,7 +419,13 @@ describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
     expect(block).toMatch(/issueId:\s*`issue-\$\{resolvedSourceIssue\}`/);
     expect(block).toMatch(/prNumber:\s*args\.pr/);
     expect(block).toMatch(/iso:\s*new Date\(\)\.toISOString\(\)/);
-    expect(block).toMatch(/phase:\s*'58-promote'/);
+    // Phase 59 SWEEP-05 / Decision C: `phase` is now `args.phase || '58-promote'`
+    // (the bare literal `phase: '58-promote'` was replaced to thread --phase
+    // through for UAT runs; non-UAT runs preserve byte-equivalent shape via
+    // the `|| '58-promote'` fallback chain). The O1 entry still pins the
+    // '58-promote' default literal; PHASE-59-O1/O2 separately pin the args.phase
+    // prefix.
+    expect(block).toMatch(/phase:\s*args\.phase \|\| '58-promote'/);
     expect(block).toMatch(/transport:\s*'subscription'/);
     // model is args.model with a default fallback — must NOT be a bare literal
     expect(block).toMatch(/model:\s*args\.model/);
@@ -536,6 +542,102 @@ describe('_skipCiGuard:true non-comment grep-count invariant (Phase 58 trust pin
     const codeLines = lines.filter((l) => !/^\s*\/\//.test(l));
     const hits = codeLines.filter((l) => /_skipCiGuard:\s*true/.test(l));
     expect(hits.length).toBe(1);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 59 SWEEP-05 — --phase argv (Decision C).
+//
+// Mirrors the Phase 58 PA4/PA5 parseArgv-extension pattern verbatim. The
+// --phase flag carries the UAT phase tag ('56-uat') onto the live ledger
+// entry per REQUIREMENTS.md SWEEP-05 literal wording (Pitfall 10:
+// "all UAT ledger entries carry `phase: '56-uat'` for filterable production
+// analysis"). Default fallback is '58-promote' (preserves the Phase 58
+// hardcoded literal byte-equivalent on non-UAT runs).
+//
+// PHASE-59-P1 — happy path: --phase 56-uat captured into args.phase.
+// PHASE-59-P2 — absent: args.phase defaults to null; entry-write path uses
+//               args.phase || '58-promote' fallback (asserted structurally).
+// PHASE-59-P3 — defense: shell-injection-shaped value exits 2 with stderr
+//               'malformed --phase' (T-59-11 mitigation).
+// ---------------------------------------------------------------------------
+describe('Phase 59 SWEEP-05 — --phase argv (Decision C)', () => {
+
+  const REQUIRED = [
+    'node', 'scripts/auto-fix-promote.mjs',
+    '--pr', '99',
+    '--pr-merged', 'true',
+    '--case-id', 'C-001',
+  ];
+
+  it('PHASE-59-P1 — --phase 56-uat captured into args.phase', () => {
+    const result = parseArgv([...REQUIRED, '--phase', '56-uat']);
+    expect(result.phase).toBe('56-uat');
+  });
+
+  it('PHASE-59-P2 — missing --phase defaults to null; entry-shape fallback uses "58-promote"', () => {
+    const result = parseArgv([...REQUIRED]);
+    expect(result.phase).toBeNull();
+    // Entry-shape default fallback structural pin: defends against silent
+    // regression to a different default (empty string, undefined, etc.).
+    const source = readPromoteSource();
+    expect(source).toContain("phase: args.phase || '58-promote'");
+  });
+
+  it('PHASE-59-P3 — shell-injection-shaped value exits 2 with stderr "malformed --phase" (T-59-11)', () => {
+    // Mirror PA4/PA5 pattern: parseArgv calls process.exit(2) on validation
+    // failure; we stub process.exit to throw a sentinel so we can assert.
+    const origExit = process.exit;
+    const origStderrWrite = process.stderr.write.bind(process.stderr);
+    let capturedStderr = '';
+    process.stderr.write = (chunk) => {
+      capturedStderr += String(chunk);
+      return true;
+    };
+    process.exit = (code) => {
+      throw new Error(`process.exit(${code})`);
+    };
+    try {
+      expect(() => parseArgv([...REQUIRED, '--phase', '56 uat; echo bad']))
+        .toThrow(/process\.exit\(2\)/);
+      expect(capturedStderr).toContain('malformed --phase');
+    } finally {
+      process.exit = origExit;
+      process.stderr.write = origStderrWrite;
+    }
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 59 SWEEP-05 — phase entry-shape structural pins.
+//
+// Mirrors the Phase 58 O1/O2/O3 entry-shape structural-grep pattern. Pins
+// both entry sites (PROMOTE-02 success + PROMOTE-03 failure) carry the
+// `phase: args.phase || '58-promote'` fallback chain AND that NO bare
+// `phase: '58-promote',` literal remains (regression guard against missing
+// one of the two edits).
+// ---------------------------------------------------------------------------
+describe('Phase 59 SWEEP-05 — phase entry-shape structural pins', () => {
+
+  it("PHASE-59-O1 — source contains `phase: args.phase || '58-promote'` at LEAST TWICE (PROMOTE-02 + PROMOTE-03 sites)", () => {
+    const source = readPromoteSource();
+    // Comment-strip: drop lines that are pure // comments before counting.
+    const codeOnly = source.split(/\r?\n/)
+      .filter((l) => !/^\s*\/\//.test(l))
+      .join('\n');
+    const matches = codeOnly.match(/phase: args\.phase \|\| '58-promote'/g) || [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("PHASE-59-O2 — bare-literal `phase: '58-promote',` regression guard: zero matches in non-comment code", () => {
+    const source = readPromoteSource();
+    const codeOnly = source.split(/\r?\n/)
+      .filter((l) => !/^\s*\/\//.test(l))
+      .join('\n');
+    const matches = codeOnly.match(/phase: '58-promote',/g) || [];
+    expect(matches.length).toBe(0);
   });
 
 });

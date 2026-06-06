@@ -53,15 +53,15 @@ Live operational tests against origin/main once the four enabling repairs (LEDGE
 - [ ] **SWEEP-02**: UAT-47-d (~5 min) — ledger snapshot post-refactor commits to `ledger-snapshots/daily-*` branch; daily cron's first run after merge produces a ledger-snapshot PR (not a direct main push)
 - [ ] **SWEEP-03**: UAT-47-a (~$0.50–$2, ~10 min) — full end-to-end auto-fix loop on either a real triage-labeled issue OR the fixture-mutator synthetic; produces merged PR with verifier-gate evidence + ledger entry carrying `errorClass` + `outcome: 'pass'` — **primary DoD evidence**
 - [ ] **SWEEP-04**: UAT-47-b — fixture-mutator drives synthetic defect through full loop; deps-update-gate smoke test confirms `v40-deps-update.yml`'s `pull_request:` trigger fires (Phase 51.1 fix confirm)
-- [ ] **SWEEP-05**: `56-UAT-EVIDENCE.md` produced with PASS/FAIL evidence per UAT (JSON snapshots from `gh api` + `gh run`); all UAT ledger entries carry `phase: '56-uat'` for filterable production analysis (Pitfall 10)
+- [ ] **SWEEP-05**: `56-UAT-EVIDENCE.md` produced with PASS/FAIL evidence per UAT (JSON snapshots from `gh api` + `gh run`); all UAT outcome ledger entries (`source: 'auto-fix-promoted'`) carry `phase: '56-uat'` for filterable production analysis (Pitfall 10). Threaded LIVE on the committed entry via Phase 59 Plan 59-03 Decision C plumbing: `scripts/auto-fix-promote.mjs --phase` argv + `.github/workflows/v40-auto-promote.yml` dual-path env expression `PHASE_TAG: ${{ github.event.inputs.PHASE_TAG || vars.PHASE_TAG || '' }}`; operator sets `gh variable set PHASE_TAG --body 56-uat` BEFORE merging the test PR, clears via `gh variable delete PHASE_TAG` during SWEEP-06 cleanup. Upstream `source: 'auto-fix-api'` entries still carry `phase: '42-auto-fix'` (Plan 59-03 deliberately scoped to auto-fix-promote.mjs only; a-b-winner.mjs keys off the outcome entry, not the upstream).
 - [ ] **SWEEP-06**: Post-UAT cleanup completed — test branches deleted, test PRs closed, synthetic issues closed, synthetic quarantine entries reverted (Pitfall 11)
 
 ### Carry-Along Cleanup
 
 Self-contained, low-risk items deferred from prior phases. Bundled to prevent further deferral.
 
-- [ ] **CLEAN-01**: Dead `MODEL` const removed from `scripts/auto-fix.mjs` (Phase 54 carry-along; 2-line deletion; `built.model` from `buildFixPrompt` is the live consumer)
-- [ ] **CLEAN-02**: `tests/e2e/scripts/v40-verifier-gate-yaml.test.js` V2 update completed — Phase 51.1's unfinished test rewrite; `npm test` shows zero pre-existing failures in this file after the commit
+- [x] **CLEAN-01**: Dead `MODEL` const removed from `scripts/auto-fix.mjs` (Phase 54 carry-along; 2-line deletion; `built.model` from `buildFixPrompt` is the live consumer)
+- [x] **CLEAN-02**: `tests/e2e/scripts/v40-verifier-gate-yaml.test.js` V2 update completed — Phase 51.1's unfinished test rewrite; `npm test` shows zero pre-existing failures in this file after the commit
 
 ## Future Requirements
 
@@ -124,8 +124,8 @@ Populated by the v4.2 roadmapper (2026-06-04).
 | SWEEP-04 | 59 | Pending |
 | SWEEP-05 | 59 | Pending |
 | SWEEP-06 | 59 | Pending |
-| CLEAN-01 | 60 | Pending |
-| CLEAN-02 | 60 | Pending |
+| CLEAN-01 | 60 | Complete |
+| CLEAN-02 | 60 | Complete |
 
 **Coverage:**
 - v4.2 requirements: 25 total

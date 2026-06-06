@@ -44,6 +44,38 @@ name: V40 Auto Promote
 on:
   pull_request:
     types: [closed]
+  # Phase 59 SWEEP-05 / Decision C: workflow_dispatch trigger for UAT runs.
+  # Operator invokes via:
+  #   gh workflow run v40-auto-promote.yml \
+  #     -f pr_number=<merged-PR-number> -f merged=true -f PHASE_TAG=56-uat
+  # so the live ledger entries on origin/main carry `phase: '56-uat'` per
+  # REQUIREMENTS.md SWEEP-05 literal wording (Pitfall 10).
+  #
+  # Phase 59 REVIEW-FIX CR-01: pr_number is REQUIRED — downstream steps
+  # consume `github.event.pull_request.number` on the pull_request trigger
+  # path; on workflow_dispatch the env-extraction at the parse step falls
+  # back to `github.event.inputs.pr_number`. Without this input the
+  # operator-driven UAT path crashed at the first `gh pr view ""` call.
+  # `merged` is also required so the dispatch path explicitly affirms the
+  # PR has been merged (the pull_request trigger path keys off the
+  # `pull_request.merged == true` payload field; the dispatch path mirrors
+  # that semantic by requiring an explicit operator affirmation).
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Merged auto-fix PR number to re-promote (required for UAT runs)'
+        required: true
+        type: string
+      merged:
+        description: 'Confirm the named PR has already been merged to main (true)'
+        required: true
+        default: 'true'
+        type: string
+      PHASE_TAG:
+        description: 'Phase tag for ledger entries (e.g., 56-uat for UAT runs; empty = default 58-promote)'
+        required: false
+        default: ''
+        type: string
 
 # Per-PR serialization (T-44-06). cancel-in-progress: false because mid-
 # flight cancellation could leave runPromote half-applied; rollback covers
@@ -68,10 +100,19 @@ jobs:
     # existing 'auto-fix:verified' clause verbatim and adds 'auto-fix:partial-
     # verified' for the partial path. Script-side main() label branch (D-15)
     # disambiguates the two.
+    # Phase 59 SWEEP-05 / Decision C: augmented with a workflow_dispatch
+    # OR-branch so operator-triggered UAT runs pass the filter. The existing
+    # pull_request branch is preserved BYTE-EQUIVALENT inside the parenthesized
+    # fallback (PHASE-58 if-filter regression pin compatibility). Auth-gate on
+    # workflow_dispatch is the operator's Actions:write permission (docs/v40-
+    # repo-config.md §3) — no privilege escalation; the PHASE_TAG value is
+    # double-validated (workflow input default '' + script parseArgv regex).
     if: |
-      github.event.pull_request.merged == true && (
-        contains(github.event.pull_request.labels.*.name, 'auto-fix:verified') ||
-        contains(github.event.pull_request.labels.*.name, 'auto-fix:partial-verified')
+      github.event_name == 'workflow_dispatch' || (
+        github.event.pull_request.merged == true && (
+          contains(github.event.pull_request.labels.*.name, 'auto-fix:verified') ||
+          contains(github.event.pull_request.labels.*.name, 'auto-fix:partial-verified')
+        )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -94,6 +135,22 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Reject empty PR_NUMBER (CR-01 defense-in-depth)
+        # Phase 59 REVIEW-FIX CR-01: hard-fail BEFORE any gh call when
+        # PR_NUMBER is empty. The pull_request trigger fills
+        # `github.event.pull_request.number`; the workflow_dispatch trigger
+        # fills `github.event.inputs.pr_number` (required: true at the
+        # trigger schema). If both are empty here, the trigger schema was
+        # bypassed somehow — fail loudly rather than crashing the first
+        # `gh pr view` with stderr noise.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+        run: |
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::PR_NUMBER is empty (neither pull_request.number nor workflow_dispatch.inputs.pr_number resolved). See Phase 59 CR-01." >&2
+            exit 1
+          fi
+
       - name: Parse PR body + labels + source issue
         id: parse
         # Resolves four outputs the dispatcher script needs:
@@ -105,8 +162,11 @@ jobs:
         #   - source_issue_raw (integer; either from the source_issue HTML
         #     comment on line 2, OR — fallback — from Fix #N in the squash-
         #     merge commit message currently on origin/main HEAD)
+        # Phase 59 REVIEW-FIX CR-01: PR_NUMBER falls back from the
+        # pull_request payload to the workflow_dispatch input so the
+        # operator-driven UAT path resolves a real PR number.
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
         run: |
           PR_JSON=$(gh pr view "$PR_NUMBER" --json body,labels,number)
           BODY=$(echo "$PR_JSON" | jq -r '.body')
@@ -256,7 +316,7 @@ jobs:
         # _skipCiGuard:false). --passing-cases is passed UNCONDITIONALLY;
         # the verified branch ignores it.
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           PR_LABELS: ${{ steps.parse.outputs.pr_labels }}
           SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
           SOURCE_ISSUE_LABELS: ${{ steps.source.outputs.source_issue_labels }}
@@ -265,6 +325,18 @@ jobs:
           FINGERPRINT: ${{ steps.fp.outputs.fingerprint }}
           ERROR_CLASS: ${{ steps.ec.outputs.error_class }}
           MODEL: ${{ steps.ml.outputs.model }}
+          # Phase 59 SWEEP-05 / Decision C: PHASE_TAG resolution sources
+          # ONLY from workflow_dispatch.inputs.PHASE_TAG. Phase 59 REVIEW-FIX
+          # WR-01: dropped the legacy repo-variable fallback to eliminate the
+          # silent ledger-corruption foot-gun where a forgotten repo variable
+          # could tag every normal pull_request auto-promote run with a stale
+          # phase string (e.g. `56-uat`, `wip`). The SWEEP runbook now passes
+          # the phase tag exclusively via `gh workflow run -f PHASE_TAG=...`
+          # at dispatch time (operator-driven workflow_dispatch only); the
+          # pull_request trigger path always sees the empty default.
+          # Empty default '' on the pull_request trigger path leaves the
+          # script-side fallback `args.phase || '58-promote'` byte-equivalent.
+          PHASE_TAG: ${{ github.event.inputs.PHASE_TAG || '' }}
         run: |
           PR_COMMIT_MSG=$(cat /tmp/pr-commit-message.txt)
           # Phase 58 REVIEW-FIX WR-01: --passing-cases is appended ONLY when
@@ -291,13 +363,24 @@ jobs:
             if [ -n "$PARTIAL_PASSING_CASES" ]; then
               ARGS+=(--passing-cases "$PARTIAL_PASSING_CASES")
             fi
+            # Phase 59 SWEEP-05 / Decision C: --phase is appended ONLY when
+            # PHASE_TAG is non-empty. The normal pull_request trigger path
+            # leaves PHASE_TAG="" (workflow `default: ''`), and parseArgv's
+            # takeValue rejects an empty-string flag value with exit 2 — same
+            # DoS failure mode as PHASE-58 WR-01 / --passing-cases. Pinned by
+            # tests/e2e/scripts/v40-auto-promote-yaml.test.js PHASE-59-Y3.
+            if [ -n "$PHASE_TAG" ]; then
+              ARGS+=(--phase "$PHASE_TAG")
+            fi
             node scripts/auto-fix-promote.mjs "${ARGS[@]}"
           done
 
       - name: Build auto-promote PR body
         id: body
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          # Phase 59 REVIEW-FIX CR-01: PR_NUMBER falls back to the
+          # workflow_dispatch input on the operator-driven UAT path.
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
           CASE_IDS: ${{ steps.parse.outputs.case_ids }}
         run: |
@@ -323,15 +406,18 @@ jobs:
       - name: Open auto-promote PR
         id: cpr
         uses: peter-evans/create-pull-request@v8
+        # Phase 59 REVIEW-FIX CR-01: branch/title/commit-message fall back
+        # to the workflow_dispatch input so the operator-driven UAT path
+        # produces a real PR number in the auto-promote PR shape.
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: auto-promote/${{ steps.parse.outputs.source_issue }}-${{ github.event.pull_request.number }}
+          branch: auto-promote/${{ steps.parse.outputs.source_issue }}-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           base: main
           draft: false
           delete-branch: true
-          title: "auto-promote: add cases from PR #${{ github.event.pull_request.number }} to test-cases.js"
+          title: "auto-promote: add cases from PR #${{ github.event.pull_request.number || github.event.inputs.pr_number }} to test-cases.js"
           body-path: /tmp/auto-promote-pr-body.md
-          commit-message: "auto-promote: add cases from PR #${{ github.event.pull_request.number }}"
+          commit-message: "auto-promote: add cases from PR #${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           labels: |
             auto-promote
           signoff: false
@@ -345,7 +431,8 @@ jobs:
         if: steps.cpr.outputs.pull-request-url != ''
         env:
           SOURCE_ISSUE: ${{ steps.parse.outputs.source_issue }}
-          AUTO_FIX_PR: ${{ github.event.pull_request.number }}
+          # Phase 59 REVIEW-FIX CR-01: fall back to workflow_dispatch input.
+          AUTO_FIX_PR: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           AUTO_PROMOTE_URL: ${{ steps.cpr.outputs.pull-request-url }}
         run: |
           gh issue close "$SOURCE_ISSUE" \
@@ -378,7 +465,8 @@ jobs:
         env:
           REPO: ${{ github.repository }}
           CASE_IDS: ${{ steps.parse.outputs.case_ids }}
-          AUTO_FIX_PR: ${{ github.event.pull_request.number }}
+          # Phase 59 REVIEW-FIX CR-01: fall back to workflow_dispatch input.
+          AUTO_FIX_PR: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
         run: |
           gh issue create \
             --repo "$REPO" \

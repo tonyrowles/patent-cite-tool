@@ -163,7 +163,7 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 - [x] **Phase 57: Ledger-Commit Branch Redirect** - Refactor `v40-cost-ledger-snapshot.yml` to push `ledger-snapshots/daily-*` branch; update diff-guard scope-decision; update S13 YAML contract test; pin `v40-auto-fix.yml` direct-to-main as anti-feature (completed 2026-06-04)
 - [x] **Phase 58: Promote Outcome Ledger Entry** - Narrow IMPORTS POLICY in `auto-fix-promote.mjs`; write event-sourced outcome entries on promotion success/failure; Vitest coverage (completed 2026-06-06)
 - [ ] **Phase 59: Fixture-Mutator + 4-UAT Re-Sweep** - Ship `inject-defect.mjs`; execute UAT-47-e → UAT-47-d → UAT-47-a → UAT-47-b in D-13 cost discipline order; produce `56-UAT-EVIDENCE.md`; post-UAT cleanup
-- [ ] **Phase 60: Carry-Along Cleanup** - Remove dead `MODEL` const from `auto-fix.mjs`; complete Phase 51.1's unfinished `v40-verifier-gate-yaml.test.js` V2 update; milestone closure artifacts
+- [x] **Phase 60: Carry-Along Cleanup** - Remove dead `MODEL` const from `auto-fix.mjs`; complete Phase 51.1's unfinished `v40-verifier-gate-yaml.test.js` V2 update; milestone closure artifacts (completed 2026-06-06)
 
 ## Phase Details
 
@@ -222,7 +222,11 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
   3. UAT-47-e PASS: diff-guard rejects a crafted PR touching a LOCKED path; the test branch is CLOSED + deleted after evidence capture; $0 API cost
   4. UAT-47-a PASS: a draft `auto-fix/*` PR opens with an LLM-proposed fix; `v40-verifier-gate.yml` runs 3x affected case + 76-case regression + diff-guard; a merged PR exists with `auto-fix:verified` label; the committed ledger contains an entry with `errorClass` and `outcome: 'pass'` — this is the primary DoD evidence
   5. `56-UAT-EVIDENCE.md` exists with PASS/FAIL status per UAT, JSON snapshots from `gh api` + `gh run`, and all UAT ledger entries carrying `phase: '56-uat'`; post-UAT cleanup is confirmed complete (test branches deleted, synthetic issues closed, synthetic quarantine entries reverted)
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 59-00-PLAN.md — Wave 0 baseline + RESEARCH Q1 resolution → RESOLVED via Plan 59-03 (autonomous; read-only)
+  - [ ] 59-01-PLAN.md — Wave 1: fixture-mutator (inject-defect.mjs + quarantine-append.mjs source-tag suppression + Vitest contracts) — MUTATOR-01..05 (autonomous; ships locally)
+  - [ ] 59-03-PLAN.md — Wave 2: SWEEP-05 phase argv expansion (Decision C) — auto-fix-promote.mjs --phase argv + workflow_dispatch PHASE_TAG plumbing — single atomic feat(59) commit (autonomous; ships locally; parallel with 59-01 conceptually but assigned wave 2 due to file-overlap-free positioning)
+  - [ ] 59-02-PLAN.md — Wave 3: Work stream B 4-UAT re-sweep against origin/main + cleanup — SWEEP-01..06 (operator runbook; non-autonomous; depends on PR #18 merge + 59-01 + 59-03)
 
 ### Phase 60: Carry-Along Cleanup
 **Goal**: All deferred carry-along items from Phase 54 and Phase 51.1 are closed; `npm test` exits 0 with zero pre-existing failures; milestone closure artifacts are committed
@@ -253,5 +257,5 @@ Landed v4.0's 215 commits on origin/main, hardened ruleset 17086676 (5 rules + 0
 | 56. Ledger Schema Extension + Leak Guard | v4.2 | 3/3 | Complete    | 2026-06-04 |
 | 57. Ledger-Commit Branch Redirect | v4.2 | 1/1 | Complete    | 2026-06-04 |
 | 58. Promote Outcome Ledger Entry | v4.2 | 3/3 | Complete    | 2026-06-06 |
-| 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/TBD | Not started | - |
-| 60. Carry-Along Cleanup | v4.2 | 0/TBD | Not started | - |
+| 59. Fixture-Mutator + 4-UAT Re-Sweep | v4.2 | 0/4 | Planning complete (revised, Decision C) | - |
+| 60. Carry-Along Cleanup | v4.2 | 1/0 | Complete    | 2026-06-06 |

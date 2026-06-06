@@ -110,3 +110,48 @@ Pre-flight scout confirms:
 - Extending ERROR_CLASS coverage beyond the 5 existing scaffolds (PIPE-FUT-01)
 
 </deferred>
+
+<scope_adjustments>
+## Phase 59 Scope Adjustment (Decision Log)
+
+**Updated:** 2026-06-05 (scope expanded with `--phase` argv plumbing on auto-fix-promote.mjs — see Decision C below)
+
+**Decision C (2026-06-05, phase argv expansion — triggered by checker context_compliance / scope_reduction BLOCKER finding):** Expand SWEEP-05 implementation to thread a `--phase <value>` argv flag through `scripts/auto-fix-promote.mjs` (mirroring Phase 58's `--fingerprint` / `--error-class` / `--model` plumbing pattern verbatim) so live ledger entries on origin/main carry `phase: '56-uat'` per REQUIREMENTS.md SWEEP-05 literal wording: "all UAT ledger entries carry `phase: '56-uat'` for filterable production analysis (Pitfall 10)". Surfaced during plan revision when checker observed:
+
+1. **The original Phase 59 plan reduced REQUIREMENTS.md SWEEP-05's literal wording to an "evidence-only jq wrapper" pattern.** The wrapper labels the local JSON evidence files in `.planning/phases/59-*/evidence/` with a derived `uat_tag: '56-uat'` field, but does NOT make the COMMITTED ledger on origin/main filterable. Pitfall 10's stated intent — "filterable production analysis" — requires the field to be on the live entry (downstream consumers like `scripts/a-b-winner.mjs` query the committed ledger, not the planning-side evidence files).
+2. **The user's consistent Phase 56 + 58 pattern (Decisions A + B in `.planning/phases/58-promote-outcome-ledger-entry/58-CONTEXT.md`)** is to expand scope to honor literal REQUIREMENTS.md wording when downstream consumers depend on it. Decision C mirrors that pattern: a small additive code edit on `auto-fix-promote.mjs` (5 single-line additions in parseArgv + 2 line-edits at the two entry sites at lines 502 + 522) + a small additive workflow YAML edit (workflow_dispatch trigger + dual-path env expression + conditional argv append) — all sharable with Phase 58's existing plumbing pattern verbatim.
+3. **Default value preserves non-UAT shape byte-equivalent:** the script's `args.phase || '58-promote'` fallback chain keeps the entry's current `phase: '58-promote'` literal on all non-UAT runs. UAT runs set the field via `vars.PHASE_TAG=56-uat` GitHub Actions repo variable (set by SWEEP-* operator runbook BEFORE merging test PRs; cleared by SWEEP-06 cleanup). Zero impact on non-UAT operational behavior.
+
+**Plumbing scope (Plan 59-03):** Single atomic `feat(59): SWEEP-05 phase argv expansion (Decision C)` commit covering 4 files:
+- `scripts/auto-fix-promote.mjs` — `--phase` argv + validation regex `/^[a-zA-Z0-9_-]+$/` + threaded into PROMOTE-02/PROMOTE-03 entry sites
+- `tests/unit/auto-fix-promote-gate.test.js` — PHASE-59-P1..P3 + PHASE-59-O1..O2 describe blocks pinning parseArgv behavior + entry-shape default fallback + bare-literal regression guard
+- `.github/workflows/v40-auto-promote.yml` — workflow_dispatch trigger variant + dual-path env expression `PHASE_TAG: ${{ github.event.inputs.PHASE_TAG || vars.PHASE_TAG || '' }}` + conditional argv append `if [ -n "$PHASE_TAG" ]; then ARGS+=(--phase "$PHASE_TAG"); fi`
+- `tests/e2e/scripts/v40-auto-promote-yaml.test.js` — PHASE-59-Y1..Y3 describe block pinning workflow_dispatch + dual-path env expression + conditional argv append
+
+**Scope deliberately NOT expanded:** Plan 59-03 does NOT modify `scripts/auto-fix.mjs` (which still carries `const PHASE = '42-auto-fix'` hardcoded on line 174). The auto-fix.mjs `source: 'auto-fix-api'` entry is UPSTREAM of the auto-fix-promote.mjs `source: 'auto-fix-promoted'` outcome entry. `a-b-winner.mjs:isAttributable` (lines 178-189) and the SWEEP-05 filterable-production-analysis goal both key off the OUTCOME entry (the `auto-fix-promoted` source), NOT the upstream `auto-fix-api` source. Therefore scope-expanding `auto-fix.mjs` would be unnecessary churn outside the SWEEP-05 closure boundary.
+
+**Effect on REQUIREMENTS.md:** SWEEP-05 wording stays verbatim (no rewording needed). REQUIREMENTS.md is updated AFTER this revision to add a clarifying note to the SWEEP-05 evidence list: `phase: '56-uat'` is now LIVE on auto-fix-promote.mjs outcome ledger entries on origin/main (not on auto-fix-api entries) when invoked via Plan 59-03's workflow PHASE_TAG plumbing.
+
+**Effect on other LOAD-BEARING constraints:** Unchanged.
+- Phase 58 `assertTripleGate` body byte-unchanged invariant remains in force (Vitest delta assertion still passes)
+- Phase 58 `_skipCiGuard:\s*true` grep count = 1 invariant remains in force
+- Phase 58 IMPORTS POLICY grep audit remains in force (Plan 59-03 adds zero new imports — both edits are within the existing import boundary)
+- Phase 58 PHASE-58-Y1..Y11 contract preserved (the Y2 dual-path env expression edit extends but does not regress the existing assertions)
+
+**Effect on Plan 59-02 (Work stream B operator runbook):**
+- depends_on += "59-03" (added)
+- wave: 2 → 3 (re-numbered to honor the new dependency)
+- SWEEP-03 Task 5 adds **Stage 3.5 — Set PHASE_TAG repo variable** (`gh variable set PHASE_TAG --body 56-uat`) BEFORE the human merge; captures evidence/uat-47-a-phase-tag-set.txt
+- SWEEP-04 Task 6 adds **Step 0 — Verify PHASE_TAG repo variable is still set**; captures evidence/uat-47-b-phase-tag-set.txt
+- SWEEP-04 Task 6 Step 3 updated to use DIRECT inspection of post-SWEEP-04 origin/main `tests/e2e/test-cases-quarantine.js` corpus (parse the synthetic entry by `source_triage_finding_id.startsWith('fixture-mutator-uat-47b')`; query the triage issue labels via gh; assert NO `quarantine:ready-for-promotion` label) — checker fix issue 5 (key_links_planned)
+- SWEEP-06 Task 7 cleanup adds step 3: `gh variable delete PHASE_TAG` (clears the UAT phase tag so subsequent non-UAT auto-promote runs default back to `phase: '58-promote'`); captures evidence/sweep-06-phase-tag-cleared.txt
+- Outcome entry capture: jq filter on `phase=='56-uat'` directly against origin/main ledger (no evidence wrapper); entry-shape acceptance criterion updated from `uat_tag` to `phase`
+- 56-UAT-EVIDENCE.md frontmatter: `phase_tag_strategy: live-entry` (was `evidence-only`); body §Phase-tag strategy paragraph rewritten
+
+**Wave structure after revision:**
+- Wave 0: 59-00 (baseline)
+- Wave 1: 59-01 (mutator + suppression — Work stream A)
+- Wave 2: 59-03 (phase argv expansion — Decision C; no file overlap with 59-01)
+- Wave 3: 59-02 (live UAT operator runbook — Work stream B; depends on all three)
+
+</scope_adjustments>

@@ -200,3 +200,129 @@ describe('quarantine-append CLI — stable_runs label dispatch (G8)', () => {
     expect(transcript).toMatch(/issue edit \d+ --add-label quarantine:ready-for-promotion/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// G9: Phase 59 Plan 59-01 — MUTATOR-04 source-tag suppression (Pitfall 8
+// LOAD-BEARING). Co-designed with tests/e2e/scripts/inject-defect.mjs in the
+// SAME commit per REQUIREMENTS.md MUTATOR-04 wording. The discriminator is
+// finalEntry.source_triage_finding_id.startsWith('fixture-mutator-uat-47b'),
+// which propagates from the synthetic triage report's run_id (set by
+// inject-defect.mjs to the literal 'fixture-mutator-uat-47b').
+// ---------------------------------------------------------------------------
+
+describe('quarantine-append CLI — MUTATOR-04 source-tag suppression (G9)', () => {
+  it('G9-a: synthetic entry crossing stable_runs threshold does NOT add the promotion label', () => {
+    // Pre-seed corpus with a stable_runs=2 entry whose
+    // source_triage_finding_id matches the fixture-mutator-uat-47b prefix.
+    // The triage-report fixture's iter-1 produces case-id
+    // US11427642-spec-short-1 (sanitized), so the upsert path will find this
+    // entry and increment stable_runs to 3 — which WOULD trigger label-add
+    // without the MUTATOR-04 suppression.
+    fs.writeFileSync(
+      corpusOverridePath,
+      '// AUTO-MANAGED\nexport const TEST_CASES_QUARANTINE = [\n' +
+        '  {\n' +
+        '    id: "US11427642-spec-short-1",\n' +
+        '    patentFile: "./tests/fixtures/US11427642.json",\n' +
+        '    selectedText: "receptor exclusively expressed on plasma cells and plasmablasts",\n' +
+        '    category: "WRONG_CITATION",\n' +
+        '    stable_runs: 2,\n' +
+        '    source_triage_finding_id: "fixture-mutator-uat-47b-iter-1",\n' +
+        '    added_iso: "2026-06-05T00:00:00.000Z"\n' +
+        '  }\n' +
+        '];\n',
+    );
+
+    const r = spawnAppend(['--input', path.join(runDir, 'triage-report.json')]);
+    expect(r.status).toBe(0);
+
+    const transcript = fs.existsSync(transcriptPath)
+      ? fs.readFileSync(transcriptPath, 'utf8')
+      : '';
+
+    // MUTATOR-04 invariant: the synthetic-tagged entry, even at
+    // stable_runs >= STABLE_RUNS_THRESHOLD, MUST NOT receive the
+    // quarantine:ready-for-promotion label.
+    expect(transcript).not.toMatch(
+      /--add-label quarantine:ready-for-promotion/,
+    );
+  });
+
+  it('G9-b: non-mutator entry crossing the same threshold STILL adds the label (negative control)', () => {
+    // Same shape as G9-a but with a non-mutator source tag. Proves the
+    // suppression is targeted (anchored-equality regex post-REVIEW-FIX
+    // WR-04; was startsWith pre-REVIEW-FIX) rather than broad.
+    fs.writeFileSync(
+      corpusOverridePath,
+      '// AUTO-MANAGED\nexport const TEST_CASES_QUARANTINE = [\n' +
+        '  {\n' +
+        '    id: "US11427642-spec-short-1",\n' +
+        '    patentFile: "./tests/fixtures/US11427642.json",\n' +
+        '    selectedText: "receptor exclusively expressed on plasma cells and plasmablasts",\n' +
+        '    category: "WRONG_CITATION",\n' +
+        '    stable_runs: 2,\n' +
+        '    source_triage_finding_id: "real-pipeline-2026-06-05-iter-1",\n' +
+        '    added_iso: "2026-06-05T00:00:00.000Z"\n' +
+        '  }\n' +
+        '];\n',
+    );
+
+    const r = spawnAppend(['--input', path.join(runDir, 'triage-report.json')]);
+    expect(r.status).toBe(0);
+
+    const transcript = fs.existsSync(transcriptPath)
+      ? fs.readFileSync(transcriptPath, 'utf8')
+      : '';
+
+    // Negative control: real-pipeline source_triage_finding_id at
+    // stable_runs===3 must still produce the label-add call.
+    expect(transcript).toMatch(
+      /issue edit \d+ --add-label quarantine:ready-for-promotion/,
+    );
+  });
+
+  // Phase 59 REVIEW-FIX WR-04: equals-vs-startsWith regression pin.
+  // Pre-REVIEW-FIX `source_triage_finding_id.startsWith('fixture-mutator-uat-47b')`
+  // would have INCORRECTLY suppressed an entry whose source_triage_finding_id
+  // started with the literal but was NOT a mutator iter-N tag — e.g. a future
+  // Phase 6X UAT named `fixture-mutator-uat-47b-v2-iter-1` or
+  // `fixture-mutator-uat-47b-extension-2026-iter-3`. The post-REVIEW-FIX
+  // anchored regex `/^fixture-mutator-uat-47b-iter-\d+$/` rejects these as
+  // NOT a match — meaning they DO receive the
+  // quarantine:ready-for-promotion label like any other real entry at
+  // stable_runs >= 3. This test pins that behaviour so a future loosening
+  // back to startsWith trips the assertion.
+  it('G9-c: entry with prefix `fixture-mutator-uat-47b-` but NOT matching iter-N regex STILL adds the label (equals-vs-startsWith pin)', () => {
+    fs.writeFileSync(
+      corpusOverridePath,
+      '// AUTO-MANAGED\nexport const TEST_CASES_QUARANTINE = [\n' +
+        '  {\n' +
+        '    id: "US11427642-spec-short-1",\n' +
+        '    patentFile: "./tests/fixtures/US11427642.json",\n' +
+        '    selectedText: "receptor exclusively expressed on plasma cells and plasmablasts",\n' +
+        '    category: "WRONG_CITATION",\n' +
+        '    stable_runs: 2,\n' +
+        '    source_triage_finding_id: "fixture-mutator-uat-47b-extension-2026-iter-1",\n' +
+        '    added_iso: "2026-06-05T00:00:00.000Z"\n' +
+        '  }\n' +
+        '];\n',
+    );
+
+    const r = spawnAppend(['--input', path.join(runDir, 'triage-report.json')]);
+    expect(r.status).toBe(0);
+
+    const transcript = fs.existsSync(transcriptPath)
+      ? fs.readFileSync(transcriptPath, 'utf8')
+      : '';
+
+    // WR-04 invariant: a `fixture-mutator-uat-47b-extension-2026-iter-1`
+    // tag is NOT the canonical SOURCE_TAG, so the anchored regex rejects
+    // it. The entry at stable_runs===3 receives the promotion label like
+    // any other real-pipeline entry. Under the pre-REVIEW-FIX startsWith
+    // check this would have been silently suppressed — proving the WR-04
+    // tightening is load-bearing.
+    expect(transcript).toMatch(
+      /issue edit \d+ --add-label quarantine:ready-for-promotion/,
+    );
+  });
+});

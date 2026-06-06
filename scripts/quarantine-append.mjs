@@ -216,8 +216,29 @@ export async function upsertQuarantineEntry(newEntry, opts = {}) {
   atomicWriteJson(corpusPath, stringifyCorpus(arr));
 
   // 5. D-12: label-add when threshold reached.
+  // Phase 59 Plan 59-01 (MUTATOR-04 / Pitfall 8 LOAD-BEARING): suppress
+  // auto-promotion for synthetic UAT-47-b entries. The fixture-mutator
+  // (tests/e2e/scripts/inject-defect.mjs) produces a synthetic triage report
+  // whose run_id is the canonical SOURCE_TAG literal 'fixture-mutator-uat-47b'.
+  // The triage layer appends '-iter-<N>' to produce
+  // source_triage_finding_id values like 'fixture-mutator-uat-47b-iter-1'.
+  // Co-designed in the SAME commit as inject-defect.mjs per
+  // REQUIREMENTS.md MUTATOR-04.
+  //
+  // Phase 59 REVIEW-FIX WR-04: anchored-equality regex (NOT startsWith).
+  // The pre-REVIEW-FIX `.startsWith('fixture-mutator-uat-47b')` discriminator
+  // was BROADER than equals — any future synthetic-tagged corpus entry whose
+  // source_triage_finding_id happened to BEGIN with that literal (e.g.
+  // 'fixture-mutator-uat-47b-extension-2026-iter-N' or a future Phase 6X
+  // UAT that picked a similar prefix like 'fixture-mutator-uat-47b-v2')
+  // would silently inherit the suppression by accident. The
+  // /^fixture-mutator-uat-47b-iter-\d+$/ regex pins exact equality against
+  // the canonical SOURCE_TAG literal followed by the triage-layer
+  // '-iter-<N>' suffix — proven by G9-c (the equals-vs-startsWith pin).
+  const isFixtureMutator = typeof finalEntry.source_triage_finding_id === 'string'
+    && /^fixture-mutator-uat-47b-iter-\d+$/.test(finalEntry.source_triage_finding_id);
   let addedLabel = false;
-  if (finalEntry.stable_runs >= STABLE_RUNS_THRESHOLD && ghClient && triageIssueNumber != null) {
+  if (finalEntry.stable_runs >= STABLE_RUNS_THRESHOLD && ghClient && triageIssueNumber != null && !isFixtureMutator) {
     ghClient.addLabel(triageIssueNumber, READY_FOR_PROMOTION_LABEL);
     addedLabel = true;
   }

@@ -283,6 +283,11 @@ const KNOWN_FLAGS = new Set([
   // arms). Threaded onto the outcome ledger entry shape so a-b-winner's
   // isAttributable filter accepts the entry once entries accumulate.
   '--fingerprint', '--error-class', '--model',
+  // Phase 59 SWEEP-05 / Decision C: --phase argv expansion so UAT runs
+  // can carry phase: '56-uat' on the live ledger entry per REQUIREMENTS.md
+  // SWEEP-05 literal wording. Default fallback is '58-promote' (preserves
+  // current hardcoded literal byte-equivalent on non-UAT runs).
+  '--phase',
   // Phase 53 PARTIAL-03 (D-16): --passing-cases CSV for the partial path.
   // Ignored by the verified path; consumed by assertPartialGate +
   // runPartialPromote on the partial branch of main().
@@ -323,6 +328,10 @@ export function parseArgv(argv) {
   let fingerprint = null;
   let errorClass = null;
   let model = null;
+  // Phase 59 SWEEP-05 / Decision C: --phase argv. Defaults to null; when
+  // null the entry-write path falls back to '58-promote' via
+  // `args.phase || '58-promote'`. UAT runs override with --phase 56-uat.
+  let phase = null;
 
   for (let i = 2; i < argv.length; i++) {
     const tok = argv[i];
@@ -353,6 +362,7 @@ export function parseArgv(argv) {
       case '--fingerprint':          fingerprint = takeValue(argv, i, tok); i++; break;
       case '--error-class':          errorClass  = takeValue(argv, i, tok); i++; break;
       case '--model':                model       = takeValue(argv, i, tok); i++; break;
+      case '--phase':                phase       = takeValue(argv, i, tok); i++; break;
     }
   }
 
@@ -387,6 +397,17 @@ export function parseArgv(argv) {
     );
     process.exit(2);
   }
+  // Phase 59 SWEEP-05 / Decision C: defensive validation of --phase. The
+  // regex accepts '56-uat', '58-promote', '42-auto-fix', etc.; rejects
+  // whitespace, semicolons, and shell metacharacters (T-59-11 mitigation —
+  // defense-in-depth against operator-controlled shell-injection-shaped
+  // values entering via the workflow_dispatch PHASE_TAG input).
+  if (phase !== null && !/^[a-zA-Z0-9_-]+$/.test(phase)) {
+    process.stderr.write(
+      '[auto-fix-promote] malformed --phase (expected /^[a-zA-Z0-9_-]+$/)\n',
+    );
+    process.exit(2);
+  }
 
   return {
     pr: Number(pr),
@@ -402,6 +423,7 @@ export function parseArgv(argv) {
     fingerprint,
     errorClass,
     model,
+    phase,
     passingCases: passingCasesCsv
       ? passingCasesCsv.split(',').map((s) => s.trim()).filter(Boolean)
       : [],
@@ -493,13 +515,16 @@ async function main(argv = process.argv) {
         `[auto-fix-promote] runPromote returned exitCode ${result.exitCode} for case ${args.caseId}\n`,
       );
       // PHASE 58 PROMOTE-03 — outcome entry on promote failure (line 440 path only — see RESEARCH §8)
+      // PHASE 59 SWEEP-05 / Decision C — `phase` defaults to '58-promote'
+      // when --phase is absent (preserves Phase 58 byte-equivalent shape on
+      // non-UAT runs); UAT runs override via --phase 56-uat per Pitfall 10.
       appendLedgerEntry(LEDGER_PATH, {
         iso: new Date().toISOString(),
         model: args.model || 'claude-sonnet-4-6',
         cost_usd: 0,
         tokens_in: 0,
         tokens_out: 0,
-        phase: '58-promote',
+        phase: args.phase || '58-promote',
         transport: 'subscription',
         issueId: `issue-${resolvedSourceIssue}`,
         prNumber: args.pr,
@@ -513,13 +538,16 @@ async function main(argv = process.argv) {
     }
 
     // PHASE 58 PROMOTE-02 — outcome entry on promote success
+    // PHASE 59 SWEEP-05 / Decision C — `phase` defaults to '58-promote'
+    // when --phase is absent (preserves Phase 58 byte-equivalent shape on
+    // non-UAT runs); UAT runs override via --phase 56-uat per Pitfall 10.
     appendLedgerEntry(LEDGER_PATH, {
       iso: new Date().toISOString(),
       model: args.model || 'claude-sonnet-4-6',
       cost_usd: 0,
       tokens_in: 0,
       tokens_out: 0,
-      phase: '58-promote',
+      phase: args.phase || '58-promote',
       transport: 'subscription',
       issueId: `issue-${resolvedSourceIssue}`,
       prNumber: args.pr,

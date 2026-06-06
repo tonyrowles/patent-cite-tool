@@ -305,3 +305,109 @@ describe('v40-auto-promote.yml Phase 58 contract — fingerprint + errorClass + 
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// Phase 59 SWEEP-05 — workflow_dispatch trigger + PHASE_TAG dual-path env
+// expression + conditional --phase argv append (Decision C).
+//
+// Together with Plan 59-03's script-side parseArgv (PHASE-59-P1..P3) and
+// entry-shape (PHASE-59-O1..O2) pins, this Vitest contract closes the end-
+// to-end pin at three layers — workflow YAML, parseArgv, entry shape.
+//
+// PHASE-59-Y1 — workflow_dispatch trigger variant with PHASE_TAG input.
+// PHASE-59-Y2 — job-level if-filter augmented to allow workflow_dispatch.
+// PHASE-59-Y3 — --phase conditional argv-append (mirrors WR-01 pattern).
+// ---------------------------------------------------------------------------
+
+describe('v40-auto-promote.yml Phase 59 contract — SWEEP-05 phase argv expansion (Decision C)', () => {
+
+  it('PHASE-59-Y1 — workflow_dispatch trigger with inputs.PHASE_TAG (description, required: false, default: \'\', type: string)', () => {
+    // (a) workflow_dispatch + inputs.PHASE_TAG presence (Phase 59 REVIEW-FIX
+    // CR-01 added pr_number + merged inputs ahead of PHASE_TAG, so the
+    // adjacency check is widened from a strict 2-line gap to "any-inputs-
+    // present then PHASE_TAG"; the SHAPE invariant Y1 cares about is the
+    // PHASE_TAG schema, not the lexical position of the key inside inputs:)
+    expect(yaml).toMatch(/workflow_dispatch:\s*\n\s*inputs:/);
+    expect(yaml).toMatch(/\s*PHASE_TAG:\s*\n/);
+    // (b) required: false default contract
+    expect(yaml).toMatch(/PHASE_TAG:\s*\n[\s\S]*?required: false/);
+    // (c) explicit empty-string default (no silent shape — preserves the
+    // byte-equivalent pull_request trigger path because the script's
+    // `args.phase || '58-promote'` fallback fires only when --phase is
+    // absent OR set to a falsy value)
+    expect(yaml).toMatch(/PHASE_TAG:\s*\n[\s\S]*?default: ''/);
+    // (d) type: string
+    expect(yaml).toMatch(/PHASE_TAG:\s*\n[\s\S]*?type: string/);
+  });
+
+  it('PHASE-59-Y2 — job-level if-filter augmented to allow workflow_dispatch event (preserves existing pull_request branch byte-equivalent)', () => {
+    // (a) workflow_dispatch OR-branch presence — operator-triggered UAT runs
+    // pass the filter without a pull_request payload.
+    expect(yaml).toMatch(/github\.event_name == 'workflow_dispatch'/);
+    // (b) existing pull_request branch preserved BYTE-EQUIVALENT inside the
+    // parenthesized fallback. PHASE-58-Y11 / WR-01 regression pin compatibility.
+    expect(yaml).toContain('github.event.pull_request.merged == true');
+    expect(yaml).toContain("contains(github.event.pull_request.labels.*.name, 'auto-fix:verified')");
+    expect(yaml).toContain("contains(github.event.pull_request.labels.*.name, 'auto-fix:partial-verified')");
+  });
+
+  it('PHASE-59-Y3 — --phase argv is gated by conditional, NOT unconditionally emitted (mirrors WR-01 PHASE-58-Y11 pattern)', () => {
+    // Phase 59 SWEEP-05 Decision C: The pull_request trigger path leaves
+    // PHASE_TAG="" (workflow `default: ''`), and
+    // scripts/auto-fix-promote.mjs's parseArgv -> takeValue rejects empty-
+    // string flag values with exit 2. The workflow MUST guard --phase
+    // behind `if [ -n "$PHASE_TAG" ]` so the flag never reaches argv with
+    // an empty value. Direct port of PHASE-58-Y11 pattern.
+    //
+    // Phase 59 REVIEW-FIX WR-01: PHASE_TAG env var is declared in the
+    // Triple-gate step env block via the SINGLE-source expression
+    // `${{ github.event.inputs.PHASE_TAG || '' }}`. The legacy
+    // `|| vars.PHASE_TAG` fallback was removed because a forgotten repo
+    // variable would silently re-tag every normal pull_request auto-promote
+    // ledger entry, corrupting per-phase attribution downstream.
+    expect(yaml).toMatch(/PHASE_TAG:\s*\$\{\{\s*github\.event\.inputs\.PHASE_TAG\s*\|\|\s*''\s*\}\}/);
+    // (a) conditional present
+    expect(yaml).toMatch(/if\s+\[\s+-n\s+"\$PHASE_TAG"\s+\]/);
+    // (b) bash array conditional-append pattern
+    expect(yaml).toMatch(/ARGS\+=\(--phase "\$PHASE_TAG"\)/);
+    // (c) defense against silent regression to unconditional emit (line-
+    // continuation backslash pattern; matches PHASE-58-Y11's third
+    // assertion shape verbatim).
+    expect(yaml).not.toMatch(/--phase "\$PHASE_TAG"\s*\\\n/);
+  });
+
+  // Phase 59 REVIEW-FIX CR-01: workflow_dispatch trigger must expose a
+  // required pr_number input so the operator-driven UAT path can resolve
+  // a real PR number for the parse step. The pre-REVIEW-FIX shape admitted
+  // workflow_dispatch events through the job-level if-filter but crashed
+  // at the first `gh pr view ""` call (PR_NUMBER empty for dispatch).
+  it('PHASE-59-Y4 — workflow_dispatch.inputs.pr_number is required and threaded into PR_NUMBER fallback', () => {
+    // (a) pr_number input present with required: true and type: string
+    expect(yaml).toMatch(/workflow_dispatch:[\s\S]*?inputs:[\s\S]*?pr_number:/);
+    expect(yaml).toMatch(/pr_number:\s*\n[\s\S]*?required: true/);
+    expect(yaml).toMatch(/pr_number:\s*\n[\s\S]*?type: string/);
+    // (b) merged input present with required: true (operator affirmation
+    // mirroring the pull_request.merged == true semantic)
+    expect(yaml).toMatch(/workflow_dispatch:[\s\S]*?inputs:[\s\S]*?merged:/);
+    expect(yaml).toMatch(/merged:\s*\n[\s\S]*?required: true/);
+    // (c) PR_NUMBER env extraction in the parse step falls back from the
+    // pull_request payload to the workflow_dispatch input
+    expect(yaml).toMatch(/PR_NUMBER:\s*\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*github\.event\.inputs\.pr_number\s*\}\}/);
+    // (d) early hard-fail step rejects empty PR_NUMBER (defense-in-depth)
+    expect(yaml).toMatch(/Reject empty PR_NUMBER[\s\S]*?if \[ -z "\$PR_NUMBER" \][\s\S]*?exit 1/);
+  });
+
+  // Phase 59 REVIEW-FIX WR-01: regression guard against silent re-
+  // introduction of the `vars.PHASE_TAG` foot-gun. The literal token
+  // `vars.PHASE_TAG` MUST NOT appear anywhere in the workflow YAML
+  // (description text, comments, or expressions). A future commit that
+  // re-adds it for any reason trips this assertion. The SWEEP runbook
+  // now passes the phase tag exclusively via the workflow_dispatch
+  // input mechanism (`gh workflow run -f PHASE_TAG=...`); a repo
+  // variable named PHASE_TAG would silently corrupt the ledger phase
+  // attribution on every normal pull_request auto-promote run.
+  it('PHASE-59-Y5 — vars.PHASE_TAG literal is absent (WR-01 regression guard)', () => {
+    expect(yaml).not.toContain('vars.PHASE_TAG');
+  });
+
+});

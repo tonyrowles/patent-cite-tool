@@ -186,7 +186,6 @@ const PHASE = '42-auto-fix';
 // were always correct (invokeClaudePWithLedger self-tags 'subscription' at
 // llm-driver.js:428); only the auxiliary entries leaked.
 const DEFAULT_TRANSPORT = 'sdk';
-const MODEL = 'claude-sonnet-4-6';
 // Phase 46-01 (AUTOFIX-06) — subscription-transport routing constants.
 // PHASE_46 tags ledger entries written by invokeClaudePWithLedger; SOURCE_FIX_ISSUE
 // distinguishes the local-iteration `npm run fix-issue` call site from the
@@ -418,7 +417,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
   if (decision.state === 'FLAKE_SUPPRESSED') {
     safeAppendLedger({
       iso: now().toISOString(),
-      model: MODEL,
+      model: 'claude-sonnet-4-6',
       cost_usd: 0,
       tokens_in: 0,
       tokens_out: 0,
@@ -515,7 +514,7 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
   // Ledger entry summarizing the dispatch decision
   safeAppendLedger({
     iso: now().toISOString(),
-    model: MODEL,
+    model: 'claude-sonnet-4-6',
     cost_usd: 0,
     tokens_in: 0,
     tokens_out: 0,
@@ -671,7 +670,7 @@ export async function runDispatcher({
   if (lsRemoteOut.trim().length > 0) {
     safeAppendLedger({
       iso: new Date().toISOString(),
-      model: MODEL,
+      model: 'claude-sonnet-4-6',
       cost_usd: 0,
       tokens_in: 0,
       tokens_out: 0,
@@ -718,7 +717,7 @@ export async function runDispatcher({
     }
     safeAppendLedger({
       iso: new Date().toISOString(),
-      model: MODEL,
+      model: 'claude-sonnet-4-6',
       cost_usd: 0,
       tokens_in: 0,
       tokens_out: 0,
@@ -815,7 +814,7 @@ export async function runDispatcher({
   if (!parsed.ok) {
     safeAppendLedger({
       iso: new Date().toISOString(),
-      model: MODEL,
+      model: 'claude-sonnet-4-6',
       cost_usd: 0,
       tokens_in: 0,
       tokens_out: 0,
@@ -838,7 +837,7 @@ export async function runDispatcher({
     const violationList = guard.violations.join(', ');
     safeAppendLedger({
       iso: new Date().toISOString(),
-      model: MODEL,
+      model: 'claude-sonnet-4-6',
       cost_usd: 0,
       tokens_in: 0,
       tokens_out: 0,
@@ -876,7 +875,7 @@ export async function runDispatcher({
     const stderrSnip = String(err.stderr ?? err.message ?? '').slice(0, 500);
     safeAppendLedger({
       iso: new Date().toISOString(),
-      model: MODEL,
+      model: 'claude-sonnet-4-6',
       cost_usd: 0,
       tokens_in: 0,
       tokens_out: 0,
@@ -950,7 +949,7 @@ export async function runDispatcher({
     `<!-- affected_cases: ${caseId ?? 'unknown'} -->\n` +
     `fingerprint: ${fingerprint}\n` +
     `fix_attempts: ${attempts + 1}\n` +
-    `model: ${MODEL}\n` +
+    `model: claude-sonnet-4-6\n` +
     `transport: ${transport}`;
   process.stdout.write(
     `[auto-fix] suggested PR-create command:\n` +

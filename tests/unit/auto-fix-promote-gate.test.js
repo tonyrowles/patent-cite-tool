@@ -441,7 +441,34 @@ describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
     expect(block).toMatch(/model:\s*args\.model/);
   });
 
-  it('O3 — triple-gate failure paths do NOT write outcome entries: total appendLedgerEntry(LEDGER_PATH, ...) count equals 2 (success + failure only)', () => {
+  it('O3 — triple-gate failure paths do NOT write outcome entries: total appendLedgerEntry(LEDGER_PATH, ...) count equals 2 (success + failure only for the verified path)', () => {
+    // Phase 58 REVIEW-FIX WR-03 (deferred-by-design clarification):
+    //
+    // The exactly-2 count is intentional and applies to the VERIFIED PATH
+    // ONLY. The partial path (main() lines 537-583) deliberately writes
+    // ZERO outcome ledger entries on either success or failure — this is
+    // a Phase 58 scope decision, NOT a bug.
+    //
+    // Rationale: the partial-promote capability is a Phase 53 feature
+    // (assertPartialGate + runPartialPromote, _skipCiGuard:false). Phase
+    // 58's scope is wiring outcome attribution for the VERIFIED auto-fix
+    // path (the path that exercises _skipCiGuard:true and therefore
+    // carries the human-gate trust invariant). Threading per-case outcome
+    // attribution onto the partial path belongs to a follow-up phase
+    // because (a) the partial path runs through normal CI semantics so
+    // the safeAppendLedger leak-vector analysis differs, and (b)
+    // per-case granularity on the partial branch requires plumbing
+    // through runPartialPromote's per-case loop rather than the single
+    // verified-branch invocation. See
+    // .planning/phases/58-promote-outcome-ledger-entry/58-REVIEW-FIX.md
+    // "Deferred" section for the durable design-decision record.
+    //
+    // Concrete a-b-winner impact: until the future partial-path phase
+    // lands, partial-verified promotions are under-represented in the
+    // ledger relative to verified-only promotions. This biases per-
+    // (class, arm) pass-rate estimates toward verified-only outcomes
+    // (which are >=5/5); partial outcomes are 4/5. The bias is bounded
+    // by the partial-PR rate and is acceptable for the Phase 58 milestone.
     const source = readPromoteSource();
     const matches = source.match(/\bappendLedgerEntry\(LEDGER_PATH,/g) || [];
     expect(matches.length).toBe(2);

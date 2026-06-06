@@ -288,4 +288,20 @@ describe('v40-auto-promote.yml Phase 58 contract — fingerprint + errorClass + 
     expect(yaml).toMatch(/Pre-resolve upstream-ledger model[\s\S]*?exit 1/);
   });
 
+  it('PHASE-58-Y11 — --passing-cases is gated by conditional, NOT unconditionally emitted (WR-01 regression pin)', () => {
+    // Phase 58 REVIEW-FIX WR-01: The verified-only path leaves
+    // PARTIAL_PASSING_CASES="", and scripts/auto-fix-promote.mjs's
+    // parseArgv -> takeValue rejects empty-string flag values with exit 2.
+    // The workflow MUST guard --passing-cases behind `if [ -n
+    // "$PARTIAL_PASSING_CASES" ]` (bash array conditional-append pattern)
+    // so the flag never reaches argv with an empty value. This regression
+    // pin asserts both halves: (a) the conditional exists; (b) the literal
+    // `--passing-cases "$PARTIAL_PASSING_CASES"` line on a continuation
+    // backslash (the pre-fix shape) is absent. (a) and (b) together prevent
+    // a silent revert to the broken shape.
+    expect(yaml).toMatch(/if\s+\[\s+-n\s+"\$PARTIAL_PASSING_CASES"\s+\]/);
+    expect(yaml).toMatch(/ARGS\+=\(--passing-cases "\$PARTIAL_PASSING_CASES"\)/);
+    expect(yaml).not.toMatch(/--passing-cases "\$PARTIAL_PASSING_CASES"\s*\\\n/);
+  });
+
 });

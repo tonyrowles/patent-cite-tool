@@ -267,20 +267,31 @@ jobs:
           MODEL: ${{ steps.ml.outputs.model }}
         run: |
           PR_COMMIT_MSG=$(cat /tmp/pr-commit-message.txt)
+          # Phase 58 REVIEW-FIX WR-01: --passing-cases is appended ONLY when
+          # PARTIAL_PASSING_CASES is non-empty. The verified-only path leaves
+          # PARTIAL_PASSING_CASES="" (workflow line 151), and parseArgv's
+          # takeValue rejects an empty-string flag value with exit 2 — which
+          # would hard-fail every verified-only auto-promote run BEFORE the
+          # Phase 58 outcome ledger writes ever fire. Pinned by
+          # tests/e2e/scripts/v40-auto-promote-yaml.test.js PHASE-58-Y11.
           for CASE_ID in ${CASE_IDS//,/ }; do
-            node scripts/auto-fix-promote.mjs \
-              --pr "$PR_NUMBER" \
-              --pr-labels "$PR_LABELS" \
-              --pr-merged true \
-              --pr-body /tmp/pr-body.txt \
-              --pr-commit-message "$PR_COMMIT_MSG" \
-              --source-issue "$SOURCE_ISSUE" \
-              --source-issue-labels "$SOURCE_ISSUE_LABELS" \
-              --case-id "$CASE_ID" \
-              --passing-cases "$PARTIAL_PASSING_CASES" \
-              --fingerprint "$FINGERPRINT" \
-              --error-class "$ERROR_CLASS" \
+            ARGS=(
+              --pr "$PR_NUMBER"
+              --pr-labels "$PR_LABELS"
+              --pr-merged true
+              --pr-body /tmp/pr-body.txt
+              --pr-commit-message "$PR_COMMIT_MSG"
+              --source-issue "$SOURCE_ISSUE"
+              --source-issue-labels "$SOURCE_ISSUE_LABELS"
+              --case-id "$CASE_ID"
+              --fingerprint "$FINGERPRINT"
+              --error-class "$ERROR_CLASS"
               --model "$MODEL"
+            )
+            if [ -n "$PARTIAL_PASSING_CASES" ]; then
+              ARGS+=(--passing-cases "$PARTIAL_PASSING_CASES")
+            fi
+            node scripts/auto-fix-promote.mjs "${ARGS[@]}"
           done
 
       - name: Build auto-promote PR body

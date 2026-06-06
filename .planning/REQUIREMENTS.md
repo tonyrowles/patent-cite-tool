@@ -31,8 +31,8 @@ Refactors the daily snapshot workflow so its push lands on a `ledger-snapshots/*
 Wires the event-sourced outcome entry on auto-fix promotion success/failure. Required for `a-b-winner.mjs` to exit abstention without code changes (Phase 54's forward-compat probe handles transparently once entries populate).
 
 - [ ] **PROMOTE-01**: `scripts/auto-fix-promote.mjs` IMPORTS POLICY narrowed to allow `llm-ledger.js`; existing grep-based Vitest assertion in `tests/unit/auto-fix-promote-gate.test.js` updated in the SAME commit
-- [ ] **PROMOTE-02**: Event-sourced outcome entry written on promotion success: `{source: 'auto-fix-promoted', outcome: 'pass', fingerprint, issueId, prNumber}` — through `safeAppendLedger`
-- [ ] **PROMOTE-03**: Event-sourced outcome entry written on promotion failure (label-flap-to-failure): `{source: 'auto-fix-failed', outcome: 'fail', fingerprint, issueId, prNumber, reason}`
+- [ ] **PROMOTE-02**: Event-sourced outcome entry written on promotion success: `{source: 'auto-fix-promoted', outcome: 'pass', errorClass, fingerprint, issueId, prNumber}` — written via `appendLedgerEntry` (CI-only context; Phase 56's safeAppendLedger wrapper is module-internal to auto-fix.mjs and not reused). `errorClass` field added 2026-06-05 (Phase 58 scope adjustment) so `a-b-winner.mjs`'s `isAttributable` filter does not drop the entry.
+- [ ] **PROMOTE-03**: Event-sourced outcome entry written on promotion failure (`runPromote` returned non-zero at line 440 only): `{source: 'auto-fix-failed', outcome: 'fail', errorClass, fingerprint, issueId, prNumber, reason}`. Pre-promotion gate failures (lines 374/404/419/425) do NOT write outcome entries (semantically distinct from "promotion failed mid-flow"). `errorClass` added 2026-06-05 same as PROMOTE-02.
 - [ ] **PROMOTE-04**: `assertTripleGate` body BYTE-UNCHANGED (Phase 53 trust invariant) — Vitest delta assertion pins zero diff lines
 
 ### Fixture-Mutator

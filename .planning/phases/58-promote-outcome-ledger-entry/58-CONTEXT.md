@@ -1,20 +1,25 @@
 # Phase 58: Promote Outcome Ledger Entry - Context
 
 **Gathered:** 2026-06-04
-**Updated:** 2026-06-05 (scope expanded with errorClass — see Phase 58 Scope Adjustment below)
+**Updated:** 2026-06-05 (scope expanded with errorClass + model — see Phase 58 Scope Adjustment below)
 **Status:** Ready for planning
 **Mode:** Auto-generated (infrastructure phase — smart discuss skipped)
 
 ## Phase 58 Scope Adjustment (Decision Log)
 
-**Decision (2026-06-05):** Expand PROMOTE-02 / PROMOTE-03 entry shape to include `errorClass`. RESEARCH §1, §2 surfaced that:
+**Decision A (2026-06-05, errorClass expansion):** Expand PROMOTE-02 / PROMOTE-03 entry shape to include `errorClass`. RESEARCH §1, §2 surfaced that:
 1. **The auto-fix PR body does NOT contain fingerprint** (only the source issue body does). Phase 58 needs a workflow-side pre-resolution step (`gh issue view --json body` + grep for `<!-- fp: ([0-9a-f]{12}) -->`) and a new `--fingerprint` argv flag passed to `auto-fix-promote.mjs`.
 2. **`a-b-winner.mjs`'s `isAttributable` filter (lines 178-189) drops entries lacking `errorClass`** — without errorClass on the outcome entry, a-b-winner cannot exit abstention even after entries accumulate. The milestone goal ("a-b-winner can exit abstention automatically once entries accumulate without any code edit") FAILS under literal-spec interpretation.
 3. Therefore Phase 58 also threads `--error-class` argv (workflow-side resolves it via auto-fix PR labels or source-issue labels using the existing `extractErrorClass` helper).
 
-**Effect on REQUIREMENTS.md:** PROMOTE-02 + PROMOTE-03 entry shapes gain `errorClass`. This is the only milestone-DoD-preserving choice; recorded here so the change rationale is durable across context resets.
+**Decision B (2026-06-05, model expansion — triggered by checker verification_derivation finding):** Expand PROMOTE-02 / PROMOTE-03 entry shape to include `model`, sourced via `--model` argv (NOT hardcoded). Surfaced during plan revision when checker observed:
+1. **Plan 01 draft hardcoded `model: 'claude-sonnet-4-6'` on both success and failure outcome entries.** `a-b-winner.mjs`'s `isAttributable` filter (lines 178-189) ALSO requires `entry.model` to start with one of the two arm prefixes (`claude-sonnet-4-6` OR `claude-opus-4-7`). Hardcoding sonnet means the opus arm receives zero outcome entries and stays in indefinite abstention — same DoD-violation pattern as Decision A's errorClass issue.
+2. **The upstream auto-fix ledger entry already carries the correct `model`** per Phase 54 wiring (along with `fingerprint` from Phase 56). The workflow can look it up via a jq query keyed on the resolved fingerprint + `source == 'auto-fix-api'` filter, then pass the result via a new `--model` argv flag.
+3. Therefore Phase 58 also threads `--model` argv. Plan 01 adds the argv flag + validation (startsWith one of two arm prefixes, mirroring isAttributable) + replaces hardcoded sonnet with `args.model` in both entries. Plan 02 adds the jq pre-resolution step, hard-fails on no match (NO silent default to sonnet — that would re-introduce the per-arm attribution gap), and pins the workflow YAML contract via Vitest assertions (PHASE-58-Y1..Y10) in `tests/e2e/scripts/v40-auto-promote-yaml.test.js`.
 
-**Effect on other LOAD-BEARING constraints:** Unchanged. `assertTripleGate` body byte-unchanged invariant (PROMOTE-04) and IMPORTS POLICY narrowing (PROMOTE-01) both remain in force.
+**Effect on REQUIREMENTS.md:** PROMOTE-02 + PROMOTE-03 entry shapes gain `errorClass` (Decision A) AND `model` (Decision B). Both changes are the only milestone-DoD-preserving choices; recorded here so the change rationale is durable across context resets.
+
+**Effect on other LOAD-BEARING constraints:** Unchanged. `assertTripleGate` body byte-unchanged invariant (PROMOTE-04) and IMPORTS POLICY narrowing (PROMOTE-01) both remain in force. Plan 01 still ships as a single atomic `feat(58)` commit; Plan 02 still ships as a separate workflow-YAML commit (now covering two files: workflow + Vitest YAML contract test).
 
 <domain>
 ## Phase Boundary

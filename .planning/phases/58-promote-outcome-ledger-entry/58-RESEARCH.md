@@ -504,20 +504,41 @@ describe('IMPORTS POLICY (Phase 58 PROMOTE-01)', () => {
 | A4 | Failure entries should write ONLY on the `runPromote returned non-zero` path (line 440), NOT on the triple-gate failure paths (404, 419, 425) | Pitfall §8 below | MEDIUM — Argument: triple-gate failures are PRE-PROMOTION (the gate did its job and refused to run runPromote at all). Recording them as `outcome: 'fail'` muddies a-b-winner.mjs's signal about MODEL performance. The planner could legitimately decide to write them with a distinct `source: 'auto-fix-promote-gate-rejected'` instead (no `outcome` field, so a-b-winner.mjs ignores them; but the dashboard could still surface them). Either choice is defensible; this research recommends "only line 440 carries `source: 'auto-fix-failed', outcome: 'fail'`". | [ASSUMED] |
 | A5 | Workflow pre-resolution of fingerprint + errorClass is the right design (vs. live `gh` lookup inside the script) | Architecture Map, Pitfall §2 | LOW — explicit invariant at scripts/auto-fix-promote.mjs:43-46 ("the script never makes its own gh calls"); confirmed by IMPORTS POLICY. | [VERIFIED: scripts/auto-fix-promote.mjs:43-46] |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three open questions were resolved during planning and the Phase 58 Scope
+> Adjustment log entries (2026-06-05 in CONTEXT.md). RESOLUTION lines below
+> point at the durable artifact that closes each question.
 
 1. **Should the planner gate Phase 58 on `--error-class` being added too?**
+
+   **RESOLVED (2026-06-05):** Yes. Added to Phase 58 scope per CONTEXT.md
+   "Phase 58 Scope Adjustment" log entry. `--error-class` is plumbed end-to-end
+   in Plan 58-01 (script-side argv + validation + entry shape) and Plan 58-02
+   (workflow-side pre-resolution from source-issue labels; 5-ERROR_CLASS
+   whitelist; hard-fail on no match). PROMOTE-02 and PROMOTE-03 entry shapes
+   in REQUIREMENTS.md were updated 2026-06-05 to include `errorClass`.
    - What we know: a-b-winner.mjs's `isAttributable` filter at lines 178-189 REQUIRES `entry.errorClass` to be a non-empty string. Outcome entries lacking it are dropped before reaching outcome detection.
    - What's unclear: CONTEXT.md / REQUIREMENTS.md do not explicitly mention `errorClass` on the outcome entry. They mention it only as a Phase 56 thing (on the upstream auto-fix entry).
    - Recommendation: **Add `--error-class` argv to Phase 58 scope.** Otherwise success-criterion #3 of milestone v4.2 ("a-b-winner.mjs exits abstention") cannot be achieved by Phase 58 + accumulation alone — a follow-up phase would be required. The cost of adding `--error-class` is trivial (one argv flag + one workflow line). The planner should mention this in their PLAN.md and either fold it into PROMOTE-02/03 scope OR raise it as a small follow-up.
 
 2. **Should the IMPORTS POLICY comment-block edit also explicitly cite the Vitest assertion file path?**
-   - What we know: The current comment cites "Plan 44-01 Audit 4" by name.
-   - Recommendation: Yes — add "Enforced by tests/unit/auto-fix-promote-gate.test.js (Phase 58-added describe block 'IMPORTS POLICY')" to the comment so future readers can find the executable assertion.
+
+   **RESOLVED:** Yes. Plan 58-01 Task 1.1 directive (e) requires the updated
+   IMPORTS POLICY comment block to add a closing sentence pointing at
+   `tests/unit/auto-fix-promote-gate.test.js` describe block
+   `'IMPORTS POLICY (Phase 58 PROMOTE-01)'`. Future readers can find the
+   executable assertion directly from the comment.
 
 3. **Does the existing test mocking strategy work for `appendLedgerEntry`?**
-   - What we know: `tests/unit/auto-fix-promote-gate.test.js` currently has zero `vi.mock` calls — all tests are pure-function direct calls. Adding mock for `appendLedgerEntry` will require `vi.mock('../../tests/e2e/lib/llm-ledger.js', ...)`.
-   - Recommendation: Mock via `vi.mock` with a factory that returns a spy. Pattern verified by `scripts/auto-fix.mjs` test file at `tests/unit/auto-fix.test.js` (per CONTEXT comment "vi.mock('../e2e/lib/llm-ledger.js', ...) factory in tests/unit/auto-fix.test.js"). Phase 58's test additions for outcome-write coverage should follow that same mock pattern.
+
+   **RESOLVED:** Yes (with a structural fallback). Plan 58-01 Task 1.2
+   directives (l)–(n) specify `vi.mock('../../tests/e2e/lib/llm-ledger.js', ...)`
+   with a factory returning `{ appendLedgerEntry: vi.fn(), LEDGER_PATH: '/tmp/test-ledger.json' }`,
+   matching the `tests/unit/auto-fix.test.js` precedent. The plan also
+   permits a structural fallback (regex over source) for the O1/O2/O3 cases
+   if the dynamic main() invocation proves brittle to mock — implementer
+   discretion.
 
 ## Environment Availability
 

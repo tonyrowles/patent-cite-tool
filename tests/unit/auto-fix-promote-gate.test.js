@@ -411,7 +411,12 @@ describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
     expect(block).toMatch(/outcome:\s*'pass'/);
     expect(block).toMatch(/errorClass:\s*args\.errorClass/);
     expect(block).toMatch(/fingerprint:\s*args\.fingerprint/);
-    expect(block).toMatch(/issueId:\s*`issue-\$\{args\.sourceIssue\}`/);
+    // Phase 58 REVIEW-FIX WR-02: issueId sources from the validated
+    // resolvedSourceIssue (not the raw args.sourceIssue which may be null
+    // when --source-issue is omitted). Pre-fix shape would have landed
+    // `issue-null` in the ledger for direct CLI callers; CI masked the
+    // bug because the workflow always passes --source-issue.
+    expect(block).toMatch(/issueId:\s*`issue-\$\{resolvedSourceIssue\}`/);
     expect(block).toMatch(/prNumber:\s*args\.pr/);
     expect(block).toMatch(/iso:\s*new Date\(\)\.toISOString\(\)/);
     expect(block).toMatch(/phase:\s*'58-promote'/);
@@ -429,7 +434,8 @@ describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
     expect(block).toMatch(/outcome:\s*'fail'/);
     expect(block).toMatch(/errorClass:\s*args\.errorClass/);
     expect(block).toMatch(/fingerprint:\s*args\.fingerprint/);
-    expect(block).toMatch(/issueId:\s*`issue-\$\{args\.sourceIssue\}`/);
+    // Phase 58 REVIEW-FIX WR-02: see O1 comment above.
+    expect(block).toMatch(/issueId:\s*`issue-\$\{resolvedSourceIssue\}`/);
     expect(block).toMatch(/prNumber:\s*args\.pr/);
     expect(block).toMatch(/reason:\s*\(?`runPromote exitCode=\$\{result\.exitCode\}`/);
     expect(block).toMatch(/model:\s*args\.model/);

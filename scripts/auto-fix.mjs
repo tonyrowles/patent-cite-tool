@@ -157,7 +157,17 @@ function safeAppendLedger(entry) {
   const hasOverride =
     typeof process.env.E2E_LEDGER_PATH_OVERRIDE === 'string' &&
     process.env.E2E_LEDGER_PATH_OVERRIDE.trim().length > 0;
-  if (!inCi && !hasOverride) {
+  // Phase 60.1 (hotfix): the documented v3.1/v4.0 subscription-local path
+  // (`npm run fix-issue -- --transport subscription`) writes auxiliary
+  // forensic entries from runDispatcher BEFORE invokeClaudePWithLedger
+  // writes the cost-bearing entry. Those forensic writes self-tag
+  // `transport: 'subscription'` (see runDispatcher resolvedTransport at
+  // ~line 762). The Phase 56 leak vector that motivated this guard is
+  // local `--force-api` runs that self-tag `transport: 'sdk'`; whitelisting
+  // subscription-tagged entries restores the v3.1/v4.0 free-iteration flow
+  // while leaving the SDK-path leak protection intact.
+  const isSubscriptionLocal = entry && entry.transport === 'subscription';
+  if (!inCi && !hasOverride && !isSubscriptionLocal) {
     throw new Error(
       `safeAppendLedger refused: cannot write to ${LEDGER_PATH} ` +
         `outside CI. Set process.env.CI=true (CI invocation) or ` +

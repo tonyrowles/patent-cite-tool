@@ -13,6 +13,18 @@ scope_note: |
   operator execution because they require PR #18 (carrying Phases 56+57+58)
   to be merged to origin/main AND live-network operations against the live
   repo. This is not a gap — it is the documented Wave-3 operator runbook.
+
+  AMENDMENT 2026-06-07 (§Cost-Discipline Amendment in 59-02-PLAN.md): SWEEP-03
+  and SWEEP-04 expected text revised. The original plan triggered v40-auto-fix.yml
+  via `issues.labeled` event which requires the ANTHROPIC_API_KEY repo secret;
+  that path was BLOCKED on 2026-06-06 (commit 8bc8627). The amendment substitutes
+  the LOCAL Claude Max subscription transport (`npm run fix-issue -- --transport
+  subscription --push`) unlocked by Phase 60.1 hotfix (commit ab2dd34). The
+  PRIMARY DoD evidence (outcome ledger entry on origin/main with the documented
+  shape) is unchanged. The v40-auto-fix.yml workflow-trigger half is explicitly
+  out of scope until the API-key secret is provisioned (filed as future-milestone
+  follow-up todo). Cost ceiling reduced from $2.00 hard cap to $0.25 forensic
+  floor.
 human_verification:
   - test: "SWEEP-01 — UAT-47-e diff-guard rejection re-test runbook"
     expected: "Crafted PR touching tests/golden/baseline.json triggers diff-guard FAIL bucket, gets human-review-required label, PR comment mentions tests/golden/baseline.json, PR closed --delete-branch, working tree clean on main"
@@ -20,14 +32,14 @@ human_verification:
   - test: "SWEEP-02 — UAT-47-d ledger-snapshot branch-redirect runbook"
     expected: "gh workflow run v40-cost-ledger-snapshot.yml --ref main produces a new origin/ledger-snapshots/daily-YYYY-MM-DD branch, no new commit on origin/main from this workflow, snapshot commit matches '[skip ci] ledger snapshot YYYY-MM-DD: N invocations, $X.XX spent' pattern"
     why_human: "Requires live workflow_dispatch trigger against origin/main; cannot run autonomously."
-  - test: "SWEEP-03 — UAT-47-a full end-to-end auto-fix loop (PRIMARY DoD)"
-    expected: "Mutator injects synthetic, v40-auto-fix.yml fires, draft PR opens, verifier-gate runs success, operator sets vars.PHASE_TAG=56-uat, operator merges PR, v40-auto-promote.yml fires, outcome ledger entry on origin/main carries source: 'auto-fix-promoted' + outcome: 'pass' + errorClass + phase: '56-uat' + fingerprint + issueId + prNumber + model; spend delta < $2.00 hard ceiling"
-    why_human: "Paid LLM invocation (estimated $0.50-2); requires explicit cost-acknowledgement gate before triggering; only operator can merge the auto-fix PR; only operator can set vars.PHASE_TAG via gh CLI. This is the v4.2 milestone PRIMARY DoD evidence."
-  - test: "SWEEP-04 — UAT-47-b mutator-driven full loop + MUTATOR-04 suppression verification"
-    expected: "Mutator with DIFFERENT seed than SWEEP-03 drives synthetic through full loop; outcome entry carries phase: '56-uat'; post-auto-promote inspection of origin/main quarantine corpus shows synthetic entry's triage issue does NOT carry quarantine:ready-for-promotion label (proves MUTATOR-04 production-path); deps-update-gate trigger smoke captured"
-    why_human: "Same live-network constraints as SWEEP-03; uses real gh CLI against origin/main."
+  - test: "SWEEP-03 — UAT-47-a full end-to-end auto-fix loop (PRIMARY DoD) — subscription transport per §Cost-Discipline Amendment 2026-06-07"
+    expected: "Mutator injects synthetic, operator runs `npm run fix-issue -- --issue $ISSUE --push` LOCALLY (Claude Max subscription transport — replaces v40-auto-fix.yml workflow path which is blocked by missing ANTHROPIC_API_KEY repo secret), auto-fix branch pushed to origin, operator runs printed `gh pr create --draft` to open the PR, verifier-gate runs success, operator merges PR, v40-auto-promote.yml fires (pull_request.closed lands phase: '58-promote'), operator runs `gh workflow run v40-auto-promote.yml -f pr_number=$PR -f merged=true -f PHASE_TAG=56-uat` to dispatch second auto-promote run, outcome ledger entry on origin/main carries source: 'auto-fix-promoted' + outcome: 'pass' + errorClass + phase: '56-uat' + fingerprint + issueId + prNumber + model; spend delta < $0.25 forensic floor (cost-bearing entries are $0 under subscription)"
+    why_human: "Local Claude Code subscription session (operator's machine, no API key); only operator can run the local `npm run fix-issue` invocation; only operator can run the printed `gh pr create --draft`; only operator can merge the auto-fix PR; only operator can dispatch the post-merge `gh workflow run v40-auto-promote.yml`. This is the v4.2 milestone PRIMARY DoD evidence."
+  - test: "SWEEP-04 — UAT-47-b mutator-driven full loop + MUTATOR-04 suppression verification — subscription transport per §Cost-Discipline Amendment 2026-06-07"
+    expected: "Mutator with DIFFERENT seed (`mutator-seed-sweep-04-claudemax`) than SWEEP-03 (`mutator-seed-sweep-03-claudemax-2`) drives synthetic through full subscription-transport loop; outcome entry carries phase: '56-uat'; post-auto-promote inspection of origin/main quarantine corpus shows synthetic entry's triage issue does NOT carry quarantine:ready-for-promotion label (proves MUTATOR-04 production-path); deps-update-gate trigger smoke captured"
+    why_human: "Same local-subscription + live-network constraints as SWEEP-03; uses real gh CLI against origin/main."
   - test: "SWEEP-06 — Post-UAT cleanup + 56-UAT-EVIDENCE.md consolidation"
-    expected: "tests/e2e/scripts/uat-cleanup.mjs ships with --close-prs / --close-issues / --revert-quarantine; cleanup PR opened (cannot direct-push due to FORBIDDEN_PATHS regex 3); gh variable delete PHASE_TAG executed; 0 open synthetic GitHub issues, 0 dangling test-uat47e-* branches; 56-UAT-EVIDENCE.md consolidates Outcome Matrix + per-UAT detail + Pitfall closure + cost ledger + cleanup status"
+    expected: "tests/e2e/scripts/uat-cleanup.mjs ships with --close-prs / --close-issues / --revert-quarantine; cleanup PR opened (cannot direct-push due to FORBIDDEN_PATHS regex 3); 0 open synthetic GitHub issues, 0 dangling test-uat47e-* branches; 56-UAT-EVIDENCE.md consolidates Outcome Matrix + per-UAT detail + Pitfall closure + cost ledger + cleanup status + §Cost-Discipline Amendment reference (subscription transport substitution for SWEEP-03/04). Note: `gh variable delete PHASE_TAG` no longer needed (Phase 59 REVIEW-FIX WR-01 made PHASE_TAG dispatch-input only — no repo variable to clear)."
     why_human: "Cleanup automation requires live gh CLI; consolidated evidence file depends on completion of SWEEP-01..04 above."
 ---
 

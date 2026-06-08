@@ -1,8 +1,9 @@
 ---
 phase: 59-fixture-mutator-4-uat-re-sweep
 verified: 2026-06-06T04:44:57Z
-status: human_needed
-score: 6/11 must-haves verified (Waves 0-2 autonomously completable subset); 5/11 deferred to Wave 3 operator runbook (blocked on PR #18 merge to origin/main)
+re-verified: 2026-06-08T22:50:00Z
+status: architecturally-deferred
+score: 6/11 must-haves verified (Waves 0-2 + SWEEP-01 + SWEEP-02 PASS on origin/main); 5/11 deferred to v4.3 (SWEEP-03/04 PRIMARY DoD + SWEEP-06 cleanup blocked on auto-fix loop architectural gap discovered 2026-06-08; not a Phase 59 plan defect)
 overrides_applied: 0
 scope_note: |
   This verification covers the autonomously-completable subset of Phase 59:
@@ -19,12 +20,59 @@ scope_note: |
   via `issues.labeled` event which requires the ANTHROPIC_API_KEY repo secret;
   that path was BLOCKED on 2026-06-06 (commit 8bc8627). The amendment substitutes
   the LOCAL Claude Max subscription transport (`npm run fix-issue -- --transport
-  subscription --push`) unlocked by Phase 60.1 hotfix (commit ab2dd34). The
-  PRIMARY DoD evidence (outcome ledger entry on origin/main with the documented
-  shape) is unchanged. The v40-auto-fix.yml workflow-trigger half is explicitly
-  out of scope until the API-key secret is provisioned (filed as future-milestone
-  follow-up todo). Cost ceiling reduced from $2.00 hard cap to $0.25 forensic
-  floor.
+  subscription --push`) unlocked by Phase 60.1 hotfix (commit ab2dd34). Cost
+  ceiling reduced from $2.00 hard cap to $0.25 forensic floor.
+
+  AMENDMENT 2026-06-08 (architectural deferral): Two SWEEP-03 subscription
+  attempts on 2026-06-07 + 2026-06-08 revealed two distinct architectural
+  constraints in the auto-fix loop that are NOT addressable within the v4.2
+  scope:
+
+    FAILURE MODE 1 — `apply-check-failed` (mutator-injected issues):
+    The fixture-mutator creates GitHub issues at the issue-creation layer
+    only (by design — it's NOT allowed to touch FORBIDDEN_PATHS). The issue
+    body says "this is a synthetic exercise" with no diagnostic data (no
+    DOM snippet for GOOGLE_DOM_DRIFT; no Verifier Disagreement for
+    WRONG_CITATION). The prompt scaffolds at
+    tests/e2e/lib/fix-prompt-builder.js:252-268 explicitly instruct Claude
+    to "Read the Google Patents page source (the issue body should include
+    a snippet of the new DOM) and pick a stable selector." With no
+    diagnostic, Claude correctly refuses to fabricate a fix and returns a
+    ~22-token rejection; the script's `git apply --check` fails.
+
+    FAILURE MODE 2 — `error_max_turns` (real preserved cases):
+    The subscription transport invokes `claude -p` with `--max-turns 1`
+    (tests/e2e/lib/llm-driver.js:94, marked "DO NOT change" — Pitfall 1+2
+    cost-discipline gate). The design assumes Claude can produce a unified
+    diff blind from the issue body alone. For issue #3 (real WRONG_CITATION,
+    Verifier tier B), Claude tried to use Read tool to inspect the
+    citation-extractor source, exhausted the 1-turn budget, and exited
+    with `error_max_turns`.
+
+    PATH D EXHAUSTED: A repo-wide GitHub issue search confirmed that no
+    real GOOGLE_DOM_DRIFT issue with a DOM snippet exists in repo history
+    (4 GOOGLE_DOM_DRIFT issues exist; all 4 are fixture-mutator synthetics).
+    The auto-fix loop's `--max-turns 1` blind-fix architecture has never
+    been validated end-to-end against the issue shape it was designed for,
+    because that shape has never occurred in production.
+
+  SWEEP-03 and SWEEP-04 are therefore marked `architecturally-deferred`
+  and DEFERRED TO v4.3. The v4.2 milestone delivers the schema/plumbing/
+  wiring work (LEDGER-01..04, COMMIT-01..04, PROMOTE-01..04, MUTATOR-01..05,
+  SWEEP-05 Decision C plumbing — all on origin/main and verified) but
+  cannot deliver live UAT-47-a evidence until the loop architecture is
+  revisited.
+
+  v4.3 follow-up todo (filed in STATE.md Pending Todos):
+    (A) Diagnostic-injection mutator — extend inject-defect.mjs to embed
+        seeded but realistic diagnostic content (DOM snippet for
+        GOOGLE_DOM_DRIFT; Verifier Disagreement block for WRONG_CITATION).
+        Co-design with prompt-scaffold expectations; pin via Vitest fixture.
+    (B) Max-turns relaxation — increase --max-turns from 1 to ~5 in
+        tests/e2e/lib/llm-driver.js + add --allowed-tools Read,Glob,Grep
+        (no Edit/Bash to preserve the cost-discipline gate). New Vitest
+        pin replaces the existing `--max-turns 1` regression test.
+    Both (A) AND (B) are required for SWEEP-03/04 to PASS end-to-end.
 human_verification:
   - test: "SWEEP-01 — UAT-47-e diff-guard rejection re-test runbook"
     expected: "Crafted PR touching tests/golden/baseline.json triggers diff-guard FAIL bucket, gets human-review-required label, PR comment mentions tests/golden/baseline.json, PR closed --delete-branch, working tree clean on main"
@@ -32,15 +80,15 @@ human_verification:
   - test: "SWEEP-02 — UAT-47-d ledger-snapshot branch-redirect runbook"
     expected: "gh workflow run v40-cost-ledger-snapshot.yml --ref main produces a new origin/ledger-snapshots/daily-YYYY-MM-DD branch, no new commit on origin/main from this workflow, snapshot commit matches '[skip ci] ledger snapshot YYYY-MM-DD: N invocations, $X.XX spent' pattern"
     why_human: "Requires live workflow_dispatch trigger against origin/main; cannot run autonomously."
-  - test: "SWEEP-03 — UAT-47-a full end-to-end auto-fix loop (PRIMARY DoD) — subscription transport per §Cost-Discipline Amendment 2026-06-07; revised 2026-06-08 to use issue #3 real WRONG_CITATION case instead of mutator-injected synthetic"
-    expected: "Operator runs `npm run fix-issue -- --issue 3 --push` LOCALLY (Claude Max subscription transport against the real preserved WRONG_CITATION case at issue #3, fp 139f821b3bb1, case-id US11427642-spec-short-1, Verifier tier B), Claude produces a valid unified diff against the citation-extractor editable surface, auto-fix branch pushed to origin, operator runs printed `gh pr create --draft` to open the PR, verifier-gate runs success, operator merges PR, v40-auto-promote.yml fires (pull_request.closed lands phase: '58-promote'), operator runs `gh workflow run v40-auto-promote.yml -f pr_number=$PR -f merged=true -f PHASE_TAG=56-uat` to dispatch second auto-promote run, outcome ledger entry on origin/main carries source: 'auto-fix-promoted' + outcome: 'pass' + errorClass: 'WRONG_CITATION' + phase: '56-uat' + fingerprint: '139f821b3bb1' + issueId: 3 + prNumber + model; spend delta < $0.25 forensic floor (cost-bearing entries are $0 under subscription). The mutator-injected synthetic path (issue #23, GOOGLE_DOM_DRIFT) was attempted twice (2026-06-06 + 2026-06-08) and FAILED at Stage 1 with apply-check-failed because the synthetic issue body lacks the diagnostic data the prompt scaffolds require — Claude correctly refused to fabricate a fix. The diagnostic-injection follow-up is filed as a v4.3 todo (Path C in the 2026-06-08 root-cause discussion)."
-    why_human: "Local Claude Code subscription session (operator's machine, no API key); only operator can run the local `npm run fix-issue` invocation; only operator can run the printed `gh pr create --draft`; only operator can merge the auto-fix PR; only operator can dispatch the post-merge `gh workflow run v40-auto-promote.yml`. This is the v4.2 milestone PRIMARY DoD evidence."
-  - test: "SWEEP-04 — UAT-47-b mutator-driven full loop + MUTATOR-04 suppression verification — subscription transport per §Cost-Discipline Amendment 2026-06-07"
-    expected: "Mutator with DIFFERENT seed (`mutator-seed-sweep-04-claudemax`) than SWEEP-03 (`mutator-seed-sweep-03-claudemax-2`) drives synthetic through full subscription-transport loop; outcome entry carries phase: '56-uat'; post-auto-promote inspection of origin/main quarantine corpus shows synthetic entry's triage issue does NOT carry quarantine:ready-for-promotion label (proves MUTATOR-04 production-path); deps-update-gate trigger smoke captured"
-    why_human: "Same local-subscription + live-network constraints as SWEEP-03; uses real gh CLI against origin/main."
-  - test: "SWEEP-06 — Post-UAT cleanup + 56-UAT-EVIDENCE.md consolidation"
-    expected: "tests/e2e/scripts/uat-cleanup.mjs ships with --close-prs / --close-issues / --revert-quarantine; cleanup PR opened (cannot direct-push due to FORBIDDEN_PATHS regex 3); 0 open synthetic GitHub issues, 0 dangling test-uat47e-* branches; 56-UAT-EVIDENCE.md consolidates Outcome Matrix + per-UAT detail + Pitfall closure + cost ledger + cleanup status + §Cost-Discipline Amendment reference (subscription transport substitution for SWEEP-03/04). Note: `gh variable delete PHASE_TAG` no longer needed (Phase 59 REVIEW-FIX WR-01 made PHASE_TAG dispatch-input only — no repo variable to clear)."
-    why_human: "Cleanup automation requires live gh CLI; consolidated evidence file depends on completion of SWEEP-01..04 above."
+  - test: "SWEEP-03 — UAT-47-a full end-to-end auto-fix loop (PRIMARY DoD) — ARCHITECTURALLY DEFERRED TO v4.3"
+    expected: "Originally: operator runs the auto-fix loop end-to-end against a real triage issue, producing an outcome ledger entry on origin/main with the documented shape. ACTUAL OUTCOME 2026-06-06/07/08: three subscription-transport attempts surfaced two distinct architectural constraints (see scope_note AMENDMENT 2026-06-08): (1) mutator-injected synthetic issues lack the diagnostic data the prompt scaffolds expect → Claude refuses to fabricate → apply-check-failed; (2) real preserved cases hit --max-turns 1 budget when Claude needs to read source files → error_max_turns. Path D investigation confirmed no real GOOGLE_DOM_DRIFT issue with DOM snippet exists in repo history. Resolution requires both (A) diagnostic-injection mutator and (B) max-turns relaxation with --allowed-tools=Read — filed as v4.3 follow-up. Evidence captured: evidence/uat-47-a-pre-run-ledger.json (origin/main snapshot), evidence/uat-47-a-fix-issue-stdout.txt (subscription invocation stdout showing both failure modes), 56-MUTATOR-CLEANUP.md Run 2026-06-07 section."
+    why_human: "n/a — architectural deferral; no operator action required for v4.2 closure."
+  - test: "SWEEP-04 — UAT-47-b mutator-driven full loop + MUTATOR-04 suppression verification — ARCHITECTURALLY DEFERRED TO v4.3"
+    expected: "Originally: mutator with different seed drives synthetic through full loop; outcome entry phase:'56-uat'; MUTATOR-04 suppression proven via direct origin/main quarantine inspection. ACTUAL OUTCOME 2026-06-08: SWEEP-04 inherits SWEEP-03's failure mode 1 (mutator-injected synthetics lack diagnostic data → loop cannot complete) plus failure mode 2 if pivoted to real cases. MUTATOR-04 suppression behavior is verified by the Vitest defense-in-depth path (tests/e2e/scripts/e2e-quarantine-append.test.js MUTATOR-04 test G9, byte-equivalent on origin/main per Phase 59 closure) — but the PRODUCTION-PATH proof on a fully-completed mutator loop is deferred to v4.3 along with SWEEP-03 PRIMARY DoD."
+    why_human: "n/a — architectural deferral; no operator action required for v4.2 closure."
+  - test: "SWEEP-06 — Post-UAT cleanup + 56-UAT-EVIDENCE.md consolidation — PARTIALLY DEFERRED TO v4.3"
+    expected: "Cleanup automation script (tests/e2e/scripts/uat-cleanup.mjs) is shipped and verified by SWEEP-05 Vitest pin. Synthetic-issue cleanup against open issues #20/21/22/23 (the 4 mutator-injected GOOGLE_DOM_DRIFT issues from the SWEEP-03 attempts) is a one-shot operator task — defer to v4.3 closure of SWEEP-03/04 to do all cleanup in one cycle. 56-UAT-EVIDENCE.md consolidation deferred to v4.3 (depends on SWEEP-03/04 PASS evidence which won't exist until architectural resolution)."
+    why_human: "Cleanup automation requires live gh CLI; consolidated evidence file depends on completion of SWEEP-01..04 above — both deferred to v4.3."
 ---
 
 # Phase 59: Fixture-Mutator + 4-UAT Re-Sweep — Verification Report

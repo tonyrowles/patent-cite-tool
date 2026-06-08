@@ -1,0 +1,5 @@
+
+> fix-issue
+> node scripts/auto-fix.mjs --transport subscription --issue 3 --push
+
+[auto-fix] SDK error: api_error:error_max_turns

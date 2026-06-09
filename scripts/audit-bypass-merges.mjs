@@ -114,6 +114,17 @@ export function rowsToCsv(rows) {
 const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 
 /**
+ * Regex used by parseArgv to validate --since-iso (WR-02 fix).
+ *
+ * Mirrors the --repo discipline: --since-iso flows verbatim into the
+ * single-quoted `gh api ...?created=>=<since>` URL at main(); a malformed
+ * value containing a single quote could escape the quote and inject shell
+ * metacharacters. Accept only the strict RFC-3339 `YYYY-MM-DDTHH:MM:SSZ`
+ * shape used by the workflow's `date -u -d '7 days ago' +'%Y-%m-%dT%H:%M:%SZ'`.
+ */
+const SINCE_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+/**
  * Parse the JSONL output of `gh api ... --paginate --jq '.workflow_runs[]'`.
  *
  * CR-01 fix (Phase 62 REVIEW): `gh api --paginate` does NOT merge pages into
@@ -175,6 +186,15 @@ export function parseArgv(argv) {
     const v = argv[i + 1];
     switch (k) {
       case '--since-iso':
+        // WR-02 fix (Phase 62 REVIEW): mirror the --repo discipline.
+        // --since-iso flows into the single-quoted `gh api ...?created=>=`
+        // URL; reject any value that does not match the strict RFC-3339
+        // shape used by the weekly workflow's `date -u -d '7 days ago'`.
+        if (typeof v !== 'string' || !SINCE_ISO_RE.test(v)) {
+          throw new Error(
+            `audit-bypass-merges: invalid --since-iso '${v}' (must be RFC-3339 like 2026-06-09T00:00:00Z)`,
+          );
+        }
         out.sinceIso = v;
         i += 1;
         break;

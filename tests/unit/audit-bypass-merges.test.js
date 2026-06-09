@@ -185,6 +185,26 @@ describe('Phase 62 BYPASS-01 — parseArgv', () => {
     );
   });
 
+  it('T_BYPASS_ARGV_SINCE_VALIDATION: malformed --since-iso throws (WR-02 fix)', () => {
+    // Plain non-ISO garbage rejected.
+    expect(() => parseArgv(['--since-iso', 'last-week'])).toThrow(
+      /invalid --since-iso/i,
+    );
+    // Shell-injection via single-quote escape rejected — main()'s
+    // `gh api 'repos/.../runs?created=>=${parsed.sinceIso}'` URL is
+    // single-quoted; an input containing `'` would break out.
+    expect(() => parseArgv(['--since-iso', "2026-06-01' && evil-command #"])).toThrow(
+      /invalid --since-iso/i,
+    );
+    // Missing seconds rejected (must be the strict workflow shape).
+    expect(() => parseArgv(['--since-iso', '2026-06-01T00:00Z'])).toThrow(
+      /invalid --since-iso/i,
+    );
+    // Valid ISO-8601 RFC-3339 shape accepted.
+    const parsed = parseArgv(['--since-iso', '2026-06-09T00:00:00Z']);
+    expect(parsed.sinceIso).toBe('2026-06-09T00:00:00Z');
+  });
+
   it('T_BYPASS_ARGV_DEFAULTS: empty argv yields documented defaults (since-iso = 8 days ago)', () => {
     const parsed = parseArgv([]);
     expect(parsed.output).toBe('csv');

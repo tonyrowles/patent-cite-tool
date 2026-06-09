@@ -368,10 +368,14 @@ describe('parseArgv --passing-cases (Phase 53)', () => {
 // ---------------------------------------------------------------------------
 describe('IMPORTS POLICY (Phase 58 PROMOTE-01)', () => {
 
-  it("IP1 — only allows node:*, ./promote-from-quarantine.mjs, ../tests/e2e/lib/llm-ledger.js", () => {
+  it("IP1 — only allows node:*, ./promote-from-quarantine.mjs, ../tests/e2e/lib/llm-ledger.js, ../tests/e2e/lib/safe-append-ledger.js", () => {
     const source = readPromoteSource();
     const importLines = source.match(/^import .+$/gm) || [];
-    const allowed = /from 'node:|from '\.\/promote-from-quarantine\.mjs'|from '\.\.\/tests\/e2e\/lib\/llm-ledger\.js'/;
+    // Phase 62 LEDX-02 extension: safe-append-ledger.js is whitelisted so
+    // the shared leak-guard can be consumed by the two outcome-entry writes
+    // at :521 (fail) and :544 (pass). Helper is a pure ESM wrapper around
+    // appendLedgerEntry with NO LLM driver code; transport-boundary clean.
+    const allowed = /from 'node:|from '\.\/promote-from-quarantine\.mjs'|from '\.\.\/tests\/e2e\/lib\/llm-ledger\.js'|from '\.\.\/tests\/e2e\/lib\/safe-append-ledger\.js'/;
     const forbidden = importLines.filter((line) => !allowed.test(line));
     expect(forbidden).toEqual([]);
   });
@@ -400,11 +404,13 @@ describe('IMPORTS POLICY (Phase 58 PROMOTE-01)', () => {
 // ---------------------------------------------------------------------------
 describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
 
-  it('O1 — success path: source contains exactly one appendLedgerEntry call with auto-fix-promoted + outcome:pass + errorClass + fingerprint + issueId + prNumber', () => {
+  it('O1 — success path: source contains exactly one safeAppendLedger call with auto-fix-promoted + outcome:pass + errorClass + fingerprint + issueId + prNumber', () => {
     const source = readPromoteSource();
-    // Find the success-entry block: appendLedgerEntry(LEDGER_PATH, { ... source: 'auto-fix-promoted' ... outcome: 'pass' ... })
-    // Match a single contiguous block. Use a non-greedy match capped at ~800 chars.
-    const blockRe = /appendLedgerEntry\(LEDGER_PATH,\s*\{[\s\S]{0,800}?source:\s*'auto-fix-promoted'[\s\S]{0,400}?\}\)/g;
+    // Phase 62 LEDX-02: the success-entry block was rewired from
+    // `appendLedgerEntry(LEDGER_PATH, { ... })` to
+    // `safeAppendLedger(LEDGER_PATH, { ... })`. Entry shape is BYTE-EQUIVALENT;
+    // only the function-call wrapper changed. Match a single contiguous block.
+    const blockRe = /safeAppendLedger\(LEDGER_PATH,\s*\{[\s\S]{0,800}?source:\s*'auto-fix-promoted'[\s\S]{0,400}?\}\)/g;
     const matches = source.match(blockRe) || [];
     expect(matches.length).toBe(1);
     const block = matches[0];
@@ -431,9 +437,10 @@ describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
     expect(block).toMatch(/model:\s*args\.model/);
   });
 
-  it('O2 — failure path: source contains exactly one appendLedgerEntry call with auto-fix-failed + outcome:fail + reason runPromote exitCode', () => {
+  it('O2 — failure path: source contains exactly one safeAppendLedger call with auto-fix-failed + outcome:fail + reason runPromote exitCode', () => {
     const source = readPromoteSource();
-    const blockRe = /appendLedgerEntry\(LEDGER_PATH,\s*\{[\s\S]{0,800}?source:\s*'auto-fix-failed'[\s\S]{0,400}?\}\)/g;
+    // Phase 62 LEDX-02: rewired from `appendLedgerEntry` to `safeAppendLedger`.
+    const blockRe = /safeAppendLedger\(LEDGER_PATH,\s*\{[\s\S]{0,800}?source:\s*'auto-fix-failed'[\s\S]{0,400}?\}\)/g;
     const matches = source.match(blockRe) || [];
     expect(matches.length).toBe(1);
     const block = matches[0];
@@ -447,7 +454,7 @@ describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
     expect(block).toMatch(/model:\s*args\.model/);
   });
 
-  it('O3 — triple-gate failure paths do NOT write outcome entries: total appendLedgerEntry(LEDGER_PATH, ...) count equals 2 (success + failure only for the verified path)', () => {
+  it('O3 — triple-gate failure paths do NOT write outcome entries: total safeAppendLedger(LEDGER_PATH, ...) count equals 2 (success + failure only for the verified path)', () => {
     // Phase 58 REVIEW-FIX WR-03 (deferred-by-design clarification):
     //
     // The exactly-2 count is intentional and applies to the VERIFIED PATH
@@ -476,7 +483,9 @@ describe('main() outcome ledger writes (Phase 58 PROMOTE-02/03)', () => {
     // (which are >=5/5); partial outcomes are 4/5. The bias is bounded
     // by the partial-PR rate and is acceptable for the Phase 58 milestone.
     const source = readPromoteSource();
-    const matches = source.match(/\bappendLedgerEntry\(LEDGER_PATH,/g) || [];
+    // Phase 62 LEDX-02: rewired from `appendLedgerEntry` to `safeAppendLedger`.
+    // Exactly-2 invariant preserved (success + failure on verified path).
+    const matches = source.match(/\bsafeAppendLedger\(LEDGER_PATH,/g) || [];
     expect(matches.length).toBe(2);
   });
 

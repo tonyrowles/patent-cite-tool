@@ -43,6 +43,14 @@ import {
   LEDGER_PATH, readLedger, checkSpendCap, appendLedgerEntry,
   phaseTotal, checkPhaseSpendCap, PHASE_HARD_CAP_USD, PHASE_WARN_THRESHOLD_USD,
 } from '../tests/e2e/lib/llm-ledger.js';
+// Phase 62 LEDX-02: route the two iter+retry ledger writes (lines 268 +
+// 320 below) through the shared CI/override/subscription guard. The two
+// e2e-explore.mjs sites historically did not self-tag `source` or
+// `transport`; opts.defaults at the call sites supplies the canonical
+// `e2e-explore` / `subscription` pair. The `appendLedgerEntry` import is
+// retained because it may be used by future plans; removing it would
+// force an unrelated import-policy audit edit.
+import { safeAppendLedger } from '../tests/e2e/lib/safe-append-ledger.js';
 import {
   extractSpecText, selectionInSpec,
 } from '../tests/e2e/lib/llm-hallucination.js';
@@ -259,11 +267,16 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
 
     // Step 5 — Append to ledger ALWAYS (Pitfall 8: cost may be 0 on hard
     // failures but is still recorded for forensic reconciliation).
-    appendLedgerEntry(LEDGER_PATH, {
+    // Phase 62 LEDX-02: route through safeAppendLedger; the entry literal
+    // historically omits `source` + `transport`, so opts.defaults supplies
+    // them (entry-shape preserved for any test that source-greps this file).
+    safeAppendLedger(LEDGER_PATH, {
       iso, model: modelId, cost_usd: costUsd,
       tokens_in: parsed.rawJson?.usage?.input_tokens ?? 0,
       tokens_out: parsed.rawJson?.usage?.output_tokens ?? 0,
       iteration_n: iterationN, run_id: runId, phase: phase,
+    }, {
+      defaults: { source: 'e2e-explore', transport: 'subscription' },
     });
 
     // Mid-run phase cap check (D-16) — only when --phase was supplied.
@@ -310,13 +323,17 @@ async function runOneIteration({ iterationN, runId, reportPath, liveCases, phase
       totalCostUsdForReport += retryCost;
       // Even the retry burns cost — record separately so the ledger reflects
       // both invocations.
-      appendLedgerEntry(LEDGER_PATH, {
+      // Phase 62 LEDX-02: route through safeAppendLedger; same opts.defaults
+      // injection as the iter site at line 262 above.
+      safeAppendLedger(LEDGER_PATH, {
         iso: new Date().toISOString(),
         model: retryParsed.modelId ?? 'unknown',
         cost_usd: retryCost,
         tokens_in: retryParsed.rawJson?.usage?.input_tokens ?? 0,
         tokens_out: retryParsed.rawJson?.usage?.output_tokens ?? 0,
         iteration_n: iterationN, run_id: runId, retry: true, phase: phase,
+      }, {
+        defaults: { source: 'e2e-explore', transport: 'subscription' },
       });
 
       // Mid-run phase cap check after the retry append (D-16) — same pattern

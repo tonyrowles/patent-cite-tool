@@ -26,16 +26,25 @@
 //                 function body byte-unchanged by Phase 56;
 //                 auto-fix-promote.mjs runs only in CI per
 //                 v40-auto-promote.yml — no leak surface)
-//   FORBIDDEN: tests/e2e/lib/*  EXCEPT llm-ledger.js (transport-confusion
-//              risk on the v3.1 subscription-vs-SDK boundary)
+//              ../tests/e2e/lib/safe-append-ledger.js
+//                (Phase 62 LEDX-02: safeAppendLedger — shared
+//                 CI/override/subscription guard. Required by Phase 62
+//                 to route the two outcome-entry writes (:521 fail +
+//                 :544 pass paths) through the shared leak-guard.
+//                 Helper is a pure ESM wrapper around appendLedgerEntry
+//                 with NO LLM driver code; transport-boundary clean.)
+//   FORBIDDEN: tests/e2e/lib/*  EXCEPT llm-ledger.js + safe-append-ledger.js
+//              (transport-confusion risk on the v3.1 subscription-vs-SDK
+//              boundary)
 //              src/*  (browser code)
 //              any LLM driver
-// Audit (Plan 44-01 Audit 4, extended by Phase 58 PROMOTE-01):
+// Audit (Plan 44-01 Audit 4, extended by Phase 58 PROMOTE-01 + Phase 62 LEDX-02):
 //   grep -nE "^import" scripts/auto-fix-promote.mjs |
-//     grep -vE "from 'node:|from './promote-from-quarantine\\.mjs'|from '\\.\\./tests/e2e/lib/llm-ledger\\.js'"
+//     grep -vE "from 'node:|from './promote-from-quarantine\\.mjs'|from '\\.\\./tests/e2e/lib/llm-ledger\\.js'|from '\\.\\./tests/e2e/lib/safe-append-ledger\\.js'"
 //   MUST return zero matches.
 // Enforced by tests/unit/auto-fix-promote-gate.test.js (Phase 58-added
-// describe block 'IMPORTS POLICY (Phase 58 PROMOTE-01)').
+// describe block 'IMPORTS POLICY (Phase 58 PROMOTE-01)' — IP1 regex
+// extended in Phase 62 to whitelist safe-append-ledger.js).
 //
 // CLI:
 //   node scripts/auto-fix-promote.mjs \
@@ -65,6 +74,12 @@ import { fileURLToPath } from 'node:url';
 
 import { runPromote } from './promote-from-quarantine.mjs';
 import { appendLedgerEntry, LEDGER_PATH } from '../tests/e2e/lib/llm-ledger.js';
+// Phase 62 LEDX-02: route the two outcome-entry writes (lines 521 + 544
+// below) through the shared CI/override/subscription guard. The
+// `appendLedgerEntry` import is retained — it may be referenced elsewhere
+// in this module by future plans and removing it would force an unrelated
+// import-policy audit edit.
+import { safeAppendLedger } from '../tests/e2e/lib/safe-append-ledger.js';
 
 // ---------------------------------------------------------------------------
 // Phase 53 — auto-fix:partial-verified semantics (PARTIAL-01 + PARTIAL-04).
@@ -518,7 +533,11 @@ async function main(argv = process.argv) {
       // PHASE 59 SWEEP-05 / Decision C — `phase` defaults to '58-promote'
       // when --phase is absent (preserves Phase 58 byte-equivalent shape on
       // non-UAT runs); UAT runs override via --phase 56-uat per Pitfall 10.
-      appendLedgerEntry(LEDGER_PATH, {
+      // PHASE 62 LEDX-02 — route through safeAppendLedger so the leak guard
+      // (CI/override/subscription whitelist) applies. Entry self-tags
+      // `transport: 'subscription' + source: 'auto-fix-failed'` inline so
+      // opts.defaults is not needed.
+      safeAppendLedger(LEDGER_PATH, {
         iso: new Date().toISOString(),
         model: args.model || 'claude-sonnet-4-6',
         cost_usd: 0,
@@ -541,7 +560,11 @@ async function main(argv = process.argv) {
     // PHASE 59 SWEEP-05 / Decision C — `phase` defaults to '58-promote'
     // when --phase is absent (preserves Phase 58 byte-equivalent shape on
     // non-UAT runs); UAT runs override via --phase 56-uat per Pitfall 10.
-    appendLedgerEntry(LEDGER_PATH, {
+    // PHASE 62 LEDX-02 — route through safeAppendLedger so the leak guard
+    // (CI/override/subscription whitelist) applies. Entry self-tags
+    // `transport: 'subscription' + source: 'auto-fix-promoted'` inline so
+    // opts.defaults is not needed.
+    safeAppendLedger(LEDGER_PATH, {
       iso: new Date().toISOString(),
       model: args.model || 'claude-sonnet-4-6',
       cost_usd: 0,

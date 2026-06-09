@@ -1,10 +1,11 @@
 ---
 phase: 67
 slug: prompt-iter-loop-shape-a-capture-and-surface-in-process
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-06-09
+approved: 2026-06-09
 ---
 
 # Phase 67 — Validation Strategy
@@ -77,4 +78,4 @@ created: 2026-06-09
 - [ ] Feedback latency < 45s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-06-09 (Wave 0 file `tests/unit/auto-fix-prompt-iter.test.js` to be created by 67-01-PLAN.md Task 3 in the same atomic commit as PITER-01..05; nyquist sampling pinned at 45s feedback latency)

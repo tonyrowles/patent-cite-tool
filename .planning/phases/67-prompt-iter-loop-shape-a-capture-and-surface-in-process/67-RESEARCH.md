@@ -746,22 +746,22 @@ it('T_PROMPT_ITER_SDK_ERROR_FAST_FAIL: sdk_error returns 1 immediately; no iter 
 
 **All other claims** in this RESEARCH.md are tagged with explicit source line references or sit inside `<user_constraints>` (verbatim from CONTEXT.md).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should round-1 hint augmentation include the round-0 failure as well, accumulating across rounds?**
    - What we know: CONTEXT.md says hint composition is "first 500 chars of stderr" or "`parseFencedDiff.reason` verbatim" — singular, from the immediately-prior attempt.
    - What's unclear: when round 1 fails for a different reason than round 0 (e.g., round 0 was malformed-diff, round 1 was apply-check), does round 2's hint replace round 1's, or accumulate?
-   - Recommendation: replace, not accumulate. The CONTEXT.md text says "previous attempt's failure mode" (singular). Accumulating would also bloat the prompt and dilute the signal. Default to replacement; if Phase 68 weekly digest shows iter_round 2 has lower fix-rate than iter_round 1, revisit in v4.4.
+   - **RESOLVED:** replace, not accumulate. The CONTEXT.md text says "previous attempt's failure mode" (singular). Accumulating would also bloat the prompt and dilute the signal. Default to replacement; if Phase 68 weekly digest shows iter_round 2 has lower fix-rate than iter_round 1, revisit in v4.4.
 
 2. **`iter_round` field name vs `iterRound` (snake_case vs camelCase)?**
    - What we know: existing ledger fields are a mix (`cost_usd`, `tokens_in`, `errorClass`, `errorReason`, `issueId`).
    - What's unclear: which convention is canonical for new fields.
-   - Recommendation: follow CONTEXT.md verbatim — `iter_round` (snake_case). Mirrors `cost_usd` / `tokens_in` / `is_error` / `fault_injection_status` (the dominant snake_case shape for ledger and producer-emitted fields). The camelCase fields are JS-side (`costUsd`, `errorReason`, `issueId`) and stay JS-side.
+   - **RESOLVED:** follow CONTEXT.md verbatim — `iter_round` (snake_case). Mirrors `cost_usd` / `tokens_in` / `is_error` / `fault_injection_status` (the dominant snake_case shape for ledger and producer-emitted fields). The camelCase fields are JS-side (`costUsd`, `errorReason`, `issueId`) and stay JS-side.
 
 3. **Does `T_PROMPT_ITER_BUDGET_01` need to assert exact ledger-row order (round 0 first, round 1 second, budget-cap third) or just presence?**
    - What we know: ROADMAP success criterion 5 says "after 2 iter-rewrites per fingerprint, next call returns abstention."
    - What's unclear: whether the order assertion is required or whether `.toContain` shape is sufficient.
-   - Recommendation: assert ORDER. The downstream A/B analytics treats ledger order as the iteration sequence; out-of-order writes would distort the analysis. Pin the order explicitly.
+   - **RESOLVED:** assert ORDER. The downstream A/B analytics treats ledger order as the iteration sequence; out-of-order writes would distort the analysis. Pin the order explicitly.
 
 ## Environment Availability
 

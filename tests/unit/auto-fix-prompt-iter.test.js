@@ -323,9 +323,57 @@ describe('Phase 67 PITER-03: PROMPT_ITER_COST_CAP_USD budget-cap', () => {
     // double-counted the terminal round in distinct-iter_round dashboards.
     expect(capRow.iter_round).toBeNull();
 
-    // SDK invocation count is bounded by the budget cap
-    expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBeGreaterThanOrEqual(1);
-    expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBeLessThanOrEqual(ITER_MAX_ROUNDS + 1);
+    // Phase 67 WR-09 (REVIEW.md) — tighten the SDK call count from `[1..3]`
+    // to the EXACT correct value (`2`). Math at costPerCall = 0.25:
+    //   Round 0 (call 1): cumCost = 0.25 → check `0.25 >= 0.50`? no  → retry
+    //   Round 1 (call 2): cumCost = 0.50 → check `0.50 >= 0.50`? YES → cap
+    // Pre-fix `>= 1 && <= 3` accepted off-by-one regressions; `toBe(2)`
+    // is the contract.
+    expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBe(2);
+  });
+
+  // Phase 67 WR-09 (REVIEW.md) — pin the `>=` vs `>` boundary on cumCost.
+  // These two companion fixtures bracket the exact threshold so a future
+  // off-by-one in the cap predicate is observable as a test failure.
+  it('WR-09 cap-exact-trigger: costPerCall = 0.26 → 2 SDK calls (cumCost 0.52 hits cap on round 1)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckFailRule(),
+    ]);
+    vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0.26,
+      rawJson: {},
+    });
+    const exitCode = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exitCode).toBe(0);
+    // Round 0 cumCost = 0.26 → 0.26 >= 0.50? no  → retry.
+    // Round 1 cumCost = 0.52 → 0.52 >= 0.50? yes → cap. Exactly 2 calls.
+    expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBe(2);
+  });
+
+  it('WR-09 cap-under: costPerCall = 0.24 → 3 SDK calls (cumCost 0.72, ITER_MAX_ROUNDS triggers cap)', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule(),
+      lsRemoteEmptyRule(),
+      applyCheckFailRule(),
+    ]);
+    vi.mocked(invokeAnthropicSdkWithLedger).mockResolvedValue({
+      ok: true,
+      llmText: makeFencedDiff('src/foo.js'),
+      modelId: 'claude-sonnet-4-6',
+      costUsd: 0.24,
+      rawJson: {},
+    });
+    const exitCode = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exitCode).toBe(0);
+    // Round 0 cumCost = 0.24 → 0 + 1 > 2? no; 0.24 >= 0.50? no  → retry.
+    // Round 1 cumCost = 0.48 → 1 + 1 > 2? no; 0.48 >= 0.50? no  → retry.
+    // Round 2 cumCost = 0.72 → 2 + 1 > 2? YES → cap. Exactly 3 calls.
+    expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBe(3);
   });
 });
 

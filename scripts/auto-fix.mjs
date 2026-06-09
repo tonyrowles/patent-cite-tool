@@ -173,6 +173,30 @@ function safeAppendLedger(entry) {
   // local `--force-api` runs that self-tag `transport: 'sdk'`; whitelisting
   // subscription-tagged entries restores the v3.1/v4.0 free-iteration flow
   // while leaving the SDK-path leak protection intact.
+  //
+  // Phase 67 WR-08 (REVIEW.md) — EXPANDED SUBSCRIPTION-WRITE SURFACE:
+  // Pre-Phase-67, the Phase 60.1 whitelist contemplated 7 auxiliary sites
+  // (idempotency, fix-attempts cap, FLAKE dispatch, FLAKE_SUPPRESSED,
+  // diff-guard-violation, malformed-diff, apply-check-failed). Phase 67's
+  // iter loop relocates the malformed-diff / apply-check-failed sites
+  // INSIDE the iter wrapper and adds TWO new sites:
+  //
+  //   (a) malformed-diff:* row inside the iter wrapper        (~line 953)
+  //   (b) apply-check-failed row inside the iter wrapper      (~line 1028)
+  //   (c) diff-guard-violation row inside the iter wrapper    (~line 987)
+  //   (d) prompt-iter-budget-cap row (writeBudgetCapAndAbstain helper)
+  //
+  // All four self-tag transport from the runDispatcher `transport` opt, so
+  // under `--transport subscription` (outside CI) they go through this
+  // whitelist branch — bypassing the leak guard like the other auxiliary
+  // sites. The dirty `tests/e2e/.llm-spend-ledger.json` in WR-08's REVIEW
+  // dev-status snapshot is observed evidence the new writes flow as
+  // designed. This is INTENTIONAL — the v3.1/v4.0 free-iteration contract
+  // for subscription users (no API charges; forensic-only ledger writes)
+  // applies to Phase 67's iter rows too. SDK-path leak protection for
+  // those four sites is preserved (`transport: 'sdk'` outside CI without
+  // E2E_LEDGER_PATH_OVERRIDE still throws). Phase 68's weekly digest is
+  // the operational visibility layer.
   const isSubscriptionLocal = entry && entry.transport === 'subscription';
   if (!inCi && !hasOverride && !isSubscriptionLocal) {
     throw new Error(

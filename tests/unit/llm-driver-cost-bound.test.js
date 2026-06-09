@@ -21,7 +21,7 @@
 // Fixture-only test — no live API calls, no @anthropic-ai/sdk import,
 // no node:child_process mocking. node:fs + node:path are Node 22 built-ins.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,8 +29,15 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(__dirname, '..', 'fixtures', 'ledger-cost-bound.jsonl');
 
-const raw = readFileSync(fixturePath, 'utf8');
-const entries = raw.trim().split('\n').map((line) => JSON.parse(line));
+// Phase 61 WR-02 fix — fixture load deferred to beforeAll so a missing or
+// malformed tests/fixtures/ledger-cost-bound.jsonl surfaces as a clean
+// test-collection failure rather than a cryptic node:fs ENOENT stack
+// trace at module-load time.
+let entries;
+beforeAll(() => {
+  const raw = readFileSync(fixturePath, 'utf8');
+  entries = raw.trim().split('\n').map((line) => JSON.parse(line));
+});
 
 describe('TURNS-03 — --max-turns 5 cost-bound regression', () => {
   it('loads exactly 5 fixture entries', () => {

@@ -69,6 +69,16 @@
  * // MODEL_DEFAULT_OK: FRAME_SHIFT_DETECTED — defaults to claude-sonnet-4-6
  *   (Phase 65 SCAF-02; pdfjs frame-mapping fixes adapt to the new pdfjs-dist
  *   API shape — also mechanical, do not require opus reasoning).
+ *
+ * Phase 65 Plan 02 follow-up — pre-existing sonnet-routed scaffolds also need
+ * MODEL_DEFAULT_OK annotations to satisfy the 5-site drift guard:
+ *
+ * // MODEL_DEFAULT_OK: WRONG_CITATION — defaults to claude-sonnet-4-6
+ *   (Phase 42 baseline; cite-by-position fixes are mechanical src/-side edits).
+ * // MODEL_DEFAULT_OK: WORKER_FALLBACK_FAILED — defaults to claude-sonnet-4-6
+ *   (Phase 45 baseline; Worker MIME-guard + retry-budget fixes are mechanical).
+ * // MODEL_DEFAULT_OK: HARNESS_ERROR — defaults to claude-sonnet-4-6
+ *   (Phase 45 baseline; harness-infra fixes are mechanical tests/ edits).
  */
 export const MODEL_ROUTES = Object.freeze({
   GOOGLE_DOM_DRIFT: 'claude-opus-4-7',

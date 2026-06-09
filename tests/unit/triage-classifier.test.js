@@ -1024,6 +1024,325 @@ describe('runTriage — Phase 64 WORKER_FALLBACK_FAILED heuristic (TRIAGE-03)', 
     expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
   });
 
+  // WR-03 (Phase 64 code review): producer field, when explicitly false,
+  // overrides stale classification. A spec re-run that succeeded MUST NOT
+  // be heuristically resolved as WORKER_FALLBACK_FAILED just because the
+  // iteration carries a stale 'WORKER_FALLBACK_FAILED' classification
+  // label from an earlier pass.
+  it('Rule 7d (WR-03): fault_injection_status.worker_fallback_failed === false overrides stale classification === WORKER_FALLBACK_FAILED', async () => {
+    const iteration = makeIteration({
+      iteration_n: 1,
+      // Stale classification from an earlier pass — fault_injection_status
+      // re-ran and reported success.
+      classification: 'WORKER_FALLBACK_FAILED',
+      fault_injection_status: { worker_fallback_failed: false },
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: 'some patent text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'medium',
+        category: 'WORKER_FALLBACK_FAILED',
+        root_cause_hypothesis: 'producer reports success — escalated',
+        confidence: 0.5,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    // Rule 7 MUST NOT fire heuristically — producer field overrides stale label.
+    expect(f.path_taken).not.toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 64 code review (WR-02): tightened DOM-drift selector regex
+// ---------------------------------------------------------------------------
+
+describe('runTriage — WR-02 selector regex tightening (false-positive surface)', () => {
+
+  // WR-02 (Phase 64 code review): the prior selector regex had
+  // \bmain\b|\barticle\b which matched arbitrary English prose containing
+  // those words. Tightened to HTML-element / CSS-selector tokens only. A
+  // mutator marker carried into a real-DOM-drift issue body that happens
+  // to mention "main" or "article" as English prose MUST NOT trigger the
+  // synthetic-injection heuristic.
+  it('WR-02a: issue body with marker AND English prose containing "main" (no HTML/selector form) → does NOT fire Rule 6 heuristic', async () => {
+    const issueBody = [
+      '<!-- fp: abc123def456 -->',
+      'The main DOM tree changed unexpectedly during this iteration.',
+      'No actual selectors observed.',
+    ].join('\n');
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: issueBody,
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: 'some text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'high',
+        category: 'GOOGLE_DOM_DRIFT',
+        root_cause_hypothesis: 'prose mention',
+        confidence: 0.7,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.path_taken).not.toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('WR-02b: issue body with marker AND English prose containing "article" (e.g., "news article") → does NOT fire Rule 6 heuristic', async () => {
+    const issueBody = [
+      '<!-- fp: cafebabe9999 -->',
+      'A news article on the patent description page now uses different markup.',
+    ].join('\n');
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: issueBody,
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: 'some text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'high',
+        category: 'GOOGLE_DOM_DRIFT',
+        root_cause_hypothesis: 'prose mention',
+        confidence: 0.7,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.path_taken).not.toBe('heuristic');
+  });
+
+  it('WR-02c: issue body with marker AND HTML <main> tag form → DOES fire Rule 6 heuristic (legitimate selector)', async () => {
+    const issueBody = [
+      '<!-- fp: deadbeef0001 -->',
+      'Selector failed: <main id="content"> not found.',
+    ].join('\n');
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: issueBody,
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.path_taken).toBe('heuristic');
+    expect(f.category).toBe('GOOGLE_DOM_DRIFT');
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+  });
+
+  it('WR-02d: issue body with marker AND quoted CSS selector "article" → DOES fire Rule 6 heuristic', async () => {
+    const issueBody = [
+      '<!-- fp: feedface1234 -->',
+      'document.querySelector("article") returned null',
+    ].join('\n');
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: issueBody,
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.path_taken).toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 64 code review (WR-04): issue_body fail-closed behavior
+// ---------------------------------------------------------------------------
+
+describe('runTriage — WR-04 issue_body fail-closed (defensive)', () => {
+
+  // WR-04 (Phase 64 code review): iter.issue_body has no producer in
+  // production llm-report.json today. When the field is undefined, Rule 6
+  // must fail closed (do NOT fire heuristic, fall through to LLM routing)
+  // — the prior `?? ''` coalesce did this implicitly; this test pins the
+  // behavior explicitly so a future refactor cannot regress it.
+  it('WR-04: classification GOOGLE_DOM_DRIFT but iter.issue_body undefined → Rule 6 does NOT fire (falls through to LLM)', async () => {
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      // issue_body intentionally absent — simulates the in-CI state where
+      // no producer has wired it onto the iteration record.
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: 'some text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'medium',
+        category: 'GOOGLE_DOM_DRIFT',
+        root_cause_hypothesis: 'no issue_body',
+        confidence: 0.5,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.path_taken).not.toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
 });
 
 // ---------------------------------------------------------------------------

@@ -424,6 +424,12 @@ export async function runTriage({
   // c. Ambiguous set — Plan 03 wires the cluster pre-filter + LLM second-pass
   const ambiguous = [];
 
+  // WR-04 (Phase 64 code review): once-per-run warning latch for
+  // Rule 6's missing issue_body producer. Without the latch, a 100-iteration
+  // run with a missing producer would print 100 identical warnings; this
+  // keeps the operator-facing signal terse.
+  let warnedMissingIssueBody = false;
+
   // d. Per-iteration D-03 rule chain (first match wins)
   for (const iter of inputLlmReport.iterations) {
     // Look up the rerun entry for this iteration (may be undefined)
@@ -530,24 +536,63 @@ export async function runTriage({
     // (no marker) MUST fall through to the LLM cluster pre-filter — DO NOT
     // short-circuit. T-64-05 trust boundary: the mutator marker /<!-- fp: <12hex> -->/
     // is the only signal distinguishing synthetic from real drift.
+    //
+    // WR-04 (Phase 64 code review): fail-closed when iter.issue_body is
+    // absent/undefined. The field has no production producer today (the
+    // e2e-explore.mjs iter-construction sites never set it; auto-fix.mjs
+    // attaches issueBody to its GH-issue prompt envelope, not to the
+    // iteration record). Logging a one-line warning at the first occurrence
+    // surfaces the missing-producer gap to operators without flooding the
+    // logs. Rule 6 then falls through to Rule 7 / Rule 4 unchanged.
+    //
+    // WR-02 (Phase 64 code review): the prior selector regex contained two
+    // unanchored common-English-word alternatives (`\bmain\b`, `\barticle\b`)
+    // that fired against arbitrary issue prose ("the main DOM tree changed",
+    // "news article reports..."). Tightened to HTML-element / CSS-selector
+    // tokens only: literal `<main` / `<article` opening tags OR the bare
+    // strings 'main' / 'article' QUOTED as CSS-selector tokens. The Phase
+    // 61 mutator emits selectors in exactly one of these forms; arbitrary
+    // English prose containing the words is rejected.
     {
-      const hasMutatorMarker = /<!-- fp: [0-9a-f]{12} -->/.test(iter.issue_body ?? '');
-      const hasDomDriftSelector = /(?:patent-result|section\[itemprop="claims"\]|\bmain\b|\barticle\b)/.test(iter.issue_body ?? '');
-      const isMutatorInjected = hasMutatorMarker && hasDomDriftSelector;
-      if (iter.classification === 'GOOGLE_DOM_DRIFT' && isMutatorInjected) {
-        report.findings.push({
-          iteration_n: iter.iteration_n,
-          severity: 'medium',
-          category: 'GOOGLE_DOM_DRIFT',
-          root_cause_hypothesis: 'Mutator-injected synthetic DOM drift (Phase 61 DIAG-01 marker present)',
-          confidence: 0.85,
-          rationale: 'Heuristic-resolved: issue_body contains both <!-- fp: <12hex> --> mutator marker AND a Phase 61 DOM-drift selector',
-          path_taken: 'heuristic',
-          triage_confidence: 'heuristic_mutator_aware',
-        });
-        continue;
+      if (iter.issue_body === undefined) {
+        // Only warn when the missing field would have plausibly mattered —
+        // i.e., when classification === 'GOOGLE_DOM_DRIFT' (the only branch
+        // Rule 6 could fire). Iterations of unrelated classifications never
+        // exercise Rule 6, so an undefined issue_body there is not a gap.
+        if (!warnedMissingIssueBody && iter.classification === 'GOOGLE_DOM_DRIFT') {
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[triage-classifier] iter.issue_body is undefined on at least one ' +
+            'GOOGLE_DOM_DRIFT iteration — Rule 6 mutator-aware heuristic cannot ' +
+            'fire without a producer wiring issue_body into llm-report.json ' +
+            'iterations[] (no producer exists today). Falling through to ' +
+            'LLM cluster pre-filter / Rule 4 ambiguous.',
+          );
+          warnedMissingIssueBody = true;
+        }
+        // Fall through — do NOT push a heuristic finding when issue_body is
+        // absent. Caller still gets LLM-routed triage via Rule 4.
+      } else {
+        const hasMutatorMarker = /<!-- fp: [0-9a-f]{12} -->/.test(iter.issue_body);
+        const hasDomDriftSelector =
+          /(?:patent-result|section\[itemprop="claims"\]|<main(?:\s|>)|<article(?:\s|>)|["']main["']|["']article["'])/
+            .test(iter.issue_body);
+        const isMutatorInjected = hasMutatorMarker && hasDomDriftSelector;
+        if (iter.classification === 'GOOGLE_DOM_DRIFT' && isMutatorInjected) {
+          report.findings.push({
+            iteration_n: iter.iteration_n,
+            severity: 'medium',
+            category: 'GOOGLE_DOM_DRIFT',
+            root_cause_hypothesis: 'Mutator-injected synthetic DOM drift (Phase 61 DIAG-01 marker present)',
+            confidence: 0.85,
+            rationale: 'Heuristic-resolved: issue_body contains both <!-- fp: <12hex> --> mutator marker AND a Phase 61 DOM-drift selector',
+            path_taken: 'heuristic',
+            triage_confidence: 'heuristic_mutator_aware',
+          });
+          continue;
+        }
+        // Real DOM drift (no mutator marker) falls through to Rule 7 / Rule 4.
       }
-      // Real DOM drift (no mutator marker) falls through to Rule 7 / Rule 4.
     }
 
     // D-03 Rule 7: WORKER_FALLBACK_FAILED heuristic (Phase 64 TRIAGE-03).
@@ -557,7 +602,26 @@ export async function runTriage({
     // and the `=== true` strict check is false — rule is a no-op for that branch.
     // The classification fallback covers legacy producers that haven't been
     // updated to emit the additive field.
+    //
+    // WR-03 (Phase 64 code review): the producer field, when present, is
+    // AUTHORITATIVE over the (possibly stale) classification label. A pass
+    // explicitly recording `fault_injection_status.worker_fallback_failed
+    // === false` MUST NOT fire the heuristic — even if iter.classification
+    // === 'WORKER_FALLBACK_FAILED' from a prior pass. The OR-gate previously
+    // here silently masked the producer's success signal with stale
+    // classification, contradicting the "ground-truth signal from the
+    // additive producer field" intent in 64-CONTEXT.
     {
+      const faultInjectionExplicitlyFalse =
+        iter.fault_injection_status?.worker_fallback_failed === false;
+      if (faultInjectionExplicitlyFalse) {
+        // Producer reports fallback succeeded — do not heuristically resolve
+        // as failure. Fall through to Rule 4 (ambiguous) so a stale
+        // classification gets re-triaged via the LLM second-pass instead of
+        // being silently overridden.
+        ambiguous.push(iter);
+        continue;
+      }
       const faultInjectionMatch = iter.fault_injection_status?.worker_fallback_failed === true;
       const wffClassMatch = iter.classification === 'WORKER_FALLBACK_FAILED';
       if (faultInjectionMatch || wffClassMatch) {

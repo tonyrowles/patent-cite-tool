@@ -841,6 +841,15 @@ export async function runDispatcher({
   // Pitfall 7: iter_round is added ONLY at ledger writes INSIDE this wrapper.
   // Pre-loop writes (Step 6 idempotency, Step 7 skip-class/FLAKE) are
   // UNCHANGED — they MUST NOT carry iter_round.
+  // Phase 67 WR-04 (REVIEW.md) — the Map currently only ever holds ONE entry
+  // (this process invocation handles exactly one fingerprint per the v3.1
+  // contract). The Map shape is intentional future-proofing: should a future
+  // phase batch multiple fingerprints per process invocation (cf. the
+  // discussion in 67-CONTEXT.md "Per-Fingerprint Accumulator"), the lookup
+  // shape stays the same — we only need to instantiate one entry per fingerprint
+  // and read by key. Simplifying to `let state = {...}` today would lose the
+  // batching path without test coverage. Keeping the Map keeps the single
+  // future-proofing surface visible at one location.
   const iterState = new Map();
   iterState.set(fingerprint, { round: 0, cumCost: 0 });
   let rewriteHint;   // undefined on round 0 → byte-identical scaffold output

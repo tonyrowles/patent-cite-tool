@@ -35,9 +35,16 @@
 //   0 — diff applied + branch pushed; OR --dry-run printed; OR skip-class
 //       short-circuit; OR --no-push staged the branch; OR subscription branch
 //       staged locally (--push not set); OR idempotent skip (branch already
-//       exists on origin).
-//   1 — rejected (apply-check fail, diff-guard violation, malformed-diff,
-//       sdk_error).
+//       exists on origin); OR Phase 67 prompt-iter budget exhaustion (apply-
+//       check-failed or malformed-diff:* that survived ITER_MAX_ROUNDS
+//       retries OR hit PROMPT_ITER_COST_CAP_USD cumulative spend — graceful
+//       abstention with a `prompt-iter-budget-cap` ledger row).
+//   1 — rejected (diff-guard violation, sdk_error). Phase 67 NOTE: apply-
+//       check-fail and malformed-diff:* no longer exit 1 once the iter
+//       wrapper exhausts its budget — they exit 0 with a budget-cap ledger
+//       row. They DO still exit 1 if the SDK fast-fails on the first round
+//       BEFORE the iter loop can engage (the sdkResult.ok===false branches
+//       short-circuit per PITER-04).
 //   2 — argv / contract error (missing --issue; missing fingerprint line;
 //       no or multi ERROR_CLASS label).
 //   3 — fix_attempts cap reached (≥3 prior matching iterations); the

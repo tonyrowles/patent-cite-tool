@@ -79,19 +79,38 @@ const PATENT_ID_RE = /^[A-Z]{2}\d+[A-Z]?\d*$/;
  *   - ANTHROPIC_API_KEY: ''   (Pitfall 1 — explicitly cleared even if the
  *                              developer set it; forces subscription auth.)
  *
- * Args (Pitfalls 1, 2 — DO NOT change):
- *   ['-p', '--output-format', 'json', '--max-turns', '1',
+ * Args (Phase 61 TURNS-01 — DO NOT change without also updating --tools palette):
+ *   ['-p', '--output-format', 'json', '--max-turns', '5',
+ *    '--tools', 'Read,Glob,Grep', '--max-budget-usd', '0.50',
  *    '--system-prompt', sysP, userP]
+ *
+ *   `--tools` RESTRICTS the available tool palette (NOT `--allowedTools` which
+ *   only grants permission); per Pitfall 1 the auto-fix loop's diff-via-fences
+ *   contract REQUIRES that Edit/Bash/Write be unavailable in the subprocess so
+ *   that parseFencedDiff → checkDiffGuard → git apply remains the sole code
+ *   mutation path. The 6 `.not.toContain` assertions in Test 23 detect any PR
+ *   that re-enables those tools "for debugging."
+ *
+ *   SDK transport (invokeAnthropicSdkWithLedger) is single-turn by API design —
+ *   messages.create is one request → one response, with no agent loop. The
+ *   `--max-turns 5` asymmetry between subscription and SDK is intentional.
+ *
+ *   `--max-budget-usd 0.50` is defense-in-depth on top of the per-issue $1 cap
+ *   (LEDGER-02) and per-PR $2 cap; flag verified real on claude CLI v2.1.169.
  *
  * @param {{ systemPrompt: string, userPrompt: string, timeoutMs?: number }} opts
  * @returns {Promise<{ timedOut: boolean, stdout: string, stderr: string, code: number|null }>}
  */
 export async function invokeClaudeP({ systemPrompt, userPrompt, timeoutMs = LLM_TIMEOUT_MS } = {}) {
   return new Promise((resolve) => {
+    // Phase 61 TURNS-01/02: --tools RESTRICTS palette (NOT --allowedTools permission-grant);
+    // --max-budget-usd verified against `claude --help` v2.1.169. See header comment above.
     const args = [
       '-p',
       '--output-format', 'json',
-      '--max-turns', '1',
+      '--max-turns', '5',
+      '--tools', 'Read,Glob,Grep',
+      '--max-budget-usd', '0.50',
       '--system-prompt', systemPrompt,
       userPrompt,
     ];

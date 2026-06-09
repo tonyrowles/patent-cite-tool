@@ -269,9 +269,92 @@ export function collisionCheckOrAbort({ fp }) {
 }
 
 // ---------------------------------------------------------------------------
+// buildDiagnosticBlock — Phase 61 Plan 61-01 (DIAG-01 / DIAG-02).
+//
+// Pure helper that returns an array of strings — spliced into buildBody between
+// the `### Reproducer` block and the `### Synthetic Defect` block. Purity is
+// the determinism guarantee: NO Math.random, NO Date.now, NO crypto.randomBytes,
+// NO file I/O. Determinism comes from input args only (seed is a deterministic
+// input string per parseArgs validation).
+//
+//   GOOGLE_DOM_DRIFT  (DIAG-01): emit a fenced HTML snippet whose tag vocabulary
+//                                is verbatim-present in tests/e2e/lib/selection.js
+//                                (lines 170-172) and tests/e2e/lib/navigation.js
+//                                (line 34). The snippet MUST contain at least one
+//                                of: 'patent-result', 'section[itemprop="claims"]',
+//                                'main', 'article'. We include ALL four nested
+//                                for richest fix-prompt scaffold context.
+//
+//   WRONG_CITATION    (DIAG-02): emit a Verifier Disagreement block whose literal
+//                                headers match tests/e2e/lib/issue-payload-builder.js
+//                                lines 208-216 ('### Verifier Disagreement',
+//                                'Expected citation', 'Observed citation',
+//                                'Verifier tier:', 'Rerun verdict:').
+//
+//   default          : empty array — spreads to nothing — body shape unchanged
+//                      for LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED,
+//                      HARNESS_ERROR (existing tests I1-I9 stay green).
+// ---------------------------------------------------------------------------
+
+export function buildDiagnosticBlock(errorClass, seed) {
+  if (errorClass === 'GOOGLE_DOM_DRIFT') {
+    // DIAG-01 verbatim-selector pin source:
+    //   tests/e2e/lib/selection.js:170-172 → 'section[itemprop="claims"]',
+    //                                        'patent-result', 'main'
+    //   tests/e2e/lib/navigation.js:34     → 'main, article, patent-result'
+    return [
+      '### DOM Drift Diagnostic',
+      '',
+      'The pre-flight DOM probe could not locate the patent body container.',
+      'Observed page structure (snippet):',
+      '',
+      '```html',
+      '<main>',
+      '  <article>',
+      '    <patent-result>',
+      '      <section itemprop="claims">',
+      '        <!-- claims content -->',
+      '      </section>',
+      '    </patent-result>',
+      '  </article>',
+      '</main>',
+      '```',
+      '',
+      `seed-hint: ${seed}`,
+      '',
+    ];
+  }
+  if (errorClass === 'WRONG_CITATION') {
+    // DIAG-02 template-parity source:
+    //   tests/e2e/lib/issue-payload-builder.js:208-216 → headers verbatim.
+    return [
+      '### Verifier Disagreement',
+      '',
+      'Expected citation (golden): `1:34-46`',
+      'Observed citation: `2:12-24`',
+      '```',
+      `Selection diverged at boundary; matching tier exhausted on seed ${seed}`,
+      '```',
+      'Verifier tier: A',
+      'Rerun verdict: CONFIRMED (3/3)',
+      '',
+    ];
+  }
+  // Default (LLM_HALLUCINATED_SELECTION, WORKER_FALLBACK_FAILED, HARNESS_ERROR):
+  // empty array — preserves existing body shape for non-extended classes.
+  return [];
+}
+
+// ---------------------------------------------------------------------------
 // buildBody — synthesizes the issue body. Line 1 MUST be the v2 marker
 // `<!-- fp: ${fp} -->` (Pitfall 1 overflow protection per RESEARCH §458;
 // auto-fix.mjs:231 regex `/<!-- fp: ([0-9a-f]{12}) -->/m`).
+//
+// Phase 61 Plan 61-01: per-errorClass diagnostic block spliced between the
+// `### Reproducer` and `### Synthetic Defect` sections via buildDiagnosticBlock.
+// Function remains pure — same {fp, caseId, seed, errorClass} → byte-identical
+// output. SOURCE_TAG, ERROR_CLASSES Set, and v2 marker shape on line 1 are
+// byte-unchanged (MUTATOR-04 co-design + Pitfall 1 + DIAG-03 invariants).
 // ---------------------------------------------------------------------------
 
 export function buildBody({ fp, caseId, seed, errorClass }) {
@@ -283,6 +366,7 @@ export function buildBody({ fp, caseId, seed, errorClass }) {
     `seed: ${seed}`,
     `error-class: ${errorClass}`,
     '',
+    ...buildDiagnosticBlock(errorClass, seed),
     '### Synthetic Defect',
     '',
     'This issue was created by `tests/e2e/scripts/inject-defect.mjs` as a',

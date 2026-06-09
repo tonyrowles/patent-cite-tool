@@ -386,7 +386,7 @@ describe('invokeClaudeP', () => {
     }
   });
 
-  it('23. args are EXACTLY ["-p","--output-format","json","--max-turns","1","--system-prompt",sysP,userP] — no --bare, no --json-schema', async () => {
+  it('23. args contain --max-turns 5 + --tools Read,Glob,Grep + --max-budget-usd 0.50; exclude Edit/Bash/Write/WebFetch/--allowed-tools/--allowedTools (Pitfall 1 trust invariant)', async () => {
     const promise = invokeClaudeP({
       systemPrompt: 'mysys',
       userPrompt: 'myuser',
@@ -399,12 +399,21 @@ describe('invokeClaudeP', () => {
     expect(args).toEqual([
       '-p',
       '--output-format', 'json',
-      '--max-turns', '1',
+      '--max-turns', '5',
+      '--tools', 'Read,Glob,Grep',
+      '--max-budget-usd', '0.50',
       '--system-prompt', 'mysys',
       'myuser',
     ]);
     expect(args).not.toContain('--bare');
     expect(args).not.toContain('--json-schema');
+    // TURNS-02 trust-invariant exclusions (Pitfall 1)
+    expect(args).not.toContain('Edit');
+    expect(args).not.toContain('Bash');
+    expect(args).not.toContain('Write');
+    expect(args).not.toContain('WebFetch');
+    expect(args).not.toContain('--allowed-tools');
+    expect(args).not.toContain('--allowedTools');
   });
 
   it('24. timeout fires child.kill(SIGTERM) and resolves {timedOut:true, stdout:"", code:null}', async () => {

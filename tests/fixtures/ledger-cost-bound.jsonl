@@ -1,0 +1,5 @@
+{"iso":"2026-06-09T10:00:00Z","cost_usd":0.15,"transport":"subscription","source":"auto-fix-api","issueId":"101","model":"claude-sonnet-4-6"}
+{"iso":"2026-06-09T10:05:00Z","cost_usd":0.22,"transport":"subscription","source":"auto-fix-api","issueId":"102","model":"claude-sonnet-4-6"}
+{"iso":"2026-06-09T10:10:00Z","cost_usd":0.28,"transport":"subscription","source":"auto-fix-api","issueId":"103","model":"claude-sonnet-4-6"}
+{"iso":"2026-06-09T10:15:00Z","cost_usd":0.27,"transport":"subscription","source":"auto-fix-api","issueId":"104","model":"claude-sonnet-4-6"}
+{"iso":"2026-06-09T10:20:00Z","cost_usd":0.28,"transport":"subscription","source":"auto-fix-api","issueId":"105","model":"claude-sonnet-4-6"}

@@ -25,6 +25,7 @@ import {
   computeFingerprint,
   SOURCE_TAG,
   ERROR_CLASSES,
+  buildBody,
 } from './inject-defect.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -319,5 +320,119 @@ describe('inject-defect.mjs — cleanup evidence emission (MUTATOR-05)', () => {
     expect(SOURCE_TAG).toBe('fixture-mutator-uat-47b');
     // Sanity: ERROR_CLASSES export contains the allowlisted class.
     expect(ERROR_CLASSES.has('GOOGLE_DOM_DRIFT')).toBe(true);
+  });
+});
+
+// ===========================================================================
+// DIAG-03: deterministic diagnostic body (Phase 61 Plan 61-01)
+//
+// Pins the Phase 61 buildBody extension:
+//   DIAG-01 — GOOGLE_DOM_DRIFT body carries at least one verbatim selector
+//             from tests/e2e/lib/selection.js:170-172 + navigation.js:34
+//             vocabulary ('patent-result', 'section[itemprop="claims"]',
+//             'main', 'article').
+//   DIAG-02 — WRONG_CITATION body carries the five Phase 35 Verifier
+//             Disagreement template-parity literals from
+//             tests/e2e/lib/issue-payload-builder.js:208-216.
+//   DIAG-03 — same {fp, caseId, seed, errorClass} → byte-identical output
+//             (purity guarantee — defends against Math.random / Date.now
+//             leakage during future edits).
+//   MUTATOR-04 co-design — SOURCE_TAG 'fixture-mutator-uat-47b' literal
+//             preserved across ALL errorClass values, including the three
+//             untouched classes (default branch).
+//   Pitfall 1 — v2 marker '<!-- fp: <12-hex> -->' remains on line 1 of
+//             buildBody output regardless of errorClass.
+// ===========================================================================
+
+describe('inject-defect.mjs — DIAG-03 deterministic diagnostic body', () => {
+  it('DIAG-03a: GOOGLE_DOM_DRIFT body contains verbatim Google-Patents selector', () => {
+    // Anti-mutator-drift pin per PITFALLS Pitfall 2 — the synthetic DOM snippet
+    // must use the SAME selector vocabulary the real selection.js / navigation.js
+    // probes; otherwise the verifier-gate rejects an LLM fix that targets the
+    // fictional DOM and the 76-case regression goes 0-PASS.
+    const body = buildBody({
+      fp: 'aaaaaaaaaaaa',
+      caseId: 'tc',
+      seed: 's1',
+      errorClass: 'GOOGLE_DOM_DRIFT',
+    });
+    expect(body).toMatch(/patent-result|section\[itemprop="claims"\]|main|article/);
+  });
+
+  it('DIAG-03b: WRONG_CITATION body matches Phase 35 Verifier Disagreement template parity', () => {
+    // Template-parity check per DIAG-02 — co-design with
+    // tests/e2e/lib/issue-payload-builder.js:208-216 (the Phase 35
+    // Verifier Disagreement section literal shape).
+    const body = buildBody({
+      fp: 'bbbbbbbbbbbb',
+      caseId: 'tc',
+      seed: 's2',
+      errorClass: 'WRONG_CITATION',
+    });
+    expect(body).toContain('### Verifier Disagreement');
+    expect(body).toContain('Expected citation');
+    expect(body).toContain('Observed citation');
+    expect(body).toContain('Verifier tier:');
+    expect(body).toContain('Rerun verdict:');
+  });
+
+  it('DIAG-03c: GOOGLE_DOM_DRIFT body byte-identical across two calls (determinism)', () => {
+    const args = {
+      fp: 'aaaaaaaaaaaa',
+      caseId: 'tc',
+      seed: 's1',
+      errorClass: 'GOOGLE_DOM_DRIFT',
+    };
+    expect(buildBody(args)).toBe(buildBody(args));
+  });
+
+  it('DIAG-03d: WRONG_CITATION body byte-identical across two calls (determinism)', () => {
+    const args = {
+      fp: 'bbbbbbbbbbbb',
+      caseId: 'tc',
+      seed: 's2',
+      errorClass: 'WRONG_CITATION',
+    };
+    expect(buildBody(args)).toBe(buildBody(args));
+  });
+
+  it('DIAG-03e: SOURCE_TAG "fixture-mutator-uat-47b" preserved across all errorClasses (MUTATOR-04)', () => {
+    // Iterate the extended (GOOGLE_DOM_DRIFT, WRONG_CITATION) AND an
+    // untouched (WORKER_FALLBACK_FAILED) class. The SOURCE_TAG literal
+    // MUST appear in every body — co-design with
+    // scripts/quarantine-append.mjs:239 isFixtureMutator filter.
+    for (const errorClass of [
+      'GOOGLE_DOM_DRIFT',
+      'WRONG_CITATION',
+      'WORKER_FALLBACK_FAILED',
+    ]) {
+      const body = buildBody({
+        fp: 'cccccccccccc',
+        caseId: 'tc',
+        seed: 'sx',
+        errorClass,
+      });
+      expect(body).toContain('fixture-mutator-uat-47b');
+    }
+  });
+
+  it('DIAG-03f: v2 marker on line 1 invariant across all errorClasses (Pitfall 1)', () => {
+    // Complements existing test I6 (which asserts via mock-gh stdin capture).
+    // Direct-import buildBody test pins line 1 marker for ALL errorClasses.
+    for (const errorClass of [
+      'GOOGLE_DOM_DRIFT',
+      'WRONG_CITATION',
+      'WORKER_FALLBACK_FAILED',
+      'LLM_HALLUCINATED_SELECTION',
+      'HARNESS_ERROR',
+    ]) {
+      const body = buildBody({
+        fp: 'aaaaaaaaaaaa',
+        caseId: 'tc',
+        seed: 's1',
+        errorClass,
+      });
+      expect(body.split('\n')[0]).toMatch(/^<!-- fp: [0-9a-f]{12} -->$/);
+    }
   });
 });

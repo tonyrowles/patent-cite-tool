@@ -1,7 +1,7 @@
 ---
 phase: 67
 slug: prompt-iter-loop-shape-a-capture-and-surface-in-process
-status: findings
+status: fixed
 depth: standard
 files_reviewed: 8
 findings:
@@ -9,7 +9,14 @@ findings:
   warning: 10
   info: 1
   total: 12
+fixed:
+  critical: 1
+  warning: 10
+  info: 1
+  total: 12
+  test_suite_after_fixes: "206/206 pass"
 created: 2026-06-09
+fixed_at: 2026-06-09
 ---
 
 # Phase 67 Code Review

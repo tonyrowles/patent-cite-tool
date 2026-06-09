@@ -244,6 +244,41 @@ const SUPPRESSION_PATH = path.resolve(__REPO_ROOT_45_03, 'tests/e2e/.flake-suppr
 const RECOGNIZED_LABELS = new Set([...ERROR_CLASSES, 'PASS']);
 
 // ---------------------------------------------------------------------------
+// Phase 67 WR-02 (REVIEW.md) — extract budget-cap helper to dedup the two
+// 22-line `safeAppendLedger + stdout.write + return 0` blocks at the parse-fail
+// and apply-check-fail iter trigger sites. Pre-fix, the blocks were identical
+// modulo their containing branch; any future change to cost_usd, errorReason,
+// or the stdout format had to be made in two places (drift risk).
+//
+// The helper writes the prompt-iter-budget-cap ledger row and prints the
+// abstention notice. Callers `return 0` immediately after invoking it.
+//
+// Per WR-01 the row records the ACTUAL cumulative spend (`state.cumCost`) so
+// downstream cost dashboards see real iter-loop cost.
+// ---------------------------------------------------------------------------
+function writeBudgetCapAndAbstain({ state, transport, issue, fingerprint, errorClass }) {
+  safeAppendLedger({
+    iso: new Date().toISOString(),
+    model: 'claude-sonnet-4-6',
+    cost_usd: state.cumCost,
+    tokens_in: 0,
+    tokens_out: 0,
+    phase: PHASE,
+    transport,
+    issueId: `issue-${issue}`,
+    fingerprint,
+    errorClass,
+    source: 'auto-fix-api',
+    errorReason: 'prompt-iter-budget-cap',
+    iter_round: state.round,
+  });
+  process.stdout.write(
+    `[auto-fix] prompt-iter budget exhausted (round=${state.round} cumCost=${state.cumCost.toFixed(4)}); ` +
+      `graceful abstention; exit 0\n`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers (also exported for unit testing if ever needed)
 // ---------------------------------------------------------------------------
 
@@ -898,32 +933,11 @@ export async function runDispatcher({
         errorReason: `malformed-diff:${parsed.reason}`,
         iter_round: state.round,          // Phase 67 PITER-03 additive field
       });
-      // Cap check — if exhausted, write budget-cap row + graceful return 0
+      // Cap check — if exhausted, write budget-cap row + graceful return 0.
+      // Phase 67 WR-02 — dedup via writeBudgetCapAndAbstain helper (was a
+      // 22-line duplicate of the apply-check-failed cap branch below).
       if (state.round + 1 > ITER_MAX_ROUNDS || state.cumCost >= PROMPT_ITER_COST_CAP_USD) {
-        safeAppendLedger({
-          iso: new Date().toISOString(),
-          model: 'claude-sonnet-4-6',
-          // Phase 67 WR-01 (REVIEW.md): record the ACTUAL cumulative spend
-          // attributable to the prompt-iter retry path. Pre-fix this row
-          // reported 0 while state.cumCost held the real spend, making
-          // downstream cost dashboards filtering on errorReason ===
-          // 'prompt-iter-budget-cap' under-report the iter-loop spend.
-          cost_usd: state.cumCost,
-          tokens_in: 0,
-          tokens_out: 0,
-          phase: PHASE,
-          transport,
-          issueId: `issue-${issue}`,
-          fingerprint,
-          errorClass,
-          source: 'auto-fix-api',
-          errorReason: 'prompt-iter-budget-cap',
-          iter_round: state.round,
-        });
-        process.stdout.write(
-          `[auto-fix] prompt-iter budget exhausted (round=${state.round} cumCost=${state.cumCost.toFixed(4)}); ` +
-            `graceful abstention; exit 0\n`,
-        );
+        writeBudgetCapAndAbstain({ state, transport, issue, fingerprint, errorClass });
         return 0;
       }
       // Otherwise — increment round, set hint, re-enter loop
@@ -994,30 +1008,9 @@ export async function runDispatcher({
         errorMessage: stderrSnip,
         iter_round: state.round,          // Phase 67 PITER-03 additive field
       });
-      // Cap check
+      // Cap check — Phase 67 WR-02 dedup via writeBudgetCapAndAbstain helper.
       if (state.round + 1 > ITER_MAX_ROUNDS || state.cumCost >= PROMPT_ITER_COST_CAP_USD) {
-        safeAppendLedger({
-          iso: new Date().toISOString(),
-          model: 'claude-sonnet-4-6',
-          // Phase 67 WR-01 (REVIEW.md): record the ACTUAL cumulative spend
-          // attributable to the prompt-iter retry path (see matching
-          // comment on the parse-fail branch above).
-          cost_usd: state.cumCost,
-          tokens_in: 0,
-          tokens_out: 0,
-          phase: PHASE,
-          transport,
-          issueId: `issue-${issue}`,
-          fingerprint,
-          errorClass,
-          source: 'auto-fix-api',
-          errorReason: 'prompt-iter-budget-cap',
-          iter_round: state.round,
-        });
-        process.stdout.write(
-          `[auto-fix] prompt-iter budget exhausted (round=${state.round} cumCost=${state.cumCost.toFixed(4)}); ` +
-            `graceful abstention; exit 0\n`,
-        );
+        writeBudgetCapAndAbstain({ state, transport, issue, fingerprint, errorClass });
         return 0;
       }
       // Otherwise — increment round, set hint, re-enter loop

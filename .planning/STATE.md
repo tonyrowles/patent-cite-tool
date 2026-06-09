@@ -4,8 +4,8 @@ milestone: v4.3
 milestone_name: Auto-Fix Loop Closure + Capability Expansion
 status: executing
 stopped_at: v4.3 roadmap created — 7 phases (61, 62, 64, 65, 66, 67, 68), 38/38 requirements mapped, ROADMAP.md + STATE.md + REQUIREMENTS.md (traceability) written
-last_updated: "2026-06-09T22:01:03.742Z"
-last_activity: 2026-06-09 -- Phase 67 planning complete
+last_updated: "2026-06-09T22:01:50.590Z"
+last_activity: 2026-06-09 -- Phase 67 execution started
 progress:
   total_phases: 7
   completed_phases: 4
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** v4.3 Auto-Fix Loop Closure + Capability Expansion (Phases 61-66 shipped on origin/main; paused before Phase 67)
+**Current focus:** Phase 67 — Prompt-Iter Loop (Shape A — Capture-and-Surface, In-Process)
 
 ## Current Position
 
-Phase: 67 (next — Prompt-Iter Loop; not started)
-Plan: —
-Status: Ready to execute
-Last activity: 2026-06-09 -- Phase 67 planning complete
+Phase: 67 (Prompt-Iter Loop (Shape A — Capture-and-Surface, In-Process)) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 67
+Last activity: 2026-06-09 -- Phase 67 execution started
 Pending operator action:
 
   1. Phase 61 UAT-01/02 live runbooks (precondition for Phase 68) — see 61-04-PLAN.md + 61-05-PLAN.md

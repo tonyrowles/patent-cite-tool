@@ -188,7 +188,10 @@ describe('Phase 62 BYPASS-01 — parseArgv', () => {
     const parsed = parseArgv([]);
     expect(parsed.output).toBe('csv');
     expect(parsed.branchPrefix).toBe('auto-fix/');
-    expect(parsed.workflowName).toBe('verifier-gate');
+    // CR-02 fix: workflow-path matches by GitHub API `path` field (resilient
+    // to YAML `name:` edits). Previous workflowName default 'verifier-gate'
+    // never matched the actual declared name 'V40 Verifier Gate'.
+    expect(parsed.workflowPath).toBe('.github/workflows/v40-verifier-gate.yml');
     // sinceIso should be ~8 days ago — validate ISO-8601 shape + recency window
     expect(typeof parsed.sinceIso).toBe('string');
     expect(parsed.sinceIso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);

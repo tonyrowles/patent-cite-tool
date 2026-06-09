@@ -120,11 +120,17 @@ const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
  *   --since-iso       8 days ago (RESEARCH Open Question 2 — 1-day cron-drift margin)
  *   --output          csv
  *   --branch-prefix   auto-fix/
- *   --workflow-name   verifier-gate
+ *   --workflow-path   .github/workflows/v40-verifier-gate.yml
+ *                     (CR-02 fix: switched from name-based to path-based
+ *                     matching. The GitHub API `name` field on /actions/runs
+ *                     is the workflow's declared `name:` from the YAML
+ *                     [`V40 Verifier Gate`], NOT the file slug. Matching by
+ *                     `path` is resilient to YAML `name:` edits and avoids
+ *                     the silent-zero-rows defect from the original code.)
  *   --repo            (omitted — main() resolves via gh repo view)
  *
  * @param {string[]} argv
- * @returns {{sinceIso: string, output: string, repo?: string, branchPrefix: string, workflowName: string}}
+ * @returns {{sinceIso: string, output: string, repo?: string, branchPrefix: string, workflowPath: string}}
  */
 export function parseArgv(argv) {
   const out = {
@@ -133,7 +139,7 @@ export function parseArgv(argv) {
       .replace(/\.\d{3}Z$/, 'Z'),
     output: 'csv',
     branchPrefix: 'auto-fix/',
-    workflowName: 'verifier-gate',
+    workflowPath: '.github/workflows/v40-verifier-gate.yml',
   };
   for (let i = 0; i < argv.length; i += 1) {
     const k = argv[i];
@@ -165,8 +171,8 @@ export function parseArgv(argv) {
         out.branchPrefix = v;
         i += 1;
         break;
-      case '--workflow-name':
-        out.workflowName = v;
+      case '--workflow-path':
+        out.workflowPath = v;
         i += 1;
         break;
       default:
@@ -240,12 +246,20 @@ export async function main(argv = process.argv.slice(2)) {
   const runsJson = JSON.parse(runsRaw);
   const runs = Array.isArray(runsJson?.workflow_runs) ? runsJson.workflow_runs : [];
 
-  // Filter to verifier-gate runs on auto-fix/* branches (Assumption A2 — name match v1).
+  // Filter to verifier-gate runs on auto-fix/* branches.
+  //
+  // CR-02 fix (Phase 62 REVIEW): match by `path` (workflow file slug), not
+  // `name` (declared YAML `name:`). The previous `r?.name === 'verifier-gate'`
+  // check never matched because the actual workflow declares
+  // `name: V40 Verifier Gate` at .github/workflows/v40-verifier-gate.yml:42 —
+  // the script silently returned zero rows on every Phase 62 invocation.
+  // `endsWith` is resilient to repo-root path prefixes and YAML name edits.
   const filtered = runs.filter(
     (r) =>
       typeof r?.head_branch === 'string' &&
       r.head_branch.startsWith(parsed.branchPrefix) &&
-      r?.name === parsed.workflowName,
+      typeof r?.path === 'string' &&
+      r.path.endsWith(parsed.workflowPath),
   );
 
   // Load ledger once for ledger_source_tag cross-ref.

@@ -3,10 +3,11 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: Auto-Fix Loop Closure + Capability Expansion
 status: planning
-last_updated: "2026-06-09T03:32:50.354Z"
-last_activity: 2026-06-09
+stopped_at: v4.3 roadmap created — 7 phases (61, 62, 64, 65, 66, 67, 68), 38/38 requirements mapped, ROADMAP.md + STATE.md + REQUIREMENTS.md (traceability) written
+last_updated: "2026-06-09T04:46:33.466Z"
+last_activity: 2026-06-09 — v4.3 roadmap created (7 phases, 38 reqs mapped)
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +21,38 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** v4.3 Auto-Fix Loop Closure + Capability Expansion (defining requirements)
+**Current focus:** v4.3 Auto-Fix Loop Closure + Capability Expansion (roadmap landed — 7 phases, 38 reqs mapped; ready to plan Phase 61)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 61 (planning — not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-09 — Milestone v4.3 started
+Status: planning
+Last activity: 2026-06-09 — v4.3 roadmap created (7 phases, 38 reqs mapped)
+
+## Budget
+
+| Cap | Value | Source |
+|-----|-------|--------|
+| Milestone soft cap | **$15** | BUDG-01 (v4.3 requirement) |
+| Milestone hard ceiling | **$30** | PITFALLS Pitfall 9 reasoning |
+| Per-phase | **< $5** | BUDG-01 distribution |
+| Mean per-call (`--max-turns 5` regression) | **< $0.30** | TURNS-03 cost-bound test |
+| Per-issue cap (existing) | $1 (`ISSUE_HARD_CAP_USD`) | Phase 39 LEDGER-02 |
+| Per-PR cap (existing) | $2 | Phase 39 LEDGER-02 |
+| Per-fingerprint prompt-iter cap | **$0.50** (`PROMPT_ITER_COST_CAP_USD`) | PITER-03 (Phase 67) |
+
+Each phase records per-phase spend in its VERIFICATION.md footer (probed against this table). Phase 68 emits the final tally and validates UAT-04 (`total spend ≤ $15`).
+
+## Bypass Conventions
+
+**LOAD-BEARING RUNBOOK** (per BYPASS-03 — Pitfall 11 mitigation):
+
+- **DO NOT** use `gh pr merge --admin` on `auto-fix/*` branches. EVER.
+- `--admin` bypasses the `verifier-gate` CI check but still writes `outcome: 'pass'` ledger entries via `auto-fix-promote.mjs`. These entries pollute A/B winner sample math because `assertTripleGate` (verified-label + merged + triage-sourced) does not detect the bypass when the maintainer manually adds `auto-fix:verified` before merging.
+- Sole-maintainer ruleset 17086676 has `@tonyrowles` (`actor_id 254599900`) as permanent bypass actor with `bypass_mode: always` (post-v4.2 reversal — see Ruleset Decision below). The bypass is for **human-authored** changes that warrant scope-decision fast-path or maintenance commits — **not** for auto-fix promotions.
+- Phase 62 `scripts/audit-bypass-merges.mjs` (BYPASS-01) queries `gh api repos/<owner>/<repo>/actions/runs` for `verifier-gate` runs completed AFTER the PR was merged; outputs CSV consumed by Phase 66's `a-b-winner.mjs --admin-bypass` filter to exclude bypass-tainted `outcome:'pass'` entries.
+- Weekly digest gains bypass-count metric (BYPASS-02) so the discipline is observable in the Auto-Fix Pipeline section.
 
 ## Performance Metrics
 
@@ -45,6 +70,8 @@ Last activity: 2026-06-09 — Milestone v4.3 started
 | v3.0 Autonomous E2E Testing Agent | 6 | 30 | ~7 days |
 | v3.1 LLM-Driven Product Improvement Loop | 7 | 31 | ~9 days |
 | v4.0 Self-Healing Test Suite | 9 | 26 | ~3 days |
+| v4.1 Readiness Gate + Push | 9 | 11 | ~2 days |
+| v4.2 Auto-Fix Loop Live | 5 (+60.1 hotfix) | 11 | ~5 days |
 
 ## Accumulated Context
 
@@ -53,6 +80,8 @@ Last activity: 2026-06-09 — Milestone v4.3 started
 - 2026-06-02: v4.1 roadmap drafted from REQUIREMENTS.md (26 reqs, 8 categories) + research/SUMMARY.md 4-wave structure. 8 phases (48-55). Wave-0 (48) blocks all; Wave-1 (49) is the single serialization point; Wave-2 (50, 51, 52) parallelizable post-push; Wave-3 (53, 54) parallelizable with Wave-2; Wave-4 (55) depends on Phase 54 model field.
 
 - 2026-06-04: v4.2 roadmap drafted from REQUIREMENTS.md (25 reqs, 6 categories) + research/SUMMARY.md 5-phase structure. Phases 56-60. Phase 56 (LEDGER-01..04) + Phase 57 (COMMIT-01..04) are parallelizable (disjoint files); Phase 56 recommended first so UAT-47-a populates `errorClass` from day one. Phase 58 (PROMOTE-01..04) depends on Phase 56 (safeAppendLedger) and Phase 57 (branch-redirect pattern). Phase 59 (MUTATOR-01..05 + SWEEP-01..06) depends on all of Phase 56+57+58 live on origin/main; UAT sequencing locked per D-13 cost discipline (SWEEP-01 $0 smoke first, SWEEP-03 paid loop last). Phase 60 (CLEAN-01..02) fully independent; runs last to avoid noise. Coverage: 25/25 requirements mapped; 0 orphans.
+
+- 2026-06-09: v4.3 roadmap drafted from REQUIREMENTS.md (38 reqs, 12 categories) + research/SUMMARY.md canonical 7-phase 61→62→64→65→66→67→68 sequence (skipping 63 to preserve PITFALLS-to-phase mapping; the skip is intentional and load-bearing for cross-document references). Wave 0 = Phases 61-62 (carry-over closure, required for DoD); Wave 1 = Phases 64-67 (capability expansion, parallelizable post-Wave-0); Wave 2 = Phase 68 (final cleanup, precondition-gated). Phase 61 atomic bundle (DIAG+TURNS+BUDG+UAT-01/02) jointly required for UAT-47-a/b PASS — partial states recreate v4.2 SWEEP-03 failure shape. Phase 62 closes auxiliary-leak via shared safe-append-ledger.js helper (NOT validation in appendLedgerEntry body — would break 33 pre-existing Vitest tests per Pitfall 3) + BYPASS-01/02/03 audit (Pitfall 11 — NEW v4.3 cross-cutting). Phase 64/65/66 parallelizable post-Wave-0 (disjoint files: triage-classifier.js / fix-prompt-builder.js+workflow / a-b-winner.mjs). Phase 67 highest-risk architecturally (Shape A in-process only; Shape B rejected outright as Anti-Feature; FORBIDDEN_PATHS extension to fix-prompt-builder.js + llm-router.js is non-negotiable defense-in-depth). Phase 68 must run LAST (precondition sentinel .planning/sweep-03-04-pass-evidence.yaml captured from Phase 61 UAT-01/UAT-02 PASS). Coverage: 38/38 requirements mapped; 0 orphans.
 
 ### Decisions
 
@@ -67,6 +96,17 @@ Last activity: 2026-06-09 — Milestone v4.3 started
 - v4.2-roadmap: UAT sequencing in Phase 59 is locked per D-13 cost discipline: SWEEP-01 ($0 smoke) → SWEEP-02 (~5 min) → SWEEP-03 (~$0.50-2 primary DoD) → SWEEP-04 (after mutator). Halt-on-fail at SWEEP-01 before spending API budget.
 - v4.2-roadmap: Fixture-mutator (MUTATOR-01..05) works at issue-creation layer only — does NOT touch FORBIDDEN_PATHS files in the working tree. Source-tag `source: 'fixture-mutator-uat-47b'` co-designed across inject-defect.mjs and quarantine-append.mjs in the same commit.
 - 2026-06-08 (Phase 59 closure): Auto-fix loop has a structural integration gap that v4.2 cannot close. Surfaced by three SWEEP-03 subscription attempts (issue #23 GOOGLE_DOM_DRIFT 2x; issue #3 WRONG_CITATION 1x). Two distinct constraints: (1) fixture-mutator design ("issue-creation layer only") leaves synthetic issue bodies without diagnostic data; the prompt scaffolds at `tests/e2e/lib/fix-prompt-builder.js:252-268` correctly refuse to fabricate fixes → `apply-check-failed`. (2) `tests/e2e/lib/llm-driver.js:94`'s `--max-turns 1` (marked "DO NOT change" — Pitfall 1+2 cost gate) prevents Claude from reading source files to understand real diagnostic-rich issues like issue #3's WRONG_CITATION → `error_max_turns`. Path D investigation confirmed no real `GOOGLE_DOM_DRIFT` issue with a DOM snippet exists in repo history (all 4 such issues are mutator synthetics). v4.2 LEDGER/COMMIT/PROMOTE/MUTATOR/SWEEP-05 work all ships on origin/main; live UAT-47-a/b end-to-end evidence is deferred to v4.3 where both architectural changes (diagnostic-injection + max-turns relaxation with `--allowed-tools=Read`) will be designed and shipped together. See `.planning/phases/59-fixture-mutator-4-uat-re-sweep/59-VERIFICATION.md` AMENDMENT 2026-06-08 for the full root-cause record.
+- v4.3-roadmap: Continue phase numbering from v4.2 (60 + 60.1 hotfix → 61). Canonical sequence 61 → 62 → 64 → 65 → 66 → 67 → 68 (skipping 63). The skip is INTENTIONAL and load-bearing for cross-document references — PITFALLS pitfall-to-phase matrix uses these specific numbers; renumbering 64-68 as 63-67 would break the reference structure.
+- v4.3-roadmap: LOAD-BEARING — Phase 61 is an ATOMIC BUNDLE (DIAG-01/02/03 + TURNS-01/02/03 + BUDG-01 + UAT-01 + UAT-02). Partial states recreate the v4.2 SWEEP-03 failure shape (just with different error-mode labels). DIAG and TURNS must ship in the SAME commit per v4.2 audit finding.
+- v4.3-roadmap: LOAD-BEARING — flag name correctness in TURNS-01. Official Claude CLI flag is `--tools "Read,Glob,Grep"` (which RESTRICTS the palette), NOT `--allowed-tools` (kebab-case — silently no-ops) or `--allowedTools` (camelCase — grants permission without prompting but does NOT remove tools). The v4.2 carry-over note used `--allowed-tools` — REQUIREMENTS.md TURNS-01 corrects this. Vitest pin (TURNS-02) asserts argv contains `--tools Read,Glob,Grep` AND excludes `Edit`/`Bash`/`Write`/`WebFetch`/`--allowed-tools`/`--allowedTools` literally anywhere.
+- v4.3-roadmap: LOAD-BEARING — `--max-turns 5` applies to SUBSCRIPTION transport ONLY. SDK transport is single-turn by API design (messages.create is one request → one response, no agent loop). This intentional asymmetry must be inline-documented at the call sites.
+- v4.3-roadmap: LOAD-BEARING — forensic-ledger hardening (LEDX-01..04) lives at the SHARED-HELPER layer (`tests/e2e/lib/safe-append-ledger.js`), NOT in `appendLedgerEntry` body. Adding validation to `appendLedgerEntry` body would break 33 pre-existing Vitest ledger tests (per Pitfall 3). The 4 unguarded sites (auto-fix-promote.mjs:521/544 + e2e-explore.mjs:262/313) consume the shared helper. Phase 60.1 subscription-transport whitelist (LEDX-04 Vitest pin `T_PHASE60_1_HOTFIX_PRESERVED`) is preserved.
+- v4.3-roadmap: LOAD-BEARING (NEW Pitfall 11) — sole-maintainer `--admin` bypass on ruleset 17086676 pollutes A/B winner outcome data. `scripts/audit-bypass-merges.mjs` (BYPASS-01) ships in Phase 62 with `a-b-winner.mjs --admin-bypass` filter consumed in Phase 66. Runbook discipline ("DO NOT use `gh pr merge --admin` on `auto-fix/*` branches") documented in this STATE.md ## Bypass Conventions section (BYPASS-03).
+- v4.3-roadmap: LOAD-BEARING (NEW Pitfall 4) — A/B winner cross-transport contamination. Phase 54 D-19 filter only stratifies by (model, errorClass); SDK and subscription have different retry semantics. Phase 66 extends `computePerClassPerArm` to stratify by (class, arm, transport) 3-way. `TIE_THRESHOLD` raised 0.05 → 0.10 (noise-floor reasoning inline-documented). `--since-iso` filter prevents pre-v4.3 entries from contaminating the sample.
+- v4.3-roadmap: LOAD-BEARING — Phase 67 prompt-iter loop ships Shape A (capture-and-surface, in-process at runDispatcher Step 10) ONLY. Shape B (full automation) is rejected outright as Anti-Feature (trust-boundary erosion via self-modifying prompts; touching `fix-prompt-builder.js` invalidates byte-stability invariants on the 5 existing scaffolds; defeats `assertTripleGate` by indirection). FORBIDDEN_PATHS extension to include `fix-prompt-builder.js` + `llm-router.js` (PITER-05) is NON-NEGOTIABLE defense-in-depth — even if Shape B ever ships in v4.4+, the auto-fix PR cannot edit scaffold source.
+- v4.3-roadmap: LOAD-BEARING — Phase 68 MUST be the FINAL phase. Precondition sentinel `.planning/sweep-03-04-pass-evidence.yaml` must exist (captured from Phase 61's UAT-01/UAT-02 PASS) before destructive action; `--dry-run` is the DEFAULT for `scripts/uat-cleanup.mjs`; `--confirm` opt-in required; triple-tagged filter (issue title regex + body fingerprint marker + label match) ensures no accidental real-issue match.
+- v4.3-roadmap: ZERO new npm dependencies target (fifth consecutive milestone if held). All 8 capabilities extend existing primitives via additive edits. Vitest pin holds at `^3.0.0` caret. `@anthropic-ai/sdk@0.100.1` EXACT pin held. `peter-evans/create-pull-request@v8` floating tag held. Bumps go through `check-deps-and-pr.mjs` review path.
+- v4.3-roadmap: Trust invariants preserved across every phase: `assertTripleGate` body sha256-equivalent to Phase 53 baseline; `appendLedgerEntry` body byte-unchanged (additive validation at wrapper layer only); `PROMPT_SCAFFOLDS` `Object.freeze` + 5 existing-scaffold byte-stability sha256; ESLint `@anthropic-ai/sdk` single-entry-point guard; `grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml` == 1 (Phase 57 scope-lock); Phase 60.1 subscription-transport whitelist.
 - [Phase 50]: Closure (2026-06-03): ruleset 17086676 hardened — 5 rules including required_status_checks for verifier-gate+deps-update-gate (integration_id=15368), bypass_actors=[], current_user_can_bypass→never. Two PUTs in audit log. Test PR proved enforcement (Method A+B); break-glass runbook (docs §7) live-tested idempotent BEFORE bypass removal. Vitest D11+D12 pin jobid strings. 6 atomic commits 79d5415→9c3b016→fab8d2a→d455b32→b57d3a9→bcaa89c.
 - [Phase 51]: Closure (2026-06-03): 0 PASS / 1 FAIL / 1 AUTO-DEFERRED / 1 STILL-DEFERRED / 1 BLOCKED-BY-PHASE-50. UAT-47-e FAILED — v40-verifier-gate.yml's pull_request.branches:['auto-fix/*'] targets BASE ref not HEAD; the gate cannot fire on PRs into main. UAT-47-a AUTO-DEFERRED per D-13 (sequence-gate). UAT-47-b STILL-DEFERRED (fixture-mutator authoring required). UAT-47-d BLOCKED-BY-PHASE-50 (ruleset blocks ledger-commit push to main). 5 atomic commits 3cb821a→24b4f08→aedafa0→5121c39→(final). Phase 56 follow-up enqueued (see Pending Todos) folding all four UATs into one v4.2 work unit covering verifier-gate trigger patch + ledger-commit refactor + deps-update audit + fixture-mutator. $0 API spent; no destructive mutations on origin; 2 transient test PRs (#12, #13) opened+closed with --delete-branch.
 - [Phase 51.1]: Closure (2026-06-03): REGRESSION-51-01 resolved — v40-verifier-gate.yml BASE-ref filter `branches:['auto-fix/*']` REMOVED + v40-deps-update.yml `pull_request:` trigger ADDED + verbatim scope-decision fast-path step prepended to 4 PR-gate jobs (verifier-gate/regression-suite/ready-flip in verifier-gate.yml; deps-update-gate in deps-update.yml); diff-guard + dep-scan jobs unguarded by design (universal LOCKED-path check + PR-creator). Phase 50 SC-1+SC-2 preserved (final-ruleset.json byte-equals baseline on {rules, bypass_actors, current_user_can_bypass}). Break-glass §7 runbook live-tested end-to-end with one extra cycle to land closure commits after planned in-task push was blocked by its own bypass removal. Verification PR #14 captured BOTH required contexts firing (verifier-gate + deps-update-gate both SUCCESS via scope-decision fast-path), then CLOSED+branch-deleted. 8 atomic chore(51.1) commits cfb0951→a5a791c→583346e→ea45a47→9d388ad→59546dd→1aa226e→(T7 closure). Phase 56 pending-todo line amended in-place with [NOTE 2026-06-03] annotation per D-16.
@@ -81,13 +121,17 @@ Last activity: 2026-06-09 — Milestone v4.3 started
 - v4.3 (CARRY-OVER from v4.2 Phase 59 SWEEP-03/04 architectural deferral, filed 2026-06-08): The auto-fix loop has an architectural integration gap that prevents live UAT-47-a/b end-to-end evidence under current design. Two distinct failure modes were surfaced by three SWEEP-03 attempts (2026-06-06 issue #23 GOOGLE_DOM_DRIFT API-key blocker; 2026-06-07 issue #23 GOOGLE_DOM_DRIFT subscription apply-check-failed; 2026-06-08 issue #3 WRONG_CITATION subscription error_max_turns):
   (A) **Diagnostic-injection mutator**: extend `tests/e2e/scripts/inject-defect.mjs` to embed seeded but realistic diagnostic content in the synthetic issue body — DOM snippet for GOOGLE_DOM_DRIFT (mirror `tests/e2e/lib/google-patents-page.js` selector patterns); Verifier Disagreement block for WRONG_CITATION (mirror Phase 35 `e2e-nightly` issue shape). Co-design with prompt-scaffold expectations in `tests/e2e/lib/fix-prompt-builder.js:252-268`; pin via Vitest fixture (deterministic same-seed → same-snippet).
   (B) **Max-turns relaxation**: increase `--max-turns` from `1` to ~5 in `tests/e2e/lib/llm-driver.js:94` AND add `--allowed-tools Read,Glob,Grep` (no `Edit`/`Bash` to preserve the Pitfall 1+2 cost-discipline gate). Replace the existing `--max-turns 1` regression test pin with a `--max-turns 5 --allowed-tools Read,Glob,Grep` pin. Required for both subscription and SDK transports.
-  Both (A) AND (B) are required for SWEEP-03/04 to PASS end-to-end. Filed against v4.3 milestone. Also carries: (C) **forensic-ledger schema hardening** — 3 orphan `claude-opus-4-7[1m]` ledger entries surfaced 2026-06-08 with no `source`/`transport` fields; tighten ledger schema to REQUIRE these on all entries (currently dispatcher-only) to close the auxiliary-leak path; and (D) **synthetic-issue cleanup** — close issues #20/21/22/23 (the 4 mutator-injected GOOGLE_DOM_DRIFT triage issues from SWEEP-03 attempts) once v4.3 architectural work is decided.
+  Both (A) AND (B) are required for SWEEP-03/04 to PASS end-to-end. Filed against v4.3 milestone. Also carries: (C) **forensic-ledger schema hardening** — 3 orphan `claude-opus-4-7[1m]` ledger entries surfaced 2026-06-08 with no `source`/`transport` fields; tighten ledger schema to REQUIRE these on all entries (currently dispatcher-only) to close the auxiliary-leak path; and (D) **synthetic-issue cleanup** — close issues #20/21/22/23 (the 4 mutator-injected GOOGLE_DOM_DRIFT triage issues from SWEEP-03 attempts) once v4.3 architectural work is decided. [NOTE 2026-06-09: v4.3 roadmap created (Phases 61, 62, 64, 65, 66, 67, 68); this entire Pending Todo is now addressed by the roadmap. Phase 61=DIAG+TURNS+BUDG+UAT-01/02 (atomic), Phase 62=LEDX+BYPASS, Phase 64=TRIAGE, Phase 65=SCAF, Phase 66=ABWIN, Phase 67=PITER (Shape A only), Phase 68=CLEAN+UAT-03/04. CORRECTION applied during requirements scoping: the canonical CLI flag is `--tools` (RESTRICTS palette) not `--allowed-tools` (kebab-case silently no-ops) or `--allowedTools` (camelCase grants permission without removing). TURNS-01 codifies the correct argv. SDK transport is single-turn by API design and stays unchanged.]
 
 ### Blockers/Concerns
 
-- **Phase 57:** Verify `v40-auto-fix.yml` ledger-commit step line numbers against live file during planning (research cites ~150-172). Scope constraint: grep-count verification gate (`grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml` equals 1) must pass after Phase 57 commits.
-- **Phase 58:** Read the exact grep pattern in `tests/unit/auto-fix-promote-gate.test.js` during planning. Confirm new `llm-ledger.js` import does not trigger the existing IMPORTS POLICY assertion unexpectedly before narrowing the allow-list.
-- **Phase 59:** Cross-reference `issue-payload-builder.js` fingerprint format during planning to confirm synthetic issue body matches what `auto-fix.mjs` expects for fingerprint parsing and auto-fix triggering. The `source: 'fixture-mutator-uat-47b'` string in inject-defect.mjs and quarantine-append.mjs must be identical (co-designed in same commit).
+- **Phase 61 (Wave 0 atomic bundle):** Needs verification during planning of (a) exact line/byte location of `--max-turns 1` in `tests/e2e/lib/llm-driver.js` (research cites line 94), (b) the existing Vitest pin location for the argv assertion (Phase 31 / Phase 42 line numbers in `tests/unit/llm-driver.test.js`), (c) the SDK-path `appendLedgerEntry` call sites already self-tag source+transport (verify lines 588, 620 in `llm-driver.js`), (d) the `fix-prompt-builder.js:252-268` GOOGLE_DOM_DRIFT_CONTRACT exact selector vocabulary expectations. Recommend `/gsd:plan-phase --research-phase 61` mandatory.
+- **Phase 62:** Shared-helper extraction is a well-understood Node.js refactor pattern. Pitfall 12 enumerates the exact 4 sites (auto-fix-promote.mjs:521/544 + e2e-explore.mjs:262/313). Verify during planning that `T_PHASE60_1_HOTFIX_PRESERVED` Vitest pin still asserts `transport:'subscription'` entries pass unblocked. New `scripts/audit-bypass-merges.mjs` follows existing `scripts/*.mjs` pattern.
+- **Phase 64:** Pure-function extension of `runTriage` D-03 rule chain. Pattern established in Phase 34. Verify during planning that the existing `VERIFIER_STRONG_AGREEMENT` Tier-A/B-only guard at triage-classifier.js:43-44 is NOT loosened. WORKER_FALLBACK_FAILED rule (TRIAGE-03) may need producer-site co-design in `tests/e2e/specs/fault-injection.spec.js` if the `fault_injection_status` field doesn't already exist.
+- **Phase 65:** Scaffold expansion pattern established in Phase 45; just adds new keys via existing `buildScaffoldSystemPrompt` helper. 5-site enumeration drift guard (SCAF-03) is a checklist — verify presence in error-codes.js + v40-auto-fix.yml:91 precheck + PROMPT_SCAFFOLDS + inject-defect.mjs ERROR_CLASSES + MODEL_ROUTES (or `// MODEL_DEFAULT_OK:` comment). Existing 5 scaffolds (WRONG_CITATION/LLM_HALLUCINATED_SELECTION/WORKER_FALLBACK_FAILED/GOOGLE_DOM_DRIFT/HARNESS_ERROR) byte-stability sha256 pin (SCAF-04) must hold against Phase 45 baseline.
+- **Phase 66:** A/B winner cleanup + 3-way stratification is mechanical once Phase 62 ledger schema is clean. Pattern established in Phase 54. Cannot meaningfully ship until ≥1 SWEEP-03/04 PASS on origin/main so outcome entries used for sample math are valid. Depends on Phase 62 BYPASS-01 CSV producer for `--admin-bypass` filter consumption.
+- **Phase 67 (HIGHEST RISK):** New architecture surface in v4.3. Needs research on (a) how `rewriteHint` flows through `buildScaffoldSystemPrompt` without breaking Phase 45 byte-stability sha256, (b) interaction with the per-issue cap ($1) and per-PR cap ($2), (c) interaction with `--max-turns 5` (multi-turn may reduce iter-rounds needed — perhaps `ITER_MAX_ROUNDS = 1` is sufficient post-Phase-61). FORBIDDEN_PATHS extension to include `fix-prompt-builder.js` + `llm-router.js` is NON-NEGOTIABLE — must ship in the same commit as the iter loop wrapper. Recommend `/gsd:plan-phase --research-phase 67` mandatory.
+- **Phase 68:** Cleanup script is a well-understood `gh` CLI orchestrator pattern. Verify during planning that the precondition sentinel `.planning/sweep-03-04-pass-evidence.yaml` logic is robust (script refuses to run when sentinel absent OR `passed_at_iso` field empty). Triple-tagged filter (issue title + body fingerprint + label) verified against synthetic real-triage fixtures missing any leg of the triple. `--dry-run` default + `--confirm` opt-in.
 
 ## Deferred Items
 
@@ -117,23 +161,28 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 | Category | Item | Status | Resolution |
 |----------|------|--------|------------|
-| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-03 | architecturally-deferred | v4.3 carry-over: requires diagnostic-injection mutator + --max-turns relaxation with --allowed-tools=Read. See 59-VERIFICATION.md AMENDMENT 2026-06-08 |
-| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-04 | architecturally-deferred | Inherits SWEEP-03 architectural constraints; production-path proof deferred (MUTATOR-04 invariant verified via Vitest defense-in-depth G9-a/G9-b) |
-| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-06 | architecturally-deferred | Cleanup automation depends on SWEEP-03/04 PASS evidence; synthetic-issue cleanup (#20/21/22/23) carried to v4.3 |
+| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-03 | architecturally-deferred | v4.3 carry-over: requires diagnostic-injection mutator + --max-turns relaxation with --allowed-tools=Read. See 59-VERIFICATION.md AMENDMENT 2026-06-08. [NOTE 2026-06-09: addressed by v4.3 Phase 61 atomic bundle (DIAG-01/02/03 + TURNS-01/02/03 + UAT-01). TURNS-01 corrects flag-name to `--tools` (RESTRICTS palette) — NOT `--allowed-tools`/`--allowedTools`.] |
+| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-04 | architecturally-deferred | Inherits SWEEP-03 architectural constraints; production-path proof deferred (MUTATOR-04 invariant verified via Vitest defense-in-depth G9-a/G9-b). [NOTE 2026-06-09: addressed by v4.3 Phase 61 UAT-02.] |
+| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-06 | architecturally-deferred | Cleanup automation depends on SWEEP-03/04 PASS evidence; synthetic-issue cleanup (#20/21/22/23) carried to v4.3. [NOTE 2026-06-09: addressed by v4.3 Phase 68 (CLEAN-01/02/03 + UAT-03). Precondition sentinel `.planning/sweep-03-04-pass-evidence.yaml` enforces ordering — Phase 68 cannot run until Phase 61 captures SWEEP-03/04 PASS evidence.] |
 | quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Pre-v4.1 closure record; persists in audit-open due to directory presence; no action needed |
 | quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Same as above |
 | quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Same as above |
 
 ## Session Continuity
 
-Last session: 2026-06-04T20:00:00Z
-Stopped at: v4.2 roadmap created — 5 phases (56-60), 25/25 requirements mapped, ROADMAP.md + STATE.md + REQUIREMENTS.md (traceability) written
-Resume file: .planning/ROADMAP.md (next: /gsd:plan-phase 56 — Ledger Schema Extension + Leak Guard)
+Last session: 2026-06-09T04:46:00Z
+Stopped at: v4.3 roadmap created — 7 phases (61, 62, 64, 65, 66, 67, 68), 38/38 requirements mapped, ROADMAP.md + STATE.md + REQUIREMENTS.md (traceability) written
+Resume file: .planning/ROADMAP.md (next: /gsd:plan-phase 61 — Carry-over Bundle (Diagnostic Mutator + Max-Turns + UAT Re-sweep))
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Run `/gsd:plan-phase 61` to begin Wave 0 (Phase 61 atomic bundle: DIAG + TURNS + BUDG + UAT-01/02). Recommend `--research-phase 61` flag to verify the exact line numbers / argv shape / scaffold contracts cited in research.
+- After Phase 61 ships and SWEEP-03/04 PASS on origin/main, capture evidence in `.planning/sweep-03-04-pass-evidence.yaml` (Phase 68 precondition sentinel).
+- After Phase 61: Phase 62 closes carry-over wave (LEDX + BYPASS). After Phase 62: Phases 64/65/66 can run in parallel (disjoint files). Phase 67 must wait for Phase 61 substrate live on `origin/main`.
+- Phase 68 MUST be the final phase — runs cleanup + final UAT tally only after sentinel evidence captured.
 
 ### Ruleset Decision (2026-06-06, post-v4.2)
 
 **Decision:** Reversed Phase 50 CLEANUP-04's `bypass_actors=[]` configuration. Re-added `@tonyrowles` (actor_id `254599900`) as permanent bypass actor on ruleset 17086676 with `bypass_mode: always`. Rationale: sole-maintainer project; the approval requirement was theoretical purity without practical security benefit since the only CODEOWNER is also the only PR author. CI required-checks (`verifier-gate` + `deps-update-gate`) remain unchanged as the load-bearing trust boundary. Auto-fix bot PRs continue to flow through the draft→ready→human-review path because the bot is a distinct identity (`github-actions[bot]`), not the maintainer. Bypass usage: `gh pr merge <n> --admin` (or direct `git push` to main if the change set warrants it). Phase 50 D-08 (`current_user_can_bypass=never`) is hereby superseded for the sole-maintainer phase of the project; if a second maintainer joins, the bypass should be removed and the original posture restored.
+
+**v4.3 NOTE (BYPASS-01..03, Pitfall 11):** The `gh pr merge --admin` capability creates an A/B winner data integrity hazard — `--admin` bypasses `verifier-gate` but still writes `outcome:'pass'` ledger entries via `auto-fix-promote.mjs`. Phase 62 ships `scripts/audit-bypass-merges.mjs` (BYPASS-01) + weekly-digest bypass-count metric (BYPASS-02) + this runbook section in STATE.md ## Bypass Conventions (BYPASS-03). Phase 66 `a-b-winner.mjs --admin-bypass` filter consumes the CSV to exclude bypass-tainted entries. **Runbook rule: DO NOT use `gh pr merge --admin` on `auto-fix/*` branches. EVER.** Use `--admin` only for human-authored scope-decision fast-path commits or maintenance work outside the auto-fix surface.

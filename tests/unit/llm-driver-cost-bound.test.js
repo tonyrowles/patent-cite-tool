@@ -9,9 +9,12 @@
 //   - mean(cost_usd) < $0.30 (TURNS-03 mean-per-call cap)
 //   - mean(cost_usd) > $0.20 (sanity floor — prevents "all entries zero" gaming)
 //   - per-entry cost_usd < $1 (per-issue ISSUE_HARD_CAP_USD)
-//   - every entry has transport:'subscription' + source:'auto-fix-api'
+//   - every entry has transport:'subscription' + source:'fix-issue-cli'
 //     (forensic-ledger schema integrity — subscription transport is the only
-//     path affected by the --max-turns argv update)
+//     path affected by the --max-turns argv update; 'fix-issue-cli' is the
+//     SOURCE_FIX_ISSUE constant emitted by scripts/auto-fix.mjs:204+784 on
+//     the subscription path — see Phase 61 WR-01 fix for the source-tag
+//     correction)
 //   - --max-budget-usd argv value 0.50 < ISSUE_HARD_CAP_USD 1.00
 //     (defense-in-depth tuning sanity check)
 //
@@ -46,10 +49,10 @@ describe('TURNS-03 — --max-turns 5 cost-bound regression', () => {
     }
   });
 
-  it('every entry tagged transport:subscription + source:auto-fix-api (forensic-ledger schema integrity)', () => {
+  it('every entry tagged transport:subscription + source:fix-issue-cli (forensic-ledger schema integrity)', () => {
     for (const e of entries) {
       expect(e.transport).toBe('subscription');
-      expect(e.source).toBe('auto-fix-api');
+      expect(e.source).toBe('fix-issue-cli');
     }
   });
 

@@ -861,9 +861,14 @@ export async function runDispatcher({
   iterState.set(fingerprint, { round: 0, cumCost: 0 });
   let rewriteHint;   // undefined on round 0 → byte-identical scaffold output
 
-  // After break (Step 13 success) the post-loop code reads `parsed.diff` to
-  // apply the real diff. Declare it OUTSIDE the loop so it survives the break.
-  let parsed;
+  // Phase 67 WR-07 (REVIEW.md) — `parsed` is reassigned inside the loop and
+  // had its `.diff` field read post-loop. That worked because `break` only
+  // fires after a successful parse, but the invariant was implicit (a future
+  // refactor adding `break` elsewhere could leave parsed.diff undefined).
+  // `successfulDiff` makes the invariant explicit: it is assigned EXACTLY
+  // ONCE, in the Step 13 success branch immediately before the break, and is
+  // the ONLY thing the post-loop code reads.
+  let successfulDiff;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -949,7 +954,7 @@ export async function runDispatcher({
     }
 
     // ─── Step 11 — parseFencedDiff (iter trigger #1: malformed-diff:*) ────
-    parsed = parseFencedDiff(sdkResult.llmText);
+    const parsed = parseFencedDiff(sdkResult.llmText);
     if (!parsed.ok) {
       safeAppendLedger({
         iso: new Date().toISOString(),
@@ -1021,7 +1026,11 @@ export async function runDispatcher({
         stdio: ['pipe', 'pipe', 'pipe'],
         encoding: 'utf8',
       });
-      // SUCCESS — break out of the loop; Steps 14-18 below apply the diff
+      // SUCCESS — capture the loop-local parsed.diff into the outer-scope
+      // `successfulDiff` so the post-loop Step 14 read survives the break.
+      // Phase 67 WR-07: pre-fix, `parsed` itself leaked out of the loop.
+      successfulDiff = parsed.diff;
+      // Break out of the loop; Steps 14-18 below apply the diff
       break;
     } catch (err) {
       const stderrSnip = String(err.stderr ?? err.message ?? '').slice(0, 500);
@@ -1054,9 +1063,12 @@ export async function runDispatcher({
   }
 
   // ─── Step 14 — git apply (the real one) ───────────────────────────────
+  // Phase 67 WR-07 — read the outer-scope `successfulDiff` (assigned exactly
+  // once, in the Step 13 success branch above) instead of the now-loop-local
+  // `parsed`. Makes the "the diff that survived --check" invariant explicit.
   try {
     execFileSync('git', ['apply'], {
-      input: parsed.diff,
+      input: successfulDiff,
       stdio: ['pipe', 'inherit', 'inherit'],
     });
   } catch (err) {

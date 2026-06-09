@@ -92,7 +92,9 @@
   2. New `FRAME_SHIFT_DETECTED` scaffold ships with new ERROR_CLASS entry in `tests/e2e/lib/error-codes.js:ERROR_CLASSES` + producer wiring in `.github/workflows/v40-pdfjs-frame-shift.yml` (emits issue body with `<frame_shift_evidence>` section)
   3. 5-site enumeration drift guard Vitest test PASSES — for each new ERROR_CLASS, presence asserted in `error-codes.js` AND `v40-auto-fix.yml:91` precheck list AND `PROMPT_SCAFFOLDS` AND `inject-defect.mjs` ERROR_CLASSES allowlist AND `MODEL_ROUTES` (or `// MODEL_DEFAULT_OK:` comment justification)
   4. Byte-stability sha256 pin holds for the 5 existing scaffolds against Phase 45 baseline (`WRONG_CITATION`, `LLM_HALLUCINATED_SELECTION`, `WORKER_FALLBACK_FAILED`, `GOOGLE_DOM_DRIFT`, `HARNESS_ERROR`); `PROMPT_SCAFFOLDS` `Object.freeze` invariant preserved
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 65-01-PLAN.md — Add VERIFIER_DISAGREE + FRAME_SHIFT_DETECTED scaffolds, error-codes append, 5-site enum wiring (SCAF-01, SCAF-02)
+  - [ ] 65-02-PLAN.md — 5-site enumeration drift guard + byte-stability sha256 pins for 7 scaffolds (SCAF-03, SCAF-04)
 
 ### Phase 66: A/B Winner Exit + 3-way Transport Stratification
 **Goal**: Drive `scripts/a-b-winner.mjs` out of abstention mode by extending `computePerClassPerArm` to stratify by (class, arm, transport) 3-way (NEW v4.3 finding — corrects Phase 54 D-19 oversight); add `--since-iso` and `--admin-bypass` argv filters; raise `TIE_THRESHOLD` 0.05 → 0.10.

@@ -205,6 +205,25 @@ const SOURCE_FIX_ISSUE = 'fix-issue-cli';
 const VALID_TRANSPORTS = new Set(['sdk', 'subscription']);
 const FIX_ATTEMPT_CAP = 3;
 const HUMAN_REVIEW_LABEL = 'human-review-required';
+// ---------------------------------------------------------------------------
+// Phase 67 PITER-03 — prompt-iter loop ceiling + per-fingerprint cumulative
+// cost cap. The wrapper in runDispatcher around Steps 10..13 retries the LLM
+// dispatch with a `rewriteHint` derived from the prior attempt's failure mode
+// (apply-check-failed stderr OR parseFencedDiff.reason) on round 1+.
+//
+// ITER_MAX_ROUNDS = 2 — at most 2 retries after the initial round 0 (so up to
+// 3 SDK calls per fingerprint per process invocation).
+//
+// PROMPT_ITER_COST_CAP_USD = 0.50 — cumulative spend ceiling per fingerprint
+// (sum of sdkResult.costUsd across all rounds in the same invocation). Exhausting
+// the cap before ITER_MAX_ROUNDS triggers a graceful abstention (exit 0 with
+// a `prompt-iter-budget-cap` ledger row). Literal `0.50` matches the STATE.md
+// Budget table value.
+//
+// Both constants are exported so the unit test in
+// tests/unit/auto-fix-prompt-iter.test.js can assert them directly (T_PROMPT_ITER_BUDGET_01).
+export const ITER_MAX_ROUNDS = 2;
+export const PROMPT_ITER_COST_CAP_USD = 0.50;
 // Phase 45-03 — flake-investigation Step-4a dispatcher guard + Step-7
 // FLAKE_ESCALATION issue label. The label name is shared between the Step-4a
 // guard (refuses to auto-fix issues that already carry it) and the
@@ -744,12 +763,12 @@ export async function runDispatcher({
     );
     return 0;
   }
-  const { systemPrompt, userPrompt } = built;
+  const { userPrompt } = built;
 
   // ─── Step 8 — --dry-run short-circuit (NO SDK / NO ledger / NO mutation) ─
   if (dryRun) {
     process.stdout.write('--- SYSTEM PROMPT ---\n');
-    process.stdout.write(systemPrompt + '\n');
+    process.stdout.write(built.systemPrompt + '\n');
     process.stdout.write('--- USER PROMPT (envelope-wrapped) ---\n');
     process.stdout.write(userPrompt + '\n');
     process.stdout.write(
@@ -758,148 +777,246 @@ export async function runDispatcher({
     return 0;
   }
 
-  // ─── Step 9 — Build systemBlocks array (Pitfall 6 cache_control wiring) ─
-  const systemBlocks = [
-    {
-      type: 'text',
-      text: systemPrompt,
-      cache_control: { type: 'ephemeral', ttl: '1h' },
-    },
-  ];
+  // ─── Phase 67 PITER-02/03 — in-process iter loop (wraps Steps 10..13) ──
+  // Per CONTEXT.md decisions + RESEARCH.md Pattern 2: instantiate an in-memory
+  // per-fingerprint accumulator (round + cumCost) INSIDE runDispatcher (NOT
+  // module-level — keeps Vitest mocks pure; Pitfall 8). The loop re-invokes
+  // buildFixPrompt + the LLM dispatch each round; on apply-check-failed (Step
+  // 13 catch) or malformed-diff:* (Step 11 !parsed.ok) it composes a
+  // rewriteHint from the prior outcome and re-enters with iter_round++.
+  //
+  // Cap exhaustion (state.round + 1 > ITER_MAX_ROUNDS OR cumCost ≥
+  // PROMPT_ITER_COST_CAP_USD) writes a final ledger row with
+  // errorReason: 'prompt-iter-budget-cap' and returns 0 (graceful abstention —
+  // mirrors A/B winner abstention in Phase 54/66).
+  //
+  // Pitfall 4: buildFixPrompt is re-called per round so the per-round
+  // rewriteHint actually reaches the model; pre-loop `built` is consumed only
+  // by the skip-class short-circuit + dry-run path above.
+  // Pitfall 5: systemBlocks is rebuilt INSIDE the loop so cache_control wraps
+  // the per-round systemPrompt (round 0 hits the cache; round N gets a new key
+  // because the appended <prior_attempt_feedback> changes the bytes).
+  // Pitfall 7: iter_round is added ONLY at ledger writes INSIDE this wrapper.
+  // Pre-loop writes (Step 6 idempotency, Step 7 skip-class/FLAKE) are
+  // UNCHANGED — they MUST NOT carry iter_round.
+  const iterState = new Map();
+  iterState.set(fingerprint, { round: 0, cumCost: 0 });
+  let rewriteHint;   // undefined on round 0 → byte-identical scaffold output
 
-  // ─── Step 10 — LLM dispatch (transport-branched, Phase 46-01) ─────────
-  // Subscription transport flows through invokeClaudePWithLedger — a v3.1
-  // local-only wrapper with a CI-refusal guard (Pitfall 8 in PITFALLS.md;
-  // see tests/e2e/lib/llm-driver.js:387-393). The wrapper takes systemPrompt
-  // (string) — NOT systemBlocks — and does NOT honor cache_control (no SDK
-  // surface for it), so we use the plain prompt here. The result shape
-  // (ok/ciGate/capBlocked/errorReason) is contract-identical to
-  // invokeAnthropicSdkWithLedger, so the error mapper below works for both.
-  let sdkResult;
-  if (transport === 'subscription') {
-    sdkResult = await invokeClaudePWithLedger({
-      systemPrompt,
-      userPrompt,
-      phase: PHASE_46,
-      source: SOURCE_FIX_ISSUE,
-    });
-  } else {
-    sdkResult = await invokeAnthropicSdkWithLedger({
-      systemBlocks,
-      userPrompt,
-      model: built.model,
-      phase: PHASE,
-      issueId: `issue-${issue}`,
-      forceApi,
-    });
-  }
+  // After break (Step 13 success) the post-loop code reads `parsed.diff` to
+  // apply the real diff. Declare it OUTSIDE the loop so it survives the break.
+  let parsed;
 
-  if (!sdkResult.ok) {
-    if (sdkResult.ciGate) {
-      process.stderr.write(
-        '[auto-fix] SDK refused: not in CI and --force-api not set. ' +
-          'Re-run with --force-api to invoke the API from a local shell.\n',
-      );
-      return 2;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const state = iterState.get(fingerprint);
+
+    // ─── Per-round buildFixPrompt + systemBlocks (Pitfall 4 + Pitfall 5) ───
+    const builtRound = buildFixPrompt({ errorClass, issueBody, rewriteHint });
+    // Supported-class + skip-class were already verified in Step 7; this call
+    // is guaranteed to return {ok:true,...} for the same errorClass + issueBody
+    // (buildFixPrompt is pure — adding a rewriteHint cannot turn an ok:true
+    // class into ok:false).
+    const systemPromptRound = builtRound.systemPrompt;
+    const systemBlocks = [
+      {
+        type: 'text',
+        text: systemPromptRound,
+        cache_control: { type: 'ephemeral', ttl: '1h' },
+      },
+    ];
+
+    // ─── Step 10 — LLM dispatch (transport-branched, Phase 46-01) ─────────
+    let sdkResult;
+    if (transport === 'subscription') {
+      sdkResult = await invokeClaudePWithLedger({
+        systemPrompt: systemPromptRound,
+        userPrompt,
+        phase: PHASE_46,
+        source: SOURCE_FIX_ISSUE,
+      });
+    } else {
+      sdkResult = await invokeAnthropicSdkWithLedger({
+        systemBlocks,
+        userPrompt,
+        model: builtRound.model,
+        phase: PHASE,
+        issueId: `issue-${issue}`,
+        forceApi,
+      });
     }
-    if (sdkResult.capBlocked) {
-      process.stderr.write(
-        `[auto-fix] SDK refused: spend cap blocked ` +
-          `(monthly=${sdkResult.monthly?.status} day=${sdkResult.day?.status} ` +
-          `issue=${sdkResult.issue?.status} pr=${sdkResult.pr?.status} ` +
-          `phase=${sdkResult.phaseCap?.status})\n`,
-      );
-      return 3;
-    }
-    if (sdkResult.errorReason === 'contract-error') {
-      process.stderr.write(`[auto-fix] SDK contract error: ${sdkResult.errorMessage}\n`);
-      return 2;
-    }
-    process.stderr.write(`[auto-fix] SDK error: ${sdkResult.errorMessage ?? sdkResult.errorReason}\n`);
-    return 1;
-  }
 
-  // ─── Step 11 — parseFencedDiff ────────────────────────────────────────
-  const parsed = parseFencedDiff(sdkResult.llmText);
-  if (!parsed.ok) {
-    safeAppendLedger({
-      iso: new Date().toISOString(),
-      model: 'claude-sonnet-4-6',
-      cost_usd: 0,
-      tokens_in: 0,
-      tokens_out: 0,
-      phase: PHASE,
-      transport,
-      issueId: `issue-${issue}`,
-      fingerprint,
-      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
-      source: 'auto-fix-api',
-      errorReason: `malformed-diff:${parsed.reason}`,
-    });
-    process.stderr.write(`[auto-fix] LLM output malformed: ${parsed.reason}; exit 1\n`);
-    return 1;
-  }
+    // PITER-04 fast-fail branches — sdk_error / ciGate / capBlocked /
+    // contract-error all exit WITHOUT entering the iter retry path. These
+    // outcomes are not solvable by re-prompting (API outage, env gate, spend
+    // cap, contract violation).
+    if (!sdkResult.ok) {
+      if (sdkResult.ciGate) {
+        process.stderr.write(
+          '[auto-fix] SDK refused: not in CI and --force-api not set. ' +
+            'Re-run with --force-api to invoke the API from a local shell.\n',
+        );
+        return 2;
+      }
+      if (sdkResult.capBlocked) {
+        process.stderr.write(
+          `[auto-fix] SDK refused: spend cap blocked ` +
+            `(monthly=${sdkResult.monthly?.status} day=${sdkResult.day?.status} ` +
+            `issue=${sdkResult.issue?.status} pr=${sdkResult.pr?.status} ` +
+            `phase=${sdkResult.phaseCap?.status})\n`,
+        );
+        return 3;
+      }
+      if (sdkResult.errorReason === 'contract-error') {
+        process.stderr.write(`[auto-fix] SDK contract error: ${sdkResult.errorMessage}\n`);
+        return 2;
+      }
+      process.stderr.write(`[auto-fix] SDK error: ${sdkResult.errorMessage ?? sdkResult.errorReason}\n`);
+      return 1;
+    }
 
-  // ─── Step 12 — diff-guard (AUTOFIX-03 — single source of truth) ───────
-  const changedPaths = changedPathsFromDiff(parsed.diff);
-  const guard = checkDiffGuard(changedPaths);
-  if (!guard.ok) {
-    const violationList = guard.violations.join(', ');
-    safeAppendLedger({
-      iso: new Date().toISOString(),
-      model: 'claude-sonnet-4-6',
-      cost_usd: 0,
-      tokens_in: 0,
-      tokens_out: 0,
-      phase: PHASE,
-      transport,
-      issueId: `issue-${issue}`,
-      fingerprint,
-      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4; LEDGER-04 test asserts on this site
-      source: 'auto-fix-api',
-      errorReason: `diff-guard-violation:${violationList}`,
-    });
+    // Accumulate cumulative spend BEFORE the trigger checks (so the budget
+    // check on the next iteration sees the current round's spend). Use
+    // nullish-coalesce so a synthetic costUsd:0 is not treated as missing.
+    state.cumCost += sdkResult.costUsd ?? 0;
+
+    // ─── Step 11 — parseFencedDiff (iter trigger #1: malformed-diff:*) ────
+    parsed = parseFencedDiff(sdkResult.llmText);
+    if (!parsed.ok) {
+      safeAppendLedger({
+        iso: new Date().toISOString(),
+        model: 'claude-sonnet-4-6',
+        cost_usd: 0,
+        tokens_in: 0,
+        tokens_out: 0,
+        phase: PHASE,
+        transport,
+        issueId: `issue-${issue}`,
+        fingerprint,
+        errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
+        source: 'auto-fix-api',
+        errorReason: `malformed-diff:${parsed.reason}`,
+        iter_round: state.round,          // Phase 67 PITER-03 additive field
+      });
+      // Cap check — if exhausted, write budget-cap row + graceful return 0
+      if (state.round + 1 > ITER_MAX_ROUNDS || state.cumCost >= PROMPT_ITER_COST_CAP_USD) {
+        safeAppendLedger({
+          iso: new Date().toISOString(),
+          model: 'claude-sonnet-4-6',
+          cost_usd: 0,
+          tokens_in: 0,
+          tokens_out: 0,
+          phase: PHASE,
+          transport,
+          issueId: `issue-${issue}`,
+          fingerprint,
+          errorClass,
+          source: 'auto-fix-api',
+          errorReason: 'prompt-iter-budget-cap',
+          iter_round: state.round,
+        });
+        process.stdout.write(
+          `[auto-fix] prompt-iter budget exhausted (round=${state.round} cumCost=${state.cumCost.toFixed(4)}); ` +
+            `graceful abstention; exit 0\n`,
+        );
+        return 0;
+      }
+      // Otherwise — increment round, set hint, re-enter loop
+      state.round += 1;
+      rewriteHint = parsed.reason;
+      continue;
+    }
+
+    // ─── Step 12 — diff-guard (PITER-04 fast-fail; NOT an iter trigger) ───
+    const changedPaths = changedPathsFromDiff(parsed.diff);
+    const guard = checkDiffGuard(changedPaths);
+    if (!guard.ok) {
+      const violationList = guard.violations.join(', ');
+      safeAppendLedger({
+        iso: new Date().toISOString(),
+        model: 'claude-sonnet-4-6',
+        cost_usd: 0,
+        tokens_in: 0,
+        tokens_out: 0,
+        phase: PHASE,
+        transport,
+        issueId: `issue-${issue}`,
+        fingerprint,
+        errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4; LEDGER-04 test asserts on this site
+        source: 'auto-fix-api',
+        errorReason: `diff-guard-violation:${violationList}`,
+        iter_round: state.round,          // Phase 67 PITER-03 — diff-guard row lives INSIDE the wrapper
+      });
+      try {
+        execFileSync('gh', [
+          'issue', 'comment', String(issue),
+          '--body',
+          `Auto-fix REJECTED: the proposed diff touches forbidden path(s): ${violationList}. ` +
+            `These paths are LOCKED by scripts/check-diff-guard.mjs (Phase 41 VFY-GATE-04). ` +
+            `The fix must target production code in src/ — NOT the golden baseline / quarantine corpus / workflows / CODEOWNERS / ledger.`,
+        ], { encoding: 'utf8' });
+      } catch (err) {
+        process.stderr.write(`[auto-fix] gh issue comment failed (non-fatal): ${err.message}\n`);
+      }
+      process.stderr.write(`[auto-fix] diff-guard violation: ${violationList}; exit 1\n`);
+      return 1;
+    }
+
+    // ─── Step 13 — git apply --check (iter trigger #2: apply-check-failed) ──
     try {
-      execFileSync('gh', [
-        'issue', 'comment', String(issue),
-        '--body',
-        `Auto-fix REJECTED: the proposed diff touches forbidden path(s): ${violationList}. ` +
-          `These paths are LOCKED by scripts/check-diff-guard.mjs (Phase 41 VFY-GATE-04). ` +
-          `The fix must target production code in src/ — NOT the golden baseline / quarantine corpus / workflows / CODEOWNERS / ledger.`,
-      ], { encoding: 'utf8' });
+      execFileSync('git', ['apply', '--check'], {
+        input: parsed.diff,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        encoding: 'utf8',
+      });
+      // SUCCESS — break out of the loop; Steps 14-18 below apply the diff
+      break;
     } catch (err) {
-      process.stderr.write(`[auto-fix] gh issue comment failed (non-fatal): ${err.message}\n`);
+      const stderrSnip = String(err.stderr ?? err.message ?? '').slice(0, 500);
+      safeAppendLedger({
+        iso: new Date().toISOString(),
+        model: 'claude-sonnet-4-6',
+        cost_usd: 0,
+        tokens_in: 0,
+        tokens_out: 0,
+        phase: PHASE,
+        transport,
+        issueId: `issue-${issue}`,
+        fingerprint,
+        errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
+        source: 'auto-fix-api',
+        errorReason: 'apply-check-failed',
+        errorMessage: stderrSnip,
+        iter_round: state.round,          // Phase 67 PITER-03 additive field
+      });
+      // Cap check
+      if (state.round + 1 > ITER_MAX_ROUNDS || state.cumCost >= PROMPT_ITER_COST_CAP_USD) {
+        safeAppendLedger({
+          iso: new Date().toISOString(),
+          model: 'claude-sonnet-4-6',
+          cost_usd: 0,
+          tokens_in: 0,
+          tokens_out: 0,
+          phase: PHASE,
+          transport,
+          issueId: `issue-${issue}`,
+          fingerprint,
+          errorClass,
+          source: 'auto-fix-api',
+          errorReason: 'prompt-iter-budget-cap',
+          iter_round: state.round,
+        });
+        process.stdout.write(
+          `[auto-fix] prompt-iter budget exhausted (round=${state.round} cumCost=${state.cumCost.toFixed(4)}); ` +
+            `graceful abstention; exit 0\n`,
+        );
+        return 0;
+      }
+      // Otherwise — increment round, set hint, re-enter loop
+      state.round += 1;
+      rewriteHint = stderrSnip;
+      continue;
     }
-    process.stderr.write(`[auto-fix] diff-guard violation: ${violationList}; exit 1\n`);
-    return 1;
-  }
-
-  // ─── Step 13 — git apply --check (BEFORE the real apply) ──────────────
-  try {
-    execFileSync('git', ['apply', '--check'], {
-      input: parsed.diff,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      encoding: 'utf8',
-    });
-  } catch (err) {
-    const stderrSnip = String(err.stderr ?? err.message ?? '').slice(0, 500);
-    safeAppendLedger({
-      iso: new Date().toISOString(),
-      model: 'claude-sonnet-4-6',
-      cost_usd: 0,
-      tokens_in: 0,
-      tokens_out: 0,
-      phase: PHASE,
-      transport,
-      issueId: `issue-${issue}`,
-      fingerprint,
-      errorClass,                       // LEDGER-01 — errorClass from extractErrorClass(issueJson.labels) in Step 4
-      source: 'auto-fix-api',
-      errorReason: 'apply-check-failed',
-      errorMessage: stderrSnip,
-    });
-    process.stderr.write(`[auto-fix] git apply --check failed: ${stderrSnip}; exit 1\n`);
-    return 1;
   }
 
   // ─── Step 14 — git apply (the real one) ───────────────────────────────

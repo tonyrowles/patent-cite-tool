@@ -703,3 +703,77 @@ describe('Phase 65 — VERIFIER_DISAGREE + FRAME_SHIFT_DETECTED scaffolds', () =
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 67 PITER-01: optional `rewriteHint` parameter on buildFixPrompt
+// ---------------------------------------------------------------------------
+//
+// The auto-fix dispatcher's in-process iteration loop (Phase 67 PITER-02)
+// re-invokes buildFixPrompt on round 1+ with the prior attempt's failure mode
+// passed as `rewriteHint`. Round 0 (no hint) MUST produce byte-identical
+// systemPrompt to today — this preserves the 7 byte-stability sha256 pins at
+// tests/unit/fix-prompt-builder-byte-stability.test.js (since those pins hash
+// PROMPT_SCAFFOLDS[className]() not buildFixPrompt(...).systemPrompt, the
+// invariant is structural; this block adds a direct equality cross-check).
+
+describe('Phase 67 PITER-01: rewriteHint parameter', () => {
+  it('round-0 byte-identity: omitting rewriteHint returns PROMPT_SCAFFOLDS.WRONG_CITATION() verbatim', () => {
+    const result = buildFixPrompt({ errorClass: 'WRONG_CITATION', issueBody: 'x' });
+    expect(result.ok).toBe(true);
+    expect(result.systemPrompt).toBe(PROMPT_SCAFFOLDS.WRONG_CITATION());
+  });
+
+  it('round-0 byte-identity: empty-string rewriteHint short-circuits to byte-identical scaffold', () => {
+    const result = buildFixPrompt({ errorClass: 'WRONG_CITATION', issueBody: 'x', rewriteHint: '' });
+    expect(result.ok).toBe(true);
+    expect(result.systemPrompt).toBe(PROMPT_SCAFFOLDS.WRONG_CITATION());
+  });
+
+  it('round-0 byte-identity: undefined rewriteHint short-circuits to byte-identical scaffold', () => {
+    const result = buildFixPrompt({ errorClass: 'WRONG_CITATION', issueBody: 'x', rewriteHint: undefined });
+    expect(result.ok).toBe(true);
+    expect(result.systemPrompt).toBe(PROMPT_SCAFFOLDS.WRONG_CITATION());
+  });
+
+  it('hint appended: non-empty rewriteHint appends <prior_attempt_feedback> block AFTER the scaffold', () => {
+    const hint = 'simulated stderr from git apply --check';
+    const result = buildFixPrompt({ errorClass: 'WRONG_CITATION', issueBody: 'x', rewriteHint: hint });
+    expect(result.ok).toBe(true);
+    expect(result.systemPrompt.startsWith(PROMPT_SCAFFOLDS.WRONG_CITATION())).toBe(true);
+    expect(result.systemPrompt).toContain('<prior_attempt_feedback>');
+    expect(result.systemPrompt).toContain('</prior_attempt_feedback>');
+    expect(result.systemPrompt).toContain(hint);
+    // Closing tag is the final non-whitespace segment of the systemPrompt
+    expect(result.systemPrompt.trimEnd().endsWith('</prior_attempt_feedback>')).toBe(true);
+    // Hint text lives BETWEEN the open and close tags
+    const openIdx = result.systemPrompt.indexOf('<prior_attempt_feedback>');
+    const closeIdx = result.systemPrompt.indexOf('</prior_attempt_feedback>');
+    expect(openIdx).toBeGreaterThan(-1);
+    expect(closeIdx).toBeGreaterThan(openIdx);
+    const between = result.systemPrompt.slice(openIdx + '<prior_attempt_feedback>'.length, closeIdx);
+    expect(between).toContain(hint);
+  });
+
+  it('round-0 byte-identity holds across all 5 pre-Phase-67 scaffolds', () => {
+    const classes = ['WRONG_CITATION', 'LLM_HALLUCINATED_SELECTION', 'WORKER_FALLBACK_FAILED', 'GOOGLE_DOM_DRIFT', 'HARNESS_ERROR'];
+    for (const className of classes) {
+      const result = buildFixPrompt({ errorClass: className, issueBody: 'x' });
+      expect(result.ok).toBe(true);
+      expect(result.systemPrompt).toBe(PROMPT_SCAFFOLDS[className]());
+    }
+  });
+
+  it('return shape preserved: rewriteHint append does not add or remove fields', () => {
+    const result = buildFixPrompt({ errorClass: 'WRONG_CITATION', issueBody: 'x', rewriteHint: 'foo' });
+    expect(result.ok).toBe(true);
+    expect(Object.keys(result).sort()).toEqual(['model', 'ok', 'systemPrompt', 'userPrompt']);
+    expect(typeof result.model).toBe('string');
+    expect(typeof result.userPrompt).toBe('string');
+  });
+
+  it('skip-class wins over rewriteHint: PASS short-circuits regardless of hint', () => {
+    const result = buildFixPrompt({ errorClass: 'PASS', rewriteHint: 'foo' });
+    expect(result.ok).toBe(false);
+    expect(result.escalate).toBe('close-as-pass');
+  });
+});

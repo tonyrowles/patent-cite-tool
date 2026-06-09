@@ -250,6 +250,12 @@ describe('WARNING-01: scripts/auto-fix.mjs auxiliary ledger entries carry runtim
   // ─── Site B — malformed-diff entry ────────────────────────────────────
   describe('Site B — malformed-diff entry', () => {
     it('subscription transport → malformed-diff ledger row has transport:subscription', async () => {
+      // Phase 67 PITER-02: malformed-diff:* is an iter retry trigger — the
+      // wrapper retries up to ITER_MAX_ROUNDS = 2 times then writes a final
+      // prompt-iter-budget-cap row and gracefully abstains (exit 0). The
+      // WARNING-01 contract (transport:subscription on the auxiliary entry) is
+      // still asserted on the round-0 malformed-diff row; only the terminal
+      // exit code shifted from 1 to 0.
       setupExecFileSyncRouter([
         ghIssueViewRule(),
         lsRemoteEmptyRule(),
@@ -262,7 +268,7 @@ describe('WARNING-01: scripts/auto-fix.mjs auxiliary ledger entries carry runtim
         rawJson: {},
       });
       const exit = await runDispatcher({ issue: ISSUE, transport: 'subscription' });
-      expect(exit).toBe(1);
+      expect(exit).toBe(0);   // Phase 67 — graceful abstention after iter budget exhausted
       const ledgerCalls = vi.mocked(appendLedgerEntry).mock.calls;
       const malformedEntry = ledgerCalls
         .map(([, e]) => e)

@@ -426,7 +426,20 @@ describe('AUTOFIX-03: diff-guard + git apply --check pre-application', () => {
     expect(hasViolationEntry).toBe(true);
   });
 
-  it('8: git apply --check fails → errorReason:apply-check-failed → exit 1', async () => {
+  // Phase 67 PITER-02/03 contract: tests 8/9/10 originally asserted the
+  // pre-Phase-67 fast-fail path (exit 1 on the FIRST apply-check-failed /
+  // malformed-diff). Phase 67's runDispatcher iter wrapper retries these
+  // outcomes up to ITER_MAX_ROUNDS = 2 times, then writes a final
+  // `prompt-iter-budget-cap` ledger row and gracefully abstains with exit 0
+  // (locked design — see 67-CONTEXT.md "Cap exhaustion behavior" and
+  // 67-PLAN.md PITER-02). The round-0 apply-check-failed / malformed-diff
+  // ledger entry is still recorded with iter_round:0 (Phase 67 PITER-03
+  // additive field) — the per-round dispatcher semantics that Tests 8/9/10
+  // pinned (one SDK call, no `git apply` without --check) carry forward as
+  // sub-assertions; only the terminal exit code and total SDK invocation
+  // count changed.
+
+  it('8: git apply --check fails → iter retries × ITER_MAX_ROUNDS + budget-cap → graceful exit 0 (Phase 67 PITER-02)', async () => {
     setupExecFileSyncRouter([
       ghIssueViewRule(),
       lsRemoteEmptyRule(),
@@ -439,18 +452,21 @@ describe('AUTOFIX-03: diff-guard + git apply --check pre-application', () => {
       ok: true,
       llmText: makeFencedDiff('src/foo.js'),
       modelId: 'claude-sonnet-4-6',
-      costUsd: 0.05,
+      costUsd: 0.05,   // 3 calls × 0.05 = 0.15 (under PROMPT_ITER_COST_CAP_USD=0.50; cap reached via round counter)
       rawJson: {},
     });
     const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
-    expect(exit).toBe(1);
-    // git apply WITHOUT --check MUST NOT have run
+    expect(exit).toBe(0);   // graceful abstention after iter budget exhausted
+    // git apply WITHOUT --check MUST NEVER have run (none of the 3 attempts succeeded)
     expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'apply' && !args.includes('--check'))).toBe(0);
     const ledgerCalls = vi.mocked(appendLedgerEntry).mock.calls;
-    expect(ledgerCalls.some(([, e]) => e.errorReason === 'apply-check-failed')).toBe(true);
+    // Round-0 apply-check-failed entry still written (Phase 67 PITER-03 — additive iter_round)
+    expect(ledgerCalls.some(([, e]) => e.errorReason === 'apply-check-failed' && e.iter_round === 0)).toBe(true);
+    // Terminal budget-cap row written before graceful abstention
+    expect(ledgerCalls.some(([, e]) => e.errorReason === 'prompt-iter-budget-cap')).toBe(true);
   });
 
-  it('9: malformed diff (zero fences) → errorReason starts with malformed-diff → exit 1', async () => {
+  it('9: malformed diff (zero fences) → iter retries × ITER_MAX_ROUNDS + budget-cap → graceful exit 0 (Phase 67 PITER-02)', async () => {
     setupExecFileSyncRouter([
       ghIssueViewRule(),
       lsRemoteEmptyRule(),
@@ -463,13 +479,14 @@ describe('AUTOFIX-03: diff-guard + git apply --check pre-application', () => {
       rawJson: {},
     });
     const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
-    expect(exit).toBe(1);
+    expect(exit).toBe(0);
     expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'apply')).toBe(0);
     const ledgerCalls = vi.mocked(appendLedgerEntry).mock.calls;
-    expect(ledgerCalls.some(([, e]) => typeof e.errorReason === 'string' && e.errorReason.startsWith('malformed-diff'))).toBe(true);
+    expect(ledgerCalls.some(([, e]) => typeof e.errorReason === 'string' && e.errorReason.startsWith('malformed-diff') && e.iter_round === 0)).toBe(true);
+    expect(ledgerCalls.some(([, e]) => e.errorReason === 'prompt-iter-budget-cap')).toBe(true);
   });
 
-  it('10: malformed diff (two fence pairs) → errorReason starts with malformed-diff → exit 1', async () => {
+  it('10: malformed diff (two fence pairs) → iter retries × ITER_MAX_ROUNDS + budget-cap → graceful exit 0 (Phase 67 PITER-02)', async () => {
     setupExecFileSyncRouter([
       ghIssueViewRule(),
       lsRemoteEmptyRule(),
@@ -483,10 +500,11 @@ describe('AUTOFIX-03: diff-guard + git apply --check pre-application', () => {
       rawJson: {},
     });
     const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
-    expect(exit).toBe(1);
+    expect(exit).toBe(0);
     expect(countCalls((cmd, args) => cmd === 'git' && args[0] === 'apply')).toBe(0);
     const ledgerCalls = vi.mocked(appendLedgerEntry).mock.calls;
-    expect(ledgerCalls.some(([, e]) => typeof e.errorReason === 'string' && e.errorReason.startsWith('malformed-diff'))).toBe(true);
+    expect(ledgerCalls.some(([, e]) => typeof e.errorReason === 'string' && e.errorReason.startsWith('malformed-diff') && e.iter_round === 0)).toBe(true);
+    expect(ledgerCalls.some(([, e]) => e.errorReason === 'prompt-iter-budget-cap')).toBe(true);
   });
 
   it('11: happy path → checkout + commit + push → exit 0', async () => {

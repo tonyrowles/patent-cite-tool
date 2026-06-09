@@ -1,5 +1,32 @@
 # Milestones
 
+## v4.2 Auto-Fix Loop Live (Shipped: 2026-06-09)
+
+**Phases completed:** 5 phases (56-60), 11 plans, 11 tasks
+**Timeline:** 5 days (2026-06-04 → 2026-06-09)
+**Git range:** e7e7166 → ef24fc1 (46 files, +7569 / -46 LOC)
+
+**Delivered:** Auto-fix loop infrastructure live on `origin/main` — ledger schema extension, cost-ledger-snapshot branch redirect, auto-promote outcome entry, deterministic fixture mutator, post-merge PHASE_TAG plumbing. Live UAT-47-a/b end-to-end loop validation deferred to v4.3 with documented architectural root-cause.
+
+**Key accomplishments:**
+
+1. **Ledger schema extension (LEDGER-01..04)** — `errorClass` field wired into all 7 `auto-fix.mjs` ledger-write sites + 2 SDK-path sites; `safeAppendLedger` leak guard funnels CI/override/subscription-only writes; `a-b-winner.mjs` reads the new schema for forward-compatible abstention exit
+2. **Cost-ledger-snapshot branch redirect (COMMIT-01..04)** — `v40-cost-ledger-snapshot.yml` daily snapshot now pushes to `ledger-snapshots/daily-${SNAPSHOT_DATE}` instead of `main` (Phase 50 ruleset compliance); diff-guard scope-decision fast-path lets non-auto-fix PRs from those branches skip FORBIDDEN_PATHS; SWEEP-02 proved live on origin/main (commit 0b56ab9)
+3. **Auto-promote outcome ledger entry (PROMOTE-01..04)** — `auto-fix-promote.mjs` writes `source:'auto-fix-promoted' + outcome:'pass'` on success and `source:'auto-fix-failed' + outcome:'fail'` on label-flap; `assertTripleGate` body sha256 byte-equivalence preserved
+4. **Deterministic fixture mutator (MUTATOR-01..05)** — Node 22 ESM `inject-defect.mjs` creates synthetic `triage`-labeled GitHub issues with `<!-- fp: <12-hex> -->` v2 markers; co-designed `&& !isFixtureMutator` suppression in `quarantine-append.mjs:239` keeps mutator synthetics out of the promotion path; shipped atomically per MUTATOR-04 co-design contract
+5. **SWEEP-01 + SWEEP-02 live evidence on origin/main** — UAT-47-e diff-guard rejection PROVEN (commit e1d9d88, PR #19 closed); UAT-47-d ledger-snapshot branch redirect PROVEN (commit 0b56ab9)
+6. **SWEEP-05 phase-tag plumbing (Decision C)** — `--phase` argv on `auto-fix-promote.mjs` + `PHASE_TAG` workflow_dispatch input on `v40-auto-promote.yml`; default `'58-promote'` preserves non-UAT byte-equivalence; ready for live UAT-47-a/b when v4.3 architectural work lands
+7. **Phase 60 cleanup (CLEAN-01..02)** — dead `MODEL` const removed from `scripts/auto-fix.mjs`; `npm test` green at 1252/1252; v4.0/v4.1 carry-along items closed
+8. **Phase 60.1 hotfix (commit ab2dd34)** — subscription-transport whitelist in `safeAppendLedger` restores the v3.1/v4.0 free-iteration flow without weakening SDK-path leak protection; 42 → 44 tests in auto-fix.test.js
+
+**Requirements:** 22/25 v4.2 requirements satisfied; 3/25 deferred to v4.3 (SWEEP-03/04/06 — see below)
+
+**Known deferred items at close:** 3 carried forward to v4.3 (see STATE.md `## Deferred Items (acknowledged at v4.2 milestone close 2026-06-09)`).
+
+**Architectural finding (v4.3 carry-over):** Three SWEEP-03 attempts (2026-06-06/07/08) surfaced two distinct constraints in the auto-fix loop architecture: (1) the fixture-mutator scope-lock ("issue-creation layer only — does NOT touch FORBIDDEN_PATHS") leaves synthetic issue bodies without the diagnostic data prompt scaffolds require → `apply-check-failed`; (2) `tests/e2e/lib/llm-driver.js:94`'s `--max-turns 1` cost-discipline gate prevents Claude from reading source files for real WRONG_CITATION cases → `error_max_turns`. A repo-wide search confirmed no real GOOGLE_DOM_DRIFT issue with a DOM snippet exists in repo history (all 4 such issues are mutator synthetics). v4.3 must design and ship together: (A) diagnostic-injection mutator extension + (B) `--max-turns` relaxation with `--allowed-tools=Read`. Plus (C) forensic-ledger schema hardening + (D) synthetic-issue cleanup. Full root-cause record in `.planning/milestones/v4.2-phases/59-fixture-mutator-4-uat-re-sweep/59-VERIFICATION.md` AMENDMENT 2026-06-08.
+
+---
+
 ## v4.1 Readiness Gate + Push (Shipped: 2026-06-04)
 
 **Phases completed:** 9 phases, 9 plans, 0 tasks

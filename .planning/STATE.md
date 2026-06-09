@@ -2,17 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: Auto-Fix Loop Live
-status: milestone_ready_for_audit
-stopped_at: Phase 59 SWEEP-03/04 architecturally-deferred to v4.3 per 2026-06-08 root-cause; Phases 56-58+60 complete; Phase 59 Waves 0-2 + SWEEP-01/02 complete on origin/main
-last_updated: 2026-06-08T22:55:00Z
-last_activity: 2026-06-08 -- Phase 59 SWEEP-03 routing: subscription substitution + architectural deferral
+status: Awaiting next milestone
+stopped_at: v4.2 roadmap created — 5 phases (56-60), 25/25 requirements mapped, ROADMAP.md + STATE.md + REQUIREMENTS.md (traceability) written
+last_updated: "2026-06-09T00:18:00.578Z"
+last_activity: 2026-06-09 — Milestone v4.2 completed and archived
 progress:
   total_phases: 5
-  completed_phases: 5
+  completed_phases: 3
   total_plans: 11
   completed_plans: 11
-  percent: 100
-  note: "Phase 59 SWEEP-03/04 PRIMARY DoD deferred to v4.3 (architectural; not a v4.2 plan defect — see VERIFICATION.md AMENDMENT 2026-06-08)"
+  percent: 60
 ---
 
 # Project State
@@ -26,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 ## Current Position
 
-Phase: 60
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-06-06
+Phase: Milestone v4.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-09 — Milestone v4.2 completed and archived
 
 ## Performance Metrics
 
@@ -115,6 +114,17 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 | quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Substantively closed pre-v4.1; same as above |
 | quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Substantively closed pre-v4.1; same as above |
 
+## Deferred Items (acknowledged at v4.2 milestone close 2026-06-09)
+
+| Category | Item | Status | Resolution |
+|----------|------|--------|------------|
+| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-03 | architecturally-deferred | v4.3 carry-over: requires diagnostic-injection mutator + --max-turns relaxation with --allowed-tools=Read. See 59-VERIFICATION.md AMENDMENT 2026-06-08 |
+| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-04 | architecturally-deferred | Inherits SWEEP-03 architectural constraints; production-path proof deferred (MUTATOR-04 invariant verified via Vitest defense-in-depth G9-a/G9-b) |
+| verification_gap | Phase 59: 59-VERIFICATION.md SWEEP-06 | architecturally-deferred | Cleanup automation depends on SWEEP-03/04 PASS evidence; synthetic-issue cleanup (#20/21/22/23) carried to v4.3 |
+| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Pre-v4.1 closure record; persists in audit-open due to directory presence; no action needed |
+| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Same as above |
+| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Same as above |
+
 ## Session Continuity
 
 Last session: 2026-06-04T20:00:00Z
@@ -123,9 +133,7 @@ Resume file: .planning/ROADMAP.md (next: /gsd:plan-phase 56 — Ledger Schema Ex
 
 ## Operator Next Steps
 
-- Run `/gsd:plan-phase 56` to begin Phase 56 planning (Ledger Schema Extension + Leak Guard)
-- Note: Phase 56 and Phase 57 are parallelizable (disjoint files). Phase 56 recommended first.
-- Critical: Phases 56+57+58 must all land on origin/main before Phase 59 UATs begin.
+- Start the next milestone with /gsd-new-milestone
 
 ### Ruleset Decision (2026-06-06, post-v4.2)
 

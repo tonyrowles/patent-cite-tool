@@ -177,6 +177,7 @@ test.describe('Phase 30 fault-injection — Worker/USPTO fallback path', () => {
           errorClass,
           citation: observed ? observed.citation : null,
           verifier_verdict: verifierVerdict,
+          fault_injection_status: { worker_fallback_failed: caseStatus === 'failed' },
           artifacts,
           duration_ms: Date.now() - t0,
         });

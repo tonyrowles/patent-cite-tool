@@ -498,6 +498,85 @@ export async function runTriage({
       continue;
     }
 
+    // D-03 Rule 5: EXTENSION_NOT_LOADED heuristic (Phase 64 TRIAGE-01).
+    // Fires when iter.classification is exactly 'EXTENSION_NOT_LOADED' OR when
+    // the free-text error_reason matches the locked regex. Confidence ceiling
+    // 0.85 per Pitfall 6 — no VERIFIER_STRONG_AGREEMENT gate, so the rule may
+    // not claim 0.95+ confidence. Does NOT gate on rerunEntry?.verdict (avoids
+    // Pitfall 6 Tier-C masking — Rule 2 is the only CONFIRMED-gated branch).
+    {
+      const extReasonMatch = /extension (?:not.*loaded|failed.*attach)/i.test(iter.error_reason ?? '');
+      const extClassMatch = iter.classification === 'EXTENSION_NOT_LOADED';
+      if (extClassMatch || extReasonMatch) {
+        report.findings.push({
+          iteration_n: iter.iteration_n,
+          severity: 'medium',
+          category: 'EXTENSION_NOT_LOADED',
+          root_cause_hypothesis: 'Extension failed to attach to the page',
+          confidence: 0.85,
+          rationale: extClassMatch
+            ? 'Heuristic-resolved: classification === EXTENSION_NOT_LOADED'
+            : `Heuristic-resolved: error_reason matched /extension (?:not.*loaded|failed.*attach)/i (${iter.error_reason})`,
+          path_taken: 'heuristic',
+          triage_confidence: 'heuristic',
+        });
+        continue;
+      }
+    }
+
+    // D-03 Rule 6: GOOGLE_DOM_DRIFT mutator-aware heuristic (Phase 64 TRIAGE-02).
+    // Resolves ONLY when the Phase 61 DIAG-01 mutator marker AND a verbatim
+    // DOM-drift selector are BOTH present in iter.issue_body. Real DOM drift
+    // (no marker) MUST fall through to the LLM cluster pre-filter — DO NOT
+    // short-circuit. T-64-05 trust boundary: the mutator marker /<!-- fp: <12hex> -->/
+    // is the only signal distinguishing synthetic from real drift.
+    {
+      const hasMutatorMarker = /<!-- fp: [0-9a-f]{12} -->/.test(iter.issue_body ?? '');
+      const hasDomDriftSelector = /(?:patent-result|section\[itemprop="claims"\]|\bmain\b|\barticle\b)/.test(iter.issue_body ?? '');
+      const isMutatorInjected = hasMutatorMarker && hasDomDriftSelector;
+      if (iter.classification === 'GOOGLE_DOM_DRIFT' && isMutatorInjected) {
+        report.findings.push({
+          iteration_n: iter.iteration_n,
+          severity: 'medium',
+          category: 'GOOGLE_DOM_DRIFT',
+          root_cause_hypothesis: 'Mutator-injected synthetic DOM drift (Phase 61 DIAG-01 marker present)',
+          confidence: 0.85,
+          rationale: 'Heuristic-resolved: issue_body contains both <!-- fp: <12hex> --> mutator marker AND a Phase 61 DOM-drift selector',
+          path_taken: 'heuristic',
+          triage_confidence: 'heuristic_mutator_aware',
+        });
+        continue;
+      }
+      // Real DOM drift (no mutator marker) falls through to Rule 7 / Rule 4.
+    }
+
+    // D-03 Rule 7: WORKER_FALLBACK_FAILED heuristic (Phase 64 TRIAGE-03).
+    // Consumes the additive fault_injection_status field (producer co-design in
+    // tests/e2e/specs/fault-injection.spec.js). Graceful degradation: when the
+    // field is absent on a legacy iter shape, optional chaining yields undefined
+    // and the `=== true` strict check is false — rule is a no-op for that branch.
+    // The classification fallback covers legacy producers that haven't been
+    // updated to emit the additive field.
+    {
+      const faultInjectionMatch = iter.fault_injection_status?.worker_fallback_failed === true;
+      const wffClassMatch = iter.classification === 'WORKER_FALLBACK_FAILED';
+      if (faultInjectionMatch || wffClassMatch) {
+        report.findings.push({
+          iteration_n: iter.iteration_n,
+          severity: 'medium',
+          category: 'WORKER_FALLBACK_FAILED',
+          root_cause_hypothesis: 'Phase 30 fault-injection spec failed: Worker/USPTO fallback did not produce accurate citation',
+          confidence: 0.85,
+          rationale: faultInjectionMatch
+            ? 'Heuristic-resolved: fault_injection_status.worker_fallback_failed === true'
+            : 'Heuristic-resolved: classification === WORKER_FALLBACK_FAILED',
+          path_taken: 'heuristic',
+          triage_confidence: 'heuristic_fault_injection',
+        });
+        continue;
+      }
+    }
+
     // D-03 Rule 4: ambiguous — Tier C CONFIRMED or any other case not matched above
     // Push iter for Plan 03's cluster pre-filter + LLM second-pass
     ambiguous.push(iter);

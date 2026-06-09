@@ -630,6 +630,754 @@ describe('runTriage — Tier C escalation (TRIAGE-01 boundary / Pitfall 2)', () 
 });
 
 // ---------------------------------------------------------------------------
+// Phase 64 — EXTENSION_NOT_LOADED heuristic (TRIAGE-01)
+// ---------------------------------------------------------------------------
+
+describe('runTriage — Phase 64 EXTENSION_NOT_LOADED heuristic (TRIAGE-01)', () => {
+
+  it('Rule 5a: iter.classification === EXTENSION_NOT_LOADED → heuristic resolution; invokeLlm NOT called', async () => {
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'EXTENSION_NOT_LOADED',
+      // No verifier_verdict / no rerun entry — Rule 3 cannot capture
+      // EXTENSION_NOT_LOADED (not in RULE3_CLASSIFICATIONS), so it falls to
+      // Rule 5.
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    // Provide a rerun entry that does NOT match Rule 1/2/3 (no FLAKE, no CONFIRMED+strong+RULE2).
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.severity).toBe('medium');
+    expect(f.category).toBe('EXTENSION_NOT_LOADED');
+    expect(f.path_taken).toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+
+    // Verify triage_confidence label survives the JSON round-trip into the written file
+    const written = writer.getParsed();
+    expect(written.findings[0].triage_confidence).toBe('heuristic');
+  });
+
+  it('Rule 5b: iter.error_reason matches /extension.*(not.*loaded|failed.*attach)/i → heuristic resolution', async () => {
+    // Use a non-matching classification (HARNESS_ERROR is in RULE3_CLASSIFICATIONS,
+    // but Rule 3 requires NOT_REPLAYABLE_EFFECTIVE; we use a CONFIRMED rerun
+    // verdict so Rule 3's guard fails, letting Rule 5 fire on error_reason.
+    // We also avoid Rule 2 by setting classification to something NOT in
+    // RULE2_SEVERITY (HARNESS_ERROR is neither WRONG_CITATION nor VERIFIER_DISAGREE).
+    const iteration = makeIteration({
+      iteration_n: 1,
+      // Use NO_CITATION_PRODUCED so Rule 3 cannot capture (it's not in
+      // RULE3_CLASSIFICATIONS). Use CONFIRMED rerun + Tier A verifier — but
+      // classification NO_CITATION_PRODUCED is not in RULE2_SEVERITY either,
+      // so Rule 2 cannot fire. The error_reason regex match is the ONLY path
+      // that triggers Rule 5.
+      classification: 'NO_CITATION_PRODUCED',
+      // Locked regex: /extension (?:not.*loaded|failed.*attach)/i.
+      // Must match literally — "extension not loaded" / "extension failed to attach".
+      error_reason: 'extension failed to attach to the active tab — chrome.runtime error',
+      verifier_verdict: { status: 'pass', tier_used: 'A', reason: 'verifier irrelevant here' },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.severity).toBe('medium');
+    expect(f.category).toBe('EXTENSION_NOT_LOADED');
+    expect(f.path_taken).toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+
+    const written = writer.getParsed();
+    expect(written.findings[0].triage_confidence).toBe('heuristic');
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 64 — GOOGLE_DOM_DRIFT mutator-aware heuristic (TRIAGE-02)
+// ---------------------------------------------------------------------------
+
+describe('runTriage — Phase 64 GOOGLE_DOM_DRIFT mutator-aware heuristic (TRIAGE-02)', () => {
+
+  it('Rule 6a: mutator marker + selector + classification GOOGLE_DOM_DRIFT → heuristic resolution', async () => {
+    const issueBody = [
+      'Some preamble.',
+      '<!-- fp: abc123def456 -->',
+      'Selector that failed: patent-result',
+      'More text.',
+    ].join('\n');
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: issueBody,
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.severity).toBe('medium');
+    expect(f.category).toBe('GOOGLE_DOM_DRIFT');
+    expect(f.path_taken).toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+
+    const written = writer.getParsed();
+    expect(written.findings[0].triage_confidence).toBe('heuristic_mutator_aware');
+  });
+
+  it('Rule 6b: real DOM drift (selector present, mutator marker ABSENT) → falls through to LLM (NOT heuristic)', async () => {
+    // No <!-- fp: <12hex> --> marker. Selector present. Classification = GOOGLE_DOM_DRIFT.
+    // Rule 6 MUST NOT fire — must fall through. With a single ambiguous finding
+    // below CLUSTER_THRESHOLD, the LLM single-path is invoked.
+    const issueBody = 'Drift report: selector patent-result returned no elements. (No mutator marker present.)';
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: issueBody,
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: 'some text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'high',
+        category: 'GOOGLE_DOM_DRIFT',
+        root_cause_hypothesis: 'real drift',
+        confidence: 0.7,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    // Critical: the heuristic did NOT fire — escalation to LLM was preserved.
+    expect(f.path_taken).not.toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('Rule 6c: mutator marker present but NO recognized selector → heuristic does NOT fire (defensive)', async () => {
+    // Marker alone is not sufficient — selector must also match.
+    const issueBody = '<!-- fp: abc123def456 -->\nNo recognized selector here, just plain text.';
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: issueBody,
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: 'some text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'high',
+        category: 'GOOGLE_DOM_DRIFT',
+        root_cause_hypothesis: 'marker without selector',
+        confidence: 0.7,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.path_taken).not.toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 64 — WORKER_FALLBACK_FAILED heuristic (TRIAGE-03)
+// ---------------------------------------------------------------------------
+
+describe('runTriage — Phase 64 WORKER_FALLBACK_FAILED heuristic (TRIAGE-03)', () => {
+
+  it('Rule 7a: iter.fault_injection_status.worker_fallback_failed === true → heuristic resolution', async () => {
+    const iteration = makeIteration({
+      iteration_n: 1,
+      // Classification does NOT match WORKER_FALLBACK_FAILED — Rule 7 must
+      // still fire on the additive fault_injection_status field alone.
+      classification: 'NO_CITATION_PRODUCED',
+      fault_injection_status: { worker_fallback_failed: true },
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.severity).toBe('medium');
+    expect(f.category).toBe('WORKER_FALLBACK_FAILED');
+    expect(f.path_taken).toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+
+    const written = writer.getParsed();
+    expect(written.findings[0].triage_confidence).toBe('heuristic_fault_injection');
+  });
+
+  it('Rule 7b: iter.classification === WORKER_FALLBACK_FAILED (fault_injection_status absent) → heuristic resolution', async () => {
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'WORKER_FALLBACK_FAILED',
+      // fault_injection_status intentionally absent — legacy iter shape.
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    expect(f.category).toBe('WORKER_FALLBACK_FAILED');
+    expect(f.path_taken).toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+
+    const written = writer.getParsed();
+    expect(written.findings[0].triage_confidence).toBe('heuristic_fault_injection');
+  });
+
+  it('Rule 7c (graceful degradation): fault_injection_status absent AND classification not covered by any rule → falls to ambiguous (Rule 4)', async () => {
+    // NO_CITATION_PRODUCED is deliberately LLM-routed (TRIAGE-DEF-03 deferred).
+    // No fault_injection_status field. Rerun CONFIRMED + Tier C verifier verdict
+    // (CONFIRMED + Tier C does NOT fire Rule 2 — VERIFIER_STRONG_AGREEMENT
+    // returns false for Tier C). Confirms Rule 7 is a no-op when its data is
+    // absent and the iter does not match any other heuristic.
+    const iteration = makeIteration({
+      iteration_n: 1,
+      classification: 'NO_CITATION_PRODUCED',
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: 'some patent text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const rerunEntry = makeRerunEntry({
+      iteration_n: 1,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    });
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'medium',
+        category: 'NO_CITATION_PRODUCED',
+        root_cause_hypothesis: 'unknown',
+        confidence: 0.5,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iteration] }),
+      inputRerunReport: makeRerunReport({ replays: [rerunEntry] }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(1);
+    const f = report.findings[0];
+    // Rule 7 did NOT fire — fell through to ambiguous + LLM second-pass.
+    expect(f.path_taken).not.toBe('heuristic');
+    expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 64 — TRIAGE-04 invariants (Pitfall 2 + Pitfall 10)
+// ---------------------------------------------------------------------------
+
+describe('runTriage — Phase 64 TRIAGE-04 invariants (Pitfall 2 + Pitfall 10)', () => {
+
+  it('T_TIER_C_NO_MASK: Tier C remains escalated except in the mutator-aware deliberate-bypass case', async () => {
+    // Two iters, processed in a single runTriage call.
+    // iter 1: GOOGLE_DOM_DRIFT + Tier C verifier verdict + CONFIRMED rerun +
+    //         mutator marker AND selector present → Rule 6 fires (heuristic).
+    //         Rule 6 gates on the mutator marker, NOT on verifier_verdict —
+    //         the deliberate-bypass case for synthetic injection.
+    // iter 2: VERIFIER_DISAGREE + Tier C verifier verdict + CONFIRMED rerun +
+    //         NO mutator marker → Rule 2 cannot fire (Tier C fails
+    //         VERIFIER_STRONG_AGREEMENT); no new rule fires → falls to ambiguous.
+    const iter1Body = '<!-- fp: deadbeef1234 -->\nselector patent-result missing';
+    const iter1 = makeIteration({
+      iteration_n: 1,
+      classification: 'GOOGLE_DOM_DRIFT',
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      issue_body: iter1Body,
+      llm_selection: {
+        selectedText: 'some text',
+        caseId: 'c1',
+        patentId: 'US1',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const iter2 = makeIteration({
+      iteration_n: 2,
+      classification: 'VERIFIER_DISAGREE',
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      // No issue_body — no mutator marker, no selector.
+      llm_selection: {
+        selectedText: 'other text',
+        caseId: 'c2',
+        patentId: 'US2',
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    });
+    const replays = [
+      makeRerunEntry({ iteration_n: 1, verdict: 'CONFIRMED', confirmed_count: 3, total_runs: 3 }),
+      makeRerunEntry({ iteration_n: 2, verdict: 'CONFIRMED', confirmed_count: 3, total_runs: 3 }),
+    ];
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: JSON.stringify({
+        severity: 'medium',
+        category: 'VERIFIER_DISAGREE',
+        root_cause_hypothesis: 'escalated',
+        confidence: 0.6,
+        rationale: 'r',
+      }),
+      costUsd: 0.01,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations: [iter1, iter2] }),
+      inputRerunReport: makeRerunReport({ replays }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    expect(report.findings).toHaveLength(2);
+    const f1 = report.findings.find((f) => f.iteration_n === 1);
+    const f2 = report.findings.find((f) => f.iteration_n === 2);
+    // iter 1: mutator-aware deliberate-bypass — Rule 6 fires heuristically
+    expect(f1.path_taken).toBe('heuristic');
+    expect(f1.category).toBe('GOOGLE_DOM_DRIFT');
+    // iter 2: Tier C VERIFIER_DISAGREE WITHOUT mutator marker → MUST escalate
+    expect(f2.path_taken).not.toBe('heuristic');
+    // And invokeLlm must have been called at least once (for iter 2)
+    expect(invokeLlmSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('T_VSA_BODY_UNCHANGED: source-grep pins the VERIFIER_STRONG_AGREEMENT arrow body byte-stability', () => {
+    // Source-grep the literal multi-line declaration of VERIFIER_STRONG_AGREEMENT.
+    // This is the Phase 34 D-02 Pitfall 2 mitigation — any byte-change MUST
+    // be a deliberate, reviewed action AND must update this pin in the same commit.
+    const srcPath = path.resolve(__dirname, '..', 'e2e', 'lib', 'triage-classifier.js');
+    const src = fs.readFileSync(srcPath, 'utf8');
+    const literal =
+      "export const VERIFIER_STRONG_AGREEMENT = ({ status, tier_used } = {}) =>\n" +
+      "  status === 'pass' && (tier_used === 'A' || tier_used === 'B');";
+    expect(src).toContain(literal);
+  });
+
+  it('T_RULE2_BODY_UNCHANGED: source-grep pins the Rule 2 (CONFIRMED + strong agreement) body byte-stability', () => {
+    // Source-grep the Rule 2 block — anchor on RULE2_SEVERITY through the
+    // trailing `continue;`. Pitfall 6 — only Rule 2 may CONFIRMED-gate,
+    // and only with the VERIFIER_STRONG_AGREEMENT call inside the if-condition.
+    const srcPath = path.resolve(__dirname, '..', 'e2e', 'lib', 'triage-classifier.js');
+    const src = fs.readFileSync(srcPath, 'utf8');
+    const r2Pattern =
+      /const RULE2_SEVERITY = \{ WRONG_CITATION: 'high', VERIFIER_DISAGREE: 'medium' \};[\s\S]*?VERIFIER_STRONG_AGREEMENT\(iter\.verifier_verdict\)[\s\S]*?path_taken: 'heuristic',\n      \}\);\n      continue;/;
+    expect(src).toMatch(r2Pattern);
+  });
+
+  it('T_NEW_RULES_NO_CONFIRMED_GATE_WITHOUT_VSA (Pitfall 6 source-grep): only ONE CONFIRMED-gated if-condition exists, and it calls VERIFIER_STRONG_AGREEMENT', () => {
+    // Strip comment-only lines (// ..., /* ... */, * ...) so doc-comments
+    // discussing CONFIRMED do not count.
+    const srcPath = path.resolve(__dirname, '..', 'e2e', 'lib', 'triage-classifier.js');
+    const rawSrc = fs.readFileSync(srcPath, 'utf8');
+    const noComments = rawSrc
+      .split('\n')
+      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .join('\n');
+    // Count occurrences of the CONFIRMED-gate token across non-comment lines.
+    const confirmedGateMatches = noComments.match(/rerunEntry\?\.verdict === 'CONFIRMED'/g) ?? [];
+    expect(confirmedGateMatches.length).toBe(1);
+    // And the one occurrence must live inside the same if-condition as
+    // VERIFIER_STRONG_AGREEMENT — assert that VERIFIER_STRONG_AGREEMENT is
+    // called on a non-comment line for the same Rule 2.
+    expect(noComments).toMatch(/VERIFIER_STRONG_AGREEMENT\(iter\.verifier_verdict\)/);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 64 — cluster pre-filter sample-size invariant (TRIAGE-04)
+// ---------------------------------------------------------------------------
+
+describe('runTriage — Phase 64 cluster pre-filter sample-size invariant (TRIAGE-04)', () => {
+
+  it('10 same-category NO_CITATION_PRODUCED ambiguous iters → exactly 1 grouped invokeLlm call (cluster path, not decreased vs v4.2 baseline)', async () => {
+    // NO_CITATION_PRODUCED is NOT covered by any new Phase 64 rule — confirms
+    // the new rules do not steal ambiguous candidates from the cluster pre-filter.
+    // 10 ≥ CLUSTER_THRESHOLD (5) → exactly 1 grouped LLM call.
+    const iterations = Array.from({ length: 10 }, (_, i) => makeIteration({
+      iteration_n: i + 1,
+      classification: 'NO_CITATION_PRODUCED',
+      verifier_verdict: { status: 'pass', tier_used: 'C', reason: 'fuzzy' },
+      llm_selection: {
+        selectedText: `selected text ${i + 1}`,
+        caseId: `c${i + 1}`,
+        patentId: `US${i + 1}`,
+        category: 'modern-short',
+        rationale: 'r',
+      },
+    }));
+    const replays = iterations.map((it) => makeRerunEntry({
+      iteration_n: it.iteration_n,
+      verdict: 'CONFIRMED',
+      confirmed_count: 3,
+      total_runs: 3,
+    }));
+    const clusterResponse = JSON.stringify(
+      iterations.map((it) => ({
+        iteration_n: it.iteration_n,
+        severity: 'medium',
+        category: 'NO_CITATION_PRODUCED',
+        root_cause_hypothesis: `cluster ${it.iteration_n}`,
+        confidence: 0.7,
+        rationale: 'r',
+      }))
+    );
+    const invokeLlmSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      llmText: clusterResponse,
+      costUsd: 0.05,
+      modelId: 'mock',
+      rawJson: {},
+    });
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations }),
+      inputRerunReport: makeRerunReport({ replays }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    // EXACTLY 1 grouped call — cluster path preserved post-Phase-64.
+    expect(invokeLlmSpy.mock.calls.length).toBe(1);
+    expect(report.findings).toHaveLength(10);
+    expect(report.findings.every((f) => f.path_taken === 'llm_cluster')).toBe(true);
+    expect(report.summary.cluster_pass_count).toBe(10);
+    expect(report.summary.heuristic_count).toBe(0);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Phase 64 — coverage assertion (7 → 10 heuristic-resolvable classes)
+// ---------------------------------------------------------------------------
+
+describe('runTriage — Phase 64 coverage assertion (7 → 10 heuristic-resolvable classes)', () => {
+
+  // Frozen fixture — pre-Phase-64 baseline was 7; Phase 64 adds 3 → 10.
+  // Pre-64: FLAKE, WRONG_CITATION, VERIFIER_DISAGREE, LLM_HALLUCINATED_SELECTION,
+  //         LLM_API_ERROR, HARNESS_ERROR, PASS
+  // +Phase 64: EXTENSION_NOT_LOADED, GOOGLE_DOM_DRIFT, WORKER_FALLBACK_FAILED
+  const HEURISTIC_RESOLVABLE_CLASSES = Object.freeze([
+    'FLAKE',
+    'WRONG_CITATION',
+    'VERIFIER_DISAGREE',
+    'LLM_HALLUCINATED_SELECTION',
+    'LLM_API_ERROR',
+    'HARNESS_ERROR',
+    'PASS',
+    'EXTENSION_NOT_LOADED',
+    'GOOGLE_DOM_DRIFT',
+    'WORKER_FALLBACK_FAILED',
+  ]);
+
+  it('HEURISTIC_RESOLVABLE_CLASSES.length === 10 (frozen fixture)', () => {
+    expect(HEURISTIC_RESOLVABLE_CLASSES).toHaveLength(10);
+    expect(Object.isFrozen(HEURISTIC_RESOLVABLE_CLASSES)).toBe(true);
+  });
+
+  it('runTriage with one minimal-triggering iter per class → 10 distinct heuristic categories', async () => {
+    // Build one iter per class with the minimal triggering shape.
+    // FLAKE → Rule 1 (rerun verdict FLAKE) — finding.category = iter.classification.
+    //         iter.classification is 'WRONG_CITATION' here (any value passes through)
+    //         and we expect the resulting finding.category to equal that value.
+    //         To assert category === 'FLAKE' at the finding level (so the
+    //         set of heuristic categories includes 'FLAKE'), we set
+    //         classification: 'FLAKE' on the iter. Rule 1 propagates iter.classification.
+    const iterFLAKE = makeIteration({
+      iteration_n: 1,
+      classification: 'FLAKE',
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    // WRONG_CITATION → Rule 2a (CONFIRMED + Tier A + WRONG_CITATION)
+    const iterWC = makeIteration({
+      iteration_n: 2,
+      classification: 'WRONG_CITATION',
+      verifier_verdict: { status: 'pass', tier_used: 'A', reason: 'ok' },
+    });
+    // VERIFIER_DISAGREE → Rule 2b (CONFIRMED + Tier B + VERIFIER_DISAGREE)
+    const iterVD = makeIteration({
+      iteration_n: 3,
+      classification: 'VERIFIER_DISAGREE',
+      verifier_verdict: { status: 'pass', tier_used: 'B', reason: 'fuzzy' },
+    });
+    // LLM_HALLUCINATED_SELECTION → Rule 3a (NOT_REPLAYABLE)
+    const iterLHS = makeIteration({
+      iteration_n: 4,
+      classification: 'LLM_HALLUCINATED_SELECTION',
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    // LLM_API_ERROR → Rule 3b
+    const iterLAE = makeIteration({
+      iteration_n: 5,
+      classification: 'LLM_API_ERROR',
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    // HARNESS_ERROR → Rule 3c
+    const iterHE = makeIteration({
+      iteration_n: 6,
+      classification: 'HARNESS_ERROR',
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    // PASS → Rule 3d
+    const iterPASS = makeIteration({
+      iteration_n: 7,
+      classification: 'PASS',
+      verifier_verdict: { status: 'pass', tier_used: 'A', reason: 'ok' },
+    });
+    // EXTENSION_NOT_LOADED → Rule 5
+    const iterENL = makeIteration({
+      iteration_n: 8,
+      classification: 'EXTENSION_NOT_LOADED',
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    // GOOGLE_DOM_DRIFT → Rule 6 (with mutator marker + selector)
+    const iterGDD = makeIteration({
+      iteration_n: 9,
+      classification: 'GOOGLE_DOM_DRIFT',
+      issue_body: '<!-- fp: cafebabe1234 -->\npatent-result missing',
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+    // WORKER_FALLBACK_FAILED → Rule 7
+    const iterWFF = makeIteration({
+      iteration_n: 10,
+      classification: 'WORKER_FALLBACK_FAILED',
+      verifier_verdict: null,
+      llm_selection: null,
+      citation: null,
+    });
+
+    const iterations = [
+      iterFLAKE, iterWC, iterVD, iterLHS, iterLAE, iterHE, iterPASS,
+      iterENL, iterGDD, iterWFF,
+    ];
+
+    const replays = [
+      // FLAKE: verdict FLAKE for Rule 1
+      makeRerunEntry({ iteration_n: 1, verdict: 'FLAKE', confirmed_count: 1, total_runs: 3 }),
+      // WRONG_CITATION + VERIFIER_DISAGREE: CONFIRMED for Rule 2
+      makeRerunEntry({ iteration_n: 2, verdict: 'CONFIRMED', confirmed_count: 3, total_runs: 3 }),
+      makeRerunEntry({ iteration_n: 3, verdict: 'CONFIRMED', confirmed_count: 2, total_runs: 3 }),
+      // LLM_HALLUCINATED_SELECTION + LLM_API_ERROR + HARNESS_ERROR + PASS: NOT_REPLAYABLE for Rule 3
+      makeRerunEntry({ iteration_n: 4, verdict: 'NOT_REPLAYABLE', confirmed_count: 0, total_runs: 0, runs: [] }),
+      makeRerunEntry({ iteration_n: 5, verdict: 'NOT_REPLAYABLE', confirmed_count: 0, total_runs: 0, runs: [] }),
+      makeRerunEntry({ iteration_n: 6, verdict: 'NOT_REPLAYABLE', confirmed_count: 0, total_runs: 0, runs: [] }),
+      makeRerunEntry({ iteration_n: 7, verdict: 'NOT_REPLAYABLE', confirmed_count: 0, total_runs: 0, runs: [] }),
+      // EXTENSION_NOT_LOADED + GOOGLE_DOM_DRIFT + WORKER_FALLBACK_FAILED: any
+      // non-FLAKE, non-strong-Rule2 verdict works since Rules 5/6/7 don't gate on rerun verdict.
+      makeRerunEntry({ iteration_n: 8, verdict: 'CONFIRMED', confirmed_count: 3, total_runs: 3 }),
+      makeRerunEntry({ iteration_n: 9, verdict: 'CONFIRMED', confirmed_count: 3, total_runs: 3 }),
+      makeRerunEntry({ iteration_n: 10, verdict: 'CONFIRMED', confirmed_count: 3, total_runs: 3 }),
+    ];
+
+    const invokeLlmSpy = makeMockInvokeLlm();
+    const writer = makeWriteReport();
+
+    const report = await runTriage({
+      inputLlmReport: makeLlmReport({ iterations }),
+      inputRerunReport: makeRerunReport({ replays }),
+      invokeLlm: invokeLlmSpy,
+      writeReport: writer,
+      now: () => new Date('2026-05-27T12:00:00.000Z'),
+      sourcePaths: { llm: '/tmp/llm.json', rerun: '/tmp/rerun.json' },
+    });
+
+    // All 10 findings must be heuristic — zero LLM calls.
+    expect(report.findings).toHaveLength(10);
+    expect(invokeLlmSpy.mock.calls.length).toBe(0);
+    const heuristicFindings = report.findings.filter((f) => f.path_taken === 'heuristic');
+    expect(heuristicFindings).toHaveLength(10);
+
+    const categories = heuristicFindings.map((f) => f.category);
+    const distinctCategories = new Set(categories);
+    expect(distinctCategories.size).toBe(10);
+    expect(distinctCategories).toEqual(new Set(HEURISTIC_RESOLVABLE_CLASSES));
+  });
+
+});
+
+// ---------------------------------------------------------------------------
 // D-09/D-10 schema-guard (TRIAGE-05)
 // ---------------------------------------------------------------------------
 

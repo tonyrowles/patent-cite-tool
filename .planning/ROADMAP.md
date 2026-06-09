@@ -64,7 +64,9 @@
   3. `scripts/audit-bypass-merges.mjs` queries `gh api repos/<owner>/<repo>/actions/runs` for `verifier-gate` runs completed AFTER PR merge timestamp; surfaces sole-maintainer `--admin` bypasses; outputs CSV consumed by Phase 66's `a-b-winner.mjs --admin-bypass` filter
   4. Weekly digest gains a bypass-count metric in the Auto-Fix Pipeline section (SUMMARY_KEYS frozen-array additive-only)
   5. `.planning/STATE.md ## Bypass Conventions` section live documenting "DO NOT use `gh pr merge --admin` on `auto-fix/*` branches" runbook discipline
-**Plans**: TBD
+**Plans:** 2 plans
+- [ ] 62-01-PLAN.md — Shared safe-append-ledger helper + wire 4 unguarded sites (LEDX-01..04)
+- [ ] 62-02-PLAN.md — Bypass-audit probe + weekly digest bypass-count metric + STATE.md verify (BYPASS-01..03)
 
 ### Phase 64: Heuristic-First Triage Extension
 **Goal**: Extend `triage-classifier.js:runTriage` D-03 rule chain with 3 new heuristic rules (`EXTENSION_NOT_LOADED`, `GOOGLE_DOM_DRIFT` mutator-aware, `WORKER_FALLBACK_FAILED`) pushing classifier coverage from 7/11 → 10/11 — without weakening the `VERIFIER_STRONG_AGREEMENT` Tier-C-masking guard (Phase 34 invariant).
@@ -172,7 +174,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 61. Carry-over Bundle — Diagnostic Mutator + Max-Turns + UAT Re-sweep | 0/TBD | Not started | - |
-| 62. Forensic Ledger Hardening + Bypass-Audit Probe | 0/TBD | Not started | - |
+| 62. Forensic Ledger Hardening + Bypass-Audit Probe | 0/2 | Not started | - |
 | 64. Heuristic-First Triage Extension | 0/TBD | Not started | - |
 | 65. Expanded Fix Scaffolds | 0/TBD | Not started | - |
 | 66. A/B Winner Exit + 3-way Transport Stratification | 0/TBD | Not started | - |

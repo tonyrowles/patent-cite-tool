@@ -18,6 +18,7 @@ import {
   ledgerSourceForPr,
   rowsToCsv,
   parseArgv,
+  parseWorkflowRunsJsonl,
 } from '../../scripts/audit-bypass-merges.mjs';
 
 // ---------------------------------------------------------------------------
@@ -201,5 +202,59 @@ describe('Phase 62 BYPASS-01 — parseArgv', () => {
     // Allow 7-9 days range to absorb clock jitter
     expect(deltaDays).toBeGreaterThan(7);
     expect(deltaDays).toBeLessThan(9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseWorkflowRunsJsonl — handles `gh api --paginate --jq '.workflow_runs[]'`
+// JSONL output. CR-01 fix.
+// ---------------------------------------------------------------------------
+
+describe('Phase 62 BYPASS-01 — parseWorkflowRunsJsonl (CR-01)', () => {
+  it('T_BYPASS_PARSE_EMPTY: blank input returns empty array', () => {
+    expect(parseWorkflowRunsJsonl('')).toEqual([]);
+    expect(parseWorkflowRunsJsonl('\n\n')).toEqual([]);
+  });
+
+  it('T_BYPASS_PARSE_SINGLE: single workflow_run JSON line parses correctly', () => {
+    const jsonl = JSON.stringify({ id: 1, name: 'V40 Verifier Gate' }) + '\n';
+    const runs = parseWorkflowRunsJsonl(jsonl);
+    expect(runs.length).toBe(1);
+    expect(runs[0]).toEqual({ id: 1, name: 'V40 Verifier Gate' });
+  });
+
+  it('T_BYPASS_PARSE_MULTI_PAGE: multi-page JSONL (3+ rows across simulated pages) flattens', () => {
+    // Simulate the output of `gh api --paginate --jq '.workflow_runs[]'`:
+    // pages are concatenated, but --jq has already flattened each page's
+    // workflow_runs array into individual lines. The parser must handle the
+    // resulting JSONL regardless of how many pages contributed.
+    const rows = [
+      { id: 1, head_branch: 'auto-fix/issue-1', path: '.github/workflows/v40-verifier-gate.yml' },
+      { id: 2, head_branch: 'auto-fix/issue-2', path: '.github/workflows/v40-verifier-gate.yml' },
+      { id: 3, head_branch: 'main', path: '.github/workflows/other.yml' },
+      { id: 4, head_branch: 'auto-fix/issue-3', path: '.github/workflows/v40-verifier-gate.yml' },
+    ];
+    const jsonl = rows.map((r) => JSON.stringify(r)).join('\n') + '\n';
+    const parsed = parseWorkflowRunsJsonl(jsonl);
+    expect(parsed.length).toBe(4);
+    expect(parsed.map((r) => r.id)).toEqual([1, 2, 3, 4]);
+    // Sanity: downstream filter (path-based, CR-02 fix) finds exactly 3 matches.
+    const filtered = parsed.filter(
+      (r) =>
+        typeof r?.head_branch === 'string' &&
+        r.head_branch.startsWith('auto-fix/') &&
+        typeof r?.path === 'string' &&
+        r.path.endsWith('.github/workflows/v40-verifier-gate.yml'),
+    );
+    expect(filtered.length).toBe(3);
+  });
+
+  it('T_BYPASS_PARSE_TOLERATES_BLANK_LINES: blank/whitespace-only lines are skipped', () => {
+    const jsonl = '\n' +
+      JSON.stringify({ id: 1 }) + '\n' +
+      '\n   \n' +
+      JSON.stringify({ id: 2 }) + '\n';
+    const parsed = parseWorkflowRunsJsonl(jsonl);
+    expect(parsed).toEqual([{ id: 1 }, { id: 2 }]);
   });
 });

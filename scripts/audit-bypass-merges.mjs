@@ -114,6 +114,35 @@ export function rowsToCsv(rows) {
 const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 
 /**
+ * Parse the JSONL output of `gh api ... --paginate --jq '.workflow_runs[]'`.
+ *
+ * CR-01 fix (Phase 62 REVIEW): `gh api --paginate` does NOT merge pages into
+ * a single JSON object — it emits each page's response body as a separate
+ * top-level JSON object, concatenated as a stream with no separator. A naive
+ * `JSON.parse(runsRaw)` succeeds for single-page results (works by accident)
+ * but throws `SyntaxError: Unexpected non-whitespace character after JSON`
+ * on any multi-page result (>100 workflow runs in the window). The
+ * `--jq '.workflow_runs[]'` filter flattens the stream into newline-delimited
+ * JSON (one workflow_run per line), which is robust to multi-page output.
+ *
+ * Accepts blank lines and trims surrounding whitespace defensively.
+ *
+ * @param {string} jsonlRaw — raw stdout from `gh api --paginate --jq '.workflow_runs[]'`
+ * @returns {Array<object>} workflow_run objects
+ */
+export function parseWorkflowRunsJsonl(jsonlRaw) {
+  if (typeof jsonlRaw !== 'string' || jsonlRaw.length === 0) return [];
+  const out = [];
+  const lines = jsonlRaw.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    out.push(JSON.parse(trimmed));
+  }
+  return out;
+}
+
+/**
  * Parse argv with defaults.
  *
  * Defaults:
@@ -238,13 +267,19 @@ export async function main(argv = process.argv.slice(2)) {
   assertGhAuth();
   const repo = parsed.repo ?? resolveDefaultRepo();
 
-  // CRITICAL: --paginate flag literal per Pitfall 62-D (prevents silent 100-result truncation)
+  // CRITICAL: --paginate flag literal per Pitfall 62-D (prevents silent 100-result truncation).
+  //
+  // CR-01 fix (Phase 62 REVIEW): `gh api --paginate` emits one JSON object per
+  // page concatenated as a stream (NOT a single merged object). The previous
+  // `JSON.parse(runsRaw)` worked by accident for single-page results and threw
+  // `SyntaxError` on any multi-page result. Pair `--paginate` with
+  // `--jq '.workflow_runs[]'` so gh flattens the stream into JSONL (one
+  // workflow_run per line), which parseWorkflowRunsJsonl handles robustly.
   const runsRaw = execSync(
-    `gh api 'repos/${repo}/actions/runs?event=pull_request&per_page=100&created=>=${parsed.sinceIso}' --paginate`,
+    `gh api 'repos/${repo}/actions/runs?event=pull_request&per_page=100&created=>=${parsed.sinceIso}' --paginate --jq '.workflow_runs[]'`,
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
   );
-  const runsJson = JSON.parse(runsRaw);
-  const runs = Array.isArray(runsJson?.workflow_runs) ? runsJson.workflow_runs : [];
+  const runs = parseWorkflowRunsJsonl(runsRaw);
 
   // Filter to verifier-gate runs on auto-fix/* branches.
   //

@@ -16,7 +16,9 @@
 // directly. Same purity discipline as scripts/issue-payload-builder.js.
 //
 // LOCKED forbidden paths (per 41-CONTEXT decisions, PITFALLS Pitfall 3,
-// AND Phase 45-02 extension for FLAKE-01/FLAKE-02 state file integrity):
+// Phase 45-02 extension for FLAKE-01/FLAKE-02 state file integrity, AND
+// Phase 67 PITER-05 defense-in-depth against the prompt-iter loop ever
+// editing scaffold source):
 //   1. tests/test-cases.js                       — 76-case golden trigger
 //   2. tests/golden/baseline.json                — golden baseline
 //   3. tests/e2e/test-cases-quarantine.js        — quarantine corpus
@@ -25,6 +27,8 @@
 //   6. .github/CODEOWNERS                        — CODEOWNERS itself
 //   7. tests/e2e/.rerun-ring-buffer.json         — FLAKE 5-state ring buffer (Phase 45-02)
 //   8. tests/e2e/.flake-suppression.json         — FLAKE_ESCALATION suppression file (Phase 45-02)
+//   9. tests/e2e/lib/fix-prompt-builder.js       — PROMPT_SCAFFOLDS registry (Phase 67 PITER-05)
+//  10. tests/e2e/lib/llm-router.js               — pure model-routing helper (Phase 67 PITER-05)
 //
 // CLI contract:
 //   stdin:  one path per line (typically `git diff --name-only origin/main..HEAD`)
@@ -55,6 +59,8 @@ export const FORBIDDEN_PATHS = Object.freeze([
   /^\.github\/CODEOWNERS$/,
   /^tests\/e2e\/\.rerun-ring-buffer\.json$/,    // Phase 45-02 — FLAKE-01 ring buffer state
   /^tests\/e2e\/\.flake-suppression\.json$/,    // Phase 45-02 — FLAKE-02 suppression state
+  /^tests\/e2e\/lib\/fix-prompt-builder\.js$/,  // Phase 67 — PITER-05 scaffold registry defense-in-depth
+  /^tests\/e2e\/lib\/llm-router\.js$/,          // Phase 67 — PITER-05 model-routing pure helper defense-in-depth
 ]);
 
 /**

@@ -31,9 +31,9 @@ import {
 
 describe('check-diff-guard (Phase 41-01, VFY-GATE-04)', () => {
   describe('FORBIDDEN_PATHS bank', () => {
-    it('exports exactly 8 regex patterns (6 Phase 41 + 2 Phase 45-02 extensions)', () => {
+    it('exports exactly 10 regex patterns (8 prior + 2 Phase 67 PITER-05 extensions)', () => {
       expect(Array.isArray(FORBIDDEN_PATHS)).toBe(true);
-      expect(FORBIDDEN_PATHS).toHaveLength(8);
+      expect(FORBIDDEN_PATHS).toHaveLength(10);
       for (const re of FORBIDDEN_PATHS) {
         expect(re).toBeInstanceOf(RegExp);
       }
@@ -103,6 +103,20 @@ describe('check-diff-guard (Phase 41-01, VFY-GATE-04)', () => {
       expect(result.ok).toBe(false);
       expect(result.violations).toContain('tests/e2e/.flake-suppression.json');
     });
+
+    // F15 — Phase 67 PITER-05 fix-prompt-builder scaffold registry
+    it('F15: rejects tests/e2e/lib/fix-prompt-builder.js (Phase 67 PITER-05)', () => {
+      const result = checkDiffGuard(['tests/e2e/lib/fix-prompt-builder.js']);
+      expect(result.ok).toBe(false);
+      expect(result.violations).toContain('tests/e2e/lib/fix-prompt-builder.js');
+    });
+
+    // F16 — Phase 67 PITER-05 llm-router pure helper
+    it('F16: rejects tests/e2e/lib/llm-router.js (Phase 67 PITER-05)', () => {
+      const result = checkDiffGuard(['tests/e2e/lib/llm-router.js']);
+      expect(result.ok).toBe(false);
+      expect(result.violations).toContain('tests/e2e/lib/llm-router.js');
+    });
   });
 
   describe('checkDiffGuard() accepts legitimate paths', () => {
@@ -116,6 +130,20 @@ describe('check-diff-guard (Phase 41-01, VFY-GATE-04)', () => {
     // F9 — legitimate test path NOT in forbidden bank
     it('F9: accepts tests/unit/foo.test.js (legitimate test path)', () => {
       const result = checkDiffGuard(['tests/unit/foo.test.js']);
+      expect(result.ok).toBe(true);
+      expect(result.violations).toEqual([]);
+    });
+
+    // F15-anchor — Phase 67 Pitfall 6: F15 regex must NOT match .bak/.orig suffix
+    it('F15-anchor: does NOT match tests/e2e/lib/fix-prompt-builder.js.bak (anchor strictness)', () => {
+      const result = checkDiffGuard(['tests/e2e/lib/fix-prompt-builder.js.bak']);
+      expect(result.ok).toBe(true);
+      expect(result.violations).toEqual([]);
+    });
+
+    // F16-anchor — Phase 67 Pitfall 6: F16 regex must NOT match subdir prefix
+    it('F16-anchor: does NOT match vendor/tests/e2e/lib/llm-router.js (anchor strictness)', () => {
+      const result = checkDiffGuard(['vendor/tests/e2e/lib/llm-router.js']);
       expect(result.ok).toBe(true);
       expect(result.violations).toEqual([]);
     });

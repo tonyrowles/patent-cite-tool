@@ -124,6 +124,39 @@ describe('tests/e2e/lib/safe-append-ledger.js — Phase 62 LEDX-01..04', () => {
     expect(ledger.months[currentMonth()].iterations).toHaveLength(1);
   });
 
+  it('T_LEDX_ALLOW_OVERRIDE_PASS — opts.allowOverride=true allows sdk transport (WR-03 fix)', () => {
+    // No CI; no env-var override; sdk transport. Without allowOverride this
+    // would throw (covered by T_LEDX_CI_GATE). With allowOverride=true it
+    // writes successfully — mirroring E2E_LEDGER_PATH_OVERRIDE behavior at
+    // the per-call granularity. Transport validation is still enforced.
+    expect(() =>
+      safeAppendLedger(
+        tmpLedger,
+        makeEntry({ transport: 'sdk', source: 'auto-fix-api' }),
+        { allowOverride: true },
+      ),
+    ).not.toThrow();
+    const ledger = readLedger(tmpLedger);
+    expect(ledger.months[currentMonth()].iterations).toHaveLength(1);
+    expect(ledger.months[currentMonth()].iterations[0]).toMatchObject({
+      transport: 'sdk',
+      source: 'auto-fix-api',
+    });
+  });
+
+  it('T_LEDX_ALLOW_OVERRIDE_TRANSPORT_STILL_VALIDATED — allowOverride does NOT bypass transport check (WR-03 fix)', () => {
+    // allowOverride bypasses ONLY the CI gate. A non-canonical transport
+    // still throws — this is the explicit guarantee in the JSDoc.
+    expect(() =>
+      safeAppendLedger(
+        tmpLedger,
+        makeEntry({ transport: 'http', source: 'X' }),
+        { allowOverride: true },
+      ),
+    ).toThrow(/transport 'http' is not canonical/);
+    expect(fs.existsSync(tmpLedger)).toBe(false);
+  });
+
   it('T_LEDX_INVALID_TRANSPORT — non-canonical transport throws', () => {
     process.env.CI = 'true';
     expect(() =>

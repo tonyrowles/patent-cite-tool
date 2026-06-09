@@ -33,9 +33,15 @@
 //     omit transport entirely are still accepted (transport === undefined).
 //   - opts.defaults lets callers wire defaults without mutating the entry
 //     literal (preserves source-grep stability of caller entry shapes).
-//   - opts.allowOverride is a reserved flag for future use (CONTEXT.md
-//     decision LEDX-01); destructured but currently has no behavioral
-//     effect.
+//   - opts.allowOverride (Phase 62 WR-03 fix) is the explicit per-call
+//     escape hatch for local `transport: 'sdk'` runs that legitimately need
+//     to write the ledger. Setting `allowOverride: true` bypasses the CI
+//     gate the same way E2E_LEDGER_PATH_OVERRIDE does, but does NOT bypass
+//     transport validation: a non-canonical transport still throws.
+//     Intended for the narrow case where a developer running
+//     `--transport sdk --force-api` locally wants a real ledger write
+//     without exporting the env var. The v3.1/v4.0 subscription-local path
+//     remains covered by isSubscriptionLocal and does not require this flag.
 
 import { appendLedgerEntry } from './llm-ledger.js';
 
@@ -51,9 +57,12 @@ export const VALID_TRANSPORTS = new Set(['sdk', 'subscription']);
 /**
  * safeAppendLedger — shared leak-guarded ledger writer (Phase 62 LEDX-01).
  *
- * Refuses to append unless the caller is in CI, has opted in via
- * E2E_LEDGER_PATH_OVERRIDE, OR the entry self-tags `transport: 'subscription'`
- * (Phase 60.1 whitelist — preserves the v3.1/v4.0 free-iteration flow).
+ * Refuses to append unless one of:
+ *   - process.env.CI === 'true' or GITHUB_ACTIONS === 'true' (CI run)
+ *   - process.env.E2E_LEDGER_PATH_OVERRIDE is set (env-var escape hatch)
+ *   - opts.allowOverride === true (per-call escape hatch — WR-03 fix)
+ *   - merged.transport === 'subscription' (Phase 60.1 whitelist —
+ *     preserves the v3.1/v4.0 free-iteration flow)
  *
  * Applies defaults from opts.defaults for missing source/transport BEFORE
  * the gate check (so a caller that omits transport but provides a
@@ -64,17 +73,13 @@ export const VALID_TRANSPORTS = new Set(['sdk', 'subscription']);
  * @param {object} entry — passed to appendLedgerEntry after default-fill
  * @param {object} [opts]
  * @param {object} [opts.defaults] — { source?, transport? } applied if entry omits
- * @param {boolean} [opts.allowOverride=false] — reserved; future-use flag (LEDX-01)
+ * @param {boolean} [opts.allowOverride=false] — WR-03 fix: per-call escape
+ *   hatch that bypasses the CI gate for legitimate local sdk-transport
+ *   writes. Does NOT bypass transport validation.
  * @throws {Error} on CI gate failure OR non-canonical transport
  */
 export function safeAppendLedger(ledgerPath, entry, opts = {}) {
-  // opts.allowOverride is destructured but currently has no behavior;
-  // reserved for future use per CONTEXT.md decision LEDX-01. Destructure
-  // explicitly so the contract surface is visible at the signature level.
-  const { defaults = {} } = opts;
-  // Read opts.allowOverride defensively without binding (avoids
-  // no-unused-vars lint warning) — the reservation is documented in the
-  // JSDoc opts.allowOverride entry.
+  const { defaults = {}, allowOverride = false } = opts;
   const merged = {
     ...entry,
     source: entry?.source ?? defaults.source,
@@ -121,13 +126,17 @@ export function safeAppendLedger(ledgerPath, entry, opts = {}) {
   // subscription-tagged entries restores the v3.1/v4.0 free-iteration flow
   // while leaving the SDK-path leak protection intact.
   const isSubscriptionLocal = merged && merged.transport === 'subscription';
-  if (!inCi && !hasOverride && !isSubscriptionLocal) {
+  // WR-03 fix: opts.allowOverride is the per-call escape hatch. Symmetric
+  // with hasOverride (env-var escape hatch) — both bypass the CI gate but
+  // NEITHER bypasses transport validation (already enforced above).
+  if (!inCi && !hasOverride && !isSubscriptionLocal && !allowOverride) {
     throw new Error(
       `safeAppendLedger refused: cannot write to ${ledgerPath} ` +
-        `outside CI. Set process.env.CI=true (CI invocation) or ` +
+        `outside CI. Set process.env.CI=true (CI invocation), ` +
         `process.env.E2E_LEDGER_PATH_OVERRIDE=/path/to/tmp.json ` +
-        `(local integration test). This guard protects the committed ` +
-        `ledger from local --force-api runs leaking entries ` +
+        `(local integration test), or pass opts.allowOverride=true ` +
+        `(local sdk-transport ledger write). This guard protects the ` +
+        `committed ledger from local --force-api runs leaking entries ` +
         `(Phase 48 leak vector + Phase 56 LEDGER-02 hardening + Phase 62 LEDX-01; ` +
         `see .planning/research/PITFALLS.md Pitfall 7).`,
     );

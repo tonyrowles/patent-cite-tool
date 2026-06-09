@@ -547,8 +547,14 @@ export async function dispatchFlakeState({ caseId, fingerprint, issueNumber, tra
       execFileSync('gh', ['label', 'create', FLAKE_INVESTIGATION_LABEL, '--force'], {
         encoding: 'utf8',
       });
-    } catch (_) {
-      // Label may already exist — `--force` keeps it idempotent. Swallow.
+    } catch (err) {
+      // Phase 67 IN-01 (REVIEW.md) — explicit `err` binding + `void err`
+      // signals the swallow is INTENTIONAL. Neighboring catches in this file
+      // consume `err.message`; `catch (_)` reads as "error forgotten" without
+      // this acknowledgement. Idempotency context: `gh label create --force`
+      // returns non-zero when the label already exists; that is a benign no-op
+      // for this idempotent step, so we deliberately drop the error.
+      void err;
     }
     try {
       const body = buildFlakeInvestigationBody({
@@ -741,7 +747,14 @@ export async function runDispatcher({
     // Idempotent label create (ignore failure — label may already exist).
     try {
       execFileSync('gh', ['label', 'create', HUMAN_REVIEW_LABEL, '--force'], { encoding: 'utf8' });
-    } catch (_) { /* ignore */ }
+    } catch (err) {
+      // Phase 67 IN-01 (REVIEW.md) — explicit `err` binding + `void err`
+      // signals the swallow is INTENTIONAL. `gh label create --force` returns
+      // non-zero when the label already exists; benign for this idempotent
+      // setup step (HUMAN_REVIEW_LABEL is created so the subsequent --add-label
+      // succeeds). Drop the error deliberately.
+      void err;
+    }
     try {
       execFileSync('gh', [
         'issue', 'edit', String(issue),

@@ -380,10 +380,17 @@ describe('IMPORTS POLICY (Phase 58 PROMOTE-01)', () => {
     expect(forbidden).toEqual([]);
   });
 
-  it('IP2 — positive: the appendLedgerEntry import is present with the locked verbatim shape', () => {
+  it('IP2 — positive: the LEDGER_PATH import is present with the locked verbatim shape', () => {
+    // Phase 62 WR-04 fix: narrowed from `{ appendLedgerEntry, LEDGER_PATH }`
+    // to `{ LEDGER_PATH }`. The four call sites that previously imported
+    // `appendLedgerEntry` directly were routed through safeAppendLedger in
+    // Phase 62 LEDX-02 — the unused symbol was a misleading dead import.
     const source = readPromoteSource();
-    const matches = source.match(/import \{ appendLedgerEntry, LEDGER_PATH \} from '\.\.\/tests\/e2e\/lib\/llm-ledger\.js'/g) || [];
+    const matches = source.match(/import \{ LEDGER_PATH \} from '\.\.\/tests\/e2e\/lib\/llm-ledger\.js'/g) || [];
     expect(matches.length).toBe(1);
+    // Defensive: the removed import shape must NOT reappear.
+    const removed = source.match(/import \{ appendLedgerEntry, LEDGER_PATH \}/g) || [];
+    expect(removed.length).toBe(0);
   });
 
 });

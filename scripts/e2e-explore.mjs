@@ -40,16 +40,17 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import {
-  LEDGER_PATH, readLedger, checkSpendCap, appendLedgerEntry,
+  LEDGER_PATH, readLedger, checkSpendCap,
   phaseTotal, checkPhaseSpendCap, PHASE_HARD_CAP_USD, PHASE_WARN_THRESHOLD_USD,
 } from '../tests/e2e/lib/llm-ledger.js';
 // Phase 62 LEDX-02: route the two iter+retry ledger writes (lines 268 +
 // 320 below) through the shared CI/override/subscription guard. The two
 // e2e-explore.mjs sites historically did not self-tag `source` or
 // `transport`; opts.defaults at the call sites supplies the canonical
-// `e2e-explore` / `subscription` pair. The `appendLedgerEntry` import is
-// retained because it may be used by future plans; removing it would
-// force an unrelated import-policy audit edit.
+// `e2e-explore` / `subscription` pair.
+// Phase 62 WR-04 fix: dropped the unused `appendLedgerEntry` from the
+// llm-ledger import above — every call site now routes through
+// safeAppendLedger.
 import { safeAppendLedger } from '../tests/e2e/lib/safe-append-ledger.js';
 import {
   extractSpecText, selectionInSpec,

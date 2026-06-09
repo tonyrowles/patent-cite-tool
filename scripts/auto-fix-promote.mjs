@@ -73,12 +73,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runPromote } from './promote-from-quarantine.mjs';
-import { appendLedgerEntry, LEDGER_PATH } from '../tests/e2e/lib/llm-ledger.js';
+import { LEDGER_PATH } from '../tests/e2e/lib/llm-ledger.js';
 // Phase 62 LEDX-02: route the two outcome-entry writes (lines 521 + 544
-// below) through the shared CI/override/subscription guard. The
-// `appendLedgerEntry` import is retained — it may be referenced elsewhere
-// in this module by future plans and removing it would force an unrelated
-// import-policy audit edit.
+// below) through the shared CI/override/subscription guard.
+// Phase 62 WR-04 fix: dropped the unused `appendLedgerEntry` from the
+// import above — every direct call site now routes through
+// safeAppendLedger. The IP2 test pin in
+// tests/unit/auto-fix-promote-gate.test.js was updated in the same
+// commit to expect the narrowed import shape.
 import { safeAppendLedger } from '../tests/e2e/lib/safe-append-ledger.js';
 
 // ---------------------------------------------------------------------------

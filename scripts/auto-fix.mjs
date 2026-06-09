@@ -903,7 +903,12 @@ export async function runDispatcher({
         safeAppendLedger({
           iso: new Date().toISOString(),
           model: 'claude-sonnet-4-6',
-          cost_usd: 0,
+          // Phase 67 WR-01 (REVIEW.md): record the ACTUAL cumulative spend
+          // attributable to the prompt-iter retry path. Pre-fix this row
+          // reported 0 while state.cumCost held the real spend, making
+          // downstream cost dashboards filtering on errorReason ===
+          // 'prompt-iter-budget-cap' under-report the iter-loop spend.
+          cost_usd: state.cumCost,
           tokens_in: 0,
           tokens_out: 0,
           phase: PHASE,
@@ -994,7 +999,10 @@ export async function runDispatcher({
         safeAppendLedger({
           iso: new Date().toISOString(),
           model: 'claude-sonnet-4-6',
-          cost_usd: 0,
+          // Phase 67 WR-01 (REVIEW.md): record the ACTUAL cumulative spend
+          // attributable to the prompt-iter retry path (see matching
+          // comment on the parse-fail branch above).
+          cost_usd: state.cumCost,
           tokens_in: 0,
           tokens_out: 0,
           phase: PHASE,

@@ -310,7 +310,13 @@ describe('Phase 67 PITER-03: PROMPT_ITER_COST_CAP_USD budget-cap', () => {
     // Round-0 apply-check-failed row exists
     expect(ledgerCalls.some((e) => e.iter_round === 0 && e.errorReason === 'apply-check-failed')).toBe(true);
     // Budget-cap row exists
-    expect(ledgerCalls.some((e) => e.errorReason === 'prompt-iter-budget-cap')).toBe(true);
+    const capRow = ledgerCalls.find((e) => e.errorReason === 'prompt-iter-budget-cap');
+    expect(capRow).toBeDefined();
+
+    // Phase 67 WR-01 — budget-cap row records ACTUAL cumulative spend
+    // (pre-fix this was hardcoded 0, under-reporting iter-loop cost).
+    // costUsd 0.25 per call × 2 calls = 0.50 cumulative.
+    expect(capRow.cost_usd).toBeCloseTo(0.50, 5);
 
     // SDK invocation count is bounded by the budget cap
     expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBeGreaterThanOrEqual(1);

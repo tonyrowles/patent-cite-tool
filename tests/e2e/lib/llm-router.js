@@ -56,6 +56,19 @@
  * strict mode (ES modules are always strict). This preserves the AB-04
  * winner-declaration invariant — the routing decision is a constant for
  * the lifetime of the process.
+ *
+ * Phase 65 Plan 01 (SCAF-01..02) — 5-site drift-guard satisfier comments.
+ * The Plan 02 drift guard test accepts EITHER a MODEL_ROUTES entry OR a
+ * `// MODEL_DEFAULT_OK: <CLASS>` comment as satisfaction. The two new
+ * Phase 65 scaffold classes route through the `??` fallthrough to sonnet
+ * (no MODEL_ROUTES entry needed) and are annotated here:
+ *
+ * // MODEL_DEFAULT_OK: VERIFIER_DISAGREE — defaults to claude-sonnet-4-6
+ *   (Phase 65 SCAF-01; Verifier-disagreement fixes target the citation
+ *   pipeline's column/line-counting logic — mechanical, sonnet-suitable).
+ * // MODEL_DEFAULT_OK: FRAME_SHIFT_DETECTED — defaults to claude-sonnet-4-6
+ *   (Phase 65 SCAF-02; pdfjs frame-mapping fixes adapt to the new pdfjs-dist
+ *   API shape — also mechanical, do not require opus reasoning).
  */
 export const MODEL_ROUTES = Object.freeze({
   GOOGLE_DOM_DRIFT: 'claude-opus-4-7',

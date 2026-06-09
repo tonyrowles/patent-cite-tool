@@ -235,12 +235,14 @@ describe('tests/e2e/lib/report.js — appendCase / writeReport / reportPathFor',
     // Phase 28 originally asserted length 8 (pre-WORKER_FALLBACK_FAILED).
     // Phase 30 (INJ-02) added WORKER_FALLBACK_FAILED → length 9.
     // Phase 31 (LLM-04) added LLM_HALLUCINATED_SELECTION + LLM_API_ERROR → length 11.
-    expect(ERROR_CLASSES).toHaveLength(11);
+    // Phase 65 (SCAF-02) appended FRAME_SHIFT_DETECTED at end → length 12.
+    expect(ERROR_CLASSES).toHaveLength(12);
     expect(ERROR_CLASSES).toContain('EXTENSION_NOT_LOADED');
     expect(ERROR_CLASSES).toContain('VERIFIER_DISAGREE');
     expect(ERROR_CLASSES).toContain('FLAKE');
     expect(ERROR_CLASSES).toContain('WORKER_FALLBACK_FAILED');
     expect(ERROR_CLASSES).toContain('LLM_HALLUCINATED_SELECTION');
     expect(ERROR_CLASSES).toContain('LLM_API_ERROR');
+    expect(ERROR_CLASSES).toContain('FRAME_SHIFT_DETECTED');
   });
 });

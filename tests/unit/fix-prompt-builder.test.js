@@ -105,17 +105,21 @@ describe('Phase 42 PROMPT-03: PROMPT_SCAFFOLDS registry shape', () => {
   });
 
   // Phase 42 originally asserted EXACTLY 1 key (WRONG_CITATION). Phase 45 Plan
-  // 01 extended the registry to 5 keys. The 5-key shape regression guard
-  // lives in the new `describe('Phase 45 PROMPT-03 extension: ...')` block
-  // below. We keep this case as a documentation marker that the count is now
-  // load-bearing at 5.
-  it('has EXACTLY 5 keys after Phase 45 expansion (WRONG_CITATION + 4 additions)', () => {
+  // 01 extended the registry to 5 keys. Phase 65 Plan 01 (SCAF-01..02)
+  // extends to 7 keys (adds VERIFIER_DISAGREE + FRAME_SHIFT_DETECTED). The
+  // 7-key shape regression guard lives in the new
+  // `describe('Phase 65 — VERIFIER_DISAGREE + FRAME_SHIFT_DETECTED scaffolds', ...)`
+  // block below. We keep this case as a documentation marker that the count
+  // is now load-bearing at 7.
+  it('has EXACTLY 7 keys after Phase 65 expansion (Phase 45 5 + 2 Phase 65 additions)', () => {
     const keys = Object.keys(PROMPT_SCAFFOLDS);
-    expect(keys.length).toBe(5);
+    expect(keys.length).toBe(7);
     expect(keys.sort()).toEqual([
+      'FRAME_SHIFT_DETECTED',
       'GOOGLE_DOM_DRIFT',
       'HARNESS_ERROR',
       'LLM_HALLUCINATED_SELECTION',
+      'VERIFIER_DISAGREE',
       'WORKER_FALLBACK_FAILED',
       'WRONG_CITATION',
     ]);
@@ -323,12 +327,15 @@ describe('Phase 45 PROMPT-03 extension: 4 new ERROR_CLASS scaffolds', () => {
     HARNESS_ERROR: ['tests/e2e/specs/', 'Playwright config'],
   };
 
-  it('PROMPT_SCAFFOLDS exports exactly 5 keys (WRONG_CITATION + 4 Phase 45 additions)', () => {
+  it('PROMPT_SCAFFOLDS exports exactly 7 keys (WRONG_CITATION + 4 Phase 45 + 2 Phase 65 additions)', () => {
+    // Phase 65 Plan 01 (SCAF-01..02): VERIFIER_DISAGREE + FRAME_SHIFT_DETECTED.
     const keys = Object.keys(PROMPT_SCAFFOLDS).sort();
     expect(keys).toEqual([
+      'FRAME_SHIFT_DETECTED',
       'GOOGLE_DOM_DRIFT',
       'HARNESS_ERROR',
       'LLM_HALLUCINATED_SELECTION',
+      'VERIFIER_DISAGREE',
       'WORKER_FALLBACK_FAILED',
       'WRONG_CITATION',
     ]);
@@ -574,5 +581,125 @@ describe('Phase 54 AB-02 — model field on ok:true return (routed by errorClass
     const r = buildFixPrompt({ errorClass: 'PASS', issueBody: SAMPLE_BODY });
     expect(r.ok).toBe(false);
     expect(r.escalate).toBe('close-as-pass');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 65 SCAF-01 + SCAF-02: VERIFIER_DISAGREE + FRAME_SHIFT_DETECTED
+// ---------------------------------------------------------------------------
+//
+// Phase 65 Plan 01 extends PROMPT_SCAFFOLDS from 5 → 7 keys, adding scaffolds
+// for VERIFIER_DISAGREE (already in error-codes.js ERROR_CLASSES; the missing
+// piece is the SCAFFOLD) and FRAME_SHIFT_DETECTED (a wholly new ERROR_CLASS
+// produced by .github/workflows/v40-pdfjs-frame-shift.yml on pdfjs-dist bump
+// regression). Both new contracts route through the existing shared
+// buildScaffoldSystemPrompt helper (whose body is byte-unchanged). Routing
+// defaults to claude-sonnet-4-6 via llm-router's `??` fallthrough (annotated
+// in llm-router.js by MODEL_DEFAULT_OK comments).
+//
+// The 5 pre-existing assertion batteries above (Phase 42 + Phase 45 + Phase 54)
+// continue to pin the existing 5 scaffolds + envelope + skip-class behavior
+// — Phase 65 changes are PURELY ADDITIVE on the source side.
+
+describe('Phase 65 — VERIFIER_DISAGREE + FRAME_SHIFT_DETECTED scaffolds', () => {
+  it('Test 1: PROMPT_SCAFFOLDS.VERIFIER_DISAGREE is callable; resolves to a non-empty string with the Phase 35 Verifier Disagreement template headers', () => {
+    expect(typeof PROMPT_SCAFFOLDS.VERIFIER_DISAGREE).toBe('function');
+    const out = PROMPT_SCAFFOLDS.VERIFIER_DISAGREE();
+    expect(typeof out).toBe('string');
+    expect(out.length).toBeGreaterThan(200);
+    // Phase 35 Verifier Disagreement template headers (parity with
+    // tests/e2e/lib/issue-payload-builder.js:209-214).
+    expect(out).toContain('### Verifier Disagreement');
+    expect(out).toContain('Verifier tier:');
+    expect(out).toContain('Expected citation');
+  });
+
+  it('Test 2: PROMPT_SCAFFOLDS.FRAME_SHIFT_DETECTED is callable; resolves to a non-empty string with the <frame_shift_evidence> producer envelope contract', () => {
+    expect(typeof PROMPT_SCAFFOLDS.FRAME_SHIFT_DETECTED).toBe('function');
+    const out = PROMPT_SCAFFOLDS.FRAME_SHIFT_DETECTED();
+    expect(typeof out).toBe('string');
+    expect(out.length).toBeGreaterThan(200);
+    // Producer envelope contract (matches v40-pdfjs-frame-shift.yml body).
+    expect(out).toContain('<frame_shift_evidence>');
+    expect(out).toContain('pdfjs-dist');
+  });
+
+  it('Test 3: PROMPT_SCAFFOLDS is still Object.frozen and has exactly the 7 expected keys', () => {
+    expect(Object.isFrozen(PROMPT_SCAFFOLDS)).toBe(true);
+    const keys = Object.keys(PROMPT_SCAFFOLDS).sort();
+    expect(keys).toEqual([
+      'FRAME_SHIFT_DETECTED',
+      'GOOGLE_DOM_DRIFT',
+      'HARNESS_ERROR',
+      'LLM_HALLUCINATED_SELECTION',
+      'VERIFIER_DISAGREE',
+      'WORKER_FALLBACK_FAILED',
+      'WRONG_CITATION',
+    ]);
+  });
+
+  it('Test 4: buildFixPrompt({errorClass:"VERIFIER_DISAGREE"}) returns {ok:true, systemPrompt, userPrompt, model} with the envelope-wrap contract', () => {
+    const issueBody = [
+      '### Verifier Disagreement',
+      'Expected citation: 1:5',
+      'Observed citation: 1:7',
+    ].join('\n');
+    const r = buildFixPrompt({ errorClass: 'VERIFIER_DISAGREE', issueBody });
+    expect(r.ok).toBe(true);
+    expect(typeof r.systemPrompt).toBe('string');
+    expect(r.systemPrompt.length).toBeGreaterThan(200);
+    // Envelope contract: userPrompt MUST start with `<issue_body_untrusted>\n`
+    // and end with `\n</issue_body_untrusted>` — same shape as the 5
+    // pre-existing supported classes.
+    expect(r.userPrompt.startsWith(`${ENVELOPE_OPEN}\n`)).toBe(true);
+    expect(r.userPrompt.endsWith(`\n${ENVELOPE_CLOSE}`)).toBe(true);
+    expect(r.userPrompt).toBe(`${ENVELOPE_OPEN}\n${issueBody}\n${ENVELOPE_CLOSE}`);
+    // Sonnet default fallthrough via llm-router ?? (MODEL_DEFAULT_OK).
+    expect(r.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('Test 5: buildFixPrompt({errorClass:"FRAME_SHIFT_DETECTED"}) returns {ok:true, ..., model:"claude-sonnet-4-6"}', () => {
+    const issueBody = '<frame_shift_evidence>diff body</frame_shift_evidence>';
+    const r = buildFixPrompt({ errorClass: 'FRAME_SHIFT_DETECTED', issueBody });
+    expect(r.ok).toBe(true);
+    expect(typeof r.systemPrompt).toBe('string');
+    expect(r.systemPrompt.length).toBeGreaterThan(200);
+    expect(r.userPrompt).toBe(`${ENVELOPE_OPEN}\n${issueBody}\n${ENVELOPE_CLOSE}`);
+    expect(r.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('Test 6: error-codes.js exports FRAME_SHIFT_DETECTED and appends it to the END of ERROR_CLASSES (additive-only, append-only)', async () => {
+    const errorCodes = await import('../../tests/e2e/lib/error-codes.js');
+    expect(errorCodes.FRAME_SHIFT_DETECTED).toBe('FRAME_SHIFT_DETECTED');
+    expect(errorCodes.ERROR_CLASSES.includes('FRAME_SHIFT_DETECTED')).toBe(true);
+    // Append-only contract: FRAME_SHIFT_DETECTED is the LAST entry (appended
+    // at end per CONTEXT D-02 additive-only).
+    expect(errorCodes.ERROR_CLASSES.indexOf('FRAME_SHIFT_DETECTED')).toBe(
+      errorCodes.ERROR_CLASSES.length - 1,
+    );
+    // VERIFIER_DISAGREE was already present pre-Phase 65 — verify it is
+    // still there (NOT re-added; Phase 65 only adds the SCAFFOLD for it).
+    expect(errorCodes.ERROR_CLASSES.includes('VERIFIER_DISAGREE')).toBe(true);
+  });
+
+  it('Test 7: existing Phase 45 SYSTEM-prompt substrings remain unchanged for the 5 pre-existing scaffolds (byte-stability of pre-existing entries)', () => {
+    // The 5 existing scaffolds each carry a class-specific surface fingerprint
+    // (a unique path/string) that was pinned at Phase 45 and must not drift
+    // through this Phase 65 additive expansion. The full sha256 byte-stability
+    // pin for the 5 existing scaffolds ships in Plan 02 (SCAF-04) — this test
+    // is the lighter-weight cross-check that the additive registry change
+    // did not accidentally touch the pre-existing SYSTEM strings.
+    const PHASE_45_SURFACE_FINGERPRINTS = {
+      WRONG_CITATION: 'cite-by-position',
+      LLM_HALLUCINATED_SELECTION: 'tests/e2e/lib/select-text.js',
+      WORKER_FALLBACK_FAILED: 'src/cf-worker/index.js',
+      GOOGLE_DOM_DRIFT: 'tests/e2e/lib/google-patents-page.js',
+      HARNESS_ERROR: 'tests/e2e/specs/',
+    };
+    for (const [className, fingerprint] of Object.entries(PHASE_45_SURFACE_FINGERPRINTS)) {
+      const out = PROMPT_SCAFFOLDS[className]();
+      expect(out).toContain(fingerprint);
+      expect(out).toContain(className);
+    }
   });
 });

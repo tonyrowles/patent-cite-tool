@@ -34,8 +34,12 @@ import {
 } from '../e2e/lib/error-codes.js';
 
 describe('tests/e2e/lib/error-codes.js — Phase 31 (LLM-04) taxonomy extension', () => {
-  it('Test 1: ERROR_CLASSES has length 11 (9 prior + LLM_HALLUCINATED_SELECTION + LLM_API_ERROR)', () => {
-    expect(ERROR_CLASSES).toHaveLength(11);
+  it('Test 1: ERROR_CLASSES has length 12 (Phase 31 11 + Phase 65 FRAME_SHIFT_DETECTED)', () => {
+    // Phase 31 (LLM-04) baseline was length 11. Phase 65 Plan 01 (SCAF-02)
+    // appends FRAME_SHIFT_DETECTED at the end as the 12th entry (additive,
+    // append-only — preserves pre-existing order at indices 0-10).
+    expect(ERROR_CLASSES).toHaveLength(12);
+    expect(ERROR_CLASSES[11]).toBe('FRAME_SHIFT_DETECTED');
   });
 
   it('Test 2: ERROR_CLASSES contains "LLM_HALLUCINATED_SELECTION" at index 9', () => {

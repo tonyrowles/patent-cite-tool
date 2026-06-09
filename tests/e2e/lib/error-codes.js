@@ -63,6 +63,17 @@ export const FLAKE = 'FLAKE';
 // (canary failures escalate to a Plan 30-04 investigation).
 export const WORKER_FALLBACK_FAILED = 'WORKER_FALLBACK_FAILED';
 
+// Phase 65 (SCAF-02) — v40-pdfjs-frame-shift workflow detected that a
+// pdfjs-dist bump altered verifier verdicts; the issue body contains a
+// <frame_shift_evidence> envelope. Producer:
+// .github/workflows/v40-pdfjs-frame-shift.yml emits a triage-labelled
+// GitHub issue on detection (in addition to the existing red-X exit 1
+// signal). Consumer: tests/e2e/lib/fix-prompt-builder.js
+// PROMPT_SCAFFOLDS.FRAME_SHIFT_DETECTED routes the issue body through
+// the FRAME_SHIFT_DETECTED_CONTRACT scaffold. Defaults to sonnet
+// routing via llm-router.js // MODEL_DEFAULT_OK: FRAME_SHIFT_DETECTED.
+export const FRAME_SHIFT_DETECTED = 'FRAME_SHIFT_DETECTED';
+
 // Phase 31 (LLM-04) — exploratory mode classifications.
 // LLM_HALLUCINATED_SELECTION: the LLM-chosen selectedText was not found
 //   in the patent spec (after wsNorm and tightNorm normalization). The
@@ -107,4 +118,5 @@ export const ERROR_CLASSES = Object.freeze([
   'WORKER_FALLBACK_FAILED',         // Phase 30 (INJ-02)
   'LLM_HALLUCINATED_SELECTION',     // Phase 31 (LLM-04)
   'LLM_API_ERROR',                  // Phase 31 (LLM-04)
+  'FRAME_SHIFT_DETECTED',           // Phase 65 (SCAF-02)
 ]);

@@ -61,12 +61,21 @@ import { fingerprint } from '../../../scripts/e2e-report-issue.mjs';
 // ERROR_CLASS allowlist — must match the workflow's pre-check enumeration at
 // .github/workflows/v40-auto-fix.yml:91. FLAKE / LLM_API_ERROR / PASS are
 // workflow-accepted but not for synthetic injection (per RESEARCH §477-481).
+//
+// Phase 65 Plan 01 (SCAF-01..02) v4.3 expansion: VERIFIER_DISAGREE +
+// FRAME_SHIFT_DETECTED added to support synthetic mutator parity with the
+// new PROMPT_SCAFFOLDS keys. The Set MUST stay in lockstep with the
+// workflow precheck enumeration at v40-auto-fix.yml:91 — Plan 02's drift
+// guard test asserts presence at both sites for every scaffold-supported
+// ERROR_CLASS.
 export const ERROR_CLASSES = new Set([
   'WRONG_CITATION',
   'LLM_HALLUCINATED_SELECTION',
   'WORKER_FALLBACK_FAILED',
   'GOOGLE_DOM_DRIFT',
   'HARNESS_ERROR',
+  'VERIFIER_DISAGREE',         // Phase 65 SCAF-01
+  'FRAME_SHIFT_DETECTED',      // Phase 65 SCAF-02
 ]);
 
 // Co-designed source-tag string. MUST match the literal checked in

@@ -61,6 +61,13 @@ concurrency:
 
 permissions:
   contents: read
+  # Phase 65 Plan 01 (SCAF-02): the workflow now emits a FRAME_SHIFT_DETECTED
+  # triage issue on detection (`gh issue create` requires issues: write). The
+  # red-X exit 1 gate is preserved as a secondary signal. T-65-03 (EoP)
+  # accepted: scope is issues only — neither write-access to repository
+  # contents nor PR-write scope is granted (the YAML grep contract pins
+  # both of those as absent — see tests/e2e/scripts/v40-pdfjs-frame-shift-yaml.test.js).
+  issues: write
 
 jobs:
   verifier-frozen-preflight:
@@ -147,7 +154,18 @@ jobs:
           fi
 
       - name: Compare citation outputs (frame-shift detection)
+        id: compare
         if: steps.delta.outputs.skip == '0'
+        # Phase 65 Plan 01 (SCAF-02) restructure: this step now ALWAYS exits 0
+        # so the next two steps can run conditionally on the step output. It
+        # writes a `<frame_shift_evidence>` envelope to /tmp/frame-shift-evidence.txt
+        # when diffs exist (consumed by the next step's `gh issue create`), and
+        # sets `frame_shift=1`/`frame_shift=0` for the downstream conditionals.
+        # The red-X exit 1 (Pitfall 6 defense) moves to the dedicated
+        # "Fail the check" step below so the issue-create step can run first.
+        env:
+          PREV_PDFJS: ${{ steps.delta.outputs.prev }}
+          NEW_PDFJS: ${{ steps.delta.outputs.new }}
         run: |
           node -e "
             const fs = require('node:fs');
@@ -162,12 +180,14 @@ jobs:
             }
             const oldR = loadReport('/tmp/results-old-pdfjs');
             const newR = loadReport('/tmp/results-new-pdfjs');
-            if (!oldR || !newR) {
-              console.error('FRAME-SHIFT DETECTED: cannot compare — one or both report.json artifacts missing.');
-              process.exit(1);
+            const prev = process.env.PREV_PDFJS;
+            const next = process.env.NEW_PDFJS;
+            const githubOutput = process.env.GITHUB_OUTPUT;
+            function setOutput(k, v) {
+              fs.appendFileSync(githubOutput, k + '=' + v + '\n');
             }
-            // The Phase 28 report.json shape uses a `cases` map keyed by
-            // case-id. Each case has an objectof verdict fields; we strip
+            // The Phase 28 report.json shape uses a \`cases\` map keyed by
+            // case-id. Each case has an object of verdict fields; we strip
             // cosmetic timestamps/durations before stringify-compare.
             const STRIP = new Set(['duration_ms', 'started_at', 'ended_at', 'pages_parsed']);
             function normalize(c) {
@@ -177,6 +197,31 @@ jobs:
                 out[k] = c[k];
               }
               return out;
+            }
+            // Phase 65 Plan 01 (SCAF-02) — if one or both report.json files
+            // are missing, treat as a frame-shift event with a synthesized
+            // evidence body so the auto-fix loop receives a triage signal
+            // rather than a silent CI red-X with no actionable artifact.
+            if (!oldR || !newR) {
+              const body = [
+                '<frame_shift_evidence>',
+                'pdfjs-dist PREV: ' + prev,
+                'pdfjs-dist NEW:  ' + next,
+                'Diverging cases: <missing-report>',
+                '',
+                'Per-case normalized JSON diff (oldR vs newR):',
+                '  MISSING: one or both report.json artifacts not produced by the regression suite.',
+                '  oldR present: ' + (!!oldR),
+                '  newR present: ' + (!!newR),
+                '</frame_shift_evidence>',
+                '',
+                'Auto-Fix path: this issue is wired into the v40-auto-fix workflow via the FRAME_SHIFT_DETECTED label. The auto-fix scaffold lives in tests/e2e/lib/fix-prompt-builder.js (Phase 65 SCAF-02).',
+                ''
+              ].join('\n');
+              fs.writeFileSync('/tmp/frame-shift-evidence.txt', body);
+              setOutput('frame_shift', '1');
+              console.error('FRAME-SHIFT DETECTED: cannot compare — one or both report.json artifacts missing. Evidence body written to /tmp/frame-shift-evidence.txt.');
+              process.exit(0);
             }
             const diffs = [];
             const oldCases = oldR.cases || {};
@@ -190,10 +235,63 @@ jobs:
             if (diffs.length > 0) {
               console.error('FRAME-SHIFT DETECTED on cases: ' + diffs.join(', '));
               console.error('Investigate: a pdfjs-dist bump altered verifier verdicts. This may indicate the bump is masking a real bug (Pitfall 6).');
-              process.exit(1);
+              // Build the per-case diff payload (pretty-printed JSON for each
+              // diverging case). Plan 02's scaffold contract expects this
+              // shape literally.
+              const perCaseDiff = diffs.map((k) => {
+                const oldCase = normalize(oldCases[k]);
+                const newCase = normalize(newCases[k]);
+                return '  ' + k + ':\n' +
+                  '    oldR: ' + JSON.stringify(oldCase, null, 2).split('\n').join('\n    ') + '\n' +
+                  '    newR: ' + JSON.stringify(newCase, null, 2).split('\n').join('\n    ');
+              }).join('\n');
+              const body = [
+                '<frame_shift_evidence>',
+                'pdfjs-dist PREV: ' + prev,
+                'pdfjs-dist NEW:  ' + next,
+                'Diverging cases: ' + diffs.join(', '),
+                '',
+                'Per-case normalized JSON diff (oldR vs newR):',
+                perCaseDiff,
+                '</frame_shift_evidence>',
+                '',
+                'Auto-Fix path: this issue is wired into the v40-auto-fix workflow via the FRAME_SHIFT_DETECTED label. The auto-fix scaffold lives in tests/e2e/lib/fix-prompt-builder.js (Phase 65 SCAF-02).',
+                ''
+              ].join('\n');
+              fs.writeFileSync('/tmp/frame-shift-evidence.txt', body);
+              setOutput('frame_shift', '1');
+              process.exit(0);
             }
             console.log('Frame-shift pre-flight: OK (' + allKeys.size + ' cases matched between OLD and NEW pdfjs).');
+            setOutput('frame_shift', '0');
           "
+
+      - name: Emit FRAME_SHIFT_DETECTED triage issue
+        # Phase 65 Plan 01 (SCAF-02): on frame-shift detection, file a
+        # `triage`-labeled GitHub issue with a FRAME_SHIFT_DETECTED label.
+        # The body carries the `<frame_shift_evidence>` envelope written by
+        # the previous step (PREV/NEW pdfjs versions + diverging case IDs +
+        # per-case normalized JSON diff). The v40-auto-fix workflow then
+        # picks up the FRAME_SHIFT_DETECTED label and routes through
+        # tests/e2e/lib/fix-prompt-builder.js PROMPT_SCAFFOLDS.FRAME_SHIFT_DETECTED.
+        if: steps.compare.outputs.frame_shift == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "FRAME_SHIFT_DETECTED: pdfjs-dist ${{ steps.delta.outputs.prev }} → ${{ steps.delta.outputs.new }} altered verifier verdicts" \
+            --label "triage" \
+            --label "FRAME_SHIFT_DETECTED" \
+            --label "auto-fix:enqueue" \
+            --body-file /tmp/frame-shift-evidence.txt
+
+      - name: Fail the check (red X — Pitfall 6 defense)
+        # Phase 65 Plan 01 (SCAF-02): preserves the Phase 40 red-X gate. The
+        # workflow MUST still exit non-zero on frame-shift detection so the
+        # PR check turns red and the human reviewer is alerted (in addition
+        # to the auto-fix triage issue filed by the previous step).
+        if: steps.compare.outputs.frame_shift == '1'
+        run: exit 1
 
       - name: Skip notice
         if: steps.delta.outputs.skip == '1'

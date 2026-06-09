@@ -295,6 +295,108 @@ const HARNESS_ERROR_CONTRACT = [
   'fail fast when something is genuinely wrong.',
 ].join('\n');
 
+// Phase 65 SCAF-01: VERIFIER_DISAGREE — the citation matches the golden',
+// baseline (the extension produced the expected col:line), but an independent
+// Phase 35 verifier ran the citation through pdfjs-dist + page-segmentation
+// and returned a DISAGREE verdict (the verifier thinks the citation points to
+// the wrong text). The Phase 35 issue body carries an `### Verifier Disagreement`
+// section with structured headers the LLM should inspect.
+const VERIFIER_DISAGREE_CONTRACT = [
+  'This is a VERIFIER_DISAGREE failure: the extension\'s citation matches the',
+  'golden baseline col:line, BUT an independent Phase 35 verifier (separate',
+  'pdfjs-dist load path + page-segmentation pipeline) returned a DISAGREE',
+  'verdict on the same citation. The disagreement was confirmed across the',
+  'rerun verdict (≥2-of-3 verifier reruns agreed on DISAGREE), so this is',
+  'NOT a transient flake.',
+  '',
+  'INSPECT the `### Verifier Disagreement` section of the issue body. It',
+  'carries the Phase 35 template headers verbatim:',
+  '',
+  '  ### Verifier Disagreement',
+  '  Expected citation (golden): `col:line`',
+  '  Observed citation: `col:line`',
+  '  Verifier tier: A | B | C',
+  '  Rerun verdict: CONFIRMED (k/n)',
+  '',
+  'The (Expected, Observed) pair often matches (the extension agrees with the',
+  'golden baseline) — the divergence is the VERIFIER\'s independent verdict.',
+  'The verifier tier names which verifier pipeline produced the disagreement',
+  '(tier A = strictest pdfjs+segmentation; tier B = page-text fallback; tier C',
+  '= text-only). Rerun verdict CONFIRMED (k/n) means k of n verifier reruns',
+  'agreed on DISAGREE.',
+  '',
+  'EDITABLE SURFACE: the v3.1 cite-by-position citation pipeline — production',
+  'code in src/ and content scripts.',
+  '  - src/selection.js          (selection capture)',
+  '  - src/popup.js              (citation rendering)',
+  '  - the Cloudflare Worker     (src/cf-worker/ — PDF fetch + extraction)',
+  '  - PDF extraction helpers    (column/line segmentation, gutter handling)',
+  '',
+  'APPROPRIATE FIX: the citation pipeline likely has an off-by-N column or',
+  'line bug, an OCR-drift mismatch, or a column-inference fail at a layout',
+  'edge case. Tier-A verifier disagreements usually point to a real bug in',
+  'the column-segmentation OR the line-counting logic. Read the (Expected,',
+  'Observed) coordinates plus the Verifier tier to localize the layer.',
+  '',
+  'DO NOT: widen verifier tolerance, "fix" by adjusting verifier thresholds,',
+  'swap to a less-strict verifier tier to make the disagreement vanish, or',
+  'edit the golden baseline to match the buggy output. The verifier is the',
+  'independent oracle; trust its disagreement and fix the producer (the',
+  'extension\'s citation pipeline).',
+].join('\n');
+
+// Phase 65 SCAF-02: FRAME_SHIFT_DETECTED — the
+// .github/workflows/v40-pdfjs-frame-shift.yml pre-flight workflow detected
+// that a pdfjs-dist version bump altered verifier verdicts on the regression
+// corpus. The workflow emits a triage issue with a `<frame_shift_evidence>`
+// envelope containing the PREV/NEW pdfjs versions + diverging case IDs +
+// per-case normalized JSON diff.
+const FRAME_SHIFT_DETECTED_CONTRACT = [
+  'This is a FRAME_SHIFT_DETECTED failure: the pdfjs-dist pre-flight workflow',
+  '(.github/workflows/v40-pdfjs-frame-shift.yml) detected that bumping',
+  'pdfjs-dist from version PREV to version NEW altered the verifier\'s',
+  'verdicts on one or more cases in the regression corpus. A frame shift',
+  'means the SAME PDF + the SAME citation now yields a DIFFERENT verifier',
+  'verdict purely because pdfjs-dist\'s text-layer extraction changed shape',
+  'between PREV and NEW. This typically masks a real bug in the citation',
+  'pipeline\'s pdfjs frame-mapping helpers (RESEARCH Pitfall 6).',
+  '',
+  'INSPECT the `<frame_shift_evidence>` envelope in the issue body. It carries:',
+  '',
+  '  <frame_shift_evidence>',
+  '    pdfjs-dist PREV: <semver>',
+  '    pdfjs-dist NEW:  <semver>',
+  '    Diverging cases: <case-id-1>, <case-id-2>, ...',
+  '    Per-case normalized JSON diff (oldR vs newR):',
+  '      <case-id>: { ...verdict-diff... }',
+  '  </frame_shift_evidence>',
+  '',
+  'The verdict-diff names which fields of the verifier output changed (most',
+  'commonly: matched_text, segment_start, segment_end, column_count). Read',
+  'the diff to localize WHICH frame-mapping helper drifted (column inference,',
+  'line counting, gutter detection, or page-text reconstruction).',
+  '',
+  'EDITABLE SURFACE: the pdfjs frame-mapping helpers — production code in',
+  'src/ and the verifier-side wrapper in tests/e2e/lib/.',
+  '  - tests/e2e/lib/pdf-verifier.js   (verifier-side pdfjs wrapper — frame',
+  '                                      coordinate mapping, page-text extraction)',
+  '  - src/ pdfjs consumers             (production-code consumers of pdfjs',
+  '                                      frame coordinates if any exist)',
+  '',
+  'APPROPRIATE FIX: the pdfjs-dist API contract for getTextContent /',
+  'getViewport / getOperatorList changed between PREV and NEW. Most frame',
+  'shifts are caused by changes in how pdfjs emits text-item coordinates',
+  '(transforms, fontSize handling, gutter-text detection). Update the',
+  'frame-mapping helper to handle the new pdfjs shape while preserving the',
+  'v3.1 cite-by-position citation contract.',
+  '',
+  'DO NOT: widen the verifier verdict-comparison tolerance (the comparison is',
+  'intentionally over-strict per Pitfall 6), fix by reverting the pdfjs-dist',
+  'bump (the bump may have legitimate security or perf wins), or edit',
+  '`tests/golden/baseline.json` to match the new verifier output. Treat the',
+  'pdfjs-dist bump as fixed and adapt the frame-mapping code to the new API.',
+].join('\n');
+
 // ---------------------------------------------------------------------------
 // SYSTEM-prompt constants (built once at module load via the helper)
 // ---------------------------------------------------------------------------
@@ -330,6 +432,23 @@ const HARNESS_ERROR_SYSTEM = buildScaffoldSystemPrompt({
   fixSurfaceContract: HARNESS_ERROR_CONTRACT,
 });
 
+// Phase 65 SCAF-01: VERIFIER_DISAGREE scaffold. Built once at module load via
+// buildScaffoldSystemPrompt — same shared 5-section template (trust boundary,
+// fix-surface contract, forbidden paths, diff-size cap, output format). The
+// helper body is byte-unchanged (Phase 45 invariant); only the registry grows.
+const VERIFIER_DISAGREE_SYSTEM = buildScaffoldSystemPrompt({
+  className: 'VERIFIER_DISAGREE',
+  fixSurfaceContract: VERIFIER_DISAGREE_CONTRACT,
+});
+
+// Phase 65 SCAF-02: FRAME_SHIFT_DETECTED scaffold. Producer:
+// .github/workflows/v40-pdfjs-frame-shift.yml emits a triage issue with a
+// <frame_shift_evidence> envelope on detection.
+const FRAME_SHIFT_DETECTED_SYSTEM = buildScaffoldSystemPrompt({
+  className: 'FRAME_SHIFT_DETECTED',
+  fixSurfaceContract: FRAME_SHIFT_DETECTED_CONTRACT,
+});
+
 // ---------------------------------------------------------------------------
 // PROMPT_SCAFFOLDS — frozen registry (PROMPT-03)
 // ---------------------------------------------------------------------------
@@ -354,12 +473,21 @@ const HARNESS_ERROR_SYSTEM = buildScaffoldSystemPrompt({
 // factory — preserve the literal Object.freeze spread. The lookup at
 // buildFixPrompt's line ~`PROMPT_SCAFFOLDS[errorClass]` accepts the new keys
 // without dispatcher changes (the function body is UNCHANGED).
+// Phase 65 Plan 01 (SCAF-01..02): registry extended from 5 → 7 keys. The 2
+// new thunks each resolve a module-scope SYSTEM constant produced by the same
+// shared buildScaffoldSystemPrompt helper. The 5 pre-existing entries are
+// preserved in their existing order — additive only. Object.freeze is
+// preserved on the extended literal: strict-mode mutation throws TypeError.
+// Pre-existing entry order MUST be byte-unchanged (Plan 02 byte-stability
+// sha256 pins lock the 5 existing scaffolds against drift).
 export const PROMPT_SCAFFOLDS = Object.freeze({
   WRONG_CITATION: () => WRONG_CITATION_SYSTEM,
   LLM_HALLUCINATED_SELECTION: () => LLM_HALLUCINATED_SELECTION_SYSTEM,
   WORKER_FALLBACK_FAILED: () => WORKER_FALLBACK_FAILED_SYSTEM,
   GOOGLE_DOM_DRIFT: () => GOOGLE_DOM_DRIFT_SYSTEM,
   HARNESS_ERROR: () => HARNESS_ERROR_SYSTEM,
+  VERIFIER_DISAGREE: () => VERIFIER_DISAGREE_SYSTEM,           // Phase 65 SCAF-01
+  FRAME_SHIFT_DETECTED: () => FRAME_SHIFT_DETECTED_SYSTEM,     // Phase 65 SCAF-02
 });
 
 // ---------------------------------------------------------------------------

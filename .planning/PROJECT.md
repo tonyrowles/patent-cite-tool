@@ -8,32 +8,42 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v4.2 Auto-Fix Loop Live
+## Current Milestone: v4.3 Auto-Fix Loop Closure + Capability Expansion
 
-**Goal:** Take the v4.0/v4.1 auto-fix infrastructure from "wired but unexercised" to operationally validated on origin/main with at least one real production fix shipped through the loop end-to-end.
+**Goal:** Close the v4.2 architectural carry-over (diagnostic-injection mutator + `--max-turns` relaxation + forensic-ledger hardening + synthetic-issue cleanup) to land live UAT-47-a/b/SWEEP-03/04/06 evidence on `origin/main`, then expand the auto-fix surface with A/B winner exit, additional fix scaffolds, broader heuristic-first triage, and a prompt-iteration loop.
 
 **Target features:**
-- Ledger-commit refactor — convert `v40-cost-ledger-snapshot.yml` + `v40-auto-fix.yml` from direct-push-to-main to PR-then-merge or `ledger-snapshots/*` branch redirect (unblocks UAT-47-a and UAT-47-d under Phase 50's ruleset)
-- Ledger schema extension — per-entry `errorClass` + `outcome`/`pr_merged` fields across all `appendLedgerEntry` call sites; unblocks A/B winner exit from abstention + populates real values on the Phase 55 dashboard
-- Fixture-mutator (UAT-47-b) — synthetic-regression mutator that injects a controlled defect into a golden case; serves as deterministic end-to-end proof-of-life through the rerun → triage → issue → auto-fix → verifier → merge → promote loop
-- 4-UAT re-sweep against origin — execute UAT-47-a, 47-b, 47-d, 47-e on pushed state once the ledger refactor lands
-- Trust/safety hardening — close the `auto-fix-api` ledger-leak vector that PRE-02's `invokeAnthropicSdkWithLedger` guard does not cover; fix `tests/unit/llm-ledger.test.js` Test 48 working-copy mutation
-- First real production fix shipped — leave the cron + LLM exploratory mode running on origin and capture the first real anomaly through the full loop (deterministic mutator first; real fix may carry past milestone close)
-- Carry-along cleanup — remove dead `MODEL` const in `scripts/auto-fix.mjs`; finish Phase 51.1's `tests/e2e/scripts/v40-verifier-gate-yaml.test.js` V2 update
+
+*Carry-over wave (closes v4.2 architectural deferral):*
+- Diagnostic-injection mutator — extend `tests/e2e/scripts/inject-defect.mjs` to embed seeded but realistic diagnostic content (DOM snippet for `GOOGLE_DOM_DRIFT`, Verifier Disagreement block for `WRONG_CITATION`); co-design with prompt-scaffold expectations in `tests/e2e/lib/fix-prompt-builder.js:252-268`
+- `--max-turns` relaxation — bump `tests/e2e/lib/llm-driver.js:94` from `1` → ~5, add `--allowed-tools Read,Glob,Grep` (no Edit/Bash) so Claude can read source files for real WRONG_CITATION cases without breaking the cost-discipline gate
+- Forensic-ledger schema hardening — require `source` + `transport` fields on ALL ledger entries (currently dispatcher-only); closes the auxiliary-leak path surfaced by 3 orphan `claude-opus-4-7[1m]` entries 2026-06-08
+- Synthetic-issue cleanup — close mutator-injected triage issues #20/21/22/23 once the loop validates end-to-end
+- Live UAT re-sweep — execute UAT-47-a/b/SWEEP-03/04/06 on `origin/main` with `errorClass` + `outcome` ledger entries flowing through
+
+*Capability expansion (new in v4.3):*
+- A/B winner exit — drive `scripts/a-b-winner.mjs` out of abstention mode and emit the markdown winner-decision table; threshold + decision-surface design TBD by research
+- Expanded fix scaffolds — add new `PROMPT_SCAFFOLD` entries beyond the 5 existing classes (`WRONG_CITATION`, `LLM_HALLUCINATED_SELECTION`, `WORKER_FALLBACK_FAILED`, `GOOGLE_DOM_DRIFT`, `HARNESS_ERROR`); specific new `ERROR_CLASS`es TBD by research
+- Better heuristic-first triage coverage — push classifier from 6/8 → toward 8/8 `ERROR_CLASS`es; specific rules TBD by research
+- Prompt-iter loop — closed-loop iteration where failed fix attempts feed back into scaffold rewrites; scope (full automation vs. capture-and-surface-for-human-review) TBD by research
 
 **Key context:**
-- Continues phase numbering from v4.1 (next phase = Phase 56)
-- DoD: pipeline operational + at least one production fix shipped through it (deterministic mutator + real anomaly)
-- Phase 53's trust-invariant rule remains load-bearing: `assertTripleGate` body byte-unchanged; ledger schema additions must be additive-only
-- Zero new npm dependencies target (fourth consecutive milestone if held)
+- Continues phase numbering from v4.2 (next phase = Phase 61)
+- DoD: live UAT-47-a/b/SWEEP-03/04/06 PROVEN on `origin/main` + at least one real production fix flowing through the expanded surface (A/B winner exit + at least one new scaffold)
+- Trust-invariant rule from Phase 53 remains load-bearing: `assertTripleGate` body byte-unchanged; all ledger-schema additions additive-only
+- Cost-discipline gate stays: `--max-turns 5` with `--allowed-tools Read,Glob,Grep` (no Edit/Bash) substitutes the Pitfall 1+2 budget guard removed from `--max-turns 1`
+- Sole-maintainer bypass on ruleset 17086676 stays (post-v4.2 reversal 2026-06-06); CI required-checks (`verifier-gate` + `deps-update-gate`) remain the load-bearing trust boundary
+- Specific design knobs (scaffold names, A/B threshold value, prompt-iter trigger conditions, cost cap) deferred to research wave
+- Zero new npm dependencies target (fifth consecutive milestone if held)
+- Scope note: broader than v4.2 (which shipped 5 phases in ~5 days). Research convergence will likely propose 7–9 phases. If too big, Prompt-iter loop or scaffold expansion can be deferred to v4.4 at requirements-scoping time
 
-## Last Shipped: v4.1 Readiness Gate + Push (Shipped 2026-06-04)
+## Last Shipped: v4.2 Auto-Fix Loop Live (Shipped 2026-06-09)
 
-v4.1 landed v4.0's 215 commits on origin/main and hardened the ruleset trust boundary while shipping 3 forward-looking auto-fix improvements. Ruleset 17086676 enforces both required status checks (verifier-gate + deps-update-gate pinned to GitHub Actions App 15368) with zero bypass actors; break-glass §7 runbook committed and live-tested. `assertPartialGate` + `runPartialPromote` ship as SEPARATE entry points (`assertTripleGate` body byte-unchanged; Vitest pins the trust-invariant boundary). Multi-model deterministic ERROR_CLASS routing via `llm-router.js` (frozen `MODEL_ROUTES`; `GOOGLE_DOM_DRIFT` + `LLM_HALLUCINATED_SELECTION` → opus, default sonnet); `a-b-winner.mjs` in abstention mode pending Phase 56 ledger schema. Auto-Fix Pipeline `<details>` section in weekly digest with 7 NaN-guarded observable metrics (SUMMARY_KEYS byte-unchanged). Two emergent hotfixes surfaced via live trust-boundary exercise: 51.1 fixed v40-verifier-gate.yml BASE-ref trigger + v40-deps-update.yml missing pull_request trigger (REGRESSION-51-01); 51.2 scope-gated diff-guard size cap + inverted v2 test (REGRESSION-51.2-01). 9 phases (48-55) + 2 hotfixes (51.1, 51.2), 11 plans, ~80 atomic commits in ~2 days; 4 UATs deferred to Phase 56 per documented decisions. Zero new npm dependencies (third consecutive milestone).
+v4.2 wired the auto-fix loop infrastructure live on `origin/main` so future v4.3 architectural work can validate the loop end-to-end on real triage traffic. Phase 56 extended the cost-ledger schema with `errorClass` (all 7 `auto-fix.mjs` call sites + 2 SDK-path sites) and added a `safeAppendLedger` leak guard that funnels CI/override/subscription-only writes (Phase 60.1 hotfix whitelists `transport: 'subscription'` entries to preserve the v3.1/v4.0 free-iteration flow). Phase 57 redirected `v40-cost-ledger-snapshot.yml` daily snapshots to `ledger-snapshots/daily-${SNAPSHOT_DATE}` branches and added a diff-guard scope-decision fast-path; SWEEP-02 PROVED live on origin/main (commit 0b56ab9). Phase 58 narrowed the `auto-fix-promote.mjs` IMPORTS POLICY allow-list and wired event-sourced outcome ledger entries (`source: 'auto-fix-promoted' + outcome: 'pass'` on success; `source: 'auto-fix-failed' + outcome: 'fail'` on label-flap), `assertTripleGate` sha256-equivalent to Phase 53. Phase 59 shipped the deterministic Node 22 ESM fixture-mutator CLI (`tests/e2e/scripts/inject-defect.mjs`) with `<!-- fp: <12-hex> -->` v2 markers + `&& !isFixtureMutator` suppression at `quarantine-append.mjs:239` + SWEEP-05 phase-tag plumbing. SWEEP-01 PROVED diff-guard rejection live (commit e1d9d88). Phase 60 removed the dead `MODEL` const + finished Phase 51.1's V2 YAML update. 22/25 requirements satisfied; 3/25 (SWEEP-03/04/06) deferred to v4.3 with two documented architectural root-causes — fixture-mutator scope-lock left issues without diagnostic data, and `llm-driver.js:94` `--max-turns 1` prevented Claude from reading source files for real cases. 5 phases (56-60) + 60.1 hotfix, 11 plans, 11 tasks, ~5 days; 46 files changed (+7569 / -46 LOC). Zero new npm dependencies (fourth consecutive milestone).
 
-## Previously Shipped: v4.0 Self-Healing Test Suite (Shipped 2026-06-02)
+## Previously Shipped: v4.1 Readiness Gate + Push (Shipped 2026-06-04)
 
-v4.0 closed the LLM-driven feedback loop end-to-end. Triaged GitHub issues from the v3.1 pipeline now automatically produce draft PRs (`v40-auto-fix.yml`) with LLM-proposed fixes (5 ERROR_CLASS scaffolds), the affected case is re-verified on the proposed branch (`v40-verifier-gate.yml` — 3×Tier A/B + 76-case regression + diff-guard), and on merge the quarantine entry promotes to golden (`v40-auto-promote.yml` + triple-gate `_skipCiGuard`). All human-gated invariants preserved: auto-fix PRs are draft by default, auto-promote opens a SEPARATE follow-up PR (never direct-to-main), CODEOWNERS-pinned files require code-owner review. 9 phases (39-47), 26 plans, 53 tasks shipped in ~3 days. Zero new npm dependencies (`@anthropic-ai/sdk@0.100.1` was the only addition).
+v4.1 landed v4.0's 215 commits on origin/main and hardened the ruleset trust boundary while shipping 3 forward-looking auto-fix improvements. Ruleset 17086676 enforces both required status checks (verifier-gate + deps-update-gate pinned to GitHub Actions App 15368); break-glass §7 runbook committed and live-tested. `assertPartialGate` + `runPartialPromote` ship as SEPARATE entry points (`assertTripleGate` body byte-unchanged; Vitest pins the trust-invariant boundary). Multi-model deterministic ERROR_CLASS routing via `llm-router.js` (frozen `MODEL_ROUTES`; `GOOGLE_DOM_DRIFT` + `LLM_HALLUCINATED_SELECTION` → opus, default sonnet); `a-b-winner.mjs` in abstention mode pending Phase 56 ledger schema. Auto-Fix Pipeline `<details>` section in weekly digest with 7 NaN-guarded observable metrics. Two emergent hotfixes (51.1 + 51.2). 9 phases (48-55) + 2 hotfixes, 11 plans, ~80 atomic commits in ~2 days; 4 UATs deferred to Phase 56 per documented decisions. Zero new npm dependencies (third consecutive milestone).
 
 ## Requirements
 
@@ -264,4 +274,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 — v4.2 milestone shipped (Auto-Fix Loop Live); v4.3 architectural carry-over filed for SWEEP-03/04/06*
+*Last updated: 2026-06-09 — v4.3 milestone started (Auto-Fix Loop Closure + Capability Expansion); carry-over from v4.2 architectural deferral scoped in*

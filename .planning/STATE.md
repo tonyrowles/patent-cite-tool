@@ -1,34 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.2
-milestone_name: Auto-Fix Loop Live
-status: Awaiting next milestone
-stopped_at: v4.2 roadmap created — 5 phases (56-60), 25/25 requirements mapped, ROADMAP.md + STATE.md + REQUIREMENTS.md (traceability) written
-last_updated: "2026-06-09T00:18:00.578Z"
-last_activity: 2026-06-09 — Milestone v4.2 completed and archived
+milestone: v4.3
+milestone_name: Auto-Fix Loop Closure + Capability Expansion
+status: planning
+last_updated: "2026-06-09T03:32:50.354Z"
+last_activity: 2026-06-09
 progress:
-  total_phases: 5
-  completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
-  percent: 60
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-04)
+See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
-**Current focus:** Milestone complete
+**Current focus:** v4.3 Auto-Fix Loop Closure + Capability Expansion (defining requirements)
 
 ## Current Position
 
-Phase: Milestone v4.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-09 — Milestone v4.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-09 — Milestone v4.3 started
 
 ## Performance Metrics
 

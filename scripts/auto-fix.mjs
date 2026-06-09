@@ -897,6 +897,21 @@ export async function runDispatcher({
       });
     }
 
+    // Phase 67 WR-05 (REVIEW.md) — accumulate cumulative spend IMMEDIATELY
+    // after the SDK await, BEFORE the !sdkResult.ok fast-fail branch. Pre-fix
+    // this accumulation lived AFTER the fast-fail return, so if the SDK
+    // returned ok:false with a non-zero costUsd (e.g. partial-stream charges
+    // captured on capBlocked / contract-error / sdk_error paths), the
+    // per-fingerprint budget arithmetic under-counted real spend.
+    //
+    // Nullish-coalesce so a synthetic costUsd:0 is not treated as missing.
+    // The mutation runs whether or not we then return — even on fast-fail the
+    // ledger entry for the cost-bearing SDK call has already been written by
+    // invokeAnthropicSdkWithLedger / invokeClaudePWithLedger, so this only
+    // affects the in-memory iter accumulator's view (which is the right view
+    // for future-batched fingerprints to read).
+    state.cumCost += sdkResult.costUsd ?? 0;
+
     // PITER-04 fast-fail branches — sdk_error / ciGate / capBlocked /
     // contract-error all exit WITHOUT entering the iter retry path. These
     // outcomes are not solvable by re-prompting (API outage, env gate, spend
@@ -925,11 +940,6 @@ export async function runDispatcher({
       process.stderr.write(`[auto-fix] SDK error: ${sdkResult.errorMessage ?? sdkResult.errorReason}\n`);
       return 1;
     }
-
-    // Accumulate cumulative spend BEFORE the trigger checks (so the budget
-    // check on the next iteration sees the current round's spend). Use
-    // nullish-coalesce so a synthetic costUsd:0 is not treated as missing.
-    state.cumCost += sdkResult.costUsd ?? 0;
 
     // ─── Step 11 — parseFencedDiff (iter trigger #1: malformed-diff:*) ────
     parsed = parseFencedDiff(sdkResult.llmText);

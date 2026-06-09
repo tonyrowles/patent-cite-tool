@@ -459,6 +459,104 @@ describe('Phase 67 PITER-03: iter_round field discipline', () => {
       expect(entry.iter_round).toBeUndefined();
     }
   });
+
+  // Phase 67 WR-10 (REVIEW.md) — FLAKE-path iter_round absence pin.
+  //
+  // Test G covered the PASS skip class. FLAKE routes through
+  // `dispatchFlakeState`, NOT the iter wrapper. Its ledger rows (FLAKE,
+  // FLAKE_SUPPRESSED, FLAKE_ESCALATION) MUST also lack iter_round, otherwise
+  // a future refactor adding `iter_round: 0` to dispatchFlakeState would slip
+  // past Test G. The three sibling tests below mirror G's mock pattern but
+  // override classifyRerunOutcomes to force each sub-state.
+  it('G2-FLAKE: dispatchFlakeState FLAKE ledger row does NOT carry iter_round', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+      // dispatchFlakeState in the FLAKE path calls `quarantine-append.mjs`
+      // (may throw; non-fatal) — swallow with an empty response.
+      {
+        match: (cmd, args) => cmd === 'node' && args[0] === 'scripts/quarantine-append.mjs',
+        respond: '',
+      },
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({ state: 'FLAKE', action: 're-quarantine' });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    expect(ledgerEntries.length).toBeGreaterThan(0);
+    // EVERY FLAKE-path entry must lack iter_round (it precedes the iter loop)
+    for (const entry of ledgerEntries) {
+      expect(entry.iter_round).toBeUndefined();
+    }
+    // Specifically confirm the flake-dispatched row exists and lacks the field
+    const flakeDispatched = ledgerEntries.find((e) => e.source === 'flake-dispatched');
+    expect(flakeDispatched).toBeDefined();
+    expect(flakeDispatched.iter_round).toBeUndefined();
+  });
+
+  it('G2-FLAKE_SUPPRESSED: dispatchFlakeState FLAKE_SUPPRESSED ledger row does NOT carry iter_round', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({
+      state: 'FLAKE_SUPPRESSED',
+      action: 'skip',
+      until: '2099-01-01T00:00:00Z',
+    });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    const suppressed = ledgerEntries.find((e) => e.source === 'flake-suppressed');
+    expect(suppressed).toBeDefined();
+    expect(suppressed.iter_round).toBeUndefined();
+    // Belt-and-suspenders: every entry in this path lacks iter_round
+    for (const entry of ledgerEntries) {
+      expect(entry.iter_round).toBeUndefined();
+    }
+  });
+
+  it('G2-FLAKE_ESCALATION: dispatchFlakeState FLAKE_ESCALATION ledger row does NOT carry iter_round', async () => {
+    setupExecFileSyncRouter([
+      ghIssueViewRule({ labels: ['triage', 'FLAKE'] }),
+      lsRemoteEmptyRule(),
+      // FLAKE_ESCALATION runs gh label create + gh issue create + quarantine
+      // reset before its ledger write — all are non-fatal on failure, but
+      // route the mocks so we don't accidentally consume the default 'unhandled'
+      // branch (which returns '' anyway, equivalent to success).
+      {
+        match: (cmd, args) => cmd === 'gh' && args[0] === 'label',
+        respond: '',
+      },
+      {
+        match: (cmd, args) => cmd === 'gh' && args[0] === 'issue' && args[1] === 'create',
+        respond: '',
+      },
+      {
+        match: (cmd, args) => cmd === 'node' && args[0] === 'scripts/quarantine-append.mjs',
+        respond: '',
+      },
+    ]);
+    vi.mocked(classifyRerunOutcomes).mockReturnValue({ state: 'FLAKE_ESCALATION', action: 'escalate' });
+    const exit = await runDispatcher({ issue: ISSUE, transport: 'sdk', forceApi: true });
+    expect(exit).toBe(0);
+    expect(invokeAnthropicSdkWithLedger).not.toHaveBeenCalled();
+
+    const ledgerEntries = vi.mocked(appendLedgerEntry).mock.calls.map(([, e]) => e);
+    // FLAKE_ESCALATION falls through to write the flake-dispatched row after
+    // the side-effect work; assert it lacks iter_round.
+    const flakeDispatched = ledgerEntries.find((e) => e.source === 'flake-dispatched');
+    expect(flakeDispatched).toBeDefined();
+    expect(flakeDispatched.iter_round).toBeUndefined();
+    // Belt-and-suspenders: every entry on this path lacks iter_round
+    for (const entry of ledgerEntries) {
+      expect(entry.iter_round).toBeUndefined();
+    }
+  });
 });
 
 // =======================================================================

@@ -79,7 +79,8 @@
   3. `runTriage` resolves `WORKER_FALLBACK_FAILED` heuristically by consuming a `fault_injection_status` field (producer-site co-design in `tests/e2e/specs/fault-injection.spec.js` if the field doesn't already exist)
   4. `VERIFIER_STRONG_AGREEMENT` Tier-C-masking guard preserved (Phase 34 invariant); Vitest pin `T_TIER_C_NO_MASK` asserts Tier C agreement never resolved heuristically
   5. Cluster pre-filter sample-size invariant test asserts cluster call count NOT decreased vs v4.2 baseline (10 same-category synthetic findings still produce exactly 1 clustered LLM call)
-**Plans**: TBD
+**Plans:** 1 plan
+- [ ] 64-01-PLAN.md — Heuristic-first triage extension (3 new rules + Vitest pins + fault-injection producer co-design)
 
 ### Phase 65: Expanded Fix Scaffolds
 **Goal**: Add `VERIFIER_DISAGREE` (highest leverage — already heuristically produced by Rule 2; needs only registry entry) + `FRAME_SHIFT_DETECTED` (closes pdfjs dep-update loop) PROMPT_SCAFFOLDS entries via `buildScaffoldSystemPrompt` helper, with 5-site enumeration drift guard ensuring every new ERROR_CLASS appears across all five canonical surfaces.
@@ -175,7 +176,7 @@
 |-------|----------------|--------|-----------|
 | 61. Carry-over Bundle — Diagnostic Mutator + Max-Turns + UAT Re-sweep | 0/TBD | Not started | - |
 | 62. Forensic Ledger Hardening + Bypass-Audit Probe | 0/2 | Not started | - |
-| 64. Heuristic-First Triage Extension | 0/TBD | Not started | - |
+| 64. Heuristic-First Triage Extension | 0/1 | Not started | - |
 | 65. Expanded Fix Scaffolds | 0/TBD | Not started | - |
 | 66. A/B Winner Exit + 3-way Transport Stratification | 0/TBD | Not started | - |
 | 67. Prompt-Iter Loop (Shape A — Capture-and-Surface, In-Process) | 0/TBD | Not started | - |

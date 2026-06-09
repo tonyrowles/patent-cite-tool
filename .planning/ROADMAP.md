@@ -107,7 +107,8 @@
   3. `--admin-bypass` argv filter consumes the CSV from `scripts/audit-bypass-merges.mjs` (BYPASS-01) to exclude bypass-tainted `outcome:'pass'` entries
   4. `PHASE_56_TODO` comments removed from `a-b-winner.mjs`; sanity-check pre-emit refuses to declare a winner when one arm has zero samples for a given (class, transport) cell
   5. Vitest pins `T_AB_TRANSPORT_01` (3-way stratification) AND `T_AB_SAMPLE_WINDOW_01` (--since-iso filter) AND `T_AB_THRESHOLD_02` (TIE_THRESHOLD === 0.10) all PASS
-**Plans**: TBD
+**Plans**: 1 plan
+  - [ ] 66-01-PLAN.md — 3-way (class, arm, transport) stratification + --since-iso/--admin-bypass filters + TIE_THRESHOLD 0.05→0.10 + remove PHASE_56_TODO + zero-sample sanity (ABWIN-01..04)
 
 ### Phase 67: Prompt-Iter Loop (Shape A — Capture-and-Surface, In-Process)
 **Goal**: Add in-process iteration loop wrapper to `auto-fix.mjs:runDispatcher` Step 10 that re-invokes `buildFixPrompt` with a `rewriteHint` parameter composed from the previous attempt's failure mode — preserving PROMPT_SCAFFOLDS `Object.freeze` and writing `iter_round` as an additive ledger field. Shape B (full automation) is rejected outright as Anti-Feature.

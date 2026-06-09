@@ -318,6 +318,11 @@ describe('Phase 67 PITER-03: PROMPT_ITER_COST_CAP_USD budget-cap', () => {
     // costUsd 0.25 per call × 2 calls = 0.50 cumulative.
     expect(capRow.cost_usd).toBeCloseTo(0.50, 5);
 
+    // Phase 67 WR-06 — budget-cap row carries iter_round: null (terminal
+    // abstention marker). Pre-fix this was state.round (an integer), which
+    // double-counted the terminal round in distinct-iter_round dashboards.
+    expect(capRow.iter_round).toBeNull();
+
     // SDK invocation count is bounded by the budget cap
     expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(vi.mocked(invokeAnthropicSdkWithLedger).mock.calls.length).toBeLessThanOrEqual(ITER_MAX_ROUNDS + 1);

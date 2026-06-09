@@ -277,7 +277,14 @@ function writeBudgetCapAndAbstain({ state, transport, issue, fingerprint, errorC
     errorClass,
     source: 'auto-fix-api',
     errorReason: 'prompt-iter-budget-cap',
-    iter_round: state.round,
+    // Phase 67 WR-06 (REVIEW.md) — write iter_round: null on the budget-cap
+    // row. Pre-fix the terminal abstention round wrote TWO ledger entries
+    // with the SAME iter_round value (the failure entry for the round PLUS
+    // the budget-cap entry); downstream dashboards counting distinct iter
+    // rounds risked double-counting. Setting the cap row's iter_round to
+    // null marks it as the terminal abstention (not a fresh round), so a
+    // simple distinct-iter_round count is faithful.
+    iter_round: null,
   });
   process.stdout.write(
     `[auto-fix] prompt-iter budget exhausted (round=${state.round} cumCost=${state.cumCost.toFixed(4)}); ` +

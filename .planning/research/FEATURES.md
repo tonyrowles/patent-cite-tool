@@ -1,27 +1,102 @@
-# Feature Research
+# Feature Landscape
 
-**Domain:** LLM-CI auto-fix loop — operational validation (v4.2)
-**Researched:** 2026-06-04
-**Confidence:** HIGH (primary sources: codebase + 51-UAT-EVIDENCE.md + a-b-winner.mjs + STATE.md)
+**Domain:** LLM-CI auto-fix loop — closure + capability expansion (v4.3)
+**Researched:** 2026-06-08
+**Confidence:** HIGH (primary sources: live codebase grep + v4.2 MILESTONES.md + STATE.md Pending Todos + archived v4.2 FEATURES)
 
 ---
 
 ## Scope note
 
-This document covers ONLY the v4.2 NEW capabilities. Everything already shipped
-(pipeline structure, 5 ERROR_CLASS scaffolds, MODEL_ROUTES, FLAKE classifier,
-weekly digest wiring, partial-verified semantics, trust invariants, cost controls)
-is NOT re-researched here.
+This document covers ONLY the v4.3 NEW capabilities (the 8 features enumerated in
+the milestone PROJECT.md). Everything already shipped (5 PROMPT_SCAFFOLDS,
+6-rule heuristic triage, MODEL_ROUTES frozen routing, FLAKE 5-state classifier,
+cost-ledger schema v2, `safeAppendLedger` leak guard, deterministic fixture
+mutator, `assertTripleGate` trust invariant, weekly digest with frozen
+`SUMMARY_KEYS`, A/B winner abstention probe) is NOT re-researched — those
+constraints land in PITFALLS.md as invariants.
 
-The four capability categories the roadmap needs to sequence are:
+The 8 v4.3 features in scope (from PROJECT.md "Target features" + MILESTONE
+carry-over). All are evidence-anchored to specific file:line in the live tree:
 
-1. **Operator experience — first real fix shipped**
-2. **Fixture-mutator (UAT-47-b)**
-3. **Ledger schema extension** (`errorClass` + `outcome`)
-4. **4-UAT re-sweep against origin**
+| # | Feature | Wave |
+|---|---------|------|
+| 1 | Diagnostic-injection mutator extension | Carry-over |
+| 2 | `--max-turns` relaxation (1 → 5 + `--allowed-tools Read,Glob,Grep`) | Carry-over |
+| 3 | Forensic-ledger schema hardening (`source` + `transport` required) | Carry-over |
+| 4 | Synthetic-issue cleanup (#20/21/22/23) | Carry-over |
+| 5 | A/B winner exit from abstention + markdown decision table | Capability expansion |
+| 6 | Expanded fix scaffolds (new `ERROR_CLASS` entries beyond the 5) | Capability expansion |
+| 7 | Better heuristic-first triage coverage (currently 6 fall-through classes) | Capability expansion |
+| 8 | Prompt-iter loop (closed-loop scaffold rewriting from failed attempts) | Capability expansion |
 
-Each category is analyzed as Table Stakes / Differentiators / Anti-Features below,
-with an explicit complexity note and dependency on v4.0/v4.1 assets.
+---
+
+## Canonical ERROR_CLASS evidence (from live tree)
+
+Single source of truth: `tests/e2e/lib/error-codes.js:98-110`
+(`ERROR_CLASSES = Object.freeze([...])` — 11 entries):
+
+```
+EXTENSION_NOT_LOADED, NO_CITATION_PRODUCED, WRONG_CITATION, UI_BROKEN,
+VERIFIER_DISAGREE, GOOGLE_DOM_DRIFT, USPTO_API_DRIFT, FLAKE,
+WORKER_FALLBACK_FAILED, LLM_HALLUCINATED_SELECTION, LLM_API_ERROR
+```
+
+Plus `HARNESS_ERROR` (`error-codes.js:85`, exported but **deliberately NOT** in
+the frozen array — only the LLM exploratory report tallies it; `by_error_class`
+in regression reports does not count it).
+
+`RECOGNIZED_LABELS` at `scripts/auto-fix.mjs:225` =
+`new Set([...ERROR_CLASSES, 'PASS'])` — the dispatcher accepts all 11 array
+entries + `PASS`.
+
+### How each class is handled (cross-referenced from live grep)
+
+| ERROR_CLASS | `fix-prompt-builder.js` | `triage-classifier.js` heuristic? | `llm-router.js` |
+|-------------|-------------------------|----------------------------------|-----------------|
+| `WRONG_CITATION` | SCAFFOLD (line 358) | YES — Rule 2 (CONFIRMED + Tier A/B) | sonnet (default) |
+| `LLM_HALLUCINATED_SELECTION` | SCAFFOLD (line 359) | YES — Rule 3 (NOT_REPLAYABLE) | **opus** (line 62) |
+| `WORKER_FALLBACK_FAILED` | SCAFFOLD (line 360) | NO — Rule 4 (LLM cluster/single) | sonnet (default) |
+| `GOOGLE_DOM_DRIFT` | SCAFFOLD (line 361) | NO — Rule 4 (LLM cluster/single) | **opus** (line 61) |
+| `HARNESS_ERROR` | SCAFFOLD (line 362) | YES — Rule 3 (NOT_REPLAYABLE) | sonnet (default) |
+| `VERIFIER_DISAGREE` | NONE → `unsupported-class:` (line 417) | YES — Rule 2 (CONFIRMED + Tier A/B) | sonnet (default) |
+| `FLAKE` | SKIP → `re-quarantine` (line 379) | YES — Rule 1 short-circuit | n/a (dispatcher branches to `dispatchFlakeState`) |
+| `LLM_API_ERROR` | SKIP → `retry` (line 380) | YES — Rule 3 (NOT_REPLAYABLE) | n/a (skip) |
+| `PASS` | SKIP → `close-as-pass` (line 381) | YES — Rule 3 (NOT_REPLAYABLE) | n/a (skip) |
+| `EXTENSION_NOT_LOADED` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
+| `NO_CITATION_PRODUCED` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
+| `UI_BROKEN` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
+| `USPTO_API_DRIFT` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
+
+### Heuristic coverage reality check
+
+The milestone framing "push classifier from 6/8 → toward 8/8" is anchored in
+the v3.1 RESEARCH-era 8-class taxonomy (pre-extension). Against the **current
+11-entry `ERROR_CLASSES` array** the picture is:
+
+- **Heuristic-resolved** (Rule 1/2/3): `FLAKE`, `WRONG_CITATION`,
+  `VERIFIER_DISAGREE`, `LLM_HALLUCINATED_SELECTION`, `LLM_API_ERROR`,
+  `HARNESS_ERROR`, `PASS` — 7 classes (`PASS` and `HARNESS_ERROR` are not in the
+  ERROR_CLASSES array but flow through the chain anyway)
+- **LLM Rule-4 fall-through**: `EXTENSION_NOT_LOADED`, `NO_CITATION_PRODUCED`,
+  `UI_BROKEN`, `GOOGLE_DOM_DRIFT`, `USPTO_API_DRIFT`, `WORKER_FALLBACK_FAILED`
+  — **6 classes** (not 2)
+
+The "6/8 → 8/8" terminology is internally consistent with v3.1's audit but
+misleading against the v4.x array. Feature 7 should track Rule-4 fall-through
+classes by **name**, not by ratio. See Feature 7 in Differentiators below.
+
+### Scaffold coverage reality check
+
+`PROMPT_SCAFFOLDS` (frozen registry at `fix-prompt-builder.js:357-363`) has 5
+keys. `SKIP_CLASS_ESCALATIONS` (frozen, line 378-382) has 3 keys. Every other
+`ERROR_CLASS` in the recognized set returns
+`{ok:false, escalate:'unsupported-class:<class>'}` from `buildFixPrompt`. That
+means today, an auto-fix run against an issue labeled e.g. `USPTO_API_DRIFT`
+exits at Step 7 with no SDK call attempted (line 740-744 of `auto-fix.mjs`,
+the skip-class branch writes a ledger entry with `escalate: built.escalate`
+and returns 0). For these classes the loop is intentionally a no-op.
 
 ---
 
@@ -29,199 +104,257 @@ with an explicit complexity note and dependency on v4.0/v4.1 assets.
 
 ### Table Stakes
 
-Features required for v4.2's DoD: "at least one production fix shipped through the
-loop end-to-end." Missing any of these = DoD not met.
+Features required for v4.3 DoD: "live UAT-47-a/b/SWEEP-03/04/06 PROVEN on
+`origin/main` + at least one real production fix flowing through the expanded
+surface." Missing any of these = DoD not met. All are CARRY-OVER from v4.2's
+deferred architectural deferral (per `STATE.md ## Deferred Items
+(acknowledged at v4.2 milestone close 2026-06-09)`).
 
-| Feature | Why Required | Complexity | v4.0/v4.1 Dependency |
-|---------|--------------|------------|----------------------|
-| Verifier-gate trigger fix | v40-verifier-gate.yml uses `pull_request.branches:['auto-fix/*']` which matches BASE not HEAD — gate NEVER fires on PRs into main (UAT-47-e FAIL, 51-UAT-EVIDENCE.md deviation #2). Without this fix UAT-47-a and any real auto-fix run cannot produce gate evidence. | LOW (YAML patch: replace `branches:` filter with job-level `if: startsWith(github.head_ref,'auto-fix/')`) | Depends on: Phase 50 ruleset (enforcement=active, bypass_actors=[]); must NOT widen assertTripleGate |
-| Ledger-commit refactor (both workflows) | `v40-cost-ledger-snapshot.yml` and `v40-auto-fix.yml` both push directly to `main`. Phase 50 ruleset blocks these pushes (no bypass actors). UAT-47-d is structurally blocked without this fix. Option B (push to `ledger-snapshots/*` branch, no merge to main) is the recommended path per 51-UAT-EVIDENCE.md — avoids diff-guard/locked-path entanglement and is independent of the verifier-gate trigger patch. | MEDIUM (two YAML edits + weekly-digest aggregation update to read from `ledger-snapshots/*` refs) | Depends on: Phase 50 ruleset state; additive-only constraint on SUMMARY_KEYS |
-| Ledger schema extension (`errorClass` + `outcome`) | `a-b-winner.mjs` is in abstention mode because no ledger entry carries `errorClass` or an outcome field. The weekly digest auto-fix section shows `n/a` for all 7 metrics because the ledger lacks these fields. STATE.md Pending Todos (Phase 54 closure note) specifies exact wiring: `errorClass` from auto-fix.mjs Step 7 var; `pr_merged` / `outcome` from auto-fix-promote.mjs verified-promotion event. | MEDIUM (7 appendLedgerEntry call sites in auto-fix.mjs + 2 in invokeAnthropicSdkWithLedger + 1 post-promote follow-up entry; `auto-fix-api` source entries are the known ledger-leak vector per MEMORY.md) | Depends on: additive-only ledger schema constraint (Phase 53 D-08); a-b-winner.mjs forward-compat probe handles transparently once fields present |
-| Fixture-mutator (`regression-fixture-mutator.mjs`) | UAT-47-b requires a script that injects a controlled citation-text defect into a known-good golden case, then confirms the full loop (rerun → triage → issue → auto-fix → verifier-gate → merge → promote) fires and closes. Without the mutator there is no deterministic end-to-end proof-of-life — waiting for a real anomaly is non-deterministic. | MEDIUM (new script: read golden case, apply text mutation, write back, record mutation log; must be idempotent and reversible) | Depends on: verifier-gate trigger fix (mutator-triggered PR must fire the gate) + ledger schema extension (outcome field needed to confirm promotion completes) |
-| UAT-47-a live execution (end-to-end auto-fix on issue #3) | Issue #3 (`US11427642-spec-short-1`, fingerprint `139f821b3bb1`) has `triage` label and is still OPEN as of v4.1 close. UAT-47-a exercises the label-cycle → auto-fix → verifier-gate → (manual merge) loop end-to-end. Was AUTO-DEFERRED in Phase 51 because verifier-gate trigger was broken. Re-attempt is the primary DoD evidence artifact. | MEDIUM (~$0.50–$2 API spend; ~10 min CI; label-cycle + watch + evidence capture) | Depends on: verifier-gate trigger fix; ledger-commit refactor (auto-fix.mjs ledger push must succeed) |
-| UAT-47-d live execution (ledger-snapshot workflow) | Confirms the refactored `v40-cost-ledger-snapshot.yml` pushes to `ledger-snapshots/YYYY-MM-DD` instead of `main`. Evidence: branch exists, ledger file updated, no locked-path violation. | LOW (workflow_dispatch + observe + evidence capture) | Depends on: ledger-commit refactor shipped |
-| UAT-47-e re-execution (verifier-gate diff-guard) | Confirms the trigger patch made the gate fire on `auto-fix/*` PRs into main; tests the diff-guard LOCKED-path rejection. Was FAIL in Phase 51 because the gate never fired. After the trigger fix this is a ~3-min cheap smoke test. | LOW (test PR, observe, close) | Depends on: verifier-gate trigger fix shipped |
-| UAT-47-b live execution (dep-PR synthetic regression) | Confirms the deps-update-gate fires and rejects a dep-PR that carries a synthetic regression. Requires the fixture-mutator as the regression-injection primitive. Pre-step: audit `v40-deps-update.yml` for same BASE/HEAD confusion as verifier-gate. | MEDIUM (workflow_dispatch + mutation push + observe + rollback) | Depends on: fixture-mutator + verifier-gate trigger audit of deps-update.yml |
-| Trust/safety hardening: `auto-fix-api` ledger-leak vector | `scripts/auto-fix.mjs` writes ledger entries via a path that `invokeAnthropicSdkWithLedger`'s PRE-02 guard does NOT cover (entries with `source: 'auto-fix-api'`). MEMORY.md flags this. Must be closed before any real production run, otherwise cost-cap enforcement is bypassable. | LOW (add source-check guard or route all entries through the guarded wrapper) | Depends on: ledger schema extension (additive change to existing call sites) |
-| Trust/safety hardening: Test 48 working-copy mutation | `tests/unit/llm-ledger.test.js` Test 48 mutates the working copy of the ledger file during test runs. This is a pre-existing failure noted at Phase 53 and 54 closures as non-scope. It must be fixed before any live run writes real ledger entries, otherwise a test run after a live run may corrupt ledger state. | LOW (fix test to write to a temp file, not the real ledger) | None beyond existing Vitest harness |
-| Remove dead `MODEL` const in auto-fix.mjs | Phase 54 left the module-level `MODEL` const as dead code per additive-only scope lock. Cleanup-debt carry-along. | LOW (2-line deletion) | None |
+| # | Feature | Why Required | Complexity | Notes |
+|---|---------|-------------|------------|-------|
+| 1 | **Diagnostic-injection mutator extension** — embed `GOOGLE_DOM_DRIFT` DOM snippet + `WRONG_CITATION` Verifier Disagreement block into synthetic issue bodies; co-design with `fix-prompt-builder.js:252-268` GOOGLE_DOM_DRIFT contract ("issue body should include a snippet of the new DOM"); pin via Vitest fixture (deterministic same-seed → same-snippet) | Without this, scaffolds correctly refuse to fabricate fixes (`apply-check-failed` on SWEEP-03 attempts 2026-06-07/08); end-to-end loop never produces a live fix | **MEDIUM** | Extends `inject-defect.mjs:277-298` `buildBody` to take a per-class diagnostic payload. Must keep MUTATOR-04 source-tag `fixture-mutator-uat-47b` (line 75) unchanged so `quarantine-append.mjs:239` suppression still fires. Pinned by Vitest synthetic-DOM fixture file (new). Must NOT add `node_modules` deps |
+| 2 | **`--max-turns` relaxation + `--allowed-tools`** — bump `llm-driver.js:94` from `'1'` to `'5'`; add `--allowed-tools Read,Glob,Grep` (no `Edit`/`Bash`); update both `invokeClaudeP` (subscription) AND `invokeAnthropicSdkWithLedger` SDK call (line 576-584) | `error_max_turns` blocked SWEEP-03 attempt 2026-06-08 on issue #3 (WRONG_CITATION needed source-file reads to understand real diagnostic-rich issues). Required for both transport paths to handle real issue bodies | **LOW** | Single argv array change at `llm-driver.js:91-97`. SDK path: model already gets file-read context via systemBlocks but Read-tool extension may need explicit `allowed_tools` field in SDK call (verify against `@anthropic-ai/sdk@0.100.1` API). Cost-discipline gate substitute: `--allowed-tools` whitelist (no `Edit`/`Bash`) replaces the `--max-turns 1` budget guard |
+| 3 | **Forensic-ledger schema hardening** — require `source` + `transport` on ALL ledger entries. Audit and patch every `appendLedgerEntry` call site that lacks one or both | 3 orphan `claude-opus-4-7[1m]` ledger entries surfaced 2026-06-08 with no `source`/`transport` fields; closes auxiliary-leak path that PRE-02 + safeAppendLedger don't cover (MEMORY.md `auto_fix_ledger_leak_vector`). Required for A/B winner accuracy (Feature 5) since `a-b-winner.mjs:185-188` filter drops entries lacking attribution metadata | **MEDIUM** | Two-tier defense: (a) ESLint or static-grep test enforcing every `appendLedgerEntry(...)` literal must pass `source:` + `transport:` keys; (b) **defensive runtime assertion** inside `appendLedgerEntry` body (`llm-ledger.js`) that throws on missing field. Both layers required — static check covers code paths, runtime check covers dynamic callers (e.g. `auto-fix.mjs:438`, `:535`, `:691`). DO NOT collapse to runtime-only — would break audit trail of pre-existing entries; need static migration first |
+| 4 | **Synthetic-issue cleanup** — close issues #20/21/22/23 (mutator-injected GOOGLE_DOM_DRIFT triage issues from SWEEP-03 attempts); execute the documented `gh issue close <n> --reason "not planned"` runbook from `inject-defect.mjs:emitCleanupEvidence` (line 396-428) | Live UAT-47-a/b cannot rerun against a polluted issue tracker; SWEEP-06 cleanup automation depends on these issues being closed before re-injection | **LOW** | Already-authored runbook in `.planning/phases/59-fixture-mutator-4-uat-re-sweep/56-MUTATOR-CLEANUP.md`. Can be done via `gh` script invocation or manual. Idempotent (closing an already-closed issue is harmless) |
 
 ### Differentiators
 
-Features that make the v4.2 loop trustworthy and observable beyond the bare DoD.
+Features that make v4.3 trustworthy/observable/scalable beyond the bare DoD.
+Each is independently shippable but DEPENDS on at least one Table Stake.
 
-| Feature | Value Proposition | Complexity | v4.0/v4.1 Dependency |
-|---------|-------------------|------------|----------------------|
-| A/B winner exit from abstention | Once `errorClass` + `outcome` fields populate ledger entries (≥20 per ERROR_CLASS per model arm), `a-b-winner.mjs` automatically emits the markdown winner table with no code changes. This is the forward-compat probe Phase 54 built. The roadmap phases just need to ship the ledger schema extension and run the loop enough times. | LOW (schema extension unlocks it; no new code needed) | Depends on: ledger schema extension; sufficient live runs |
-| Observability: fix-rate per ERROR_CLASS | After ledger schema lands, `cost_per_fix` in the weekly digest becomes non-`n/a`. The 7-metric SUMMARY_KEYS section populates with real values. This confirms the loop is operational to any reader of Monday digests. | LOW (automatic from schema extension + existing renderAutoFixPipelineSection) | Depends on: ledger schema extension + at least one merged auto-fix PR |
-| Observability: time-to-merge P50 | `time_to_merge_p50` metric (already wired in renderAutoFixPipelineSection, filters `mergedAt !== null` before median) becomes meaningful once real PRs merge. This is the primary "pipeline health" signal operators can watch week-over-week. | LOW (automatic from schema extension + merged PRs) | Depends on: ledger schema extension + first real merge |
-| Observability: flake-to-real-bug ratio | The FLAKE 5-state machine (classifyRerunOutcomes, ring buffer, 30-day suppression) already tracks this. Once real runs accumulate, the classification breakdown in the weekly digest shows FLAKE vs CONFIRMED ratio. No new code needed — just need live data. | LOW (no new code; live data accumulation) | Depends on: live loop running |
-| Observability: abandonment rate | Ledger entries with `source: 'auto-fix-api'` and `fix_attempts` at cap (3) without a merged outcome indicate abandoned fixes. Adding a `fix_abandoned` outcome field would surface this explicitly. This is a DIFFERENTIATOR (not table stakes) because the loop can be minimally operational without it. | MEDIUM (one extra outcome value in schema; no dashboard changes needed until A/B winner uses it) | Depends on: ledger schema extension |
-| Fixture-mutator safety: idempotent + reversible + case-scoped | A well-built mutator must be (a) deterministic given the same case-id (re-running produces the same diff), (b) reversible via `git checkout` or explicit `--restore` flag, (c) scoped to a single case so it never mutates the full baseline. The UAT-47-b runbook (51-UAT-EVIDENCE.md §UAT-47-b step 2) specifies idempotency. The key primitive is: read the case's `expectedCitation` from `tests/golden/baseline.json`, apply a repeatable text transformation (e.g., increment column number by 1), write back, log mutation summary. | MEDIUM | Depends on: golden baseline schema (already known from Phase 33 rerun-validator work) |
-| Promotion observability: `auto-fix-promoted` ledger entry | When `auto-fix-promote.mjs` successfully promotes a case from quarantine to golden, writing a follow-up ledger entry with `source: 'auto-fix-promoted'` and `outcome: 'pass'` creates an audit trail that closes the loop in the ledger. This is how the A/B winner script determines the per-model pass-rate. | LOW (2–3 lines added to auto-fix-promote.mjs post-promote event path) | Depends on: ledger schema extension; assertTripleGate byte-unchanged constraint |
+| # | Feature | Value Proposition | Complexity | Notes |
+|---|---------|------------------|------------|-------|
+| 5 | **A/B winner exit from abstention + markdown decision table** | Once Feature 3 lands forensic schema, plus 1 real merged PR per arm per class (≥20 per N_PER_ARM_REQUIRED at `a-b-winner.mjs:86`), the script auto-exits abstention via the `outcomeUnavailable` probe (`a-b-winner.mjs:259-266`) and emits the table via `formatMarkdownTable` (line 332-348). NEW work needed: (a) decision-surface — where the markdown table lands (weekly digest section vs standalone GH Discussion vs committed `.md` artifact); (b) threshold lowering — `N_PER_ARM_REQUIRED=20` is high for a sole-maintainer corpus where total fix attempts may run in single digits per month. Recommend conditional emission (table renders if ANY class has ≥N; per-class abstention rows for the rest) | **LOW** for emission wiring; **MEDIUM** if dropping the N threshold requires re-pinning Vitest tests at `tests/unit/a-b-winner.test.js` | Depends on: Feature 3 (schema hardening MUST be live so `errorClass` + outcome populated). Recommend the table land as a Phase 55-pattern section appended to the existing weekly digest (mirrors Phase 55 DASH-02 `renderAutoFixPipelineSection` pattern at `weekly-digest.mjs`). DO NOT make this a Discord/Slack push — operator-driven decision tool, not realtime alert |
+| 6 | **Expanded fix scaffolds** — add NEW `PROMPT_SCAFFOLDS` entries for currently-unsupported classes. Concrete candidates (anchored in evidence): see "Concrete scaffold candidates" section below | Today 4 in-array `ERROR_CLASS` values (`EXTENSION_NOT_LOADED`, `NO_CITATION_PRODUCED`, `UI_BROKEN`, `USPTO_API_DRIFT`) route to `unsupported-class:` and silently no-op. Auto-fix loop has zero coverage for them. Adding scaffolds + Verifier Disagreement scaffold (already heuristically triaged but lacks fix template) widens the loop's surface | **MEDIUM** per scaffold (each adds ~30-line CONTRACT string + Object.freeze registry entry + Vitest pin); **LOW** marginal once the first one shipped | Depends on: Feature 1 (diagnostic-injection mutator) for end-to-end testability of any new scaffold; Feature 2 (`--max-turns 5`) so the scaffold can actually read source files. Recommend NOT shipping all candidates in v4.3 — pick 2-3 with highest evidence and defer rest to v4.4 |
+| 7 | **Better heuristic-first triage coverage** — add Rule-1/2/3-equivalent heuristic short-circuits for the 6 LLM-routed fall-through classes (`EXTENSION_NOT_LOADED`, `NO_CITATION_PRODUCED`, `UI_BROKEN`, `GOOGLE_DOM_DRIFT`, `USPTO_API_DRIFT`, `WORKER_FALLBACK_FAILED`) | Currently each Rule-4 fall-through class triggers a cluster (N≥5) or per-finding LLM call (`triage-classifier.js:517-561`). Heuristic resolution = zero LLM cost + faster turnaround. Several of these have deterministic signals: e.g. `GOOGLE_DOM_DRIFT` ↔ pre-flight DOM probe failure result; `WORKER_FALLBACK_FAILED` ↔ verifier returned `tier='D'` AND non-2xx Worker status; `EXTENSION_NOT_LOADED` / `UI_BROKEN` ↔ harness threw before the verifier ran. Concrete rules: see "Concrete heuristic rules" section below | **MEDIUM** (one new rule + RULE_*_CLASSIFICATIONS map per class; each ~10-20 lines + Vitest pin) | Depends on: nothing (pure-function classifier). Recommend tackling 2-3 highest-signal classes in v4.3 (`GOOGLE_DOM_DRIFT`, `WORKER_FALLBACK_FAILED`, `EXTENSION_NOT_LOADED`) and deferring `UI_BROKEN` / `USPTO_API_DRIFT` to v4.4 where signal is more ambiguous |
+| 8 | **Prompt-iter loop — CAPTURE-AND-SURFACE shape** | Failed fix attempts (Step 5 `fix_attempts >= FIX_ATTEMPT_CAP=3` branch at `auto-fix.mjs:648-666`; label-flap to `auto-fix:failed`; or `apply-check-failed` events) emit a NEW ledger row with `source: 'fix-attempt-failed'` + `errorClass` + `escalate_reason` + truncated `llm_text` snippet. A weekly digest section enumerates these for human review. Operator decides whether the scaffold needs rewriting | **MEDIUM** (one new ledger source string + 1 digest section + `auto-fix.mjs` minor surface change to write the failed-attempt entry) | Depends on: Feature 3 (forensic schema for the failed-attempt ledger row to be queryable). RECOMMEND THIS SHAPE for v4.3. Full automation (variant below) is rejected — see Anti-Features |
 
 ### Anti-Features
 
 These are features the pipeline MUST NOT have. They are explicit design invariants.
 
-| Anti-Feature | Why It Seems Attractive | Why It Is Prohibited | What to Do Instead |
-|--------------|------------------------|---------------------|--------------------|
-| Auto-merge auto-fix PRs | Speeds up loop; removes human latency | Destroys the human-gated trust invariant that is the ENTIRE POINT of the pipeline for citation-accuracy code (legal filing core value). Phase 53 D-18 and the triple-gate invariant are load-bearing. Any attempt to add `--auto` to the auto-fix PR create step or to add the auto-fix bot to CODEOWNERS bypass actors violates this invariant. | Human reviews and merges the auto-fix PR. The pipeline signals readiness via the `auto-fix:verified` label; humans act on the label. |
-| Direct-to-main auto-promote | Removes the separate follow-up PR step | `v40-auto-promote.yml` MUST open a SEPARATE follow-up PR, never push directly. The `_skipCiGuard:true` triple-gate reconstruction is the only exception and is guarded by assertTripleGate throwing on any leg failure. Any shortcut here (e.g., `gh api repos/.../git/refs` direct update) bypasses CODEOWNERS and the verifier-gate. | Keep auto-promote as a separate follow-up PR. The operator merges the follow-up after reviewing the promotion diff. |
-| Widening `assertTripleGate` to accept `auto-fix:partial-verified` | Partial-verified cases are not fully validated; accepting them in the main gate would allow partially-validated fixes to promote to golden via the standard path. | Phase 53's load-bearing decision: `assertPartialGate` is a SEPARATE entry point. `assertTripleGate` body is byte-unchanged. Vitest Test 5 (auto-fix-promote-gate.test.js) pins that assertTripleGate throws on the partial-verified label. | Use `assertPartialGate` + `runPartialPromote` for partially-verified cases. Never route partial cases through assertTripleGate. |
-| Bypassing Phase 50 ruleset (bypass_actor re-add) | Simplifies the ledger-commit and test UAT workflows | Phase 50 spent an entire phase removing bypass actors. Re-adding even temporarily for automation defeats GATE-02. The break-glass §7 runbook exists for one-off human operator use only, not for CI automation. | Fix the workflows to not need main-branch pushes: Option B (ledger-snapshots/* branch) for ledger commits; PR-then-merge for anything that needs to land on main. |
-| Polling the real ledger file in Vitest tests | Allows tests to use real production data | Tests that read or write the real `tests/e2e/.llm-spend-ledger.json` create cross-contamination between test runs and live runs. Test 48 in llm-ledger.test.js already does this and is a known pre-existing failure. New tests MUST use temp files or injected-path overrides. | Use the `--ledger <path>` CLI override (already built into a-b-winner.mjs) or the injected-deps pattern (already used in weekly-digest.mjs runDigest). |
-| Extending `MODEL_ROUTES` during v4.2 | Fine-tuning routing during live loop operation looks beneficial | `MODEL_ROUTES` is frozen (Object.isFrozen). Changing routing mid-experiment invalidates the A/B comparison. The whole point of the abstention mode is to let data accumulate under a STABLE routing table before declaring a winner. | Run the loop with the current frozen routes. After A/B winner declares (≥20 entries per arm per class), THEN update MODEL_ROUTES in a separate deliberate change. |
-| Adding new npm dependencies | Extending capabilities during the operational validation milestone | This would be the fourth consecutive zero-new-npm-deps milestone if held. Supply-chain risk and dependency maintenance cost grow with each addition. | Use Node 22 built-ins. All current v4.2 features (YAML edits, JSON schema extension, shell script) can be built without new packages. |
-| Running the fixture-mutator without a `--dry-run` guard | Faster to omit the guard | If the mutator writes without first verifying the case exists in baseline.json, a typo in the case-id creates a silent no-op that looks like a pass but proves nothing. Worse, if the script has a bug in the restore path, it permanently corrupts a golden case. | Require the mutator to validate the case-id exists in baseline.json before mutating, and require `git status --short` to confirm only the expected file is dirty after the mutation. Explicit `--restore` flag to revert. |
+| Anti-Feature | Why It Seems Attractive | Why Prohibited | What to Do Instead |
+|--------------|------------------------|---------------|--------------------|
+| **Prompt-iter loop — FULL AUTOMATION shape** (failure → LLM analyzes scaffold → LLM rewrites scaffold → auto-commits scaffold change → retries) | Closes the loop; removes human latency entirely | (a) `fix-prompt-builder.js` is FORBIDDEN_PATH-adjacent (`tests/e2e/lib/` is excluded from diff-guard but `fix-prompt-builder.js` is the production scaffold registry — meta-loop attacking it = uncontrolled trust boundary expansion). (b) The 5 scaffolds are LOAD-BEARING (`fix-prompt-builder.js:117-178` `buildScaffoldSystemPrompt` helper guarantees byte-stable forbidden-paths enumeration); a wayward LLM rewrite could drift the path list and let downstream auto-fixes touch FORBIDDEN_PATHS. (c) Defeats Phase 53 `assertTripleGate` byte-unchanged invariant by indirection. (d) No clear cost-cap on the meta-loop — could runaway-spend chasing a bad scaffold | **Capture-and-surface** (Feature 8 above). Operator reads weekly digest, manually authors scaffold revision PRs |
+| **Auto-merging A/B winner-decision-driven `MODEL_ROUTES` edits** | Once the table declares a winner, route the routing-table to use it automatically | `MODEL_ROUTES` is `Object.freeze`'d at `llm-router.js:60-63` and the freeze is LOAD-BEARING for the A/B comparison invariant (`llm-router.js:30-37`). Mutating mid-experiment invalidates the ledger entries before/after the edit. Even if the table declares a winner, the routing edit must be a human-reviewed PR | Emit the table only; human authors the `MODEL_ROUTES` PR after reading it |
+| **Bumping `--max-turns` to unbounded** (e.g., `--max-turns 50`) | Maximum freedom for the model to explore the codebase | (a) Cost-discipline: each turn is an SDK round-trip. (b) The `--max-turns 5` figure from STATE.md Pending Todos was researched and locked. (c) Empirically Claude resolves most fix tasks in 2-4 turns; 5 gives 1-2 turns of headroom. (d) Unbounded turns + Read tool can fan out into reading the entire `src/` tree, blowing the prompt-token budget | Keep `--max-turns 5`. If a class genuinely needs more, raise it per-class via the dispatcher, not globally |
+| **Allowing `--allowed-tools Edit,Bash`** | Faster — the model could apply the fix in-process | (a) Defeats the entire dispatcher architecture (parse-fenced-diff at `auto-fix.mjs:279-298` exists for a reason: humans audit a diff, not a multi-step tool trace). (b) `Bash` tool inside the SDK call could run arbitrary commands against the CI runner's filesystem, bypassing the FORBIDDEN_PATHS diff-guard regex bank. (c) `Edit` tool could mutate the working copy without leaving a unified-diff audit trail | Whitelist ONLY `Read,Glob,Grep`. The model proposes a diff via the existing fence-bracketed output format (`fix-prompt-builder.js:167-176`); the dispatcher applies it via `git apply --check` |
+| **Adding a 6th scaffold for a class that the heuristic triage cannot route** | Coverage at any cost | A scaffold without a path through triage is dead code — the dispatcher never invokes it. E.g., adding a `TIER_C_DISAGREEMENT` scaffold without a corresponding ERROR_CLASS string in `error-codes.js` and a triage rule that emits it means `buildFixPrompt({errorClass:'TIER_C_DISAGREEMENT'})` returns `{ok:false, escalate:'unsupported-class:TIER_C_DISAGREEMENT'}`. Useless | Verify the candidate ERROR_CLASS already exists in `ERROR_CLASSES` (lines 98-110) OR can be added with a co-designed triage rule (e.g. Rule 2/3 extension) and a producer site in regression spec / verifier output. Co-design in same commit per Phase 56 LEDGER-01 pattern |
+| **A/B winner table on the auto-fix PR body** (instead of weekly digest) | Decision context next to the PR | (a) PR body has size limits + already crowded with affected-cases HTML comment. (b) The table is decision-surface for *future* MODEL_ROUTES edits, not for the current PR. (c) Same misclassification as `cost_per_fix` would be if it were per-PR (the metric only makes sense aggregated) | Land in the weekly digest as a Phase-55-pattern `<details>` section, OR in a standalone committed `docs/a-b-winner-latest.md` artifact |
+| **Backfilling old ledger entries with synthetic `source`/`transport` defaults** (e.g., scripted patch to retroactively tag the 3 orphan `claude-opus-4-7[1m]` entries) | Cleaner audit trail | Falsifies the forensic record — those 3 entries genuinely lack provenance metadata. Inserting fake `source: 'unknown-pre-v4.3'` tags makes future grep audits unreliable | Leave them as-is. The Feature 3 schema hardening should be **forward-only**: enforce on new writes; allow but flag the 3 known orphans in a documented allowlist (Vitest pin) |
+| **Treating GOOGLE_DOM_DRIFT as a routinely heuristic-resolvable class** | The DOM snippet pattern in mutator synthetics suggests it's recognizable | The diagnostic data shape is what makes Rule-4 LLM-routing the right call: the snippet itself needs LLM reasoning to map "old selector → new selector". A naive heuristic could fire on any "no patent body found" string and mis-route a genuinely-LLM-needing case to a no-op | If shipping Feature 7 for `GOOGLE_DOM_DRIFT`, the heuristic should be **selector-extraction-only** (recognize that the issue body has a `data-testid=` snippet pre-injected by Feature 1's mutator extension); fall through to LLM for any non-mutator GOOGLE_DOM_DRIFT |
+
+---
+
+## Concrete scaffold candidates (for Feature 6)
+
+The milestone PROJECT.md lists 10 candidate names. Each is graded against three
+criteria from grep evidence:
+
+1. **Triage-emittable?** Is there an existing producer site in the regression
+   suite or verifier that emits this ERROR_CLASS? (Grep for the string literal.)
+2. **In `ERROR_CLASSES`?** Adding new entries requires extending the frozen
+   array — that's a co-design across `error-codes.js`, `report.js`,
+   `auto-fix.mjs`'s `RECOGNIZED_LABELS`, and at least one Vitest pin.
+3. **Fix-surface plausibility?** Is there a coherent fix surface (production
+   src/ files + tests/) for the LLM to actually edit?
+
+| Candidate | Triage-emittable? | In ERROR_CLASSES? | Fix-surface? | Recommendation |
+|-----------|-------------------|-------------------|--------------|----------------|
+| `TIER_C_DISAGREEMENT` | NO — no producer site found. Tier C is a verifier status (`triage-classifier.js:43-44` `VERIFIER_STRONG_AGREEMENT` returns false), not an emitted class | NO | Marginal — the fix would be in the verifier independence layer; complex | **DEFER** — needs taxonomy extension first; not v4.3 scope |
+| `PDF_PARSE_ERROR` | NO direct producer in grep; closest is `error_max_turns` (unrelated) and `pdf-verifier.js` exceptions | NO | YES — fix surface in `src/offscreen/position-map-builder.js` / `src/shared/matching.js` | **DEFER** — needs ERROR_CLASS taxonomy extension; high value but big surface |
+| `WORKER_TIMEOUT` | PARTIAL — `WORKER_FALLBACK_FAILED` covers this today (`error-codes.js:64`); a sub-class would split the existing bucket | NO (would be sub-class of WORKER_FALLBACK_FAILED) | YES — `src/cf-worker/index.js` retry policy | **DEFER** — over-specification; existing WORKER_FALLBACK_FAILED scaffold already covers the fix surface |
+| `IDB_FAILURE` | NO producer in grep; IndexedDB has detect-once degradation (`idbAvailable` flag) but no error-class emission | NO | YES — `src/shared/idb-helper.js` (if exists) or wherever IDB calls live | **DEFER** — needs new producer site + taxonomy extension |
+| `CACHE_MISS_TIMEOUT` | NO producer; closest is the Worker 3s cache timeout handling | NO | YES — Worker cache path | **REJECT** — current behavior (silent fallthrough) is intentional per Key Decisions; no scaffold needed |
+| `COLUMN_INFERENCE_FAIL` | NO producer for this specific error; column-inference is in `position-map-builder.js` | NO | YES — narrow fix surface in column-inference logic | **DEFER** — needs producer; v4.4 candidate when accuracy regression evidence accumulates |
+| `OCR_TIER0B_REGRESSION` | NO producer; Tier 0b is `normalizeOcr` preprocessing (`src/shared/matching.js`) | NO | YES | **REJECT** — this would be a `WRONG_CITATION` sub-case with specific root-cause; existing WRONG_CITATION scaffold already addresses |
+| `GUTTER_TIER5_REGRESSION` | NO producer | NO | YES | **REJECT** — same as OCR_TIER0B; subsumed by WRONG_CITATION |
+| `FRAME_SHIFT_DETECTED` | YES — `v40-pdfjs-frame-shift.yml` workflow exits with sentinel `FRAME-SHIFT DETECTED` on citation divergence between old/new pdfjs (Phase 47 work, referenced in MILESTONES) | NO | YES — fix surface is the pdfjs pin in `package.json` `verifierDeps.pdfjs-dist` | **PRIMARY CANDIDATE** — has producer, has fix surface (pin bump or rollback), aligns with v4.0 DEPS-04 architecture |
+| `AB_WINNER_FLIP` | NO producer (would need to be detected from successive A/B winner emissions); chicken-and-egg with Feature 5 | NO | Marginal — fix surface is `MODEL_ROUTES` which is frozen | **REJECT** — meta-feature; A/B winner emission is itself the signal; no auto-fix needed |
+| `VERIFIER_DISAGREE` *(already in ERROR_CLASSES)* | YES — heuristically triaged today via Rule 2 | YES (in array) | YES — verifier or matching tier logic | **PRIMARY CANDIDATE** — most leveraged add: existing producer, existing triage row, just no fix scaffold. Fix surface: `tests/e2e/lib/pdf-verifier.js` (tier classification thresholds) + `src/shared/matching.js` (when matching tier disagrees with verifier) |
+| `WORKER_FALLBACK_FAILED` *(already has scaffold)* | YES today | YES | YES today | **already scaffolded** — not a candidate, listed for completeness |
+
+### Recommended v4.3 scaffold additions (concrete)
+
+**Ship 2 scaffolds in v4.3** (paired with Feature 7 heuristic rules):
+
+1. **`VERIFIER_DISAGREE`** — already in `ERROR_CLASSES` array; already produced
+   by Rule 2 of the heuristic triage; needs only a new entry in
+   `PROMPT_SCAFFOLDS` registry at `fix-prompt-builder.js:357-363` + a CONTRACT
+   string mirroring the existing 5. Fix surface: `tests/e2e/lib/pdf-verifier.js`
+   (tier classification + window matching). Co-design with `llm-router.js`
+   decision: stays on sonnet default (no opus needed; the fix surface is
+   well-bounded).
+
+2. **`FRAME_SHIFT_DETECTED`** — needs a NEW `ERROR_CLASS` entry in
+   `error-codes.js:98-110` (after `LLM_API_ERROR`), a producer in
+   `v40-pdfjs-frame-shift.yml` workflow (file the GH issue with
+   `FRAME_SHIFT_DETECTED` label when the sentinel fires), and a scaffold whose
+   CONTRACT names the fix surface (`package.json` `verifierDeps.pdfjs-dist`
+   pin + the `v40-pdfjs-frame-shift.yml` workflow assertion). This is the
+   HIGHEST-leverage add: closes the loop on the dep-update flow.
+
+**Defer** the other candidates to v4.4 — they need producer sites OR taxonomy
+extension that exceed v4.3 budget.
+
+---
+
+## Concrete heuristic rules (for Feature 7)
+
+For each LLM-routed fall-through class, the rule's signal source must be
+already-present in `inputLlmReport.iterations[*]` or `inputRerunReport.replays[*]`
+(no new harness data collection). Grep evidence:
+
+| Class | Signal source | Heuristic | Complexity |
+|-------|---------------|-----------|------------|
+| `GOOGLE_DOM_DRIFT` | `iter.classification === 'GOOGLE_DOM_DRIFT'` AND issue body contains a `data-testid=` substring (Feature 1's mutator pre-injects this) | If diagnostic snippet present AND NOT_REPLAYABLE → emit heuristic finding with severity `medium`, rationale "DOM probe failed; diagnostic snippet pre-injected". If snippet absent → fall through to existing Rule 4 (LLM-needed) | **LOW** (one more `if` branch in `triage-classifier.js` after Rule 3) |
+| `WORKER_FALLBACK_FAILED` | `iter.classification === 'WORKER_FALLBACK_FAILED'` AND `iter.verifier_verdict.tier_used === 'D'` (verifier could not match) AND `iter.fault_injection_status` ∈ {`worker_404`, `worker_5xx`, `worker_html_response`} | If CONFIRMED + above signals → emit heuristic finding with severity `high`, rationale "Worker fallback path broke deterministically (status: X)". If only some signals match → Rule 4 fallthrough | **MEDIUM** (requires producer site at `tests/e2e/specs/fault-injection.spec.js` to write `fault_injection_status` into the iteration record — additive but co-design) |
+| `EXTENSION_NOT_LOADED` | `iter.classification === 'EXTENSION_NOT_LOADED'` (harness threw before verifier ran) | Always heuristic — this class is binary (loaded or not); LLM cannot help with extension-load failures. Severity `low` (almost always a fixture/CI runner issue, not a product bug), rationale "Extension failed to attach; check CI fixture" | **LOW** (one `if` branch; no signal extraction needed) |
+| `UI_BROKEN` | `iter.classification === 'UI_BROKEN'` (Shadow DOM closed-mode not accessible OR pill never attached) | Two sub-signals: shadow-DOM-blocked vs pill-attach-timeout. Heuristic: severity `medium`, rationale "Shadow DOM probe failed — selector update likely needed". Subsumed under GOOGLE_DOM_DRIFT heuristic if the page-level DOM probe ALSO failed | **MEDIUM** — needs disambiguation logic; can co-route with GOOGLE_DOM_DRIFT |
+| `USPTO_API_DRIFT` | `iter.classification === 'USPTO_API_DRIFT'` AND iter has a `worker_response_shape` mismatch flag | Heuristic feasible only if Worker spec writes the shape-mismatch flag. Without that producer, fall-through is correct | **MEDIUM** — depends on Worker spec extension; **DEFER** to v4.4 |
+| `NO_CITATION_PRODUCED` | `iter.classification === 'NO_CITATION_PRODUCED'` (extension ran but produced no citation) | Tier-D verifier verdict + production no-citation = symptom of matching-tier exhaustion. Recommend Rule 4 fallthrough (LLM cluster) — heuristic risks false-positive route to "do nothing" | **REJECT** — Rule 4 LLM-routing is correct; heuristic would hide real product bugs |
+
+### Recommended v4.3 heuristic additions (concrete)
+
+**Ship 3 heuristic rules in v4.3** (covers 3 of 6 fall-through classes):
+
+1. **`GOOGLE_DOM_DRIFT` mutator-aware** (LOW complexity) — depends on Feature 1
+2. **`EXTENSION_NOT_LOADED`** (LOW complexity, no deps)
+3. **`WORKER_FALLBACK_FAILED`** (MEDIUM complexity, needs co-design with
+   fault-injection spec producer)
+
+**Defer** `UI_BROKEN`, `USPTO_API_DRIFT`, `NO_CITATION_PRODUCED` to v4.4 (signal
+ambiguity or absent producer sites).
+
+**Result**: 7-of-11 heuristic-resolved → 10-of-11 heuristic-resolved
+(`NO_CITATION_PRODUCED` deliberately remains LLM-routed by Anti-Feature
+decision above).
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Verifier-gate trigger fix]
-    └──required-by──> [UAT-47-e re-execution]    (gate must fire for UAT to pass)
-    └──required-by──> [UAT-47-a live execution]   (gate run is success evidence)
-    └──required-by──> [UAT-47-b execution]        (deps-update-gate likely same bug)
+Feature 1 (diagnostic-injection mutator)
+  ├─ blocks Feature 6.GOOGLE_DOM_DRIFT testability (mutator-injected DOM snippet)
+  ├─ blocks Feature 7.GOOGLE_DOM_DRIFT heuristic (mutator-aware signal)
+  └─ co-designed with fix-prompt-builder.js:252-268 GOOGLE_DOM_DRIFT contract
 
-[Ledger-commit refactor]
-    └──required-by──> [UAT-47-d live execution]   (workflow must not push to main)
-    └──required-by──> [UAT-47-a live execution]   (auto-fix.mjs ledger push must not fail ruleset)
+Feature 2 (--max-turns 5 + --allowed-tools Read,Glob,Grep)
+  ├─ blocks Feature 6.WRONG_CITATION live testability (already-shipped scaffold)
+  ├─ blocks Feature 6.VERIFIER_DISAGREE testability (new scaffold)
+  └─ blocks ANY scaffold attempt against real production issues
+     (without it, dispatcher hits error_max_turns)
 
-[Ledger schema extension (errorClass + outcome)]
-    └──required-by──> [A/B winner exit from abstention]   (filterAttributableEntries drops entries without errorClass)
-    └──required-by──> [Promotion observability entry]     (outcome field must exist to write pass/fail)
-    └──required-by──> [Meaningful weekly digest metrics]  (cost_per_fix, time_to_merge_p50, fix_rate)
-    └──enabled-by──>  [auto-fix-api ledger-leak fix]      (same call sites, fix together)
+Feature 3 (forensic schema source + transport required)
+  ├─ blocks Feature 5 (a-b-winner.mjs:185-188 isAttributable filter)
+  ├─ blocks Feature 8 (capture-and-surface needs ledger entries with source)
+  └─ closes the 3-orphan claude-opus-4-7[1m] leak path
 
-[Fixture-mutator]
-    └──required-by──> [UAT-47-b execution]
-    └──enhanced-by──> [Verifier-gate trigger fix]  (mutator injects regression; gate must fire on dep-PR branch)
+Feature 4 (synthetic-issue cleanup #20/21/22/23)
+  └─ blocks UAT-47-a/b re-execution (cannot rerun against polluted tracker)
 
-[Trust/safety hardening (both items)]
-    └──prerequisite-for──> [Any live loop run]    (corrupted ledger or bypassed cost cap invalidates all evidence)
+Feature 5 (A/B winner table emission)
+  ├─ depends on Feature 3 (schema)
+  └─ depends on ≥1 real merged auto-fix PR per arm per class
+     (which depends on Features 1+2+4)
 
-[Test 48 fix]
-    └──prerequisite-for──> [Any live loop run]    (working-copy mutation during test would corrupt live ledger)
+Feature 6 (new scaffolds)
+  ├─ depends on Feature 1 + Feature 2 for testability
+  ├─ co-design with error-codes.js ERROR_CLASSES array (if new class added)
+  └─ co-design with Feature 7 (need matching producer for triage routing)
+
+Feature 7 (new heuristic rules)
+  ├─ Rule for GOOGLE_DOM_DRIFT depends on Feature 1 (mutator-injected snippet signal)
+  ├─ Rule for WORKER_FALLBACK_FAILED depends on fault-injection spec producer update
+  └─ Rule for EXTENSION_NOT_LOADED — no deps
+
+Feature 8 (prompt-iter loop — capture-and-surface shape)
+  ├─ depends on Feature 3 (schema for failed-attempt ledger row)
+  └─ co-shipped with weekly-digest.mjs section addition
 ```
 
-### Dependency Notes
+### Topological sequencing recommendation
 
-- **Verifier-gate trigger fix blocks three UATs:** UAT-47-e, UAT-47-a, UAT-47-b all depend on the gate firing. This is the single most critical unblock. It is a YAML-only change (job-level `if:` instead of `on:`-level `branches:` filter), no logic changes required.
+Wave 0 (Carry-over closure, must all land before Wave 1):
+- Feature 1 (mutator extension)
+- Feature 2 (`--max-turns 5`)
+- Feature 3 (forensic schema)
+- Feature 4 (synthetic-issue cleanup)
 
-- **Ledger-commit refactor is independent of verifier-gate trigger fix:** Option B (push to `ledger-snapshots/*`, no merge to main) ships independently without waiting for the trigger patch. This is the recommended ordering: ship Option B first, then the trigger patch, then run UATs in sequence.
+Wave 1 (Capability expansion, parallelizable post-Wave-0):
+- Feature 5 (A/B winner table emission) — independent post-Wave-0
+- Feature 7.{EXTENSION_NOT_LOADED} — fully independent
+- Feature 7.{GOOGLE_DOM_DRIFT} — depends on Feature 1
+- Feature 8 (prompt-iter capture-and-surface) — depends on Feature 3
 
-- **Ledger schema extension has a safe-by-construction constraint:** All additions must be additive-only (Phase 53 D-08 / load-bearing from assertTripleGate byte-unchanged invariant). Adding `errorClass` + `outcome` to appendLedgerEntry call sites is purely additive. The `auto-fix-api` ledger-leak vector (MEMORY.md) must be fixed as part of this work because the same call sites are being touched.
-
-- **Fixture-mutator design constraints (from mutation testing literature and UAT-47-b runbook):** The three non-negotiable primitives are: (1) case-scoped read from `tests/golden/baseline.json`, (2) deterministic transformation given case-id (e.g., citation column +1 or substring replacement of first 20 chars of selectedText), (3) explicit restore path (`git checkout -- tests/golden/baseline.json` or `--restore` flag). The mutator MUST log what it changed to stdout so the UAT evidence file can include the exact mutation applied.
-
-- **UAT sequencing (inherited from 51-CONTEXT.md D-13 pattern):** UAT-47-e first (cheap, ~3 min, $0), UAT-47-a second (~$0.50–$2, ~10 min). If 47-e fails again after the trigger patch, halt and diagnose before spending on 47-a. UAT-47-b and UAT-47-d can run in parallel or after 47-a — they are cheaper and do not require API spend.
-
----
-
-## MVP Definition
-
-### Phase 56 must ship (v4.2 DoD)
-
-These are the features the downstream requirement-definer must scope as REQUIRED for v4.2 closure.
-
-- [ ] **Verifier-gate trigger fix** — YAML patch, unblocks all three UATs, no logic changes, ~15 min implementation
-- [ ] **Ledger-commit refactor (Option B)** — modifies `v40-cost-ledger-snapshot.yml` and `v40-auto-fix.yml` to push to `ledger-snapshots/*` branch; unblocks UAT-47-d and fixes the auto-fix ledger-push structural block
-- [ ] **Ledger schema extension** — adds `errorClass` + `outcome`/`pr_merged` to all 9+ appendLedgerEntry call sites; simultaneously fixes the `auto-fix-api` ledger-leak vector (MEMORY.md); unblocks A/B winner from abstention
-- [ ] **Fixture-mutator script** — new `tests/e2e/uat-helpers/regression-fixture-mutator.mjs` (prefer .mjs for consistency with existing scripts); case-scoped, idempotent, reversible, logs mutation to stdout; enables UAT-47-b
-- [ ] **Trust hardening: Test 48 fix** — fix Vitest test to not mutate working-copy ledger; prerequisite for safe live runs
-- [ ] **Trust hardening: `auto-fix-api` ledger-leak** — close the PRE-02 guard gap (fold into ledger schema extension phase since same call sites)
-- [ ] **4-UAT re-sweep** — execute UAT-47-e, UAT-47-a, UAT-47-b, UAT-47-d against origin; produce `56-UAT-EVIDENCE.md`; DoD requires at least UAT-47-a PASS as first real production fix
-- [ ] **Cleanup: dead `MODEL` const removal** — 2-line deletion in auto-fix.mjs; carry-along from Phase 54
-- [ ] **v40-verifier-gate-yaml.test.js V2 update** — finish Phase 51.1's unfinished test update (pre-existing failure noted at Phase 53 + 54 closures)
-
-### After UAT-47-a passes (auto-populate from live data)
-
-These become meaningful automatically once the schema extension lands and UAT-47-a succeeds.
-
-- [ ] **A/B winner activation** — no code change; requires ≥20 live entries per ERROR_CLASS per model arm; track as a metric milestone, not a code deliverable
-- [ ] **Weekly digest metrics populated** — `cost_per_fix`, `time_to_merge_p50`, `fix_rate`, `abandonment_rate` all show real values after first merged auto-fix PR; this is the "pipeline operational" signal for future operators
-
-### Defer to v4.3+
-
-- [ ] **`fix_abandoned` outcome field** — useful for observability but not needed for DoD; add when abandonment rate becomes a meaningful operational concern
-- [ ] **A/B winner routing table update** — only after abstention ends and the data actually points to a winner; not a v4.2 task
-- [ ] **Fork-based UAT environment** — the operator deferred this in Phase 51 (D-01 accepted canonical-repo risk); revisit if UAT-47-a causes issues on canonical
+Wave 2 (Scaffold expansion + remaining triage rules, sequential after Wave 1
+evidence accumulates):
+- Feature 6.{VERIFIER_DISAGREE} — low risk, just registry add
+- Feature 6.{FRAME_SHIFT_DETECTED} — needs taxonomy extension + producer
+- Feature 7.{WORKER_FALLBACK_FAILED} — needs fault-injection spec co-design
 
 ---
 
-## Feature Prioritization Matrix
+## MVP Recommendation for v4.3
 
-| Feature | Operator Value | Implementation Cost | Priority |
-|---------|----------------|---------------------|----------|
-| Verifier-gate trigger fix | HIGH (unblocks 3 UATs) | LOW (YAML edit only) | P1 |
-| Ledger schema extension + leak fix | HIGH (unblocks A/B winner + dashboard) | MEDIUM (9+ call sites, additive) | P1 |
-| Test 48 fix | HIGH (safety prerequisite for live runs) | LOW (test isolation) | P1 |
-| Ledger-commit refactor (Option B) | HIGH (unblocks UAT-47-d + auto-fix ledger push) | MEDIUM (2 YAML files + digest aggregation) | P1 |
-| Fixture-mutator | HIGH (enables UAT-47-b, deterministic DoD) | MEDIUM (new script with safety guards) | P1 |
-| 4-UAT re-sweep (including UAT-47-a) | HIGH (DoD evidence) | MEDIUM (operator time + API spend) | P1 |
-| Dead MODEL const removal | LOW (cleanup) | LOW (2 lines) | P2 |
-| verifier-gate-yaml test V2 update | LOW (pre-existing failure, non-blocking) | LOW (test update) | P2 |
-| Promotion observability entry | MEDIUM (closes ledger audit trail) | LOW (2–3 lines in promote path) | P2 |
-| A/B winner routing update | LOW (data not available yet) | LOW (when data arrives) | P3 |
-| `fix_abandoned` outcome field | LOW (monitoring enhancement) | LOW | P3 |
+**Mandatory (Wave 0 — all 4):**
+1. Diagnostic-injection mutator extension
+2. `--max-turns 5` + `--allowed-tools Read,Glob,Grep`
+3. Forensic-ledger schema hardening
+4. Synthetic-issue cleanup
 
----
+**High-value (Wave 1 — pick 2-3):**
+5. A/B winner table emission to weekly digest
+6. Feature 7 heuristic rules: `EXTENSION_NOT_LOADED` + `GOOGLE_DOM_DRIFT`
+   (mutator-aware)
+7. Feature 8 prompt-iter capture-and-surface
 
-## What "Operational" Means for Each UAT
+**Stretch (Wave 2 — defer if Wave 0+1 consumes the phase budget):**
+8. Feature 6 scaffold: `VERIFIER_DISAGREE`
+9. Feature 6 scaffold: `FRAME_SHIFT_DETECTED`
+10. Feature 7 heuristic rule: `WORKER_FALLBACK_FAILED`
 
-These are not CI tests — they are live operational tests against origin. The distinction matters for evidence shape.
+**Defer to v4.4:**
+- Feature 6 scaffolds for PDF_PARSE_ERROR / COLUMN_INFERENCE_FAIL / IDB_FAILURE
+  (need new producer sites)
+- Feature 7 heuristic for UI_BROKEN / USPTO_API_DRIFT (signal ambiguity)
+- Full-automation prompt-iter loop (rejected outright as Anti-Feature)
 
-| UAT | Operational Signal | Evidence Shape | Confirms |
-|-----|--------------------|----------------|---------|
-| UAT-47-e | `diff-guard` check appears on PR and shows FAILURE; `human-review-required` label applied | `gh pr checks`, `gh pr view --json labels,comments` captured to JSON files | Verifier-gate trigger patch worked; diff-guard fires on `auto-fix/*` PRs into main |
-| UAT-47-a | Draft PR opens on `auto-fix/3-139f821b`; verifier-gate run exists (3× affected case + 76-case regression + diff-guard); ledger entry written with `errorClass` + (after merge) `outcome` | `gh pr list`, `gh pr view --json body`, `gh run list --workflow=v40-verifier-gate.yml`, ledger JSON diff | Full loop fires end-to-end; ledger schema extension is wired; first real production fix candidate |
-| UAT-47-b | `deps-update-gate` check shows FAILURE after regression push onto dep-PR branch | `gh pr checks --json bucket,name,state` showing `deps-update-gate` with `bucket: fail` | Deps-update workflow trigger not affected by same BASE/HEAD bug; fixture-mutator produces a regression the gate catches |
-| UAT-47-d | `ledger-snapshots/YYYY-MM-DD` branch exists on origin; branch contains updated `.llm-spend-ledger.json`; NO new commit on `main` | `git ls-remote origin 'ledger-snapshots/*'`, `git show refs/remotes/origin/ledger-snapshots/...` | Ledger-commit refactor is live and working; daily snapshot workflow no longer blocked by ruleset |
-
-The difference between these and CI tests: CI tests run on every push and can be faked with synthetic fixtures. These UATs exercise LIVE GitHub API interactions, real workflow triggers, real ledger file mutations, and real API spend. Evidence is captured as JSON files and committed, not asserted by Vitest.
-
----
-
-## Phase Sequencing Recommendations
-
-The roadmap author should sequence phases as follows, based on the dependency graph above:
-
-**Wave 0 (unblocking infrastructure — must ship before any UAT):**
-- Verifier-gate trigger fix (YAML patch)
-- Ledger-commit refactor (Option B)
-- Ledger schema extension + `auto-fix-api` leak fix + Test 48 fix (these touch the same call sites; ship together)
-- Cleanup: dead MODEL const + verifier-gate-yaml V2 test update (carry-alongs, bundle into Wave 0)
-
-**Wave 1 (fixture-mutator — enables UAT-47-b):**
-- `regression-fixture-mutator.mjs` authoring + tests
-
-**Wave 2 (UAT re-sweep — against origin, requires Wave 0 shipped):**
-- UAT-47-e first (cheap smoke test of trigger fix, ~3 min)
-- UAT-47-d (ledger-snapshot confirm, ~5 min)
-- UAT-47-a (full end-to-end, ~$0.50–$2 + 10 min; DoD evidence)
-- UAT-47-b (dep-PR synthetic regression; requires fixture-mutator from Wave 1)
-
-These can compress to 2 phases (infrastructure + UAT sweep) or expand to 4 if the changes need granular separation. The constraint is Wave 0 must be pushed to origin before Wave 2 can execute.
+Per PROJECT.md: "Research convergence will likely propose 7–9 phases. If too
+big, Prompt-iter loop or scaffold expansion can be deferred to v4.4 at
+requirements-scoping time." This MVP shape lands 7 features in v4.3 (Wave 0 +
+Wave 1) and explicitly carries 3 to v4.4 (Wave 2) — leaving roadmap a clean
+"ship or defer" decision per feature.
 
 ---
 
 ## Sources
 
-- `/home/fatduck/patent-cite-tool/.planning/milestones/v4.1-phases/51-live-readiness-uats/51-UAT-EVIDENCE.md` — UAT outcomes, deviation #2 (trigger bug), sharper runbooks for Phase 56
-- `/home/fatduck/patent-cite-tool/.planning/milestones/v4.1-phases/51-live-readiness-uats/51-CONTEXT.md` — sequencing decisions (D-13), deferral reasoning
-- `/home/fatduck/patent-cite-tool/.planning/milestones/v4.0-phases/47-v4-0-cleanup/47-UAT-DEFERRED.md` — original runbook stubs
-- `/home/fatduck/patent-cite-tool/.planning/STATE.md` — Phase 54 closure note (exact wiring spec for ledger schema), Phase 55 closure (dashboard metrics), Pending Todos
-- `/home/fatduck/patent-cite-tool/.planning/PROJECT.md` — Key Decisions table, trust invariants
-- `/home/fatduck/patent-cite-tool/scripts/a-b-winner.mjs` — abstention mode design, PHASE_56_TODO annotations, forward-compat outcome probe
-- `/home/fatduck/patent-cite-tool/scripts/weekly-digest.mjs` — existing metrics, SUMMARY_KEYS contract, injected-deps hook pattern
-- `/home/fatduck/patent-cite-tool/tests/e2e/lib/triage-classifier.js` — FLAKE 5-state machine, classifyRerunOutcomes, ring buffer semantics
-- MEMORY.md — `auto-fix-api` ledger-leak vector documentation
-- Stryker Mutator (https://stryker-mutator.io/docs/) — mutation operator determinism principles
-- GoldenTransformer fault injection framework (https://arxiv.org/html/2509.10790v1) — reversible fault injection via reversion method
-- Braintrust LLM monitoring (https://www.braintrust.dev/articles/what-is-llm-monitoring) — cost attribution, quality metrics in CI/CD
+Primary (HIGH confidence — live tree grep):
+- `tests/e2e/lib/error-codes.js:51-110` — canonical `ERROR_CLASSES` taxonomy
+- `tests/e2e/lib/fix-prompt-builder.js:357-363, 378-382, 406-434` — 5
+  PROMPT_SCAFFOLDS + 3 SKIP_CLASS_ESCALATIONS + `buildFixPrompt` dispatch
+- `tests/e2e/lib/triage-classifier.js:428-505` — D-03 rule chain (Rules 1-4)
+- `tests/e2e/lib/llm-router.js:60-85` — MODEL_ROUTES freeze + routeModel
+- `tests/e2e/lib/llm-driver.js:89-146` — `invokeClaudeP` argv (line 94
+  `--max-turns 1`); `:506-647` `invokeAnthropicSdkWithLedger` SDK path
+- `tests/e2e/scripts/inject-defect.mjs:64-75, 277-298, 396-428` — mutator
+  ERROR_CLASSES allowlist + buildBody + cleanup runbook emitter
+- `scripts/auto-fix.mjs:219-270, 600-746` — RECOGNIZED_LABELS, errorClass
+  extraction, Step 7 dispatch + skip-class ledger entry
+- `scripts/a-b-winner.mjs:78-285, 332-389` — N_PER_ARM_REQUIRED, abstention
+  probe, formatMarkdownTable, main flow
 
----
-*Feature research for: v4.2 Auto-Fix Loop Live*
-*Researched: 2026-06-04*
+Secondary (HIGH confidence — planning artifacts):
+- `.planning/STATE.md` lines 81-85 — v4.3 carry-over Pending Todos with
+  exact line refs
+- `.planning/MILESTONES.md` line 26 — Architectural finding (SWEEP-03
+  attempts root-cause)
+- `.planning/PROJECT.md` lines 11-38 — milestone scope + DoD
+- `.planning/research-v4.2-archive/FEATURES.md` — v4.2 feature framing
+  (consulted for style, not duplicated)
+
+Tertiary (MEDIUM confidence — operator memory):
+- MEMORY.md `auto_fix_ledger_leak_vector.md` — orphan ledger entry leak
+  vector context for Feature 3

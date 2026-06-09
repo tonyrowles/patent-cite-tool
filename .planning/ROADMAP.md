@@ -121,7 +121,8 @@
   3. Iteration triggers ONLY on `apply-check-failed` and `malformed-diff:*` outcomes — NEVER on `sdk_error` (fast-fail to preserve cost-discipline); test fixture pins fast-fail on `sdk_error`
   4. FORBIDDEN_PATHS regex bank in `scripts/check-diff-guard.mjs` extended to include `tests/e2e/lib/fix-prompt-builder.js` AND `tests/e2e/lib/llm-router.js` (defense-in-depth: even if prompt-iter ever ships Shape B in v4.4+, the auto-fix PR cannot edit scaffold source) — NON-NEGOTIABLE
   5. Per-fingerprint cumulative spend stays within `PROMPT_ITER_COST_CAP_USD = 0.50`; Vitest pin `T_PROMPT_ITER_BUDGET_01` asserts that after 2 iter-rewrites per fingerprint, next call returns abstention
-**Plans**: TBD
+**Plans:** 1 plan
+- [ ] 67-01-PLAN.md — Atomic single-plan delivery of all 5 PITER-* requirements (buildFixPrompt rewriteHint + runDispatcher iter wrapper + iter_round ledger field + trigger gating + FORBIDDEN_PATHS extension; single commit per D-09 atomicity)
 
 ### Phase 68: Synthetic-Issue Cleanup + Final UAT Tally
 **Goal**: Close mutator-injected GitHub issues #20/21/22/23 + clean up associated auto-fix PRs + revert quarantine entries via `scripts/uat-cleanup.mjs` (triple-tagged filter + dry-run default + `--confirm` opt-in + precondition sentinel) and verify total v4.3 spend within $15 soft cap.
@@ -182,7 +183,7 @@
 | 64. Heuristic-First Triage Extension | 0/1 | Not started | - |
 | 65. Expanded Fix Scaffolds | 0/TBD | Not started | - |
 | 66. A/B Winner Exit + 3-way Transport Stratification | 0/TBD | Not started | - |
-| 67. Prompt-Iter Loop (Shape A — Capture-and-Surface, In-Process) | 0/TBD | Not started | - |
+| 67. Prompt-Iter Loop (Shape A — Capture-and-Surface, In-Process) | 0/1 | Not started | - |
 | 68. Synthetic-Issue Cleanup + Final UAT Tally | 0/TBD | Not started | - |
 
 ---

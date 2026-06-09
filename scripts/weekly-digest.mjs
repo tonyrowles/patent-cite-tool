@@ -484,10 +484,18 @@ export async function runDigest(opts = {}) {
   const autoFixLedger = fs.existsSync(ledgerPath)
     ? readLedger(ledgerPath)
     : { months: {} };
+  // Phase 62 BYPASS-02 — read the most recent bypass-audit CSV (produced by the
+  // workflow step that runs scripts/audit-bypass-merges.mjs BEFORE this digest
+  // generator) and surface the count in the Auto-Fix Pipeline section.
+  // Errors-returned-not-thrown: missing dir / parse failure → 0.
+  const bypassCountForSection = loadLatestBypassCount(
+    path.join(PROJECT_ROOT, 'reports/bypass-audits'),
+  );
   const autoFixSection = renderAutoFixPipelineSection({
     ledger: autoFixLedger,
     ghPrs: ghPrsResult.prs,
     now: nowDate,
+    bypass_count: bypassCountForSection,
   });
   const finalMd = md + '\n\n' + autoFixSection;
 
@@ -553,14 +561,19 @@ function _median(nums) {
 /**
  * Render the Auto-Fix Pipeline `<details>` section.
  *
+ * Phase 62 BYPASS-02: accepts an additive `bypass_count` field. Always renders
+ * a `Bypasses: N (last 7 days)` line — even when N=0 ("absence of bypasses is
+ * itself signal that the discipline held this week" — RESEARCH Open Question 3).
+ *
  * @param {{
  *   ledger: object,
  *   ghPrs: Array<object>,
  *   now: Date,
+ *   bypass_count?: number,
  * }} opts
  * @returns {string} markdown string opening with `<details>...` and closing `</details>`
  */
-export function renderAutoFixPipelineSection({ ledger, ghPrs, now }) {
+export function renderAutoFixPipelineSection({ ledger, ghPrs, now, bypass_count }) {
   const prs = Array.isArray(ghPrs) ? ghPrs : [];
   const nowDate = now instanceof Date ? now : new Date(now);
   const month = nowDate.toISOString().slice(0, 7);
@@ -685,9 +698,47 @@ export function renderAutoFixPipelineSection({ ledger, ghPrs, now }) {
   lines.push(`| fix_attempts_p50 | ${fixAttemptsP50} |`);
   lines.push(`| flake_escalation_count | ${flakeEscalationCount} |`);
   lines.push('');
+  // Phase 62 BYPASS-02 — additive metric at position 8 of the LOCKED order. The
+  // count is the number of `bypass_detected=true` rows in the latest
+  // reports/bypass-audits/<date>.csv produced by scripts/audit-bypass-merges.mjs.
+  // Always render (even when 0) — absence-of-bypasses is itself signal.
+  const bypassN = Number.isFinite(bypass_count) ? bypass_count : 0;
+  lines.push(`Bypasses: ${bypassN} (last 7 days)`);
+  lines.push('');
   lines.push('</details>');
 
   return lines.join('\n');
+}
+
+/**
+ * Phase 62 BYPASS-02 helper — count bypass_detected=true rows in the most-recent
+ * `<reportsDir>/<YYYY-MM-DD>.csv` file. Errors-returned-not-thrown (Phase 55
+ * D-15 contract): returns 0 on missing dir, missing file, or parse failure.
+ *
+ * @param {string} [reportsDir]
+ * @returns {number}
+ */
+export function loadLatestBypassCount(reportsDir = 'reports/bypass-audits') {
+  try {
+    const entries = fs
+      .readdirSync(reportsDir)
+      .filter((f) => /^\d{4}-\d{2}-\d{2}\.csv$/.test(f))
+      .sort();
+    if (entries.length === 0) return 0;
+    const latest = entries[entries.length - 1];
+    const csv = fs.readFileSync(path.join(reportsDir, latest), 'utf8');
+    const rows = csv.split('\n').slice(1); // skip header
+    let n = 0;
+    for (const row of rows) {
+      if (!row) continue;
+      // CSV header: pr_number,merged_at,verifier_gate_completed_at,bypass_detected,ledger_source_tag
+      const cols = row.split(',');
+      if (cols.length >= 4 && cols[3] === 'true') n += 1;
+    }
+    return n;
+  } catch {
+    return 0;
+  }
 }
 
 /**

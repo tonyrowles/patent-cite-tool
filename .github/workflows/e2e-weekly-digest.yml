@@ -74,6 +74,23 @@ jobs:
             --description "Weekly analytics digest" \
             --force 2>/dev/null || true
 
+      - name: Audit bypass merges (Phase 62 BYPASS-02)
+        # Phase 62 BYPASS-02: probe sole-maintainer `--admin` bypasses on
+        # auto-fix/* PRs. The script queries `gh api .../actions/runs --paginate`
+        # for verifier-gate runs completed AFTER the PR merged, emits CSV
+        # consumed by the digest's renderAutoFixPipelineSection (bypass_count
+        # metric, position 8). RESEARCH Pitfall 62-E: invoke as `node scripts/...`
+        # directly — inline-scripting the audit logic via a node-interpreter
+        # heredoc would lose the GH_TOKEN env binding.
+        run: |
+          mkdir -p reports/bypass-audits
+          node scripts/audit-bypass-merges.mjs \
+            --since-iso "$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" \
+            --output csv \
+            > reports/bypass-audits/$(date -u +%Y-%m-%d).csv
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate weekly digest
         # D-06: DIGEST_PUBLISH_MODE=issue forces the active e2e-digest issue path.
         # The script (weekly-digest.mjs) reads DIGEST_PUBLISH_MODE from env, inherited

@@ -25,11 +25,15 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   renderAutoFixPipelineSection,
   fetchAutoFixPrs,
   runDigest,
 } from '../../scripts/weekly-digest.mjs';
+
+const __dirname_test = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname_test, '../..');
 
 // -------- helpers (synthetic fixtures inline; no I/O against committed ledger) --------
 
@@ -85,7 +89,7 @@ describe('Phase 55 DASH-01..03 — Auto-Fix Pipeline section', () => {
   // Test 3 (D-19.3) — all 7 metric key strings present (LOCKED order)
   // ----------------------------------------------------------------------------
 
-  it('Test 3 (D-19.3): contains all 7 metric key strings in LOCKED order', () => {
+  it('Test 3 (D-19.3): contains all 8 metric key strings in LOCKED order (Phase 62 BYPASS-02: +bypass_count at end)', () => {
     const md = renderAutoFixPipelineSection({
       ledger: makeLedger('2026-06', 0),
       ghPrs: [],
@@ -99,6 +103,8 @@ describe('Phase 55 DASH-01..03 — Auto-Fix Pipeline section', () => {
       'time_to_merge_p50',
       'fix_attempts_p50',
       'flake_escalation_count',
+      // Phase 62 BYPASS-02 — additive at position 8; renders as `Bypasses: N (last 7 days)`.
+      'Bypasses:',
     ];
     for (const k of lockedKeys) {
       expect(md).toContain(k);
@@ -272,5 +278,54 @@ describe('Phase 55 DASH-01..03 — Auto-Fix Pipeline section', () => {
 
     // cleanup
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+});
+
+// ===========================================================================
+// Phase 62 BYPASS-02 — bypass_count render tests
+// Phase 62 BYPASS-03 — STATE.md ## Bypass Conventions verify-only smoke
+// ===========================================================================
+
+describe('Phase 62 BYPASS-02 — renderAutoFixPipelineSection bypass_count', () => {
+  it('T_BYPASS_RENDER_LINE_PRESENT: emits "Bypasses: N (last 7 days)" line with caller-provided count', () => {
+    const md = renderAutoFixPipelineSection({
+      ledger: makeLedger('2026-06', 0),
+      ghPrs: [],
+      now: NOW,
+      bypass_count: 2,
+    });
+    expect(md).toContain('Bypasses: 2 (last 7 days)');
+  });
+
+  it('T_BYPASS_RENDER_LINE_ZERO_STATE: always renders even when bypass_count = 0 (absence is signal)', () => {
+    const md = renderAutoFixPipelineSection({
+      ledger: makeLedger('2026-06', 0),
+      ghPrs: [],
+      now: NOW,
+      bypass_count: 0,
+    });
+    expect(md).toContain('Bypasses: 0 (last 7 days)');
+  });
+
+  it('T_BYPASS_RENDER_LINE_DEFAULT_ZERO: defaults to 0 when bypass_count is omitted', () => {
+    const md = renderAutoFixPipelineSection({
+      ledger: makeLedger('2026-06', 0),
+      ghPrs: [],
+      now: NOW,
+    });
+    expect(md).toContain('Bypasses: 0 (last 7 days)');
+  });
+});
+
+describe('Phase 62 BYPASS-03 — STATE.md ## Bypass Conventions runbook present', () => {
+  it('T_BYPASS_STATE_MD_RUNBOOK_PRESENT: heading + canonical "DO NOT" runbook literal present', () => {
+    const stateMd = fs.readFileSync(path.join(REPO_ROOT, '.planning/STATE.md'), 'utf8');
+    expect(stateMd).toMatch(/^## Bypass Conventions$/m);
+    // Canonical runbook discipline literal — Pitfall 11 mitigation. The string
+    // uses backticks around the command + branch glob, which we match as a
+    // substring (no regex special handling needed).
+    expect(stateMd).toContain('DO NOT');
+    expect(stateMd).toContain('gh pr merge --admin');
+    expect(stateMd).toContain('auto-fix/');
   });
 });

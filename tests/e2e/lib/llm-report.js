@@ -128,6 +128,7 @@ export const SUMMARY_KEYS = Object.freeze([
   'llm_api_error',
   'harness_error',
   'total_cost_usd',
+  'bypass_count', // BYPASS-02 (Phase 62) — additive-only; Object.freeze preserved
 ]);
 
 function emptySummary() {

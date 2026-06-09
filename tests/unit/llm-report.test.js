@@ -129,6 +129,7 @@ describe('tests/e2e/lib/llm-report.js — initLlmReport', () => {
       llm_api_error: 0,
       harness_error: 0,
       total_cost_usd: 0,
+      bypass_count: 0, // Phase 62 BYPASS-02 — additive
     });
     expect(r.iterations).toEqual([]);
   });
@@ -400,13 +401,21 @@ describe('tests/unit/fixtures/sample-llm-report.json — fixture consistency', (
 // ---------------------------------------------------------------------------
 
 describe('SUMMARY_KEYS export (Phase 37 D-01)', () => {
-  it('Test A: SUMMARY_KEYS is exported, frozen, and has exactly 7 keys', () => {
+  it('Test A: SUMMARY_KEYS is exported, frozen, and has exactly 8 keys (Phase 62 BYPASS-02 grew 7 → 8)', () => {
     expect(SUMMARY_KEYS).toBeDefined();
     expect(Object.isFrozen(SUMMARY_KEYS)).toBe(true);
-    expect(SUMMARY_KEYS.length).toBe(7);
+    expect(SUMMARY_KEYS.length).toBe(8);
+    // T_BYPASS_SUMMARY_KEYS_FROZEN + T_BYPASS_SUMMARY_KEYS_CONTAINS — additive-only:
+    // the new key is present AND a representative pre-existing key still is too.
+    // (Plan/RESEARCH references 'e2e_nightly' as the sentinel — that name appears
+    // in the RESEARCH interfaces.md snippet but NOT in the actual SUMMARY_KEYS at
+    // HEAD; the real first key is 'passed' per llm-report.js:124. Substitute the
+    // real one to keep the additive-only intent meaningful — deviation Rule 1.)
+    expect(SUMMARY_KEYS).toContain('bypass_count');
+    expect(SUMMARY_KEYS).toContain('passed');
   });
 
-  it('Test B: SUMMARY_KEYS exact order matches canonical contract (passed → total_cost_usd)', () => {
+  it('Test B: SUMMARY_KEYS exact order matches canonical contract (passed → bypass_count; additive at end)', () => {
     expect(SUMMARY_KEYS).toEqual([
       'passed',
       'wrong_citation',
@@ -415,6 +424,7 @@ describe('SUMMARY_KEYS export (Phase 37 D-01)', () => {
       'llm_api_error',
       'harness_error',
       'total_cost_usd',
+      'bypass_count', // Phase 62 BYPASS-02 — additive at end; no reorder
     ]);
   });
 

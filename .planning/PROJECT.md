@@ -8,34 +8,49 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v4.3 Auto-Fix Loop Closure + Capability Expansion
+## Current Milestone: v5.0 Bug Report Feature
 
-**Goal:** Close the v4.2 architectural carry-over (diagnostic-injection mutator + `--max-turns` relaxation + forensic-ledger hardening + synthetic-issue cleanup) to land live UAT-47-a/b/SWEEP-03/04/06 evidence on `origin/main`, then expand the auto-fix surface with A/B winner exit, additional fix scaffolds, broader heuristic-first triage, and a prompt-iteration loop.
+**Goal:** Give extension users a low-friction in-product affordance to report citation failures (inaccurate / no-match / non-functioning), routing rich auto-captured diagnostic bundles to a private Cloudflare-backed observability pipeline (KV durable + Discord notify) for maintainer triage — establishing the inbound signal channel that v5.1's resumed auto-fix work will eventually ingest.
 
 **Target features:**
 
-*Carry-over wave (closes v4.2 architectural deferral):*
-- Diagnostic-injection mutator — extend `tests/e2e/scripts/inject-defect.mjs` to embed seeded but realistic diagnostic content (DOM snippet for `GOOGLE_DOM_DRIFT`, Verifier Disagreement block for `WRONG_CITATION`); co-design with prompt-scaffold expectations in `tests/e2e/lib/fix-prompt-builder.js:252-268`
-- `--max-turns` relaxation — bump `tests/e2e/lib/llm-driver.js:94` from `1` → ~5, add `--allowed-tools Read,Glob,Grep` (no Edit/Bash) so Claude can read source files for real WRONG_CITATION cases without breaking the cost-discipline gate
-- Forensic-ledger schema hardening — require `source` + `transport` fields on ALL ledger entries (currently dispatcher-only); closes the auxiliary-leak path surfaced by 3 orphan `claude-opus-4-7[1m]` entries 2026-06-08
-- Synthetic-issue cleanup — close mutator-injected triage issues #20/21/22/23 once the loop validates end-to-end
-- Live UAT re-sweep — execute UAT-47-a/b/SWEEP-03/04/06 on `origin/main` with `errorClass` + `outcome` ledger entries flowing through
+*User-facing capture surface:*
+- In-citation Report button — unobtrusive affordance in the existing citation result UI (Shadow DOM); auto-surfaces on No-match/failure, Yellow confidence (Tier 5 fallback / 0.85 cap), and Worker-fallback errors
+- Toolbar popup + options page fallback — secondary surfaces for "tool didn't load at all" cases where the citation UI never appears
+- Debug Mode — options-page toggle; when ON, Report button is always available regardless of citation outcome (placeholder for future observability surfaces — metrics, last-N-reports view, possibly access-limited)
+- One-tap category picker — 4 categories (Inaccurate citation / No match found / Tool not working / Other) + optional free-text note
+- Inline privacy disclosure — one-line "what's included" with expandable full-payload preview before submit
 
-*Capability expansion (new in v4.3):*
-- A/B winner exit — drive `scripts/a-b-winner.mjs` out of abstention mode and emit the markdown winner-decision table; threshold + decision-surface design TBD by research
-- Expanded fix scaffolds — add new `PROMPT_SCAFFOLD` entries beyond the 5 existing classes (`WRONG_CITATION`, `LLM_HALLUCINATED_SELECTION`, `WORKER_FALLBACK_FAILED`, `GOOGLE_DOM_DRIFT`, `HARNESS_ERROR`); specific new `ERROR_CLASS`es TBD by research
-- Better heuristic-first triage coverage — push classifier from 6/8 → toward 8/8 `ERROR_CLASS`es; specific rules TBD by research
-- Prompt-iter loop — closed-loop iteration where failed fix attempts feed back into scaffold rewrites; scope (full automation vs. capture-and-surface-for-human-review) TBD by research
+*Auto-captured diagnostic payload:*
+- Core context — patent #, Google Patents URL, user's selected text, returned citation (or no-match flag), confidence tier (green/yellow/red), extension version, browser+OS
+- DOM/PDF diagnostics — selected-node xpath, viewport/scroll position, PDF parse status (reuses v3.1 `llm-report.json` schema where applicable)
+- Settings snapshot — trigger mode, citation format, prefix on/off
+- Recent error log ring buffer — last N console errors / extension-internal warnings
+
+*Transport & observability:*
+- Cloudflare Worker submission endpoint — new route on existing Worker (same provider as USPTO proxy + KV cache)
+- KV durable storage — every report persisted, queryable, dedup-able; survives Discord channel changes
+- Discord webhook notification — real-time observation channel; webhook URL stays server-side (Worker env binding), NEVER embedded in extension code
+
+*Guardrails:*
+- Client-side rate limit — ~5 reports / 10 min per install, persisted in extension storage; defends against accidental rage-click loops
+- Server-side fingerprint dedup — Worker computes fingerprint (patent # + category + selection hash) and dedups within an N-minute window in KV
+- Local queue + retry on Worker failure — report sits in extension storage and retries on next extension load (matches existing graceful-degradation pattern from `idbAvailable` flag)
+- No CAPTCHA for v1 — layer in only if abuse shows up
 
 **Key context:**
-- Continues phase numbering from v4.2 (next phase = Phase 61)
-- DoD: live UAT-47-a/b/SWEEP-03/04/06 PROVEN on `origin/main` + at least one real production fix flowing through the expanded surface (A/B winner exit + at least one new scaffold)
-- Trust-invariant rule from Phase 53 remains load-bearing: `assertTripleGate` body byte-unchanged; all ledger-schema additions additive-only
-- Cost-discipline gate stays: `--max-turns 5` with `--allowed-tools Read,Glob,Grep` (no Edit/Bash) substitutes the Pitfall 1+2 budget guard removed from `--max-turns 1`
-- Sole-maintainer bypass on ruleset 17086676 stays (post-v4.2 reversal 2026-06-06); CI required-checks (`verifier-gate` + `deps-update-gate`) remain the load-bearing trust boundary
-- Specific design knobs (scaffold names, A/B threshold value, prompt-iter trigger conditions, cost cap) deferred to research wave
-- Zero new npm dependencies target (fifth consecutive milestone if held)
-- Scope note: broader than v4.2 (which shipped 5 phases in ~5 days). Research convergence will likely propose 7–9 phases. If too big, Prompt-iter loop or scaffold expansion can be deferred to v4.4 at requirements-scoping time
+- Phase numbering RESET — `--reset-phase-numbers` active; v5.0 starts at **Phase 1** (v4.3 paused at Phases 61-67; auto-fix carry-over resumes in v5.1 picking up wherever the deferred Phase 68 work lands)
+- v4.3 paused phases archived at `.planning/milestones/v4.3-phases-paused/` (init JSON's `phase_archive_path` pointed at the stale `v4.2-phases/` path; overridden to keep v4.3's audit trail distinct from v4.2's)
+- Promotion to GitHub Issues OUT of scope for v1 — manual `gh issue create` for now; v5.1 auto-promotion will tie bug-report observability into the resumed auto-fix triage classifier (existing v3.1 ISSUE-01..04 `issue-payload-builder` is the eventual reuse target)
+- Privacy model — inline disclosure + expandable payload preview; no separate consent modal; user sees exactly what's sent before submitting; PII review of the auto-captured payload is a load-bearing requirement
+- Pattern B versioning — v4.3 carry-over scope (Phase 68 destructive UAT-03 + scaffold expansion follow-on + ongoing A/B winner observability + prompt-iter loop refinement) pulls forward into **v5.1** alongside bug-report ingestion requirements derived from v5.0 report volume
+- v40-auto-fix CI workflow currently `workflow_dispatch:` only (commit `d8d54c4`); stays dormant for the v5.0 cycle to remove a noise vector while bug-report ships
+- Zero new npm dependencies target (sixth consecutive milestone if held — relies on existing Cloudflare Worker + KV + extension primitives + Discord webhook HTTP POST)
+- DoD: end-user can submit a report from the in-citation UI, it lands in KV + Discord, maintainer can observe + manually triage. Live UAT against a real failed-citation scenario before milestone close
+
+## Paused Milestone: v4.3 Auto-Fix Loop Closure + Capability Expansion (Paused 2026-06-12)
+
+v4.3 shipped 6 of 7 planned phases on `origin/main` before being paused for v5.0. Phases delivered: **Phase 61** (diagnostic-injection mutator extension + `--max-turns` relaxation to ~5 with `--allowed-tools Read,Glob,Grep` cost-discipline substitute), **Phase 62** (forensic-ledger hardening — `source` + `transport` required on all entries + bypass audit probe closing the auxiliary-leak path), **Phase 64** (heuristic-first triage extension toward 8/8 `ERROR_CLASS` coverage), **Phase 65** (expanded fix scaffolds beyond the 5 v4.0 classes), **Phase 66** (A/B winner exit from abstention mode + 3-way transport stratification), **Phase 67** (prompt-iter loop Shape A — capture-and-surface-in-process; FORBIDDEN_PATHS extension PITER-01..05; 17 unpushed commits `5a6630a..5b749b1`, 12/12 code-review findings fixed in atomic commits `4cc0e51..4bec87b`, 206/206 unit tests pass on `main` local). **Phase 68** (destructive UAT-03 + final cleanup of mutator-injected synthetic issues #20/21/22/23 + final spend tally) deferred — blocked on `.planning/sweep-03-04-pass-evidence.yaml` (Phase 61 UAT-01/02 live runbook output not yet captured). Paused intentionally 2026-06-12 to ship the v5.0 bug-report observability pipeline first; the auto-fix carry-over scope will resume in **v5.1** alongside ingestion requirements driven by v5.0 report volume. Paused phase artifacts archived at `.planning/milestones/v4.3-phases-paused/`. v40-auto-fix CI workflow set to `workflow_dispatch:` only (commit `d8d54c4`) while v4.3 is paused.
 
 ## Last Shipped: v4.2 Auto-Fix Loop Live (Shipped 2026-06-09)
 
@@ -274,4 +289,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 — v4.3 milestone started (Auto-Fix Loop Closure + Capability Expansion); carry-over from v4.2 architectural deferral scoped in*
+*Last updated: 2026-06-12 — v5.0 milestone started (Bug Report Feature); v4.3 paused at Phase 67 (6/7 shipped) — carry-over scope flows to v5.1 per Pattern B versioning. Phase numbering reset for v5.0 (`--reset-phase-numbers`); v4.3 paused-phase artifacts archived to `.planning/milestones/v4.3-phases-paused/`*

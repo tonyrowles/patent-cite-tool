@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.3
-milestone_name: Auto-Fix Loop Closure + Capability Expansion
-status: paused
-stopped_at: Phase 67 shipped on main + code review 12/12 findings fixed (CR-01 BLOCKER + WR-01..10 + IN-01). User stopped autonomous mode at Phase 68 boundary — Phase 68 destructive UAT-03 requires `.planning/sweep-03-04-pass-evidence.yaml` (captured from Phase 61 UAT-01/02 live runbook); sentinel absent. Operator must run Phase 61 UAT-01/02 runbook first, then resume with `/gsd-autonomous --from 68`.
-last_updated: "2026-06-11T00:00:00.000Z"
-last_activity: 2026-06-11 — Phase 67 complete (verified 8/8 + 12/12 review findings fixed; 206/206 tests pass); paused before Phase 68 pending UAT-01/02 sentinel
+milestone: v5.0
+milestone_name: Bug Report Feature
+status: planning
+last_updated: "2026-06-12T21:53:22.248Z"
+last_activity: 2026-06-12
 progress:
-  total_phases: 7
-  completed_phases: 6
-  total_plans: 13
-  completed_plans: 13
-  percent: 86
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,17 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: 67 — COMPLETE (verified 8/8 must-haves; 12/12 review findings fixed in 12 atomic commits 4cc0e51..4bec87b; 206/206 unit tests pass on `main` local)
-Plan: 67-01 shipped via `5a6630a feat(67): prompt-iter loop Shape A + FORBIDDEN_PATHS extension (PITER-01..05)`
-Status: paused — Phase 68 destructive UAT-03 BLOCKED on `.planning/sweep-03-04-pass-evidence.yaml` (Phase 61 UAT-01/02 live runbook output)
-Last activity: 2026-06-11 — Phase 67 complete + 12 code-review fixes landed; autonomous mode stopped at Phase 68 boundary
-
-Pending operator action:
-
-  1. Phase 61 UAT-01/02 live runbooks (precondition for Phase 68) — see 61-04-PLAN.md + 61-05-PLAN.md
-  2. After Phase 61 UAT-01/02 PASS evidence captured at `.planning/sweep-03-04-pass-evidence.yaml`, resume with `/gsd-autonomous --from 68`
-  3. Phase 68 will then ship CLEAN-01/02/03 + UAT-03 (live destructive cleanup of issues #20/21/22/23) + UAT-04 (final spend tally) → v4.3 lifecycle (audit + complete + cleanup)
-  4. Push Phase 67's 17 unpushed commits (5a6630a..5b749b1) to origin/main per the operator's batch-push convention (commits stay LOCAL per Phase 67 plan D-23)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-12 — Milestone v5.0 started
 
 ## Budget
 

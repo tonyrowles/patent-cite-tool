@@ -1,467 +1,471 @@
-# Stack Research — v4.3 Auto-Fix Loop Closure + Capability Expansion
+# Stack Research — v5.0 Bug Report Feature
 
-**Domain:** Subsequent-milestone capability expansion on a v4.0–v4.2 self-healing test-suite stack
-**Researched:** 2026-06-08
-**Scope:** NEW work for v4.3 ONLY — the v4.0/v4.1/v4.2 shipped surface is not re-researched
-**Overall confidence:** HIGH (Context7 + official `code.claude.com` docs + GitHub releases verified; only the in-codebase wiring is novel)
-
----
-
-## Bottom line up front
-
-**Zero new npm dependencies is achievable for ALL seven v4.3 work items.** Every capability extends existing primitives (`tests/e2e/lib/llm-driver.js`, `fix-prompt-builder.js`, `triage-classifier.js`, `llm-ledger.js`, `scripts/a-b-winner.mjs`, `scripts/auto-fix.mjs`, `tests/e2e/scripts/inject-defect.mjs`) using Node 22 LTS built-ins and the already-pinned `@anthropic-ai/sdk@0.100.1` + `claude` (Claude Code) CLI surface. Two **flag-name correctness risks** must be communicated to requirements scoping:
-
-1. The official CLI flag is **`--allowedTools`** (camelCase) — NOT `--allowed-tools`. The v4.3 carry-over note in STATE.md uses the kebab-case form; that string would silently NOT do what the writer intends.
-2. `--allowedTools` and `--tools` have **different semantics** — `--allowedTools` grants tools without prompting (permission-mode), while `--tools` actively RESTRICTS which built-in tools are even available. For a cost-discipline gate that replaces `--max-turns 1`, the correct flag is `--tools "Read,Edit,Glob,Grep"` (or `--tools "Read,Glob,Grep"` for strict read-only), NOT `--allowedTools`.
-
-This is a load-bearing distinction for the entire `--max-turns 5` relaxation work.
+**Domain:** In-extension bug-report feature — Cloudflare Worker new `/report` route, KV durable storage of reports, Discord webhook notification, extension-side UI capture + background-script transport, local retry queue, options page Debug Mode
+**Researched:** 2026-06-12
+**Scope:** NEW work for v5.0 ONLY — existing Worker/KV/extension surfaces verified from direct source reads; nothing re-architected
+**Overall confidence:** HIGH (Worker source, manifests, options page, background scripts, and constants all read directly; Discord limits verified from official docs + well-cited secondary; Cloudflare KV and secrets verified from official docs; Chrome storage limits verified from Chrome for Developers)
 
 ---
 
-## Pinned Versions vs. Current Latest (verified 2026-06-08)
+## What Was Verified vs Already Known
 
-| Dependency | Pinned | Current Latest | Status | Action |
-|------------|--------|----------------|--------|--------|
-| `@anthropic-ai/sdk` | `0.100.1` EXACT | `0.102.0` (released 2026-06-06) | Behind by 2 patches; **NO breaking changes** for v4.3 surfaces | **HOLD at 0.100.1** — supply-chain lockfile pin + ESLint guard are load-bearing. Bump only if a v4.3 capability needs a new SDK feature (none identified). |
-| `peter-evans/create-pull-request` | `@v8` floating | `v8.1.1` (released 2025-04-10) | Current major; minor versions auto-tracked | **HOLD at `@v8`** — no v4.3 work touches the action invocations. |
-| `@playwright/test` | `1.60.0` EXACT | `1.60.0` (last published ~30 days ago) | Current | **HOLD** — v4.3 adds no new browser flows. |
-| `pdfjs-dist` | `^5.5.207` caret + `verifierDeps.pdfjs-dist: "5.5.207"` EXACT pin | `5.7.284` | Behind by 2 minor; frame-shift workflow manages bumps | **HOLD** — v4.3 does NOT touch pdfjs. |
-| `vitest` | `^3.0.0` caret | `5.0.x` stable (with `4.1.x` security-backports) | Behind major(s); v3.x still receives patches per Vitest team | **HOLD on `^3.0.0`** — see "Vitest version sensitivity" below; a major bump is out of scope for v4.3. |
-| `eslint` | `10.4.0` EXACT | (not researched — no v4.3 ESLint config changes) | n/a for v4.3 | **HOLD** |
-| `esbuild` | `^0.27.3` caret | n/a for v4.3 | n/a for v4.3 | **HOLD** |
-| `web-ext` | npx-invoked, no pin | `10.1.0` | n/a for v4.3 | **HOLD** |
+The milestone context asserted several facts about the existing codebase. All were confirmed by reading source directly before doing any external research.
 
-**Source confidence:**
-- `@anthropic-ai/sdk` 0.102.0 + changelog verified via GitHub releases page (HIGH)
-- `peter-evans/create-pull-request@v8.1.1` verified via GitHub releases page (HIGH)
-- Vitest 5.0/4.1/3.x status verified via Vitest releases page (MEDIUM — WebSearch summary)
-- `claude` CLI flags verified directly against `https://code.claude.com/docs/en/cli-reference` (HIGH)
-
----
-
-## v4.3 Capability → Stack Mapping
-
-The seven v4.3 capabilities are listed below in the same order as the carry-over note in `STATE.md`, with the stack additions/changes (if any) for each.
-
-### 1. Diagnostic-injection mutator extension (carry-over A)
-
-**File touched:** `tests/e2e/scripts/inject-defect.mjs` (extend; do NOT create a new file)
-
-**New stack surface:** **NONE.** The mutator already uses Node 22 ESM built-ins (`node:fs`, `node:path`, `node:child_process`). Diagnostic-content injection is pure string composition — no new libraries.
-
-**Specifically:**
-- For `GOOGLE_DOM_DRIFT` synthetic bodies: mirror the `data-testid` + ARIA-role selector patterns from `tests/e2e/lib/google-patents-page.js` (already in tree). Read that file at mutator runtime and embed a small, deterministic excerpt verbatim into the synthetic issue body's `<!-- dom_snippet: ... -->` HTML comment. Pure file-read + template substitution — no DOM library.
-- For `WRONG_CITATION` synthetic bodies: mirror the Verifier Disagreement section shape from `lib/issue-payload-builder.js` (already in tree, Phase 35). Re-use the existing helpers (e.g. import `assembleVerifierDisagreementSection` if exported; if not, the section is ~12 lines of pure markdown — duplicate inline with a `// Source: issue-payload-builder.js line N` comment for traceability).
-
-**Deterministic-seed primitive:** the existing v2 fingerprint pattern `<!-- fp: <12-hex> -->` from Phase 59. Re-use `crypto.createHash('sha256')` from `node:crypto` — already in scope; no new dep.
-
-**Vitest pin:** existing pattern. New test in `tests/unit/inject-defect.test.js` (or extend Phase 59's test file) asserting same-seed → byte-identical synthetic body. No new test runner needed.
-
-**Do NOT add:**
-- `faker` / `chance` — random data libraries. We need DETERMINISTIC injection (same seed → same bytes). Random fixture generators are the wrong abstraction.
-- `cheerio` / `jsdom` — DOM parsing. We're WRITING a snippet, not parsing one.
-- `mustache` / `handlebars` — template engines. Template literals + small helper functions handle this in ~20 LOC.
-
-**Confidence:** HIGH
+| Claim | Verified | Source |
+|-------|---------|--------|
+| Worker is ES Modules syntax (`export default { async fetch(...) }`) | YES | `worker/src/index.js:120` |
+| Route dispatch already uses `if (path === '/cache')` pattern | YES | `worker/src/index.js:157` |
+| CORS preflight handled BEFORE auth check | YES | `worker/src/index.js:131-141` |
+| `PATENT_CACHE` KV binding in `wrangler.toml` with `id` | YES | `worker/wrangler.toml:5-7` |
+| `PROXY_TOKEN` and `USPTO_API_KEY` accessed via `env.*` params | YES | `worker/src/index.js:273, 126` |
+| Existing routes: `GET /cache`, `POST /cache`, `GET /?patent=` | YES | `worker/src/index.js` |
+| `WORKER_URL = 'https://pct.tonyrowles.com'` in offscreen | YES | `src/offscreen/offscreen.js:23` |
+| `PROXY_TOKEN` embedded in extension source (known debt) | YES | `src/offscreen/offscreen.js:24` |
+| `https://pct.tonyrowles.com/*` already in `host_permissions` (both manifests) | YES | `src/manifest.json:17`, `src/manifest.firefox.json:17` |
+| `chrome.storage.sync` used for options settings | YES | `src/options/options.js:45` |
+| `chrome.storage.local` used for `currentPatent` state | YES | `src/background/service-worker.js` throughout |
+| Firefox background.js does Worker fetches (via pdf-pipeline) | YES | `src/firefox/background.js:20-21` |
+| `compatibility_date = "2025-01-01"` in wrangler.toml | YES | `worker/wrangler.toml:3` |
 
 ---
 
-### 2. `--max-turns` relaxation + `--allowedTools` addition (carry-over B)
+## Q1: Cloudflare Worker — Current State and Adding `/report`
 
-**Files touched:**
-- `tests/e2e/lib/llm-driver.js` line 94 (`'--max-turns', '1'` → `'--max-turns', '5'`) + add `--allowedTools` flag (see below for the correct flag name)
-- `tests/e2e/lib/llm-driver.js` — also update the comment block at lines 31-37 (Pitfall 2 reference to `--max-turns 1`)
-- `tests/unit/llm-driver.test.js` — flip the `--max-turns 1` regression pin to `--max-turns 5` + `--tools/--allowedTools` pin
-- (SDK path) `tests/e2e/lib/llm-driver.js` `invokeAnthropicSdkWithLedger` — review whether the SDK call needs a parallel adjustment for code-fix prompts that must read source files (research finding below)
+### Syntax Confirmed: ES Modules
 
-**Critical flag-name correctness finding (HIGH confidence — direct from official docs):**
+`worker/src/index.js` uses `export default { async fetch(request, env, ctx) {} }`. This is the Workers Modules format. No syntax migration needed.
 
-The official `claude` CLI documentation lists the following flags for **print mode** (`-p`):
+### How to Add the `/report` Route
 
-| Flag | Semantics | Use for v4.3 |
-|------|-----------|--------------|
-| `--max-turns N` | "Limit the number of agentic turns. Exits with an error when the limit is reached. No limit by default." | Set to **`5`** per the v4.3 carry-over plan. Replaces the current `--max-turns 1`. |
-| `--allowedTools "Read" "Grep" "Glob"` | **PERMISSION grant** — "Tools that execute without prompting for permission. See permission rule syntax for pattern matching. **To restrict which tools are available, use `--tools` instead.**" | Wrong flag for cost-discipline restriction. Adds permission allowlist but does NOT prevent Edit/Bash if Claude's default tool palette already includes them. |
-| `--tools "Read,Grep,Glob"` | **AVAILABILITY restriction** — "Restrict which built-in tools Claude can use. Use `""` to disable all, `"default"` for all, or tool names like `"Bash,Edit,Read"`." | **THIS is the correct flag** for the v4.3 cost-discipline gate — actually prevents Claude from invoking Edit/Bash. |
-| `--max-budget-usd N.NN` | "Maximum dollar amount to spend on API calls before stopping (print mode only)" | **NEW v4.3 OPPORTUNITY** — Hard dollar cap as defense-in-depth on top of the per-day/per-issue/per-PR ledger caps. Recommend adding `--max-budget-usd 0.50` (or whatever PR-cap divided by typical retries equals) to every `invokeClaudeP` invocation as a belt-and-suspenders measure. |
-| `--exclude-dynamic-system-prompt-sections` | "Move per-machine sections from the system prompt (working directory, environment info, memory paths, git-repo flag) into the first user message. Improves prompt-cache reuse across different users and machines running the same task. Only applies with the default system prompt; ignored when `--system-prompt` or `--system-prompt-file` is set." | **Not applicable** to `invokeClaudeP` (we always pass `--system-prompt`). Safe to ignore. |
-| `--permission-mode auto` (or `dontAsk`) | Skip permission prompts in non-interactive mode | **Already implicit** in `-p` mode for the tools Claude has by default; not needed if `--tools` already restricts the palette to safe-by-construction Read/Glob/Grep. |
-
-**Recommended argv shape for `invokeClaudeP` in v4.3:**
+The Worker dispatches on `path` at line 157. The `/report` POST handler slots in immediately after the `/cache` block and BEFORE the fallthrough USPTO proxy route (which uses `url.searchParams.get('patent')` for `GET /`). The insertion point is critical: if the handler is placed after the fallthrough, POST requests to `/report` will hit the patent-number validator and 400.
 
 ```javascript
-const args = [
-  '-p',
-  '--output-format', 'json',
-  '--max-turns', '5',                          // was '1'
-  '--tools', 'Read,Glob,Grep',                 // NEW — restricts palette (NOT --allowedTools)
-  '--max-budget-usd', '0.50',                  // NEW — hard dollar cap (defense-in-depth)
-  '--system-prompt', systemPrompt,
-  userPrompt,
-];
-```
+// worker/src/index.js — insert after the /cache block (~line 253), before USPTO fallthrough
 
-**Why `--tools` not `--allowedTools`:**
-- `--allowedTools` grants permission to USE a tool without prompting — it does NOT remove tools from the model's context. If Claude's default palette includes `Edit`, passing `--allowedTools "Read"` would still let Edit fire if Claude decides to call it (the call just prompts for permission, which in `-p` mode means failure). Worse, with `--permission-mode auto` or similar, the Edit call would silently execute.
-- `--tools "Read,Glob,Grep"` actually removes Edit/Bash from the tool palette Claude sees — the model cannot call what it does not know exists. This is the correct construction for a cost-discipline gate.
-
-**Test pin update:** flip every test currently asserting `'--max-turns', '1'` to assert the new argv tuple. Search count: 1 production site (`llm-driver.js:94`) + N test sites (existing pin per Phase 31 / Phase 42 line numbers in `tests/unit/llm-driver.test.js`).
-
-**Subscription transport (`invokeClaudePWithLedger`):** the `claude -p` subprocess gets the new args. No SDK changes needed for the subscription transport.
-
-**SDK transport (`invokeAnthropicSdkWithLedger`):** the Anthropic Messages API does NOT have a `--tools`/`--allowedTools` equivalent at the messages.create level for "restrict which tools Claude can call" — tools are explicitly passed via the `tools` parameter in the API. The current SDK call sites in `llm-driver.js` do NOT pass `tools` (the fix-scaffold prompts instruct Claude to OUTPUT a unified diff between fences, not to USE tools). **So the SDK path needs NO change for `--max-turns` parity** — the SDK is a single-turn API call by construction (one `messages.create` → one response). The `--max-turns` flag exists because the CLI agent loop can multi-turn; the SDK doesn't have a tool-use loop here. **The `--max-turns 5` change applies ONLY to the subscription transport.**
-
-This is a meaningful constraint: the SDK path keeps its current "one-shot" behavior. Subscription path now allows up to 5 turns where Claude can call Read/Glob/Grep before producing the final diff. **This intentional asymmetry should be documented in the v4.3 implementation note.**
-
-**Do NOT add:**
-- `@anthropic-ai/claude-code` as an npm dep — the `claude` CLI is invoked as a subprocess; bundling it as a npm dep would change the auth model (subscription credit → API key) and break the v3.1 Pitfall 1 mitigation.
-- Any "agent framework" wrapper (LangChain, LlamaIndex, Anthropic Agent SDK, etc.) — the dispatcher in `auto-fix.mjs` IS the agent framework for this project. Adding a generic wrapper would duplicate the cost-discipline gates already in `llm-driver.js`.
-
-**Confidence:** HIGH on the CLI flag semantics (verified against `https://code.claude.com/docs/en/cli-reference`). HIGH on the SDK-vs-subscription asymmetry.
-
----
-
-### 3. Forensic-ledger schema hardening — require `source` + `transport` on all entries (carry-over C)
-
-**File touched:** `tests/e2e/lib/llm-ledger.js` — extend `appendLedgerEntry` to enforce field presence (additive validation only — function body changes locked under additive-only invariant from v4.2 D-18 line 67 of STATE.md decisions)
-
-**New stack surface:** **NONE.** Pure field validation in existing function. Two implementation approaches:
-
-**Option A — strict mode at write time (recommended):**
-```javascript
-// Add at the top of appendLedgerEntry:
-if (entry && typeof entry === 'object') {
-  if (typeof entry.source !== 'string' || entry.source.length === 0) {
-    throw new Error(`appendLedgerEntry: entry.source is required (got: ${entry.source}); ` +
-      `prevents auxiliary-leak orphan entries. See v4.3 carry-over C.`);
-  }
-  if (typeof entry.transport !== 'string' ||
-      (entry.transport !== 'subscription' && entry.transport !== 'sdk')) {
-    throw new Error(`appendLedgerEntry: entry.transport must be 'subscription' or 'sdk' ` +
-      `(got: ${entry.transport}); prevents auxiliary-leak orphan entries.`);
-  }
+if (path === '/report' && request.method === 'POST') {
+  return handleReport(request, env, ctx);
 }
 ```
 
-**Option B — soft warn + auto-populate from a known-default (NOT recommended):** would silently mask leaks rather than surface them; rejects the entire point of the hardening.
+Auth is automatically shared — the existing bearer check at line 144 runs before route dispatch. `/report` inherits `PROXY_TOKEN` auth with zero additional auth code. This is intentional: the Worker token is already in the extension's offscreen document source, so the report endpoint is protected from arbitrary internet POST spam.
 
-**Caveat:** the change MUST be co-shipped with a sweep of every `appendLedgerEntry` call site (9 currently) to ensure `source` + `transport` are always provided. Two call sites in `llm-driver.js` (subscription line 421, SDK lines 588 + 620) already provide both; the 7 call sites in `auto-fix.mjs` need to be audited. The v4.3 carry-over note in STATE.md cites 3 orphan `claude-opus-4-7[1m]` entries 2026-06-08 — these are the symptom that the hardening directly closes.
+**`handleReport` responsibilities (all in `worker/src/index.js`):**
+1. Parse and validate JSON body (same pattern as `/cache` POST at line 215)
+2. Compute fingerprint: `crypto.subtle.digest('SHA-256', ...)` over `patentNumber + category + selectionText.slice(0,64)`
+3. Dedup check: `env.BUG_REPORTS.get('report:${fingerprint}:*')` via `list({ prefix: \`report:${fingerprint}:\` })` — if any key exists within the last N minutes, return 409 Conflict
+4. Write to `BUG_REPORTS`: `await env.BUG_REPORTS.put(key, JSON.stringify(report), { expirationTtl: 7776000 })`
+5. POST to Discord webhook: `await fetch(env.DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(discordPayload) })`
+6. Return 201 or appropriate error — Discord failure should NOT cause a 5xx to the extension (swallow Discord errors, log to console; KV write already succeeded)
 
-**Vitest defense:** add a unit test (existing pattern in `tests/unit/llm-ledger.test.js`) asserting `appendLedgerEntry(LEDGER_PATH, {iso, model, cost_usd: 0})` throws when `source`/`transport` are missing. Re-pin tests that previously called `appendLedgerEntry` without `source` to include the field.
+**CORS:** The existing `corsHeaders()` helper applies to all responses. `/report` needs `POST` in `Access-Control-Allow-Methods` (already present in the preflight at line 138: `'GET, POST, OPTIONS'`). No CORS change needed.
 
-**Cross-check against memory file:** `project_auto_fix_ledger_leak_vector.md` flags `scripts/auto-fix.mjs` as a leak vector that `invokeAnthropicSdkWithLedger`'s PRE-02 guard does NOT cover. The Option A throw at `appendLedgerEntry` time IS the chokepoint fix — closes the leak surface for ALL future call sites without needing to track each one.
+### `wrangler.toml` Changes
 
-**Do NOT add:**
-- A JSON Schema library (`ajv`, `zod`, `jsonschema`) — the validation surface is 2 fields. A 6-line if-block is correct.
-- A logging framework (`winston`, `pino`) — `console.error` + throw is the correct surfacing for a write-time invariant violation.
+Add a second `[[kv_namespaces]]` block. The `[[double-bracket]]` TOML syntax means "append to array" — repeating the block is the correct pattern per Cloudflare docs.
 
-**Confidence:** HIGH
+```toml
+name = "patent-cite-worker"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
 
----
+[[kv_namespaces]]
+binding = "PATENT_CACHE"
+id = "6e7af6faa9c340fdb8120036913b00b5"
 
-### 4. A/B winner exit from abstention mode (`scripts/a-b-winner.mjs`)
+[[kv_namespaces]]
+binding = "BUG_REPORTS"
+id = "<output of: npx wrangler kv namespace create 'BUG_REPORTS'>"
+```
 
-**File touched:** `scripts/a-b-winner.mjs` — read `outcome` (or `pr_merged`) field that now populates ≥20 entries per ERROR_CLASS per model arm via the Phase 56 (v4.2) ledger-schema extension.
+Create the namespace before editing the file:
+```bash
+cd worker && npx wrangler kv namespace create "BUG_REPORTS"
+# Output: id = "xxxxxxxxxxxx" — paste that id above
+```
 
-**New stack surface:** **NONE.** The script already imports `node:fs` only and is locked at zero-deps per D-21 in its own file header. `computePerClassPerArm` already probes for `outcome:'pass'|'fail'`, `success:bool`, `passed:bool`, `pr_merged:bool` — the field-shape forward-compat work was done in Phase 54.
+### Adding the Discord Webhook URL as a Worker Secret
 
-**v4.3 wiring is the remaining gap:** the script exits abstention automatically once both `errorClass` (already wired in v4.2) AND an outcome field accumulate to threshold. The work is to **validate that real triage traffic populates the outcome field** — `scripts/auto-fix-promote.mjs` writes `outcome:'pass'` / `'fail'` per Phase 58. The integration test:
+Secrets are set via `wrangler secret put` and appear in `env.*` at runtime. They are never in `wrangler.toml` or any committed file.
 
-1. Verify the auto-promote outcome ledger entry is being written (event-sourced from `auto-fix-promote.mjs`)
-2. Confirm `computePerClassPerArm` sees `outcome:'pass'|'fail'` not the others (the `outcome` probe is FIRST in priority — line 232-233 of `a-b-winner.mjs`)
-3. Test threshold transition with a synthetic 20+entry fixture
+```bash
+cd worker && npx wrangler secret put DISCORD_WEBHOOK_URL
+# Interactive prompt — paste the full webhook URL
+```
 
-**Threshold design knob (open for requirements scoping):** `N_PER_ARM_REQUIRED = 20` (current) — this was a D-16 lock for v4.1. v4.3 has the opportunity to revisit if the live ledger accumulates faster or slower than expected. **Research recommendation: keep at 20** until v4.3 has at least one full week of post-deployment ledger entries to baseline against; defer any threshold tuning to v4.4.
+In the Worker handler: `env.DISCORD_WEBHOOK_URL` is the full Discord webhook URL string at runtime.
 
-**Do NOT add:**
-- A statistics library (`simple-statistics`, `mathjs`) — pass-rate calculation is `pass / n`. The script already does this in 4 lines.
-- A binomial-test / chi-squared library (`jstat`, `simple-statistics`) — for a 20-sample threshold the `delta < 0.05` heuristic is operationally indistinguishable from a statistical test; adding inferential statistics would be theater.
-- A data-frame library (`dataframe-js`, `arquero`) — the grouping is a single `for` loop over ledger entries.
+For local development, create `worker/.dev.vars` (must be gitignored — verify `.gitignore` covers `worker/.dev.vars`):
+```
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
 
-**Confidence:** HIGH
+The extension code NEVER sees the Discord webhook URL. The URL lives exclusively in the Worker deployment. This is the load-bearing security property of the design.
 
----
-
-### 5. Expanded fix scaffolds (new `ERROR_CLASS`es beyond the 5)
-
-**File touched:** `tests/e2e/lib/fix-prompt-builder.js` — extend `PROMPT_SCAFFOLDS` registry; co-extend `tests/e2e/lib/llm-router.js` `MODEL_ROUTES` if any new class wants opus-routing.
-
-**New stack surface:** **NONE.** The `buildScaffoldSystemPrompt` helper (Phase 45) already factors the 5-section template; adding a 6th/7th class is ~30 LOC per class plus a 1-line registry entry plus a Vitest mutation-guard regression.
-
-**Candidate new classes (deferred to requirements scoping for selection — research provides the menu):**
-
-| Candidate class | Symptom | Editable surface | Co-design need |
-|-----------------|---------|------------------|----------------|
-| `PDF_PARSE_FAILED` | PDF.js threw during text extraction; verifier could not get text | `tests/e2e/lib/pdf-verifier.js` (verifier path) OR `src/offscreen/` (extension path, NOT auto-fixable without expanding diff-guard) | Yes — needs diagnostic capture of the PDF page-index + error |
-| `CACHE_INVALIDATION_BUG` | Citation pipeline returns stale result because `CACHE_VERSION` did not bump | `src/shared/constants.js` `CACHE_VERSION` + invalidation logic | Yes — needs cache-state diagnostic in issue body |
-| `FALLBACK_CHAIN_BROKEN` | All 3 fallback points triggered but produced no citation | `src/shared/uspto-fallback.js` + `src/cf-worker/index.js` | Maybe — overlaps with `WORKER_FALLBACK_FAILED` |
-| `OCR_NORMALIZATION_GAP` | Tier 0b normalization pairs incomplete for a new PDF pattern | `src/shared/matching.js` `normalizeOcr` 5-pair list | Yes — needs the offending text in the issue body |
-| `SELECTION_ANCHOR_LOST` | Selection captured but DOM mutation between mouseup and verifier read | `tests/e2e/lib/select-text.js` + harness teardown | Yes — needs DOM snapshot diff |
-
-**Research recommendation:** ship at least one new class in v4.3 (`PDF_PARSE_FAILED` is the highest-frequency real failure mode in the v3.0/v3.1 nightly logs based on the Context note "Tier 0/1/2/3/4/5 matching → ~2-5% of patents lack text layers"). The other 4 are good v4.4 candidates.
-
-**Co-design with diagnostic-injection mutator (capability 1):** any new scaffold MUST have a corresponding synthetic-body injection capability in `inject-defect.mjs` for SWEEP-tier UAT coverage; otherwise the v4.2 SWEEP-03 architectural blocker recurs.
-
-**Do NOT add:**
-- A prompt-templating engine (`langchain/prompts`, `prompt-toolkit`) — `buildScaffoldSystemPrompt` IS the template engine for this project. Replacing it would invalidate the byte-stable 6-forbidden-paths invariant pinned by Vitest.
-- A taxonomy library / error-classes enum library — the existing `tests/e2e/lib/error-codes.js` ERROR_CLASS_SET is the single source of truth. Any new class adds 1 line there + 1 line in `PROMPT_SCAFFOLDS`.
-
-**Confidence:** HIGH on the mechanism; MEDIUM on the specific class choice (depends on operator priorities for v4.3 vs v4.4 scope split).
+**Confidence: HIGH** — verified against [Cloudflare Workers Secrets docs](https://developers.cloudflare.com/workers/configuration/secrets/).
 
 ---
 
-### 6. Better heuristic-first triage coverage (6/8 → 8/8 ERROR_CLASSes)
+## Q2: KV Schema for Reports
 
-**File touched:** `tests/e2e/lib/triage-classifier.js` — extend the D-03 rule chain in `runTriage` to resolve the 2 currently-LLM-routed classes heuristically. Per the v3.1 description, the 2 ambiguous classes that route to LLM are likely `VERIFIER_DISAGREE` (Tier C agreement — Pitfall 2 in 34-RESEARCH) and an unspecified second. Auditing the rule chain in lines 433-504 shows:
+### Key Structure: Fingerprint-First
 
-- Rule 1: FLAKE short-circuit (heuristic — 1 class)
-- Rule 2: CONFIRMED + Tier A/B + `{WRONG_CITATION, VERIFIER_DISAGREE}` (heuristic — 2 classes)
-- Rule 3: NOT_REPLAYABLE + `{LLM_HALLUCINATED_SELECTION, LLM_API_ERROR, HARNESS_ERROR, PASS}` (heuristic — 4 classes)
-- Rule 4: ambiguous → LLM (2 remaining classes — Tier C CONFIRMED + WORKER_FALLBACK_FAILED + GOOGLE_DOM_DRIFT pre-cluster)
+Use `report:{fingerprint}:{timestamp-ms}` — **fingerprint as prefix, timestamp as suffix**.
 
-**The 6/8 split likely counts ERROR_CLASS_SET cardinality rather than rule cardinality.** Confirming this would need a re-audit during requirements scoping. The 2 LLM-routed classes appear to be:
-1. `WORKER_FALLBACK_FAILED` — needs the HTTP-status + MIME-type pattern in the verifier verdict to be heuristically resolvable; if the verifier verdict carries `worker_status_code` and `worker_response_mime` fields, a pure-function rule chain can resolve this without LLM.
-2. `GOOGLE_DOM_DRIFT` — needs the pre-flight DOM probe failure signature in the rerun report; if the rerun-validator emits a `dom_probe_failed: true` field, this is heuristically resolvable.
+**Why fingerprint-first:** KV's primary query API is `list({ prefix })`. Server-side dedup needs `list({ prefix: 'report:${fingerprint}:' })` to find prior reports for the same fingerprint in one call. If keys were `report:{timestamp}:{fingerprint}`, the fingerprint dedup check would require listing the entire namespace, which hits KV list limits on volume and is O(n) expensive.
 
-**Stack additions: NONE.** Both extensions are pure rule-chain additions to `runTriage` (~10-20 LOC each). The verifier verdict shape and rerun report shape are already in tree; the question is whether the diagnostic fields ALREADY exist (re-research at planning time).
+**Fingerprint construction (Worker-side, never extension-side):**
+```javascript
+async function computeFingerprint(patentNumber, category, selectionText) {
+  const input = `${patentNumber}:${category}:${selectionText.slice(0, 64).toLowerCase().replace(/\s+/g, ' ')}`;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).slice(0, 5).map(b => b.toString(16).padStart(2, '0')).join('');
+  // 10-hex chars = 5 bytes = 1,099,511,627,776 unique values — sufficient for dedup
+}
+```
 
-**Caveat:** the Vitest pin `triage-01 invariant preserved` (line 382-383 of `triage-classifier.js`) — heuristically-resolved paths MUST NOT invoke `invokeLlm` (callCount === 0). Adding Rules 5+6 must preserve this invariant: same `for...continue` pattern as Rules 1-3, never falling through to the `ambiguous.push(iter)` line.
+`crypto.subtle` is available natively in the Cloudflare Workers runtime (Web Crypto API). No library needed.
 
-**Do NOT add:**
-- A rules engine (`json-rules-engine`, `nools`, `node-rules`) — the rule chain is 4 sequential `if-continue` blocks. A rules engine would obscure the locked D-03 ordering invariant.
-- A decision-tree / decision-table library — same reason.
-- An NLP library for error-message classification (`compromise`, `natural`) — the error patterns are STRUCTURED fields, not free-text. String comparison handles this.
+**Key example:**
+```
+report:a3f9b12c4d:1749734400000
+```
 
-**Confidence:** MEDIUM — the heuristics-extension is mechanically simple, but the audit of which fields are available in the verifier/rerun verdict shapes needs requirements-scoping confirmation against live report.json files.
+### Value Structure
 
----
+```json
+{
+  "fingerprint": "a3f9b12c4d",
+  "timestamp": 1749734400000,
+  "category": "inaccurate",
+  "note": "Column number is off by one",
+  "patentNumber": "12505414",
+  "patentUrl": "https://patents.google.com/patent/US12505414",
+  "selectedText": "...",
+  "returnedCitation": "4:32-4:45",
+  "confidenceTier": "green",
+  "extensionVersion": "5.0.0",
+  "browser": "Chrome/125",
+  "os": "Windows 10",
+  "xpathNode": "...",
+  "scrollY": 1200,
+  "viewportWidth": 1920,
+  "viewportHeight": 1080,
+  "pdfParseStatus": "success",
+  "triggerMode": "floating-button",
+  "includePatentNumber": false,
+  "errorLog": ["...", "..."]
+}
+```
 
-### 7. Prompt-iteration loop (failed fix → analyze → rewrite scaffold → retry)
+This reuses the v3.1 `llm-report.json` schema fields (`selected_node_xpath`, `scroll_y`, `viewport_*`) remapped to camelCase for consistency with the extension's existing `chrome.storage.local` shape. Realistic payload: 2–5 KB. KV value max is 25 MB — no constraint applies here.
 
-**File touched:** depends on scope decision (full-auto vs capture-and-surface-for-human-review). Two viable shapes:
+### TTL Strategy
 
-**Shape A — capture-and-surface (recommended for v4.3, defer full-auto to v4.4):**
+Use `expirationTtl: 7776000` (90 days = 90 × 86400 seconds) on all `BUG_REPORTS.put()` calls. Rationale: 90 days covers any realistic triage cycle for a solo-maintainer tool. Bug reports are observability data, not authoritative cache — indefinite storage wastes free-tier KV quota (1 GB) for data that's irrelevant after 90 days. Contrast with `PATENT_CACHE` (no TTL, by design — position maps are immutable and benefit all users indefinitely).
 
-When `auto-fix.mjs` Step 7 dispatches to a scaffold and the resulting fix attempt FAILS (apply-check, diff-guard, verifier-gate), write a NEW ledger entry with `source: 'prompt-iter-candidate'`, `outcome: 'fail'`, AND the FULL system prompt + user prompt + Claude response + failure reason. A new helper script `scripts/prompt-iter-review.mjs` reads these entries and emits a weekly markdown digest (extends `scripts/weekly-digest.mjs` Auto-Fix Pipeline section) listing the top failed scaffolds + their failure modes. Human reads, hand-edits `fix-prompt-builder.js`, ships.
+```javascript
+await env.BUG_REPORTS.put(key, JSON.stringify(report), { expirationTtl: 7776000 });
+```
 
-This is **observable infrastructure** — the loop is closed manually but the data is captured automatically.
+Minimum `expirationTtl` is 60 seconds per Cloudflare docs. 90 days (7,776,000 seconds) is well above that.
 
-Stack additions: NONE. Pure ledger-entry extension + new script in the existing `scripts/*.mjs` pattern.
-
-**Shape B — full-auto rewrite (NOT recommended for v4.3):**
-
-`auto-fix.mjs` Step N would invoke a NEW SDK call (sonnet or opus) with a meta-prompt: "Here is the scaffold that failed, here is the failure reason, here is the original issue body — propose a rewritten scaffold." Then apply the rewrite to `fix-prompt-builder.js`, file a PR.
-
-Problems:
-- Self-modifying prompts is a trust boundary violation — touches `fix-prompt-builder.js` which is currently a CODEOWNERS-pinned + Vitest-pinned + ESLint-D-04-purity-pinned file. Any auto-modification of this file invalidates the byte-stability invariants on the 5 existing scaffolds.
-- Failure-attribution becomes ambiguous: did the LATEST iteration's fix succeed because of the prompt rewrite, or in spite of it?
-- Cost compounds: every failed fix triggers a meta-LLM call (sonnet ~$0.02-0.05) on top of the original fix call.
-
-**Recommendation: ship Shape A in v4.3, hold Shape B for v4.4 OR explicitly out-of-scope.**
-
-**Stack additions for Shape A: NONE.** Reuses:
-- `appendLedgerEntry` with the new `source: 'prompt-iter-candidate'` value (compatible with capability 3's `source` requirement)
-- The Phase 37 weekly-digest scaffolding (`scripts/weekly-digest.mjs`)
-- The Phase 55 `renderAutoFixPipelineSection` markdown renderer (extend with a 5-line summary block)
-
-**Do NOT add (regardless of shape):**
-- An LLM evaluation / observability platform (`Helicone`, `LangSmith`, `Promptfoo`, `Weave`) — these are full-fat external services. The ledger + weekly-digest IS the observability stack for this project.
-- A prompt-versioning library (`promptlayer`, `humanloop`) — git history of `fix-prompt-builder.js` is the prompt-version system.
-- A retry/circuit-breaker library (`p-retry`, `cockatiel`, `opossum`) — the existing `fix_attempts` cap of 3 in `auto-fix.mjs` (per Phase 42 AUTOFIX-05) is the retry policy.
-
-**Confidence:** HIGH on Shape A mechanism + ZERO-deps; MEDIUM on the Shape A vs Shape B scope decision (depends on operator risk tolerance and v4.3 phase budget per PROJECT.md note "Scope note: broader than v4.2 (which shipped 5 phases in ~5 days). Research convergence will likely propose 7–9 phases. If too big, Prompt-iter loop or scaffold expansion can be deferred to v4.4").
-
----
-
-## Vitest version sensitivity
-
-**Status:** Vitest 5.0 is the current stable (released by mid-2026), Vitest 4.1 receives security backports, Vitest 3.x receives important fixes per Vitest team policy. The patent-cite-tool is on `^3.0.0` (caret pin).
-
-**Risk for v4.3:** The seven v4.3 capabilities only ADD tests using patterns already established in the existing 1252-test suite — `vi.mock`, `vi.fn`, `vi.useFakeTimers`, `describe` / `it` / `expect`, `test.skip`. None of these surfaces have breaking changes between 3.x → 5.x.
-
-**Test patterns that v4.3 will rely on:**
-
-| Pattern | First introduced (phase) | v4.3 use |
-|---------|--------------------------|----------|
-| `vi.mock('node:fs')` | Phase 33 | Ledger-leak hardening tests |
-| `vi.useFakeTimers({ now: ... })` | Phase 45 | classifyRerunOutcomes deterministic tests |
-| `expect(...).toThrow(/regex/)` | Phase 39 | Ledger schema-hardening throw assertions |
-| Source-grep static tests (read `.js` file, regex-match) | Phase 40 | `--max-turns 5` + `--tools` arg pin |
-| Fixture-injection deterministic tests | Phase 59 | Mutator extension same-seed pins |
-
-**Recommendation: HOLD on `^3.0.0`.** A major bump to 4.x / 5.x is OUT OF SCOPE for v4.3. The `check-deps-and-pr.mjs` watchlist handles bumps via the `auto-fix:major-bump` review path; vitest is on that watchlist and will surface via the weekly dep-update PR when an operator decides to invest the migration effort. Doing this DURING v4.3 would increase change risk on a milestone whose own scope is already at the upper edge of feasibility.
-
-**Confidence:** HIGH on the pin-hold recommendation; MEDIUM on the exact 3.x → 5.x migration cost (depends on which 3.x patches are in lockfile).
+**Confidence: HIGH** — [Cloudflare KV Write docs](https://developers.cloudflare.com/kv/api/write-key-value-pairs/) confirm `expirationTtl` minimum 60s and 25 MB value limit.
 
 ---
 
-## Playwright version sensitivity
+## Q3: Discord Webhook Payload
 
-**Status:** `@playwright/test@1.60.0` exact pin. Current latest is `1.60.0` (i.e., no upgrade pending). No v4.3 capability touches Playwright specs or page lifecycle.
+### Exact Fetch Shape
 
-**Recommendation: HOLD.** No upgrade required, no risk.
+```javascript
+async function postToDiscord(webhookUrl, report, fingerprint) {
+  const category = report.category;
+  const colorMap = {
+    inaccurate: 0xF59E0B,   // amber
+    'no-match':  0xEF4444,   // red
+    'not-working': 0x8B5CF6, // purple
+    other:       0x6B7280,   // gray
+  };
 
-**Confidence:** HIGH
+  const body = JSON.stringify({
+    username: 'Patent Bug Report',
+    embeds: [{
+      title: `[${category}] US${report.patentNumber}`.slice(0, 256),
+      color: colorMap[category] ?? 0x6B7280,
+      fields: [
+        { name: 'Citation', value: (report.returnedCitation || 'none').slice(0, 100), inline: true },
+        { name: 'Confidence', value: report.confidenceTier, inline: true },
+        { name: 'Browser', value: `${report.browser} / ${report.os}`.slice(0, 100), inline: true },
+        { name: 'Selected Text', value: (report.selectedText || '').slice(0, 500), inline: false },
+        { name: 'Note', value: (report.note || '(none)').slice(0, 500), inline: false },
+      ],
+      footer: { text: `fp:${fingerprint} | v${report.extensionVersion}` },
+      timestamp: new Date(report.timestamp).toISOString(),
+    }],
+  });
 
----
+  const resp = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
 
-## `peter-evans/create-pull-request@v8` version sensitivity
+  if (!resp.ok && resp.status !== 429) {
+    console.error(`[Worker] Discord webhook failed: ${resp.status}`);
+  }
+  // Discord 429 rate limit: log and swallow — KV write already succeeded
+}
+```
 
-**Status:** Pinned at `@v8` floating tag, currently resolving to `v8.1.1` (released 2025-04-10). Used in three workflows: `v40-auto-fix.yml`, `v40-auto-promote.yml`, `v40-deps-update.yml`.
+**Total character count for this embed:** title (≤80) + 5 field names (≤50) + 5 field values (≤1400 worst case) + footer (≤40) ≈ 1570 chars. Well under the 6000-char total-across-all-embeds limit.
 
-**v4.3 risk surfaces:**
+### Hard Limits (All Verified)
 
-1. **Capability 1 (diagnostic-injection mutator):** does NOT use `create-pull-request` — the mutator creates ISSUES via `gh` CLI, not PRs.
-2. **Capability 4 (A/B winner exit):** the script writes a markdown table to stdout; it does NOT open a PR. The weekly-digest workflow picks up the output. No `create-pull-request` interaction.
-3. **Capability 7 (prompt-iter loop, Shape A):** the candidate-capture is a ledger entry + weekly-digest extension. No new PRs.
+| Limit | Value | Notes |
+|-------|-------|-------|
+| `content` field | 2,000 chars | Not using `content` — using `embeds` instead |
+| Embed title | 256 chars | Truncate with `.slice(0, 256)` |
+| Embed description | 4,096 chars | Not used in this design |
+| Embed field name | 256 chars | All field names well under this |
+| Embed field value | 1,024 chars | Truncate `selectedText` and `note` to 500 chars each for margin |
+| Embed footer text | 2,048 chars | Fingerprint + version is ~30 chars |
+| **Total chars across ALL embeds** | **6,000 chars** | **Binding constraint** — single embed at ~1570 chars is safe |
+| Max embeds per message | 10 | Using 1 |
+| Max fields per embed | 25 | Using 5 |
+| **Rate limit per webhook URL** | **5 requests / 2 seconds** | Applies per webhook endpoint URL |
+| Rate limit per minute | 30 requests/min | Well above v5.0 expected volume |
 
-**No v4.3 work touches `peter-evans/create-pull-request` invocations.** The `@v8` floating tag continues to track patches automatically.
+### Rate Limit Reality for v5.0
 
-**Recommendation: HOLD at `@v8` floating.** The 422 eventual-consistency retry fix in v8.1.1 (April 2025) is unambiguously beneficial — no downgrade needed.
+The client-side rate limit caps users at 5 reports per 10 minutes per install. Even with 50 concurrent users hitting the same webhook, that's at most 250 reports per 10 minutes = ~0.4/second, well under 5/2s. The rate limit is not a practical concern at this scale. If Discord returns 429, the Worker should swallow the error (the report is already in KV) rather than failing the request to the extension.
 
-**Confidence:** HIGH
-
----
-
-## @anthropic-ai/sdk version sensitivity
-
-**Status:** `0.100.1` EXACT (no caret) pinned. Current latest is `0.102.0` (released 2026-06-06, 2 days before this research). Patch versions 0.100.1 → 0.102.0 contain:
-
-- v0.100.1 (2026-05-29) — `encrypted_content` carried on beta compaction blocks (bugfix; doesn't affect us)
-- v0.101.0 (2026-06-05) — middleware support added; request-timeout-applies-to-inner-fetch fix; JSON-scientific-notation parse fix; `stop_details` on `message_delta` (additive features; doesn't affect us)
-- v0.102.0 (2026-06-06) — middleware runs before request signing (bugfix; doesn't affect us)
-
-**Breaking changes:** NONE in this version range (verified against GitHub releases).
-
-**Deprecations affecting v4.3:** Claude Opus 4.1 marked deprecated in v0.101.0. The project uses `claude-opus-4-7` (per `llm-router.js` MODEL_ROUTES from Phase 54), NOT Opus 4.1. No impact.
-
-**v4.3 surfaces touching the SDK:**
-- Capability 2 (`--max-turns` relaxation): subscription transport only; SDK path unchanged.
-- Capability 3 (ledger schema hardening): the 2 SDK-path `appendLedgerEntry` calls already provide `source` + `transport`. Hardening will REVEAL any missing fields at first SDK call after deploy — no functional change to the SDK call itself.
-
-**Recommendation: HOLD at `0.100.1` EXACT pin.** Three reasons:
-
-1. The ESLint single-entry-point guard + lockfile EXACT pin + `verifierDeps`-style pin are layered supply-chain defenses. Bumping the pin is a separate operator-gated decision that should go through `check-deps-and-pr.mjs`'s `auto-fix:sdk-bump` review path.
-2. No v4.3 capability requires a feature only in 0.101+ (middleware is for production observability platforms; we don't use one).
-3. Holding the pin keeps v4.3's risk surface OFF the dependency-pin trust boundary, which is the most expensive boundary to flip-flop on.
-
-**Confidence:** HIGH
-
----
-
-## Cross-cutting: Node 22 built-ins coverage check
-
-The seven v4.3 capabilities collectively touch these Node built-ins (all already in use across the codebase):
-
-| Module | Used for | v4.3 new use? |
-|--------|----------|---------------|
-| `node:fs` (sync + promises) | All file IO | Yes (capabilities 1, 3, 4, 7) — pattern unchanged |
-| `node:path` | Path resolution | Yes (capability 1) — pattern unchanged |
-| `node:child_process` (`spawn`, `spawnSync`) | `claude -p` subprocess, `gh` CLI calls | Yes (capability 2) — `spawn` argv extended |
-| `node:crypto` (`createHash`) | Fingerprinting | Yes (capability 1) — pattern unchanged |
-| `node:url` (`fileURLToPath`) | ESM `__dirname` shim | Yes (capabilities 3, 4) — pattern unchanged |
-| `node:util` (`promisify`, `inspect`) | n/a for v4.3 | No |
-| `node:os` | n/a for v4.3 | No |
-| `node:worker_threads` | n/a for v4.3 | No |
-
-All required built-ins are stable in Node 22 LTS. No experimental flags needed.
-
-**Confidence:** HIGH
+**Confidence: MEDIUM** — rate limit figures from [birdie0 Discord Webhooks guide](https://birdie0.github.io/discord-webhooks-guide/other/rate_limits.html) (well-cited community reference; official Discord docs confirmed field-level limits but the specific webhook sub-limit was in a secondary source).
 
 ---
 
-## Explicit "DO NOT add" list (zero-deps streak defense)
+## Q4: Extension-Side Fetch — Content Script vs Background Script
 
-The v4.3 work surfaces are common attractors for new dependencies. Each row below explains the dep, why it would NOT solve the v4.3 problem, and what to use instead.
+### Answer: Background Script (Service Worker), NOT Content Script
 
-| Tempting dep | Where someone might want it | Why NOT | Use instead |
-|--------------|-----------------------------|---------|-------------|
-| `@anthropic-ai/claude-code` (npm) | "Use the official SDK for claude code" | Bundling changes the auth model (subscription → API key) and breaks v3.1 Pitfall 1 mitigation. The CLI IS the boundary. | `spawn('claude', args, env)` — existing pattern in `llm-driver.js` |
-| `langchain` / `llamaindex` / `Anthropic Agent SDK` | "We need an agent framework" | The dispatcher in `auto-fix.mjs` IS the framework. Generic wrappers duplicate cost-discipline gates already in `llm-driver.js`. | The existing `invokeClaudePWithLedger` + `invokeAnthropicSdkWithLedger` wrappers |
-| `stryker-mutator` / `fast-check` / `schemath` | "We need mutation testing for the fixture-mutator" | Mutation-testing frameworks mutate code AST, not data fixtures. The v4.3 mutator needs DETERMINISTIC fixture injection (same seed → same bytes), not random property-based testing. | `crypto.createHash('sha256')` + deterministic template substitution (already in tree) |
-| `ajv` / `zod` / `jsonschema` | "We need to validate ledger schema additions" | The schema-hardening surface is 2 fields with 2 types. A 6-line if-block in `appendLedgerEntry` is correct; a schema library would obscure the load-bearing invariant. | Plain `typeof` + `throw new Error` (existing pattern in 9 other validators) |
-| `cheerio` / `jsdom` / `linkedom` | "We need DOM parsing for GOOGLE_DOM_DRIFT mutator" | The mutator WRITES a snippet, not parses one. Real DOM-drift fixes use Playwright in tests. | Template string with `data-testid` literal + Playwright selectors (existing pattern in `google-patents-page.js`) |
-| `mustache` / `handlebars` / `eta` / `nunjucks` | "We need a template engine for synthetic issue bodies" | Template literals + a 20-LOC helper handle this. Adding a template engine is a security boundary (template injection). | Template literals + `String.raw` + escape helpers (existing pattern in `issue-payload-builder.js`) |
-| `faker` / `chance` / `casual` | "We need fake data for synthetic issues" | Fake-data libraries are non-deterministic by design. v4.3 mutator needs DETERMINISTIC injection. | Constant strings + `crypto.createHash` seed (existing pattern in `inject-defect.mjs` v2 markers) |
-| `simple-statistics` / `mathjs` / `jstat` | "We need statistical tests for A/B winner" | At N=20 samples per arm, `delta < 0.05` is operationally equivalent to a t-test. Adding inferential stats would be theater. | `pass / n` calculation (existing in `a-b-winner.mjs` line 314) |
-| `dataframe-js` / `arquero` / `tinyqueue` | "We need to group/aggregate ledger entries" | The grouping is a single `for` loop. Data-frame libraries are a different abstraction tier than this script needs. | Plain `for...of` + `Map` / `Object` (existing pattern in `phaseTotal`, `dayTotal`, `prTotal`, etc.) |
-| `winston` / `pino` / `bunyan` | "We need structured logging for the prompt-iter loop" | The ledger JSON file IS the structured log for this project. Adding a logger creates a second source of truth. | `appendLedgerEntry` with new `source: 'prompt-iter-candidate'` (capability 7 Shape A) |
-| `helicone` / `langsmith` / `promptfoo` / `weave` | "We need LLM observability for prompt iteration" | These are external SaaS observability platforms. The ledger + weekly digest IS the observability stack. Adding one would split the data trail. | Extend `renderAutoFixPipelineSection` in `weekly-digest.mjs` (existing pattern from Phase 55) |
-| `promptlayer` / `humanloop` | "We need prompt versioning" | Git history of `fix-prompt-builder.js` is the prompt-version system. Vitest mutation-guard pins each scaffold. | `git log -p tests/e2e/lib/fix-prompt-builder.js` (existing) |
-| `p-retry` / `cockatiel` / `opossum` | "We need retry / circuit-breaker for failed fixes" | The `fix_attempts` cap of 3 in `auto-fix.mjs` (Phase 42 AUTOFIX-05) is the retry policy. A circuit-breaker library would duplicate it. | `countFixAttempts` from `llm-ledger.js` (existing) |
-| `json-rules-engine` / `nools` / `node-rules` | "We need a rules engine for triage heuristic expansion" | The rule chain is 4-6 sequential `if-continue` blocks. A rules engine would obscure the locked D-03 ordering invariant. | Plain `if (...) continue;` (existing pattern in `runTriage`) |
-| `compromise` / `natural` / `nlp.js` | "We need NLP for error-message classification" | Error patterns are STRUCTURED fields (`verifier_verdict.tier_used`, `rerun.verdict`, etc.), not free text. | `===` and `includes()` (existing) |
-| `vitest@5` major-bump | "Vitest 3 is end-of-life-ish" | Vitest 3.x still receives important fixes; v4.3 capabilities use only stable APIs unchanged 3.x → 5.x. Bumping during v4.3 doubles change risk. | Hold `^3.0.0` caret; let `check-deps-and-pr.mjs` surface the bump on its own timeline |
-| `@playwright/test@1.61+` | "Playwright is old" | Already at latest 1.60.0; no upgrade pending. | n/a — already current |
-| `@anthropic-ai/sdk@0.101+` | "SDK is 2 patches behind" | ESLint guard + lockfile EXACT pin + ESLint single-entry-point are layered supply-chain defenses. Bump goes through `check-deps-and-pr.mjs` `auto-fix:sdk-bump`. | Hold 0.100.1; queue 0.102 bump via the deps-update review path post-v4.3 |
-| Any new MV3 / extension test library | "We need to test extension manifest changes" | v4.3 does NOT touch `src/`, `manifest.json`, or any extension code. The diff-guard regex bank rejects PRs that try to. | n/a — v4.3 is scripts/ + tests/e2e/lib/ only |
+**Content scripts cannot make cross-origin requests even if the domain is in `host_permissions`.** Per [Chrome cross-origin network requests docs](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests):
 
-**Zero new npm dependencies target: ACHIEVABLE.** Fifth consecutive milestone if held (v3.1, v4.0, v4.1, v4.2, v4.3).
+> "Cross-origin requests are always treated as such in content scripts, even if the extension has host permissions."
 
----
+The background service worker CAN call `fetch()` to `https://pct.tonyrowles.com/*` because that origin is in `host_permissions` AND the background context runs in the extension origin (not the web page origin that content scripts inherit).
 
-## Integration Points with v4.0–v4.2 Surface
+### `host_permissions`: Already Covered — No Manifest Change
 
-| v4.3 capability | Integrates with (existing surface) | Mutation type |
-|-----------------|------------------------------------|---------------|
-| 1. Diagnostic-injection mutator | `tests/e2e/scripts/inject-defect.mjs` (Phase 59 v2 markers) + `tests/e2e/lib/google-patents-page.js` + `lib/issue-payload-builder.js` (Phase 35) | Extend (additive sections in synthetic body) |
-| 2. `--max-turns` + `--tools` | `tests/e2e/lib/llm-driver.js` line 94 (`invokeClaudeP` argv) | Replace 1 arg pair, add 2 new arg pairs; subscription transport only |
-| 3. Ledger schema hardening | `tests/e2e/lib/llm-ledger.js` `appendLedgerEntry` | Add field-presence check at function top; co-audit 9 call sites |
-| 4. A/B winner exit | `scripts/a-b-winner.mjs` (no code change needed) + `scripts/auto-fix-promote.mjs` outcome write path (Phase 58) | Validation only — confirm wiring is producing real outcome entries |
-| 5. Expanded fix scaffolds | `tests/e2e/lib/fix-prompt-builder.js` PROMPT_SCAFFOLDS (Phase 45) + `tests/e2e/lib/llm-router.js` MODEL_ROUTES (Phase 54) | Extend frozen registries (additive) |
-| 6. Better heuristic triage | `tests/e2e/lib/triage-classifier.js` `runTriage` D-03 rule chain (Phase 34) | Add 2 new rules BEFORE the `ambiguous.push(iter)` line |
-| 7. Prompt-iter loop (Shape A) | `scripts/auto-fix.mjs` Step 7 failure handlers + `scripts/weekly-digest.mjs` `renderAutoFixPipelineSection` (Phase 55) | Add ledger entries on failure; extend digest renderer |
+Both `src/manifest.json:16-19` and `src/manifest.firefox.json:16-19` already have:
+```json
+"host_permissions": [
+  "https://patentimages.storage.googleapis.com/*",
+  "https://pct.tonyrowles.com/*"
+]
+```
 
-**Trust-invariant non-mutations (load-bearing):**
-- `scripts/auto-fix-promote.mjs:assertTripleGate` body — byte-unchanged (Phase 53)
-- `tests/e2e/lib/llm-ledger.js` `appendLedgerEntry` body — ADDITIVE checks only (new throws at top; existing body unchanged)
-- `tests/e2e/lib/fix-prompt-builder.js` `buildScaffoldSystemPrompt` body — byte-unchanged; new scaffolds use existing helper
-- `tests/e2e/lib/llm-router.js` `MODEL_ROUTES` — Object.freeze() invariant preserved (additive extension only)
-- ESLint `no-restricted-imports` guard on `@anthropic-ai/sdk` — preserved (capability 2 SDK path is unchanged)
+`https://pct.tonyrowles.com/*` covers `POST /report` with no path restriction — no manifest change needed.
+
+### Message-Passing Architecture
+
+The report submission flow follows the exact existing pattern for `MSG.FETCH_USPTO_PDF`:
+
+1. **Content script** (`src/content/citation-ui.js`) collects report payload, sends `chrome.runtime.sendMessage({ type: MSG.SUBMIT_REPORT, payload })`.
+2. **Background service worker** (`src/background/service-worker.js`) handles `MSG.SUBMIT_REPORT`: checks rate limit from `chrome.storage.local`, calls `fetch('https://pct.tonyrowles.com/report', { method: 'POST', headers: { Authorization: 'Bearer ...', 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })`, writes/reads retry queue.
+3. **Background → Content** sends `chrome.runtime.sendMessage({ type: MSG.REPORT_RESULT, success: true/false })` back (or `chrome.tabs.sendMessage` if sender tab context is needed).
+
+For **Firefox**: `src/firefox/background.js` already uses the same `chrome.storage.local` and `fetch()` pattern (confirmed by reading lines 146, 166, 176, 198, etc.). The same message handler added to `service-worker.js` needs to be mirrored in `src/firefox/background.js`.
+
+**Offscreen document is NOT needed for report submission.** The offscreen document exists for PDF parsing (which requires a Blob URL and `pdf.worker.mjs`). A plain JSON POST needs no offscreen context. The background service worker (Chrome) and Firefox background.js both can `fetch()` directly.
+
+**Confidence: HIGH** — verified against official Chrome extension network request docs.
 
 ---
 
-## Stack Patterns by Capability-Grouping Choice
+## Q5: Local Queue / Retry Persistence
 
-**If v4.3 ships all 7 capabilities (7-9 phases per PROJECT.md note):**
-- Hold every dep version as documented above
-- Phase ordering: 1+2 (carry-over architectural) → 3 (schema hardening) → 4 (A/B winner exit) → 6 (triage expansion) → 5 (new scaffolds) → 7 Shape A (prompt-iter capture) → live UAT-47-a/b/SWEEP-03/04/06 sweep
-- Phase 1+2 MUST ship in a single atomic commit (the v4.2 SWEEP-03 architectural finding established this co-design requirement)
+### Use `chrome.storage.local`, NOT IndexedDB
 
-**If v4.3 ships only carry-over (capabilities 1-4, 4-5 phases):**
-- Hold dep versions; same Phase 1+2 atomic requirement
-- Capabilities 5, 6, 7 defer to v4.4
-- Slightly lower phase count matches v4.2's 5-phase shape; safer scope
+**Rationale:**
+- IndexedDB already has the `idbAvailable` graceful-degradation flag — it can silently fail in Firefox private browsing. A retry queue that silently discards reports on IDB failure defeats the queue's purpose.
+- `chrome.storage.local` is the established extension state pattern: `currentPatent` key is already read/written in 30+ places across `service-worker.js` and `firefox/background.js`. The API is Promise-based with no open/close lifecycle, survives service worker restarts, and has straightforward error handling.
+- Report queue entries are small (~3–6 KB each). The 10 MB `chrome.storage.local` quota (Chrome 114+; 5 MB on Chrome ≤113) is not a concern for a queue capped at 5 items.
 
-**If v4.3 ships carry-over + scaffold expansion (capabilities 1-5, 5-6 phases):**
-- Same dep posture
-- Defers triage-expansion + prompt-iter to v4.4
+**Queue storage shape:**
+```javascript
+// Key: 'reportQueue'
+// Value: array of pending report objects
+[
+  {
+    payload: { /* full report payload */ },
+    attempts: 1,
+    queuedAt: 1749734400000,
+    lastAttemptAt: 1749734500000,
+  }
+]
+```
 
-**Research recommendation:** the carry-over-only scope (1-4) is the lowest-risk minimum to honor PROJECT.md's DoD ("live UAT-47-a/b/SWEEP-03/04/06 PROVEN on `origin/main` + at least one real production fix flowing through the expanded surface"). Capability 5 (one new scaffold — `PDF_PARSE_FAILED` recommended) brings the "expanded surface" requirement into reach within 5-6 phases. Capabilities 6 + 7 are valuable but deferrable.
+**Retry trigger:** `chrome.runtime.onStartup` and `chrome.runtime.onInstalled` event handlers in both `service-worker.js` and `firefox/background.js`. On each trigger, read `reportQueue`, attempt to submit each item, remove items that succeed or have `attempts >= 3`.
+
+**Quota math:** 5 queued reports × 6 KB each = 30 KB. The 10 MB quota has a 99.97% margin.
+
+**Firefox parity:** `chrome.storage.local` is natively supported in Firefox without polyfill — confirmed by the existing `PROJECT.md` "No webextension-polyfill" key decision.
+
+**Confidence: HIGH** — [Chrome Storage API docs](https://developer.chrome.com/docs/extensions/reference/api/storage) confirm `QUOTA_BYTES = 10,485,760` (10 MB, Chrome 114+; 5 MB pre-Chrome 114).
+
+---
+
+## Q6: Rate Limit Implementation
+
+### Pattern: Sliding-Window Counter in `chrome.storage.local`
+
+No library. Pure JS in the background service worker.
+
+```javascript
+// Storage key: 'reportRateLimit'
+// Value shape: { timestamps: [number, ...] }
+
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;  // 10 minutes
+const RATE_LIMIT_MAX = 5;
+
+async function checkAndRecordRateLimit() {
+  const now = Date.now();
+  const data = await chrome.storage.local.get('reportRateLimit');
+  const timestamps = (data.reportRateLimit?.timestamps ?? [])
+    .filter(t => now - t < RATE_LIMIT_WINDOW_MS);  // prune expired entries
+
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    return { allowed: false, remainingMs: RATE_LIMIT_WINDOW_MS - (now - timestamps[0]) };
+  }
+
+  timestamps.push(now);
+  await chrome.storage.local.set({ reportRateLimit: { timestamps } });
+  return { allowed: true };
+}
+```
+
+This runs atomically in the background SW message handler for `MSG.SUBMIT_REPORT` — the rate check and the fetch happen in sequence in the same async function. No race condition risk because the extension's background context is single-threaded in practice (one message processed at a time per the Chrome extension event model).
+
+**Pattern precedent:** The existing `service-worker.js` already does `chrome.storage.local.get('currentPatent')` / `chrome.storage.local.set({ currentPatent })` pairs in every message handler. The rate limit counter follows identical structure.
+
+**Confidence: HIGH** — this is a pure-JS pattern with no external dependencies, verified against existing codebase patterns.
+
+---
+
+## Q7: What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `axios` | HTTP client library (~40 KB); does nothing `fetch()` doesn't already do; would be the first runtime npm dep in the extension build | `fetch()` — already used at `src/offscreen/offscreen.js:199, 246, 295, 427`; available natively in Workers runtime and extension background contexts |
+| `uuid` / `nanoid` | Random ID generation libraries | `crypto.randomUUID()` — available natively in MV3 service workers and Cloudflare Workers runtime; zero bundle cost |
+| `discord.js` / any Discord SDK | Server-side bot library with massive dependencies; designed for persistent WebSocket connections, not one-off webhook POSTs | Plain `fetch()` POST to the webhook URL — Discord webhooks are stateless HTTP, no persistent connection needed |
+| `node-fetch` / `cross-fetch` | Node.js fetch compatibility shims | `fetch` is native in Cloudflare Workers runtime AND in extension service workers (MV3) — no shim needed |
+| `date-fns` / `dayjs` / `moment` | Date formatting | `new Date(timestamp).toISOString()` for Discord `timestamp` field; `Date.now()` for all other timestamps |
+| `crypto-js` / `sha.js` / `js-sha256` | SHA-256 for fingerprint computation | `crypto.subtle.digest('SHA-256', ...)` — available natively in Cloudflare Workers runtime (Web Crypto API) |
+| `ky` | Fetch wrapper with retry/timeout | Manual retry is 10 lines; adding a library dependency for this violates the zero-new-deps constraint |
+| `zod` / `joi` / `ajv` | Schema validation of report payload | A 3-field structural check at the Worker is sufficient (`typeof report.patentNumber === 'string'`); full schema validation is overkill for a solo-maintainer observability payload |
+| `p-retry` / `async-retry` / `cockatiel` | Retry logic with backoff | The retry interval is "on next extension load" — not time-based backoff. A simple loop over `reportQueue` on `onStartup` is 10 lines. |
+| `webextension-polyfill` | Chrome API compatibility for Firefox | Firefox natively supports `chrome.*` namespace — this is an explicit "Out of Scope" decision in `PROJECT.md` |
+| Durable Objects / D1 | More capable Cloudflare persistence options | KV is already deployed and sufficient; adding a new Cloudflare product class breaks the free-tier assumption and introduces Wrangler migration complexity |
+
+---
+
+## Integration Points: Exact Files for New Code
+
+| Component | File | Nature of Change |
+|-----------|------|-----------------|
+| Worker route + handlers | `worker/src/index.js` | Add `handleReport()` + `computeFingerprint()` + `postToDiscord()` functions; add dispatch at ~line 253 BEFORE USPTO fallthrough |
+| Worker KV namespace | `worker/wrangler.toml` | Add second `[[kv_namespaces]]` block for `BUG_REPORTS` |
+| Worker Discord secret | CLI only (`wrangler secret put DISCORD_WEBHOOK_URL`) | Never appears in any file |
+| Message type constants | `src/shared/constants.js` | Add `SUBMIT_REPORT: 'submit-report'` and `REPORT_RESULT: 'report-result'` to `MSG` object |
+| Chrome background handler | `src/background/service-worker.js` | Add `MSG.SUBMIT_REPORT` branch to the `onMessage.addListener` at line 132; add `onStartup` queue-retry handler; add `checkAndRecordRateLimit()` helper |
+| Firefox background handler | `src/firefox/background.js` | Mirror the same `SUBMIT_REPORT` handler — Firefox background already does Worker fetches; same storage patterns |
+| Citation UI — Report button | `src/content/citation-ui.js` | Report button affordance in Shadow DOM; collect diagnostic payload; `chrome.runtime.sendMessage(MSG.SUBMIT_REPORT, ...)` |
+| Options page JS | `src/options/options.js` | Add `debugMode` checkbox handler using `chrome.storage.sync.set({ debugMode: checked })` — same auto-save + showSaved pattern as existing controls |
+| Options page HTML | `src/options/options.html` | Add Debug Mode section with checkbox + `<span id="debugModeSaved">` element |
+| Popup | `src/popup/popup.html` + popup JS | Secondary "Report a problem" affordance for the "tool didn't load at all" case |
+
+---
+
+## Recommended Stack Summary
+
+### Core Technologies (Zero New Deps — Sixth Consecutive Milestone)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| Cloudflare Workers (ES Modules) | existing deployed | New `/report` route handler | Already running; same `export default { fetch }` syntax; zero new infrastructure |
+| Cloudflare KV — `BUG_REPORTS` namespace | new namespace, existing service | 90-day durable report storage | Already used for `PATENT_CACHE`; `expirationTtl: 7776000` for auto-expiry; free-tier compatible |
+| Discord Webhook HTTP POST | N/A (HTTP only) | Real-time maintainer notification | Stateless HTTP; no SDK; webhook URL stays in Worker secret, never in extension code |
+| `wrangler secret put` | existing CLI | Discord webhook URL secret management | Encrypted at rest in Cloudflare; accessed as `env.DISCORD_WEBHOOK_URL` at runtime |
+| `crypto.subtle.digest` (Web Crypto) | built-in Workers runtime | Server-side SHA-256 fingerprint | Available natively; no library |
+| `chrome.storage.local` | built-in extension API | Rate-limit timestamp ring + retry queue | Already used for `currentPatent`; 10 MB quota; survives SW restarts; works in private browsing |
+| `chrome.storage.sync` | built-in extension API | Debug Mode toggle (syncs across devices) | Already used for all options settings in `src/options/options.js` |
+| `fetch()` from background service worker | built-in | Report submission POST to Worker | Content scripts cannot cross-origin fetch; background can; `pct.tonyrowles.com/*` already in `host_permissions` |
+| `crypto.randomUUID()` | built-in | Client-side report ID for retry queue | Available in MV3 service workers natively |
+
+### What Does NOT Change
+
+| Item | Reason |
+|------|--------|
+| `wrangler.toml` `compatibility_date` | Stays `2025-01-01` — no new Workers APIs needed |
+| `PATENT_CACHE` KV binding | Untouched — separate namespace, no TTL change |
+| `PROXY_TOKEN` auth check | `/report` inherits existing bearer auth, no change needed |
+| Both manifests `host_permissions` | `pct.tonyrowles.com/*` already covers `/report` endpoint |
+| esbuild pipeline structure | No structural change — new source files drop into existing `src/` directories |
+| `PROXY_TOKEN` embedding in offscreen.js | Existing known debt; v5.0 does not fix it (that would be a security refactor out of scope) |
+
+---
+
+## Alternatives Considered
+
+| Recommended | Alternative | Why Not |
+|-------------|-------------|---------|
+| `chrome.storage.local` for retry queue | IndexedDB | IDB has `idbAvailable` graceful-degradation flag — silently fails in Firefox private browsing; a retry queue that silently drops reports on IDB failure is broken by design |
+| Background service worker for report `fetch()` | Content script fetch | Chrome docs are explicit: "Cross-origin requests are always treated as such in content scripts, even if the extension has host permissions." |
+| Fingerprint-first KV key `report:{fp}:{ts}` | Timestamp-first `report:{ts}:{fp}` | Dedup check requires `list({ prefix: 'report:{fp}:' })` — only works if fingerprint is the prefix component; timestamp-first forces full namespace scan |
+| 90-day KV TTL | Indefinite storage | Reports are transient observability data; indefinite storage wastes free-tier KV quota with no benefit after triage window; contrast with position maps which are immutable and beneficial indefinitely |
+| Worker-side Discord POST | Extension-side Discord POST | Webhook URL must NEVER be in extension code — it's extractable from the extension package by any user. Worker keeps it server-side as an encrypted secret. |
+| Single embed, field-level truncation | Multi-embed rich layout | 6000-char total-across-all-embeds limit is a hard ceiling; single embed with truncated fields stays safely under 2000 chars and is sufficient for at-a-glance triage |
+| `crypto.subtle.digest` for fingerprint | Embedding a SHA-256 library | Web Crypto API is available natively in both Workers runtime and MV3 service workers; adding a library would be the first runtime npm dependency in the Worker |
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Basis |
+|------|------------|-------|
+| Worker route insertion point | HIGH | Read `worker/src/index.js` directly; exact line numbers identified |
+| `wrangler.toml` KV binding syntax | HIGH | Cloudflare official docs confirmed `[[kv_namespaces]]` repeat syntax |
+| Worker secret mechanism | HIGH | Cloudflare official docs for `wrangler secret put` |
+| `host_permissions` coverage | HIGH | Both manifests read directly; `pct.tonyrowles.com/*` confirmed |
+| Background-vs-content fetch CORS | HIGH | Chrome official extension docs quote confirmed |
+| Discord webhook payload format | HIGH | Discord official docs confirmed field list; field character limits from embed docs |
+| Discord webhook character limits | MEDIUM | 6000-char total-embeds limit confirmed from secondary source (Discord docs confirmed individual field limits; total-across-embeds limit from [discord-webhook.com](https://discord-webhook.com/en/blog/discord-webhook-embed-limits/)) |
+| Discord rate limits | MEDIUM | 5/2sec confirmed from [birdie0 guide](https://birdie0.github.io/discord-webhooks-guide/other/rate_limits.html); Discord official rate-limit docs confirmed the header names but the webhook-specific sub-limit was secondary |
+| `chrome.storage.local` quota | HIGH | Chrome for Developers API reference confirmed 10 MB (Chrome 114+), 5 MB (≤113) |
+| KV TTL minimum and value size limit | HIGH | Cloudflare official KV docs confirmed 60s minimum TTL, 25 MB value limit |
 
 ---
 
 ## Sources
 
-- `https://code.claude.com/docs/en/cli-reference` — fetched 2026-06-08; canonical CLI flag documentation (HIGH confidence)
-  - `--max-turns N` semantics: "Limit the number of agentic turns (print mode only). Exits with an error when the limit is reached."
-  - `--allowedTools` semantics: "Tools that execute without prompting for permission. To restrict which tools are available, use `--tools` instead."
-  - `--tools` semantics: "Restrict which built-in tools Claude can use. Use `""` to disable all, `"default"` for all, or tool names like `Bash,Edit,Read`."
-  - `--max-budget-usd N.NN` semantics: "Maximum dollar amount to spend on API calls before stopping (print mode only)"
-- `https://github.com/anthropics/anthropic-sdk-typescript/releases` — fetched 2026-06-08; 0.100.1 → 0.102.0 changelog (HIGH confidence)
-- `https://github.com/peter-evans/create-pull-request/releases` — fetched 2026-06-08; v8.0.0 / v8.1.0 / v8.1.1 release notes (HIGH confidence)
-- WebSearch: Vitest 5.0 / 4.1 / 3.x version status (MEDIUM confidence — secondary summaries; Vitest team policy on 3.x backports confirmed in releasebot.io page)
-- Direct code reading: `tests/e2e/lib/llm-driver.js` lines 76-146 (subscription transport argv shape), 378-450 (subscription ledger wrapper), 506-647 (SDK ledger wrapper)
-- Direct code reading: `tests/e2e/lib/fix-prompt-builder.js` lines 117-178 (`buildScaffoldSystemPrompt` helper), 357-363 (PROMPT_SCAFFOLDS frozen registry)
-- Direct code reading: `tests/e2e/lib/llm-ledger.js` lines 74-98 (`LEDGER_PATH` resolution), 686-738 (`appendLedgerEntry` body — additive-only target)
-- Direct code reading: `tests/e2e/lib/triage-classifier.js` lines 400-504 (D-03 rule chain), 644-716 (5-state FLAKE classifier)
-- Direct code reading: `scripts/a-b-winner.mjs` lines 178-285 (filter + group + abstention probe)
-- Memory file: `project_auto_fix_ledger_leak_vector.md` — leak vector via `source: 'auto-fix-api'` orphan entries (cross-checked against v4.3 carry-over C in STATE.md)
-- `.planning/STATE.md` line 80-85 — v4.3 carry-over A/B/C/D scope (load-bearing requirements baseline)
-- `.planning/research-v4.2-archive/STACK.md` — prior cycle's stack research (consulted, not duplicated; v4.2 work items 1-4 are SHIPPED — v4.3 builds on top)
+- `worker/src/index.js` — direct source read; ES Modules syntax, route dispatch, auth, CORS, env bindings confirmed
+- `worker/wrangler.toml` — direct source read; `PATENT_CACHE` binding, `compatibility_date` confirmed
+- `src/offscreen/offscreen.js:23-24` — direct source read; `WORKER_URL`, `PROXY_TOKEN` constants; existing fetch call patterns
+- `src/manifest.json` + `src/manifest.firefox.json` — direct source read; `host_permissions` for `pct.tonyrowles.com/*` confirmed
+- `src/options/options.js` — direct source read; `chrome.storage.sync` auto-save pattern for options settings
+- `src/background/service-worker.js` — direct source read; `chrome.storage.local` pattern, message dispatch shape
+- `src/firefox/background.js` — direct source read; Worker fetch imports (`fetchAndParsePdf`, `fetchUsptoAndParse`), storage pattern
+- `src/shared/constants.js` — direct source read; `MSG` object structure
+- [Cloudflare Workers Secrets docs](https://developers.cloudflare.com/workers/configuration/secrets/) — `wrangler secret put`; `env.*` access at runtime — HIGH confidence
+- [Cloudflare KV Write docs](https://developers.cloudflare.com/kv/api/write-key-value-pairs/) — `expirationTtl` min 60s; 25 MB value limit — HIGH confidence
+- [Cloudflare KV Bindings docs](https://developers.cloudflare.com/kv/concepts/kv-bindings/) — multiple `[[kv_namespaces]]` block syntax — HIGH confidence
+- [Chrome Storage API docs](https://developer.chrome.com/docs/extensions/reference/api/storage) — `QUOTA_BYTES = 10,485,760` (Chrome 114+, 5 MB pre-114) — HIGH confidence
+- [Chrome Cross-Origin Network Requests docs](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests) — "Cross-origin requests are always treated as such in content scripts, even if the extension has host permissions" — HIGH confidence
+- [Discord Embed Limits](https://discord-webhook.com/en/blog/discord-webhook-embed-limits/) — 6000 total-chars-across-embeds hard limit, per-field limits — MEDIUM confidence
+- [birdie0 Discord Webhooks Rate Limits](https://birdie0.github.io/discord-webhooks-guide/other/rate_limits.html) — 5 requests per 2 seconds per webhook; failed requests count toward limit — MEDIUM confidence
 
 ---
 
-*Stack research for: v4.3 Auto-Fix Loop Closure + Capability Expansion (subsequent milestone — capability extension on the v4.0–v4.2 stack)*
-*Researched: 2026-06-08*
-*Confidence: HIGH (CLI flags + SDK changelog + GitHub releases all verified directly against authoritative sources; only the in-codebase wiring is novel and that surface is read verbatim from local files)*
+*Stack research for: v5.0 Bug Report Feature — Cloudflare Worker /report route, KV durable storage, Discord webhook notification, extension-side transport + retry*
+*Researched: 2026-06-12*
+*Confidence: HIGH overall (all Worker/extension source read directly; external API limits verified from official or well-cited sources)*

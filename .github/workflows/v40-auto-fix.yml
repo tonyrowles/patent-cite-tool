@@ -40,9 +40,21 @@
 
 name: V40 Auto Fix
 
+# PAUSED 2026-06-12: v4.3 auto-fix milestone backburnered for public-release
+# work (see STATE.md). Workflow is dormant — code preserved, automatic firing
+# disabled. To resume, restore the trigger block below:
+#
+#   on:
+#     issues:
+#       types: [labeled]
+#
+# Manual invocation note: the body references ${{ github.event.issue.number }}
+# and ${{ github.event.label.name }} — manual workflow_dispatch runs will
+# fail until those refs are rewired to inputs. The dispatch entry exists only
+# so the workflow shows up in the Actions UI; do not rely on it firing
+# cleanly without restoring the issues trigger.
 on:
-  issues:
-    types: [labeled]
+  workflow_dispatch:
 
 # Per-issue serialization; cancel-in-progress: false protects in-flight LLM
 # cost (Pitfall 7). Opposite of Phase 41 verifier-gate.

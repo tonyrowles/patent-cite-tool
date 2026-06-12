@@ -153,61 +153,61 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+Which phases cover which requirements. Updated during roadmap creation 2026-06-12.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| XPORT-01 | TBD | Pending |
-| XPORT-02 | TBD | Pending |
-| XPORT-03 | TBD | Pending |
-| XPORT-04 | TBD | Pending |
-| PAY-01 | TBD | Pending |
-| PAY-02 | TBD | Pending |
-| PAY-03 | TBD | Pending |
-| PAY-04 | TBD | Pending |
-| PRIV-01 | TBD | Pending |
-| PRIV-02 | TBD | Pending |
-| PRIV-03 | TBD | Pending |
-| PRIV-04 | TBD | Pending |
-| PRIV-05 | TBD | Pending |
-| LIMIT-01 | TBD | Pending |
-| LIMIT-02 | TBD | Pending |
-| PAY-05 | TBD | Pending |
-| PAY-06 | TBD | Pending |
-| PAY-07 | TBD | Pending |
-| XPORT-05 | TBD | Pending |
-| XPORT-06 | TBD | Pending |
-| LIMIT-03 | TBD | Pending |
-| QUEUE-01 | TBD | Pending |
-| QUEUE-02 | TBD | Pending |
-| QUEUE-03 | TBD | Pending |
-| QUEUE-04 | TBD | Pending |
-| CAP-01 | TBD | Pending |
-| CAP-02 | TBD | Pending |
-| CAP-03 | TBD | Pending |
-| CAP-04 | TBD | Pending |
-| TRIG-01 | TBD | Pending |
-| TRIG-02 | TBD | Pending |
-| TRIG-03 | TBD | Pending |
-| TRIG-04 | TBD | Pending |
-| PAY-08 | TBD | Pending |
-| PAY-09 | TBD | Pending |
-| DBG-01 | TBD | Pending |
-| DBG-02 | TBD | Pending |
-| CAP-05 | TBD | Pending |
-| CAP-06 | TBD | Pending |
-| UAT-01 | TBD | Pending |
-| UAT-02 | TBD | Pending |
-| UAT-03 | TBD | Pending |
-| UAT-04 | TBD | Pending |
-| UAT-05 | TBD | Pending |
-| UAT-06 | TBD | Pending |
+| XPORT-01 | Phase 1 | Pending |
+| XPORT-02 | Phase 1 | Pending |
+| XPORT-03 | Phase 1 | Pending |
+| XPORT-04 | Phase 1 | Pending |
+| PAY-01 | Phase 1 | Pending |
+| PAY-02 | Phase 1 | Pending |
+| PAY-03 | Phase 1 | Pending |
+| PAY-04 | Phase 1 | Pending |
+| PRIV-01 | Phase 1 | Pending |
+| PRIV-02 | Phase 1 | Pending |
+| PRIV-03 | Phase 1 | Pending |
+| PRIV-04 | Phase 1 | Pending |
+| PRIV-05 | Phase 1 | Pending |
+| LIMIT-01 | Phase 1 | Pending |
+| LIMIT-02 | Phase 1 | Pending |
+| PAY-05 | Phase 2 | Pending |
+| PAY-06 | Phase 2 | Pending |
+| PAY-07 | Phase 2 | Pending |
+| XPORT-05 | Phase 3 | Pending |
+| XPORT-06 | Phase 3 | Pending |
+| LIMIT-03 | Phase 3 | Pending |
+| QUEUE-01 | Phase 3 | Pending |
+| QUEUE-02 | Phase 3 | Pending |
+| QUEUE-03 | Phase 3 | Pending |
+| QUEUE-04 | Phase 3 | Pending |
+| CAP-01 | Phase 4 | Pending |
+| CAP-02 | Phase 4 | Pending |
+| CAP-03 | Phase 4 | Pending |
+| CAP-04 | Phase 4 | Pending |
+| TRIG-01 | Phase 4 | Pending |
+| TRIG-02 | Phase 4 | Pending |
+| TRIG-03 | Phase 4 | Pending |
+| TRIG-04 | Phase 4 | Pending |
+| PAY-08 | Phase 4 | Pending |
+| PAY-09 | Phase 4 | Pending |
+| DBG-01 | Phase 5 | Pending |
+| DBG-02 | Phase 5 | Pending |
+| CAP-05 | Phase 5 | Pending |
+| CAP-06 | Phase 5 | Pending |
+| UAT-01 | Phase 5 | Pending |
+| UAT-02 | Phase 5 | Pending |
+| UAT-03 | Phase 5 | Pending |
+| UAT-04 | Phase 5 | Pending |
+| UAT-05 | Phase 5 | Pending |
+| UAT-06 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 44 total
-- Mapped to phases: 0 (filled by roadmapper in Step 10)
-- Unmapped: 44 (filled by roadmapper)
+- v1 requirements: 45 total
+- Mapped to phases: 45
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-12*
-*Last updated: 2026-06-12 after milestone-start research convergence (4 researchers + synthesizer, HIGH confidence)*
+*Last updated: 2026-06-12 — traceability table filled by roadmapper (45/45 requirements mapped, 0 orphans)*

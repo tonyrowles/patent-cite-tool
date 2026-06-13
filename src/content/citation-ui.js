@@ -5,8 +5,8 @@
  *
  * Exports:
  *   showFloatingButton(rect, onClick)   - Small "Cite" button near selection
- *   showCitationPopup(citation, rect, confidence, displayMode, matchedText) - Citation result
- *   showErrorPopup(errorMessage, rect)  - Error message popup
+ *   showCitationPopup(citation, rect, confidence, displayMode, matchedText, reportOutcome) - Citation result
+ *   showErrorPopup(errorMessage, rect, reportOutcome)  - Error message popup
  *   showLoadingIndicator(rect)          - Loading dots indicator
  *   showSuccessToast(citation, rect)    - Silent mode success pill (green, 2s auto-dismiss)
  *   showFailureToast(reason, rect)      - Silent mode failure pill (red, 4s auto-dismiss)
@@ -15,6 +15,8 @@
  * All UI is injected via a single Shadow DOM host to prevent CSS conflicts
  * with Google Patents (which uses Polymer web components).
  */
+
+import { showReportDialog } from './report-dialog.js';
 
 let citationHost = null;
 let citationShadow = null;
@@ -107,8 +109,9 @@ export function showFloatingButton(rect, onClick) {
  * @param {number} confidence - Match confidence (0-1).
  * @param {string} displayMode - 'default' or 'advanced'.
  * @param {string} [matchedText] - Matched text for advanced display.
+ * @param {{ category: string|null, confidenceTier: string }|null} [reportOutcome] - Report outcome for button injection; null = no button (CAP-03 / TRIG-04).
  */
-export function showCitationPopup(citation, rect, confidence, displayMode, matchedText) {
+export function showCitationPopup(citation, rect, confidence, displayMode, matchedText, reportOutcome = null) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -146,6 +149,23 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
     dot.title = confidenceLabel;
     row.appendChild(dot);
   }
+
+  // Report button (CAP-03 / TRIG-04): injected only when outcome is non-green
+  // D-05: button surfaces the affordance — dialog opens ONLY on click, never auto-opening.
+  if (reportOutcome && reportOutcome.confidenceTier !== 'green') {
+    const reportBtn = document.createElement('button');
+    reportBtn.className = 'cite-report-btn';
+    reportBtn.title = 'Report a problem';
+    reportBtn.setAttribute('aria-label', 'Report a problem with this citation');
+    // D-06: all non-green outcomes show the nudge label (failure/yellow/error)
+    reportBtn.textContent = '⚑ Report a problem';
+    reportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showReportDialog(shadow, reportOutcome, rect, reportBtn);
+    });
+    row.appendChild(reportBtn);
+  }
+  // TRIG-04: if confidenceTier === 'green' (or reportOutcome is null), button is not appended
 
   popup.appendChild(row);
 
@@ -236,8 +256,9 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
  *
  * @param {string} errorMessage - Error text to display.
  * @param {DOMRect} rect - Bounding rect near which to show the error.
+ * @param {{ category: string|null, confidenceTier: string }|null} [reportOutcome] - Report outcome for button injection; null = no button (CAP-03 / TRIG-04).
  */
-export function showErrorPopup(errorMessage, rect) {
+export function showErrorPopup(errorMessage, rect, reportOutcome = null) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -251,6 +272,22 @@ export function showErrorPopup(errorMessage, rect) {
   msg.className = 'cite-error-msg';
   msg.textContent = errorMessage;
   popup.appendChild(msg);
+
+  // Report button for error popups (CAP-03 / TRIG-01/03 / TRIG-04)
+  // D-05: button surfaces affordance only — dialog opens on click.
+  if (reportOutcome && reportOutcome.confidenceTier !== 'green') {
+    const reportBtn = document.createElement('button');
+    reportBtn.className = 'cite-report-btn';
+    reportBtn.title = 'Report a problem';
+    reportBtn.setAttribute('aria-label', 'Report a problem with this citation');
+    // D-06: nudge label on failure/error outcomes
+    reportBtn.textContent = '⚑ Report a problem';
+    reportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showReportDialog(shadow, reportOutcome, rect, reportBtn);
+    });
+    popup.appendChild(reportBtn);
+  }
 
   let top = rect.bottom + 8;
   let left = rect.left;
@@ -492,6 +529,33 @@ function getCitationPopupCSS() {
     .cite-error-msg {
       color: #991b1b;
       font-size: 12px;
+    }
+    .cite-report-btn {
+      border: none;
+      border-radius: 4px;
+      background: rgba(245, 158, 11, 0.08);
+      color: #92400e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 2px 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      min-width: 24px;
+      min-height: 24px;
+      line-height: 1.4;
+      transition: background 0.15s;
+    }
+    .cite-report-btn:hover {
+      background: #f3f4f6;
+      color: #1a1a1a;
+    }
+    .cite-report-btn:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    .cite-report-btn:active {
+      opacity: 0.8;
     }
   `;
 }

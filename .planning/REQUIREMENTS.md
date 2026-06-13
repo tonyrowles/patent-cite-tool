@@ -69,15 +69,15 @@ Phase numbering RESET via `--reset-phase-numbers`. v5.0 starts at Phase 1; v4.3 
 
 - [x] **CAP-01**: New `src/content/report-dialog.js` — Shadow DOM modal rendered inside the existing closed-shadow host from `citation-ui.js:getCitationHost()`; contents: 4-category radio picker (labels: "Inaccurate citation" / "No match found" / "Tool not working" / "Other"), optional free-text note (256-char limit with live counter), Submit + Cancel buttons, inline one-line privacy disclosure ("Includes patent #, your selection, URL, extension version — see what's sent")
 - [x] **CAP-02**: Expandable "What's included" panel inside the dialog — renders the full to-be-submitted payload preview (field-by-field) AND a [Remove selection text] toggle that, when activated, sets `includeSelectionText: false` for the buildReportPayload call so `selectionText` is omitted entirely from the payload before submit; toggle state is sticky per install via `chrome.storage.local` key `reportDialogRemoveSelectionText`
-- [ ] **CAP-03**: Report button added to existing citation popup in `src/content/citation-ui.js` adjacent to the copy action; visually unobtrusive (icon-only, e.g., flag/megaphone glyph) with `title="Report a problem"` tooltip; category auto-selected based on the outcome that triggered the popup (no-match → "No match found"; yellow-confidence → "Inaccurate citation"; worker-fallback-error → "Tool not working")
+- [x] **CAP-03**: Report button added to existing citation popup in `src/content/citation-ui.js` adjacent to the copy action; visually unobtrusive (icon-only, e.g., flag/megaphone glyph) with `title="Report a problem"` tooltip; category auto-selected based on the outcome that triggered the popup (no-match → "No match found"; yellow-confidence → "Inaccurate citation"; worker-fallback-error → "Tool not working")
 - [x] **CAP-04**: Dialog UX — closes on Submit success (toast confirmation per QUEUE-04); Cancel button dismisses with no submission; Escape key dismisses; click-outside dismisses; tab order + ARIA labels for keyboard accessibility; focus trapped within the modal while open
 
 **Trigger — auto-surfacing conditions:**
 
-- [ ] **TRIG-01**: Report button auto-surfaces on No-match / failure outcomes — when `matchAndCite` returns no match, USPTO fallback fails, or the extension throws an uncaught error inside the citation flow; auto-selects category "No match found" or "Tool not working" depending on which path failed
-- [ ] **TRIG-02**: Report button auto-surfaces on Yellow confidence outcomes — Tier 5 gutter-tolerant matches (0.85 confidence cap) AND any other yellow-tier outcome; piggy-backs on the same UI moment that already shows the yellow indicator; auto-selects "Inaccurate citation"
-- [ ] **TRIG-03**: Report button auto-surfaces on Worker-fallback errors — when USPTO Worker proxy returns 5xx or times out (caught at the existing fallback site); auto-selects "Tool not working"
-- [ ] **TRIG-04**: Report button does NOT auto-surface on Green / high-confidence successful citations; only available manually in this case via Debug Mode (DBG-01). Rationale: noise reduction; green-but-wrong is rare and the maintainer surfaces it via Debug Mode
+- [x] **TRIG-01**: Report button auto-surfaces on No-match / failure outcomes — when `matchAndCite` returns no match, USPTO fallback fails, or the extension throws an uncaught error inside the citation flow; auto-selects category "No match found" or "Tool not working" depending on which path failed
+- [x] **TRIG-02**: Report button auto-surfaces on Yellow confidence outcomes — Tier 5 gutter-tolerant matches (0.85 confidence cap) AND any other yellow-tier outcome; piggy-backs on the same UI moment that already shows the yellow indicator; auto-selects "Inaccurate citation"
+- [x] **TRIG-03**: Report button auto-surfaces on Worker-fallback errors — when USPTO Worker proxy returns 5xx or times out (caught at the existing fallback site); auto-selects "Tool not working"
+- [x] **TRIG-04**: Report button does NOT auto-surface on Green / high-confidence successful citations; only available manually in this case via Debug Mode (DBG-01). Rationale: noise reduction; green-but-wrong is rare and the maintainer surfaces it via Debug Mode
 
 **Payload — diagnostic enrichment:**
 
@@ -184,12 +184,12 @@ Which phases cover which requirements. Updated during roadmap creation 2026-06-1
 | QUEUE-04 | Phase 3 | Complete |
 | CAP-01 | Phase 4 | Complete |
 | CAP-02 | Phase 4 | Complete |
-| CAP-03 | Phase 4 | Pending |
+| CAP-03 | Phase 4 | Complete |
 | CAP-04 | Phase 4 | Complete |
-| TRIG-01 | Phase 4 | Pending |
-| TRIG-02 | Phase 4 | Pending |
-| TRIG-03 | Phase 4 | Pending |
-| TRIG-04 | Phase 4 | Pending |
+| TRIG-01 | Phase 4 | Complete |
+| TRIG-02 | Phase 4 | Complete |
+| TRIG-03 | Phase 4 | Complete |
+| TRIG-04 | Phase 4 | Complete |
 | PAY-08 | Phase 4 | Complete |
 | PAY-09 | Phase 4 | Complete |
 | DBG-01 | Phase 5 | Pending |

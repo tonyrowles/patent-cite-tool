@@ -731,7 +731,7 @@ No external dependencies added. No new environment setup required.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`[PCT]` vs `[CS]` prefix for content-script errors**
    - What we know: D-08 says "e.g. [SW]/[PCT] prefixes" — PCT likely stands for "Patent Citation Tool"

@@ -91,7 +91,7 @@
   <p class="subtitle"><strong>Patent Citation Tool</strong></p>
   <p class="last-updated">Last updated: March 2026</p>
 
-  <p>Patent Citation Tool does not collect, store, or transmit any personal data. The extension runs entirely in your browser and only communicates with two services for its core citation generation functionality.</p>
+  <p>Patent Citation Tool does not collect, store, or transmit any personal data, except as described in the Bug Report Feature section below. The extension runs entirely in your browser and only communicates with two services for its core citation generation functionality.</p>
 
   <h2>Information We Collect</h2>
   <p>We collect <strong>no personal information</strong> of any kind. Specifically:</p>
@@ -140,6 +140,29 @@
 
   <h2>Contact</h2>
   <p>For questions about this privacy policy, please open an issue at <a href="https://github.com/tonyrowles/patent-cite-tool">https://github.com/tonyrowles/patent-cite-tool</a>.</p>
+
+  <h2>Bug Report Feature</h2>
+  <p>The extension includes a voluntary bug report feature that allows you to submit a diagnostic report when you encounter a citation failure. Submission is entirely optional and user-initiated — a report is only sent when you explicitly click the Submit button. No data is collected during normal citation-only operation.</p>
+  <p><strong>What is transmitted when you submit a bug report:</strong></p>
+  <ul>
+    <li><strong>Patent number</strong> — the US patent number of the page you were viewing</li>
+    <li><strong>Patent URL</strong> — the Google Patents URL of the patent page</li>
+    <li><strong>Selection text</strong> (optional) — the text you had highlighted, up to approximately 200 characters. You can remove this before submitting using the [Remove selection text] toggle. This field is not transmitted if you toggle it off.</li>
+    <li><strong>Returned citation</strong> — the citation result the extension produced (or a no-match flag)</li>
+    <li><strong>Confidence tier</strong> — the confidence level of the citation result (green / yellow / red)</li>
+    <li><strong>Extension version</strong> — the installed version of this extension</li>
+    <li><strong>Browser and OS</strong> — your browser name and operating system</li>
+    <li><strong>Selected-node XPath</strong> — the DOM path of the element containing your selected text</li>
+    <li><strong>Scroll and viewport position</strong> — scroll offset and viewport dimensions at the time of the report</li>
+    <li><strong>PDF parse status</strong> — whether the patent PDF was successfully parsed</li>
+    <li><strong>Trigger mode</strong> — your configured citation trigger mode (floating button, automatic, context menu, or silent)</li>
+    <li><strong>Recent error log</strong> — up to 20 recent internal extension errors or warnings, if any occurred</li>
+    <li><strong>Free-text note</strong> (optional) — any additional description you choose to provide</li>
+  </ul>
+  <p><strong>No IP address is stored in bug report records.</strong> Your IP address is used only for transient server-side rate limiting (a short-lived counter that resets automatically) and is never written to any stored report record.</p>
+  <p><strong>Retention:</strong> Bug reports are retained for 90 days and then automatically deleted.</p>
+  <p><strong>Purpose:</strong> Reports are used solely for maintainer triage — to identify and fix citation failures. They are not used for advertising, analytics, or any other purpose.</p>
+  <p><strong>Destinations:</strong> Submitted reports are stored in Cloudflare KV (the <code>BUG_REPORTS</code> namespace on first-party infrastructure at pct.tonyrowles.com) and a notification is sent to a maintainer-only Discord channel. These are the only destinations. No data is shared with third parties.</p>
 
   <footer>
     Patent Citation Tool &mdash; <a href="https://github.com/tonyrowles/patent-cite-tool">GitHub</a>

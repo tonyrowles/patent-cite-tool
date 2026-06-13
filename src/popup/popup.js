@@ -99,6 +99,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       chrome.runtime.openOptionsPage();
     });
   }
+
+  // Open options page at the #report section when "Report a problem" is clicked.
+  // chrome.runtime.openOptionsPage() accepts no hash/fragment parameter.
+  // Signal the options page via chrome.storage.local (pendingOptionsHash pattern — Pitfall 5).
+  const reportLink = document.getElementById('reportLink');
+  if (reportLink) {
+    reportLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.storage.local.set({ pendingOptionsHash: '#report' }, () => {
+        chrome.runtime.openOptionsPage();
+      });
+    });
+  }
 });
 
 function createStatusDiv(className) {

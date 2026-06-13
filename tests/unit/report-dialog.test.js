@@ -232,10 +232,10 @@ describe('PAY-09: getOsString', () => {
     _resetBufferForTest();
   });
 
-  it('returns "Windows 10" for Windows 10 UA', () => {
+  it('returns "Windows 10/11" for Windows NT 10.0 UA (WR-02: both Win10 and Win11 use NT 10.0)', () => {
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' });
     const result = getOsString();
-    expect(result).toBe('Windows 10');
+    expect(result).toBe('Windows 10/11');
   });
 
   it('returns "macOS" for Mac UA', () => {

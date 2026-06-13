@@ -136,6 +136,11 @@ v4.1 landed v4.0's 215 commits on origin/main and hardened the ruleset trust bou
 - ✓ **DIGEST-01..04**: Monday 07:00 UTC GitHub Discussion (or `e2e-digest` labeled issue fallback) + committed markdown file with findings count, classification breakdown, top 3 failure categories, quarantine growth, cost vs cap — all within 50 lines, anchored on frozen `SUMMARY_KEYS` array — Phase 37
 - ✓ **v3.1 cleanup**: 3 integration fragility warnings resolved (QUARANTINE_REPORT_FILENAME ESM, DIGEST-04 self-ref guard, `e2e-nightly` upload-artifact quarantine clause); Nyquist VALIDATION coverage stamped on 5 carry-over phases; 8/8 live human-UAT confirmations (5 PASS, 1 PARTIAL, 1 DONE, 1 DEFERRED) — Phase 38
 
+### Validated (v5.0)
+
+- ✓ **XPORT-01..04, PAY-01..04, LIMIT-01..02**: `POST /report` Cloudflare Worker route behind the existing Bearer `PROXY_TOKEN` gate; `BUG_REPORTS` KV namespace with `report:{fingerprint}:{timestamp}` keys at 90-day TTL; explicit field allowlist (no `ip`/`clientIp`/`userAgent` stored); SHA-256 fingerprint dedup (15-min window, increments `duplicate_count`); IP-keyed transient rate limit (5 req/60s via `rl:{ip}`); best-effort Discord webhook notification with the URL kept server-side only; `report-schema.md` Phase 2 contract; 23-case Vitest suite — Phase 1 (BLOCK-02 webhook hygiene, BLOCK-03 IP-not-in-KV resolved)
+- ✓ **PRIV-01..05**: Firefox manifest `data_collection_permissions` declared; privacy policy "Bug Report Feature" section with field-by-field disclosure; "no personal information" claims qualified to normal citation use; Data Sharing names Cloudflare/Discord as processors; CWS store-listing data-use declaration internally consistent across checklist, quick-reference, and body — Phase 1 (BLOCK-01 privacy compliance resolved). Human-judgment items carried to `01-HUMAN-UAT.md`: AMO required-vs-optional permission placement (WR-06), patentNumber input-validation scope (CR-01), and `web-ext lint` on a built `dist/firefox/` (PRIV-05, owned by Phase 5 UAT-04)
+
 ### Future
 
 - Chrome Web Store screenshot (1280x800) and promotional tile (440x280)
@@ -289,4 +294,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-12 — v5.0 milestone started (Bug Report Feature); v4.3 paused at Phase 67 (6/7 shipped) — carry-over scope flows to v5.1 per Pattern B versioning. Phase numbering reset for v5.0 (`--reset-phase-numbers`); v4.3 paused-phase artifacts archived to `.planning/milestones/v4.3-phases-paused/`*
+*Last updated: 2026-06-13 — v5.0 Phase 1 complete (Worker route + KV schema + privacy compliance groundwork; 3/3 plans, re-verified 15/15 after gap closure, BLOCK-01/02/03 resolved). v4.3 paused at Phase 67 (6/7 shipped) — carry-over scope flows to v5.1 per Pattern B versioning. Phase numbering reset for v5.0 (`--reset-phase-numbers`); v4.3 paused-phase artifacts archived to `.planning/milestones/v4.3-phases-paused/`*

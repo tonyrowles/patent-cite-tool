@@ -67,10 +67,10 @@ Phase numbering RESET via `--reset-phase-numbers`. v5.0 starts at Phase 1; v4.3 
 
 **Capture — Shadow DOM dialog in citation popup:**
 
-- [ ] **CAP-01**: New `src/content/report-dialog.js` — Shadow DOM modal rendered inside the existing closed-shadow host from `citation-ui.js:getCitationHost()`; contents: 4-category radio picker (labels: "Inaccurate citation" / "No match found" / "Tool not working" / "Other"), optional free-text note (256-char limit with live counter), Submit + Cancel buttons, inline one-line privacy disclosure ("Includes patent #, your selection, URL, extension version — see what's sent")
-- [ ] **CAP-02**: Expandable "What's included" panel inside the dialog — renders the full to-be-submitted payload preview (field-by-field) AND a [Remove selection text] toggle that, when activated, sets `includeSelectionText: false` for the buildReportPayload call so `selectionText` is omitted entirely from the payload before submit; toggle state is sticky per install via `chrome.storage.local` key `reportDialogRemoveSelectionText`
+- [x] **CAP-01**: New `src/content/report-dialog.js` — Shadow DOM modal rendered inside the existing closed-shadow host from `citation-ui.js:getCitationHost()`; contents: 4-category radio picker (labels: "Inaccurate citation" / "No match found" / "Tool not working" / "Other"), optional free-text note (256-char limit with live counter), Submit + Cancel buttons, inline one-line privacy disclosure ("Includes patent #, your selection, URL, extension version — see what's sent")
+- [x] **CAP-02**: Expandable "What's included" panel inside the dialog — renders the full to-be-submitted payload preview (field-by-field) AND a [Remove selection text] toggle that, when activated, sets `includeSelectionText: false` for the buildReportPayload call so `selectionText` is omitted entirely from the payload before submit; toggle state is sticky per install via `chrome.storage.local` key `reportDialogRemoveSelectionText`
 - [ ] **CAP-03**: Report button added to existing citation popup in `src/content/citation-ui.js` adjacent to the copy action; visually unobtrusive (icon-only, e.g., flag/megaphone glyph) with `title="Report a problem"` tooltip; category auto-selected based on the outcome that triggered the popup (no-match → "No match found"; yellow-confidence → "Inaccurate citation"; worker-fallback-error → "Tool not working")
-- [ ] **CAP-04**: Dialog UX — closes on Submit success (toast confirmation per QUEUE-04); Cancel button dismisses with no submission; Escape key dismisses; click-outside dismisses; tab order + ARIA labels for keyboard accessibility; focus trapped within the modal while open
+- [x] **CAP-04**: Dialog UX — closes on Submit success (toast confirmation per QUEUE-04); Cancel button dismisses with no submission; Escape key dismisses; click-outside dismisses; tab order + ARIA labels for keyboard accessibility; focus trapped within the modal while open
 
 **Trigger — auto-surfacing conditions:**
 
@@ -182,10 +182,10 @@ Which phases cover which requirements. Updated during roadmap creation 2026-06-1
 | QUEUE-02 | Phase 3 | Complete |
 | QUEUE-03 | Phase 3 | Complete |
 | QUEUE-04 | Phase 3 | Complete |
-| CAP-01 | Phase 4 | Pending |
-| CAP-02 | Phase 4 | Pending |
+| CAP-01 | Phase 4 | Complete |
+| CAP-02 | Phase 4 | Complete |
 | CAP-03 | Phase 4 | Pending |
-| CAP-04 | Phase 4 | Pending |
+| CAP-04 | Phase 4 | Complete |
 | TRIG-01 | Phase 4 | Pending |
 | TRIG-02 | Phase 4 | Pending |
 | TRIG-03 | Phase 4 | Pending |

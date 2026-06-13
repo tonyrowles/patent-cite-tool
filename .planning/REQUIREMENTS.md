@@ -81,8 +81,8 @@ Phase numbering RESET via `--reset-phase-numbers`. v5.0 starts at Phase 1; v4.3 
 
 **Payload — diagnostic enrichment:**
 
-- [ ] **PAY-08**: Error log ring buffer — last 20 console errors / extension-internal warnings captured to `chrome.storage.local` key `bugReportErrorBuffer` via a thin wrapper around `console.error` + `console.warn` in the content script + background; ring overwrites at 20; included in payload when present (PAY-06 reads the buffer)
-- [ ] **PAY-09**: DOM/PDF diagnostics — payload reuses the v3.1 `llm-report.json` schema field names where applicable (`selected_node_xpath`, `viewport_width`, `viewport_height`, `scroll_y`); new field `pdfParseStatus: 'success' | 'failed' | 'skipped' | 'cache-hit'` added; reused from existing capture sites in `src/content/` (do NOT re-derive these from scratch)
+- [x] **PAY-08**: Error log ring buffer — last 20 console errors / extension-internal warnings captured to `chrome.storage.local` key `bugReportErrorBuffer` via a thin wrapper around `console.error` + `console.warn` in the content script + background; ring overwrites at 20; included in payload when present (PAY-06 reads the buffer)
+- [x] **PAY-09**: DOM/PDF diagnostics — payload reuses the v3.1 `llm-report.json` schema field names where applicable (`selected_node_xpath`, `viewport_width`, `viewport_height`, `scroll_y`); new field `pdfParseStatus: 'success' | 'failed' | 'skipped' | 'cache-hit'` added; reused from existing capture sites in `src/content/` (do NOT re-derive these from scratch)
 
 ### Options Page Debug Mode + Popup Fallback (Phase 5, secondary surfaces)
 
@@ -190,8 +190,8 @@ Which phases cover which requirements. Updated during roadmap creation 2026-06-1
 | TRIG-02 | Phase 4 | Pending |
 | TRIG-03 | Phase 4 | Pending |
 | TRIG-04 | Phase 4 | Pending |
-| PAY-08 | Phase 4 | Pending |
-| PAY-09 | Phase 4 | Pending |
+| PAY-08 | Phase 4 | Complete |
+| PAY-09 | Phase 4 | Complete |
 | DBG-01 | Phase 5 | Pending |
 | DBG-02 | Phase 5 | Pending |
 | CAP-05 | Phase 5 | Pending |

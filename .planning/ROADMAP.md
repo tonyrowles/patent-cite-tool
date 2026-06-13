@@ -104,7 +104,7 @@
   5. Server-side dedup UAT-03: two submissions with identical fingerprint within 15 minutes produce exactly ONE KV record (with `duplicate_count: 2`) and ONE primary Discord notification; a third submission after 15 minutes creates a new record
 **UI hint**: yes
 **Plans**: 5 plans
-- [ ] 05-01-PLAN.md — Debug Mode: options debugMode checkbox + content-script live-read + citation-ui green-show plain-icon (DBG-01, DBG-02)
+- [x] 05-01-PLAN.md — Debug Mode: options debugMode checkbox + content-script live-read + citation-ui green-show plain-icon (DBG-01, DBG-02)
 - [ ] 05-02-PLAN.md — showReportDialog mountContext refactor (shadow|page) + bundling resolution; keeps Phase-4 shadow path green (CAP-06)
 - [ ] 05-03-PLAN.md — popup "Report a problem" link + options #report section + hash routing + page-mode dialog from currentPatent snapshot (CAP-05, CAP-06)
 - [ ] 05-04-PLAN.md — node-env Vitest static-grep guards for DBG-01/02, CAP-05/06, D-01/D-05/D-08 (DBG-01, DBG-02, CAP-05, CAP-06)
@@ -118,4 +118,4 @@
 | 2. Shared Constants + Pure Payload Builder | 1/1 | Complete   | 2026-06-13 |
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 3/3 | Complete   | 2026-06-13 |
 | 4. Report Dialog UI + Citation-UI Wiring | 4/4 | Complete   | 2026-06-13 |
-| 5. Options Page Debug Mode + Popup Fallback + Live UAT | 0/5 | Planned | - |
+| 5. Options Page Debug Mode + Popup Fallback + Live UAT | 1/5 | In Progress|  |

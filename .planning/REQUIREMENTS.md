@@ -88,8 +88,8 @@ Phase numbering RESET via `--reset-phase-numbers`. v5.0 starts at Phase 1; v4.3 
 
 **Debug Mode:**
 
-- [ ] **DBG-01**: Options page adds `debugMode` checkbox (default: false) — follows the existing `includePatentNumber` checkbox + auto-save UI pattern; persisted to `chrome.storage.sync`; labeled "Debug Mode — always show Report button" with description: "Surfaces the Report button on every citation, including successful ones. Useful for catching confidently-wrong citations the tool didn't flag."
-- [ ] **DBG-02**: When `debugMode === true` is read from `chrome.storage.sync` by the content script, the TRIG-04 "don't show on green" invariant relaxes — Report button shows on ALL citation outcomes; live read on each citation (no extension reload required to toggle)
+- [x] **DBG-01**: Options page adds `debugMode` checkbox (default: false) — follows the existing `includePatentNumber` checkbox + auto-save UI pattern; persisted to `chrome.storage.sync`; labeled "Debug Mode — always show Report button" with description: "Surfaces the Report button on every citation, including successful ones. Useful for catching confidently-wrong citations the tool didn't flag."
+- [x] **DBG-02**: When `debugMode === true` is read from `chrome.storage.sync` by the content script, the TRIG-04 "don't show on green" invariant relaxes — Report button shows on ALL citation outcomes; live read on each citation (no extension reload required to toggle)
 
 **Capture — fallback surfaces:**
 
@@ -192,8 +192,8 @@ Which phases cover which requirements. Updated during roadmap creation 2026-06-1
 | TRIG-04 | Phase 4 | Complete |
 | PAY-08 | Phase 4 | Complete |
 | PAY-09 | Phase 4 | Complete |
-| DBG-01 | Phase 5 | Pending |
-| DBG-02 | Phase 5 | Pending |
+| DBG-01 | Phase 5 | Complete |
+| DBG-02 | Phase 5 | Complete |
 | CAP-05 | Phase 5 | Pending |
 | CAP-06 | Phase 5 | Pending |
 | UAT-01 | Phase 5 | Pending |

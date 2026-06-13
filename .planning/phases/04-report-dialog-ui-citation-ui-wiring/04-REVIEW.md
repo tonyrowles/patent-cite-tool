@@ -14,7 +14,17 @@ findings:
   warning: 4
   info: 2
   total: 9
-status: issues_found
+resolutions:
+  CR-01: fixed (29e61f0) — added '[BG]' to EXTENSION_PREFIXES so Firefox background entries are captured
+  CR-02: fixed (a56903a) — citation-ui.js exports cancelPopupClickOutside(); showReportDialog() calls it on open so the stale popup mousedown handler can't tear out the host
+  CR-03: fixed (6058ace) — Submit disabled until the sticky reportDialogRemoveSelectionText pref loads; includeSelectionText derived from the live checkbox (no privacy race)
+  WR-01: fixed (3f993e6) — backgrounds set source=null on cache hit so getPdfParseStatus returns 'cache-hit'
+  WR-02: fixed (0b3c6d5,3eb9b40) — getOsString returns 'Windows 10/11' (UA can't distinguish); removed dead branch
+  WR-03: fixed (a51a161) — typeof-guard extractPatentInfo at line 718 (matches submit-handler guard)
+  WR-04: fixed (47a91d3) — builder-error catch shows neutral failure toast, not the rate-limit string
+  IN-01: deferred (info) — getBrowserString returns full version vs major-only; cosmetic
+  IN-02: deferred (info) — Submit-before-Cancel DOM/tab order vs HIG convention; cosmetic
+status: resolved
 ---
 
 # Phase 04: Code Review Report

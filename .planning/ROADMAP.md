@@ -45,7 +45,7 @@
 **Plans**: 3 plans
 - [x] 01-01-PLAN.md — POST /report Worker route, BUG_REPORTS KV namespace, fingerprint dedup + IP rate limit, Discord webhook, report-schema.md (XPORT-01..04, PAY-01..04, LIMIT-01/02)
 - [x] 01-02-PLAN.md — Privacy compliance gates: Firefox manifest data_collection_permissions, privacy policy Bug Report section, store-listing data-use update (PRIV-01..05)
-- [ ] 01-03-PLAN.md — Gap closure: reconcile store-listing CWS declaration (CR-02) + privacy policy collection/sharing claims (WR-07/08); fix duplicate_count off-by-one + falsy-zero coercion (WR-01/03) (PRIV-03, PRIV-04, LIMIT-01)
+- [x] 01-03-PLAN.md — Gap closure: reconcile store-listing CWS declaration (CR-02) + privacy policy collection/sharing claims (WR-07/08); fix duplicate_count off-by-one + falsy-zero coercion (WR-01/03) (PRIV-03, PRIV-04, LIMIT-01)
 **UI hint**: no
 
 ### Phase 2: Shared Constants + Pure Payload Builder
@@ -101,7 +101,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 2/2 | Complete   | 2026-06-13 |
+| 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 3/3 | Complete   | 2026-06-13 |
 | 2. Shared Constants + Pure Payload Builder | 0/TBD | Not started | - |
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 0/TBD | Not started | - |
 | 4. Report Dialog UI + Citation-UI Wiring | 0/TBD | Not started | - |

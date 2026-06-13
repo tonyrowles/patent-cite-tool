@@ -1,10 +1,11 @@
 ---
 phase: 4
 slug: report-dialog-ui-citation-ui-wiring
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-06-13
+reviewed_at: 2026-06-13
 ---
 
 # Phase 4 — UI Design Contract: Report Dialog UI + Citation-UI Wiring
@@ -49,7 +50,27 @@ spacing in `report-dialog.js` must use these values. **Source: citation-ui.js ex
 | xl | 32px | Not used in this popup-scale component |
 
 **Exceptions:**
-- Popup `padding: 8px 10px` (citation-ui.js:424) — 10px is the established token for the inline-padding of the parent popup; the Report panel padding matches at `padding: 12px 14px` to give slightly more room to the form content.
+
+> **Preamble:** This component deliberately inherits the existing `citation-ui.js` spacing scale
+> rather than a fresh 4px grid, per locked decision D-02 ("reuse the existing citation-pill
+> aesthetic"). The popup's own CSS uses sub-grid values (10px, 6px, 2px) that are not multiples
+> of 4. Every such value in this spec is inherited verbatim and is listed below with its source
+> and justification. Snapping them to a 4px grid would break visual consistency with the parent
+> popup and violate D-02.
+
+| Value | Location in spec | Justification |
+|-------|-----------------|---------------|
+| `10px` (inline-padding) | Popup `padding: 8px 10px` (citation-ui.js:424) | Inherited verbatim from citation-ui.js:424 — D-02 mandates matching the existing compact-popup token; the extension's established UI is not on a 4px grid. |
+| `14px` (panel padding-x) | Report panel `padding: 12px 14px` | Inherited from the popup's 10px inline-padding rhythm, nudged 2px wider to accommodate form content; compact-popup density convention consistent with the parent popup's 8px/10px rhythm (D-02). |
+| `6px` (radio group gap) | Radio group `gap: 6px` | Compact-popup density convention; consistent with the parent popup's 8px/10px rhythm (D-02). |
+| `10px` (radio group margin) | Radio group `margin-bottom: 10px` | Inherited verbatim from citation-ui.js compact-popup spacing rhythm — D-02 mandates matching the existing aesthetic; the extension's established UI is not on a 4px grid. |
+| `6px` (radio option gap) | Radio option label `gap: 6px` | Compact-popup density convention; consistent with the parent popup's 8px/10px rhythm (D-02). |
+| `6px 8px` (textarea padding) | Note textarea `padding: 6px 8px` | Inherited verbatim from citation-ui.js compact-popup token rhythm — D-02 mandates matching the existing aesthetic; the extension's established UI is not on a 4px grid. |
+| `2px` (counter margin) | Character counter `margin-top: 2px` | Compact-popup density convention; a 4px margin-top would add excessive separation between textarea and its live counter in this sub-scale context (D-02). |
+| `6px` (toggle margin) | Selection-text toggle `margin-top: 6px` | Compact-popup density convention; consistent with the parent popup's 8px/10px rhythm (D-02). |
+| `2px 6px` (nudge button padding) | Nudge Report button `padding: 2px 6px` | Compact-popup density convention; consistent with the parent popup's sub-grid rhythm (D-02). Button is icon+text and must remain compact enough to fit in `.cite-row`. |
+
+**Standard non-4-multiple values also inherited:**
 - Touch-target minimum: Report button click target must be at least 24px × 24px (icon-only mode); nudge mode adds text so it naturally exceeds this.
 - Positioning offsets: `top = rect.bottom + 8` (popup standard) and `left` clamped with `8px` inset (citation-ui.js:213-214) — replicated for the anchored report panel.
 
@@ -60,12 +81,21 @@ spacing in `report-dialog.js` must use these values. **Source: citation-ui.js ex
 All type in the report dialog inherits from the popup's established CSS. No new typefaces.
 **Source: citation-ui.js extracted CSS.**
 
+This component uses **3 type sizes** (collapsed from 4 to eliminate ambiguous 1px steps).
+The 12px size that appeared in the previous draft is absorbed into the 11px meta tier and
+the 13px body tier — both groups of elements are compact-popup scale and do not need a
+distinct 12px rung.
+
 | Role | Size | Weight | Line Height | CSS class / element |
 |------|------|--------|-------------|---------------------|
-| Body / form label | 13px | 400 (regular) | 1.4 | `.cite-report-panel`, radio labels, disclosure text |
-| Small / meta | 11px | 400 (regular) | 1.4 | `.cite-report-counter` (note char count), "What's included" field labels, copy button |
-| Button label | 11px–13px | 500 (medium) | 1.0 | Submit button, Cancel button, copy-btn equivalent |
-| Nudge label | 13px | 500 (medium) | 1.0 | Report button text in nudge mode ("Report a problem") |
+| Body / form label / button label | 13px | 400 (regular) or 500 (medium) | 1.4 | `.cite-report-panel`, radio labels, disclosure text, Submit button, Cancel button, nudge label |
+| Small / meta / counter | 11px | 400 (regular) | 1.4 | `.cite-report-counter` (note char count), "What's included" field labels and values, "see what's sent" inline toggle, selection-text toggle label |
+| Decorative glyph | 14px | 400 (regular) | 1.0 | `⚑` flag glyph in icon-only Report button only — size chosen to render the Unicode glyph at a visually balanced 24px touch target; not a text hierarchy level |
+
+**Why 3 sizes and not 4:** The existing popup uses 11px and 13px as its two functional text sizes
+(citation-ui.js:437, :475). A separate 12px rung would be a 1px delta with no perceptible hierarchy
+difference. The 14px entry is exclusively for the decorative flag glyph and should not be treated
+as a content hierarchy level.
 
 **Font stack (verbatim from citation-ui.js:425):**
 `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
@@ -111,6 +141,16 @@ All hex values are extracted verbatim from `citation-ui.js`. No new color values
 
 ## Component Anatomy
 
+### Focal Point
+
+**The Submit ("Submit report") button with its green accent (`#ecfdf5` background, `#065f46` text,
+`#a7f3d0` border) is the dialog's primary visual focal point and the only element using a non-neutral
+color.** The auto-selected radio option is the first keyboard focus target on open, but is visually
+secondary to the CTA. The executor should ensure the Submit button's green is the only saturated
+element in the panel and is never obscured by the collapsible section when expanded.
+
+---
+
 ### 1. Report Button (CAP-03) — added to `.cite-row` in `citation-ui.js`
 
 **Normal state (icon-only, never shown on green — TRIG-04):**
@@ -123,7 +163,7 @@ All hex values are extracted verbatim from `citation-ui.js`. No new color values
 - Background: transparent
 - Border: none
 - Color: `#6b7280` (muted)
-- Font-size: 14px (glyph)
+- Font-size: 14px (glyph only — decorative; see Typography section)
 - Cursor: pointer
 - Hidden entirely (`display: none`) when `confidenceTier === 'green'` (TRIG-04 invariant)
 
@@ -135,9 +175,9 @@ All hex values are extracted verbatim from `citation-ui.js`. No new color values
 - Background: `rgba(245, 158, 11, 0.08)` (amber tint, 8% opacity)
 - Border: none
 - Border-radius: 4px
-- Padding: 2px 6px
+- Padding: 2px 6px (see Exceptions — compact-popup density convention, D-02)
 - Color: `#92400e` (amber-900 — readable on white)
-- Font-size: 12px; font-weight: 500
+- Font-size: 13px; font-weight: 500
 
 **Hover state (both modes):**
 - Background: `#f3f4f6` (citation-ui.js copy-btn hover: citation-ui.js:459)
@@ -156,7 +196,7 @@ All hex values are extracted verbatim from `citation-ui.js`. No new color values
 - `min-width: 220px`
 - `max-width: 320px`
 - `width: auto`
-- `padding: 12px 14px`
+- `padding: 12px 14px` (see Exceptions — compact-popup density convention, D-02)
 
 **Visual shell (matches cite-popup exactly):**
 - `background: #ffffff`
@@ -194,8 +234,10 @@ Four options rendered as native `<input type="radio">` elements with `<label>` w
 - Tab order: radio group receives tab focus as a group; arrow keys cycle within group (native radio behavior)
 
 **Layout:** `display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px`
+(see Exceptions — both values are compact-popup density conventions, D-02)
 
 Each option: `<label style="display:flex; align-items:center; gap:6px; cursor:pointer">`
+(see Exceptions — 6px gap is compact-popup density convention, D-02)
 
 ---
 
@@ -204,9 +246,9 @@ Each option: `<label style="display:flex; align-items:center; gap:6px; cursor:po
 - Element: `<textarea class="cite-report-note" maxlength="256" rows="3" placeholder="Optional — add context for the maintainer">`
 - `width: 100%; box-sizing: border-box`
 - `border: 1px solid #d1d5db; border-radius: 4px`
-- `padding: 6px 8px`
+- `padding: 6px 8px` (see Exceptions — compact-popup density convention, D-02)
 - `font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
-- `font-size: 12px; color: #1a1a1a`
+- `font-size: 13px; color: #1a1a1a`
 - `resize: vertical`
 - `background: #f9fafb`
 
@@ -214,6 +256,7 @@ Each option: `<label style="display:flex; align-items:center; gap:6px; cursor:po
 
 **Character counter (live):**
 - Element: `<div class="cite-report-counter">` positioned `text-align: right; font-size: 11px; color: #6b7280; margin-top: 2px`
+  (see Exceptions — 2px margin-top is compact-popup density convention, D-02)
 - Content: `"0 / 256"` updating on `input` event; counts `note.length` (UTF-16 code units per Pitfall 7 resolution)
 - At limit (256): color changes to `#dc2626` (red) to signal cap reached
 
@@ -262,6 +305,7 @@ Each row: `display: flex; justify-content: space-between; font-size: 11px`
 - Placed as last item in the expanded panel, below the divider
 - Element: `<label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:6px; font-size:11px; color:#374151">`
   with `<input type="checkbox" class="cite-report-selection-toggle">` + text "Remove selection text"
+  (see Exceptions — 6px gap and 6px margin-top are compact-popup density conventions, D-02)
 - Checkbox `accent-color: #3b82f6`
 - When checked: hides the "The text you selected" row above; updates `includeSelectionText` state
 - Initial state: loaded from `chrome.storage.local` key `reportDialogRemoveSelectionText` (CAP-02 sticky)
@@ -277,7 +321,7 @@ Layout: `display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px`
 - `<button class="cite-report-submit">`
 - Default label: "Submit report"
 - `background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46`
-- `border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 500; cursor: pointer`
+- `border-radius: 4px; padding: 4px 12px; font-size: 13px; font-weight: 500; cursor: pointer`
 - Hover: `background: #d1fae5`
 - Focus: `outline: 2px solid #059669; outline-offset: 2px`
 - **Loading state** (while `sendMessage` in flight): `disabled` attribute; label changes to "Submitting…"; `opacity: 0.6; cursor: not-allowed`
@@ -287,7 +331,7 @@ Layout: `display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px`
 - `<button class="cite-report-cancel">`
 - Label: "Cancel"
 - `background: #f9fafb; border: 1px solid #d1d5db; color: #374151`
-- `border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 400; cursor: pointer`
+- `border-radius: 4px; padding: 4px 12px; font-size: 13px; font-weight: 400; cursor: pointer`
 - Hover: `background: #f3f4f6`
 - Focus: `outline: 2px solid #3b82f6; outline-offset: 2px`
 - Click: dismiss dialog without submission

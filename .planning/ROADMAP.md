@@ -26,7 +26,7 @@
 
 - [x] **Phase 1: Worker Route + KV Schema + Privacy Compliance Groundwork** - New `POST /report` Cloudflare Worker route, `BUG_REPORTS` KV namespace, server-side rate-limit + fingerprint dedup, and all store-submission compliance gates (privacy policy, manifest `data_collection_permissions`, webhook URL as server-side secret) (completed 2026-06-13)
 - [x] **Phase 2: Shared Constants + Pure Payload Builder** - `src/shared/constants.js` additions and new `src/shared/report-payload-builder.js` pure function establish the payload schema contract between all extension surfaces and the Worker; Vitest-pinned before any UI work (completed 2026-06-13)
-- [ ] **Phase 3: Background Submission Handler + Rate Limit + Retry Queue** - Extension-side transport layer: `MSG.SUBMIT_REPORT` handlers in Chrome SW + Firefox background, client-side sliding-window rate limit, disk-first retry queue with exponential backoff; full end-to-end submission path testable without UI
+- [x] **Phase 3: Background Submission Handler + Rate Limit + Retry Queue** - Extension-side transport layer: `MSG.SUBMIT_REPORT` handlers in Chrome SW + Firefox background, client-side sliding-window rate limit, disk-first retry queue with exponential backoff; full end-to-end submission path testable without UI (completed 2026-06-13)
 - [ ] **Phase 4: Report Dialog UI + Citation-UI Wiring** - Shadow DOM report dialog, Report button in citation popup, auto-surfacing on failure/yellow-confidence/Worker-error, error log ring buffer, DOM/PDF diagnostic enrichment
 - [ ] **Phase 5: Options Page Debug Mode + Popup Fallback + Live UAT** - Debug Mode options toggle, popup "Report a problem" fallback, options page report section; milestone close with live UAT-01..06 DoD evidence
 
@@ -73,7 +73,7 @@
 **Plans**: 3 plans
 - [x] 03-01-PLAN.md — shared report-transport.js helper: rate-limit + disk-first queue + retry/backoff + drain + return contract (XPORT-05, LIMIT-03, QUEUE-01..04)
 - [x] 03-02-PLAN.md — per-target Vitest suites (chrome + firefox) covering SC1-SC4 incl. XPORT-06 static-grep guard + simulated SW termination; vitest.config include wiring (XPORT-06, QUEUE-01..04)
-- [ ] 03-03-PLAN.md — wire identical SUBMIT_REPORT branch + onStartup/onInstalled/opportunistic drain into service-worker.js + firefox/background.js (XPORT-05, XPORT-06)
+- [x] 03-03-PLAN.md — wire identical SUBMIT_REPORT branch + onStartup/onInstalled/opportunistic drain into service-worker.js + firefox/background.js (XPORT-05, XPORT-06)
 **UI hint**: no
 
 ### Phase 4: Report Dialog UI + Citation-UI Wiring
@@ -107,6 +107,6 @@
 |-------|----------------|--------|-----------|
 | 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 3/3 | Complete   | 2026-06-13 |
 | 2. Shared Constants + Pure Payload Builder | 1/1 | Complete   | 2026-06-13 |
-| 3. Background Submission Handler + Rate Limit + Retry Queue | 2/3 | In Progress|  |
+| 3. Background Submission Handler + Rate Limit + Retry Queue | 3/3 | Complete   | 2026-06-13 |
 | 4. Report Dialog UI + Citation-UI Wiring | 0/TBD | Not started | - |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | 0/TBD | Not started | - |

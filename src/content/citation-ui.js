@@ -165,22 +165,32 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
     row.appendChild(dot);
   }
 
-  // Report button (CAP-03 / TRIG-04): injected only when outcome is non-green
+  // Report button (CAP-03 / TRIG-04): injected only when outcome is non-green,
+  // OR when debugMode is ON (DBG-02: relaxed guard).
   // D-05: button surfaces the affordance — dialog opens ONLY on click, never auto-opening.
-  if (reportOutcome && reportOutcome.confidenceTier !== 'green') {
+  if (reportOutcome && (reportOutcome.confidenceTier !== 'green' || reportOutcome.debugMode)) {
     const reportBtn = document.createElement('button');
     reportBtn.className = 'cite-report-btn';
     reportBtn.title = 'Report a problem';
     reportBtn.setAttribute('aria-label', 'Report a problem with this citation');
-    // D-06: all non-green outcomes show the nudge label (failure/yellow/error)
-    reportBtn.textContent = '⚑ Report a problem';
+    const isGreenDebug = reportOutcome.confidenceTier === 'green';
+    // D-05: plain icon on green debug; nudge text + amber only on non-green outcomes
+    reportBtn.textContent = isGreenDebug ? '⚑' : '⚑ Report a problem';
+    if (!isGreenDebug) {
+      reportBtn.style.background = 'rgba(245, 158, 11, 0.08)';
+      reportBtn.style.color = '#92400e';
+      reportBtn.style.fontSize = '13px';
+      reportBtn.style.fontWeight = '500';
+      reportBtn.style.padding = '2px 6px';
+      reportBtn.style.borderRadius = '4px';
+    }
     reportBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       showReportDialog(shadow, reportOutcome, rect, reportBtn);
     });
     row.appendChild(reportBtn);
   }
-  // TRIG-04: if confidenceTier === 'green' (or reportOutcome is null), button is not appended
+  // TRIG-04: if confidenceTier === 'green' AND debugMode is false (or reportOutcome is null), button is not appended
 
   popup.appendChild(row);
 

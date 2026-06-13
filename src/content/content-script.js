@@ -186,6 +186,7 @@ const DEFAULT_SETTINGS = {
   triggerMode: 'floating-button',
   displayMode: 'default',
   includePatentNumber: false,
+  debugMode: false,   // DBG-01/02: default off; TRIG-04 holds until toggled
 };
 
 let selectionTimeout = null;
@@ -206,6 +207,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (changes.triggerMode) cachedSettings.triggerMode = changes.triggerMode.newValue;
     if (changes.displayMode) cachedSettings.displayMode = changes.displayMode.newValue;
     if (changes.includePatentNumber) cachedSettings.includePatentNumber = changes.includePatentNumber.newValue;
+    if (changes.debugMode) cachedSettings.debugMode = changes.debugMode.newValue;
   }
 });
 
@@ -497,6 +499,7 @@ async function generateCitation(selectedText, rect) {
         {
           category: mapOutcomeToReportCategory(null, result.confidence),
           confidenceTier: mapConfidenceTier(result.confidence),
+          debugMode: cachedSettings.debugMode,   // DBG-02: read from cachedSettings at call time
         }
       );
     } else {
@@ -600,6 +603,7 @@ function handleCitationResult(message) {
       {
         category: mapOutcomeToReportCategory(null, message.confidence),
         confidenceTier: mapConfidenceTier(message.confidence),
+        debugMode: cachedSettings.debugMode,   // DBG-02: read from cachedSettings at call time
       }
     );
   } else {

@@ -9,6 +9,7 @@ export default defineConfig({
     include: [
       'tests/unit/text-matcher.test.js',
       'tests/unit/shared-matching.test.js',
+      'tests/unit/report-transport-firefox.test.js',
     ],
     name: 'firefox-dist',
   },

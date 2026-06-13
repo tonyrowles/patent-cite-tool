@@ -22,6 +22,7 @@ import {
   lookupPosition,
   uploadToCache,
 } from './pdf-pipeline.js';
+import { submitReport, drainQueueOnce } from '../shared/report-transport.js';
 
 // ---------------------------------------------------------------------------
 // Icon state paths — same as Chrome's service-worker.js
@@ -70,6 +71,12 @@ chrome.runtime.onInstalled.addListener(() => {
     contexts: ['selection'],
     documentUrlPatterns: ['https://patents.google.com/patent/US*'],
   });
+
+  drainQueueOnce(); // drain on install/update (D-02) — fire-and-forget
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  drainQueueOnce(); // drain on browser restart (D-02/D-07) — fire-and-forget, silent
 });
 
 // ---------------------------------------------------------------------------
@@ -104,6 +111,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  drainQueueOnce(); // opportunistic drain on any SW wake (D-02) — fire-and-forget
   const tabId = sender.tab?.id;
 
   if (message.type === MSG.PDF_LINK_FOUND) {
@@ -114,6 +122,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleLookupPosition(message, sender);
   } else if (message.type === MSG.GET_STATUS) {
     handleGetStatus(sendResponse);
+    return true; // Keep channel open for async sendResponse
+  } else if (message.type === MSG.SUBMIT_REPORT) {
+    submitReport(message.payload).then(result => sendResponse(result)).catch(() => sendResponse({ ok: false, queued: false, fingerprint: null, rateLimited: false, dropped: true }));
     return true; // Keep channel open for async sendResponse
   }
   // Note: No handlers for PDF_FETCH_RESULT, PARSE_RESULT, USPTO_FETCH_RESULT,

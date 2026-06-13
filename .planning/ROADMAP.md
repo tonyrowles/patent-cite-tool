@@ -42,9 +42,10 @@
   3. A sixth submission from the same IP within 60 seconds returns HTTP 429 with a `Retry-After` header; the IP appears only in the transient `rl:{ip}` KV key, not in any stored report record
   4. `web-ext lint` against `dist/firefox/` exits 0 with zero AMO-blocking warnings after the `data_collection_permissions` update to `manifest.firefox.json`; the privacy policy at the canonical URL includes a "Bug Report Submission" section describing the payload field-by-field
   5. `wrangler secret put DISCORD_WEBHOOK_URL` is the only mechanism that sets the webhook URL; `grep -r 'discord.com/api/webhooks' .` (excluding `.git/`) returns zero results across the entire repo
-**Plans**: 2 plans
+**Plans**: 3 plans
 - [x] 01-01-PLAN.md — POST /report Worker route, BUG_REPORTS KV namespace, fingerprint dedup + IP rate limit, Discord webhook, report-schema.md (XPORT-01..04, PAY-01..04, LIMIT-01/02)
 - [x] 01-02-PLAN.md — Privacy compliance gates: Firefox manifest data_collection_permissions, privacy policy Bug Report section, store-listing data-use update (PRIV-01..05)
+- [ ] 01-03-PLAN.md — Gap closure: reconcile store-listing CWS declaration (CR-02) + privacy policy collection/sharing claims (WR-07/08); fix duplicate_count off-by-one + falsy-zero coercion (WR-01/03) (PRIV-03, PRIV-04, LIMIT-01)
 **UI hint**: no
 
 ### Phase 2: Shared Constants + Pure Payload Builder

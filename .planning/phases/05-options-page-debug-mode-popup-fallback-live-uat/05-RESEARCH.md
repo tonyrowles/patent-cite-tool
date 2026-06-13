@@ -681,7 +681,7 @@ npm run test:lint
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`openOptionsPage()` + hash anchor (A1)**
    - What we know: The Chrome extension API `openOptionsPage()` takes no parameters.

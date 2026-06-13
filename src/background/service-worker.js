@@ -10,6 +10,11 @@
 
 import { MSG, STATUS, PATENT_TYPE } from '../shared/constants.js';
 import { submitReport, drainQueueOnce } from '../shared/report-transport.js';
+import { installErrorBuffer } from '../content/report-dialog.js';
+
+// Install extension-tagged error ring buffer (PAY-08 / D-08)
+// Captures [SW]-prefixed console.error/warn from the service worker context.
+installErrorBuffer();
 
 // ---------------------------------------------------------------------------
 // Icon state paths — used by chrome.action.setIcon for three-state toolbar icon

@@ -13,6 +13,10 @@ import {
   showLoadingIndicator, showSuccessToast, showFailureToast,
   dismissCitationUI
 } from './citation-ui.js';
+import { installErrorBuffer } from './report-dialog.js';
+
+// Install extension-tagged error ring buffer (PAY-08 / D-08)
+installErrorBuffer();
 
 /**
  * Extract patent ID, type, and kind code from the current URL.

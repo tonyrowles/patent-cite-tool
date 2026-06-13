@@ -21,6 +21,21 @@ import { showReportDialog } from './report-dialog.js';
 let citationHost = null;
 let citationShadow = null;
 
+/** Module-level handle for the popup click-outside mousedown handler (CR-02). */
+let _popupClickOutsideHandler = null;
+
+/**
+ * Cancel the popup's click-outside mousedown handler.
+ * Must be called before the Report dialog goes live to prevent the popup
+ * handler from calling dismissCitationUI() while the dialog is open (CR-02).
+ */
+export function cancelPopupClickOutside() {
+  if (_popupClickOutsideHandler) {
+    document.removeEventListener('mousedown', _popupClickOutsideHandler);
+    _popupClickOutsideHandler = null;
+  }
+}
+
 /**
  * Get or create the Shadow DOM host for citation UI.
  * Reuses a single host element to avoid accumulating DOM nodes.
@@ -240,14 +255,17 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
 
   shadow.appendChild(popup);
 
-  // Auto-dismiss on click outside after a short delay
+  // Auto-dismiss on click outside after a short delay (CR-02: store handler so
+  // cancelPopupClickOutside() can remove it before the Report dialog opens).
   setTimeout(() => {
-    document.addEventListener('mousedown', function handler(e) {
+    _popupClickOutsideHandler = function handler(e) {
       if (!citationHost || !citationHost.contains(e.target)) {
         dismissCitationUI();
-        document.removeEventListener('mousedown', handler);
+        document.removeEventListener('mousedown', _popupClickOutsideHandler);
+        _popupClickOutsideHandler = null;
       }
-    });
+    };
+    document.addEventListener('mousedown', _popupClickOutsideHandler);
   }, 100);
 }
 

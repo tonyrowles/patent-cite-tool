@@ -17,7 +17,7 @@
 
 import { MSG } from '../shared/constants.js';
 import { buildReportPayload } from '../shared/report-payload-builder.js';
-import { showSuccessToast, showFailureToast } from './citation-ui.js';
+import { showSuccessToast, showFailureToast, cancelPopupClickOutside } from './citation-ui.js';
 
 // ---------------------------------------------------------------------------
 // PAY-08: Error ring buffer constants (D-08)
@@ -563,6 +563,11 @@ const CATEGORY_LABELS = {
  *   (focus is restored to this element on every dismiss path).
  */
 export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl) {
+  // CR-02: Neutralise the popup's stale click-outside mousedown handler before
+  // the dialog goes live, so an outside click cannot call dismissCitationUI()
+  // and tear the host out from under the live dialog.
+  cancelPopupClickOutside();
+
   // -----------------------------------------------------------------------
   // PAY-09: Capture diagnostics IMMEDIATELY at button-click time
   // (selection clears on click; stale at submit time — RESEARCH Pitfall 3)

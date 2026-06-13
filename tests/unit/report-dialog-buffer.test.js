@@ -12,7 +12,7 @@
 //   - host-page strings are never appended
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { installErrorBuffer } from '../../src/content/report-dialog.js';
+import { installErrorBuffer, _resetBufferForTest } from '../../src/content/report-dialog.js';
 
 // ---------------------------------------------------------------------------
 // Stateful chrome.storage.local mock (mirrors report-transport-chrome pattern)
@@ -47,6 +47,10 @@ describe('PAY-08: installErrorBuffer', () => {
     // Save originals before installErrorBuffer replaces them
     origConsoleError = console.error;
     origConsoleWarn = console.warn;
+
+    // Reset the idempotency guard so each test gets a fresh install
+    // with the current test's chrome mock.
+    _resetBufferForTest();
   });
 
   afterEach(() => {
@@ -54,6 +58,8 @@ describe('PAY-08: installErrorBuffer', () => {
     console.error = origConsoleError;
     console.warn = origConsoleWarn;
     vi.restoreAllMocks();
+    // Reset guard so next test also starts fresh
+    _resetBufferForTest();
   });
 
   it('captures extension-tagged console.error entries', async () => {
@@ -96,22 +102,28 @@ describe('PAY-08: installErrorBuffer', () => {
 
   it('accepts all four extension prefixes: [SW], [PCT], [Offscreen], [Firefox]', async () => {
     installErrorBuffer();
+    // Stagger calls to avoid RMW races (Pitfall 4)
     console.error('[SW] service worker error');
+    await new Promise(r => setTimeout(r, 20));
     console.error('[PCT] content script error');
+    await new Promise(r => setTimeout(r, 20));
     console.warn('[Offscreen] offscreen warning');
+    await new Promise(r => setTimeout(r, 20));
     console.warn('[Firefox] firefox background warning');
-    await new Promise(r => setTimeout(r, 80));
+    await new Promise(r => setTimeout(r, 20));
     const buf = store.bugReportErrorBuffer ?? [];
     expect(buf.length).toBe(4);
   });
 
   it('caps ring buffer at 20 entries (oldest dropped when >20)', async () => {
     installErrorBuffer();
-    // Fire 25 tagged errors
+    // Fire 25 tagged errors sequentially, waiting for each to flush before the next.
+    // This avoids RMW races (RESEARCH Pitfall 4: fire-and-forget accepts occasional
+    // loss under concurrent load, but sequential with awaited flushes is deterministic).
     for (let i = 0; i < 25; i++) {
       console.error(`[PCT] error #${i}`);
+      await new Promise(r => setTimeout(r, 10));
     }
-    await new Promise(r => setTimeout(r, 200));
     const buf = store.bugReportErrorBuffer ?? [];
     expect(buf.length).toBe(20);
     // The last entry should be error #24 (newest)

@@ -1015,11 +1015,14 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
       // result?.dropped → silent per Phase 3 D-07
 
     } catch (err) {
-      // Builder throw or sendMessage error — dismiss and show generic failure toast
+      // Builder throw or sendMessage error — dismiss and show generic failure toast.
+      // WR-04: do NOT show the rate-limit string here — that is reserved for the
+      // result?.rateLimited branch above. Builder validation errors (e.g. missing
+      // patentNumber) would show a factually wrong "wait a few minutes" message.
       // (T-04-07: never expose internal error details to UI)
       dismissDialog();
       showFailureToast(
-        'Too many reports in a short period — please wait a few minutes',
+        'Report could not be sent — please try again',
         selectionRect
       );
     }

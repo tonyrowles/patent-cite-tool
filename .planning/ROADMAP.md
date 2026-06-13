@@ -57,7 +57,8 @@
   2. When `includeSelectionText: false` is passed, the `selectionText` field is absent (not `null`, not `""`, but entirely absent) from the returned payload object; when `true`, it is present
   3. Two calls to `buildReportPayload()` with identical inputs produce byte-identical JSON serialization (fingerprint reproducibility confirmed across runs)
   4. `REPORT_CATEGORIES`, `MSG.SUBMIT_REPORT`, and `WORKER_REPORT_URL` are importable from `src/shared/constants.js` and the constants module contains zero `chrome.*` calls (confirmed by static-grep Vitest assertion)
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 02-01-PLAN.md — Extend constants.js (MSG.SUBMIT_REPORT, frozen REPORT_CATEGORIES, WORKER_REPORT_URL) + new pure report-payload-builder.js + Vitest suite pinning all 4 Success Criteria (PAY-05, PAY-06, PAY-07)
 **UI hint**: no
 
 ### Phase 3: Background Submission Handler + Rate Limit + Retry Queue
@@ -102,7 +103,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 3/3 | Complete   | 2026-06-13 |
-| 2. Shared Constants + Pure Payload Builder | 0/TBD | Not started | - |
+| 2. Shared Constants + Pure Payload Builder | 0/1 | Not started | - |
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 0/TBD | Not started | - |
 | 4. Report Dialog UI + Citation-UI Wiring | 0/TBD | Not started | - |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | 0/TBD | Not started | - |

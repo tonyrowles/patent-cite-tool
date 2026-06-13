@@ -54,7 +54,10 @@ export function buildReportPayload({ context, category, note, settings, errors, 
   }
 
   // D-08 — Resolve defaults for optional fields.
-  const errorLog = errors ?? [];
+  // Defensive copy of errors: returning the caller's array by reference would let
+  // post-call mutation silently alter the payload, breaking the D-07/SC3 purity
+  // guarantee (same inputs → byte-identical output).
+  const errorLog = errors != null ? [...errors] : [];
   const resolvedNote = note ?? null;
   const patentUrl = context.patentUrl ??
     ('https://patents.google.com/patent/US' + context.patentNumber);

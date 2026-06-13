@@ -124,6 +124,7 @@ describe('buildReportPayload() — SC1 allowlist-only output', () => {
     const payload = buildReportPayload(makeReportInputs());
     const keys = Object.keys(payload);
     // Server-computed fields must not be sent (report-schema.md server-computed set)
+    expect(keys).not.toContain('fingerprint');
     expect(keys).not.toContain('timestamp');
     expect(keys).not.toContain('duplicate_count');
     // PAY-03 hard-constraint forbidden fields (report-schema.md:58-68)
@@ -257,5 +258,21 @@ describe('buildReportPayload() — D-08 defaults on minimal input', () => {
     expect(payload.viewportHeight).toBe(null);
     expect(payload.pdfParseStatus).toBe(null);
     expect(payload.triggerMode).toBe(null);
+  });
+
+  it('Test 16: errorLog is a defensive copy — appending to the caller ring buffer after the call does not alter the payload (D-07 purity)', () => {
+    const errors = [{ message: 'boom' }];
+    const payload = buildReportPayload({
+      context: { patentNumber: '12505414', extensionVersion: '5.0.0' },
+      category: 'other',
+      errors,
+      includeSelectionText: false,
+    });
+    const snapshot = JSON.stringify(payload);
+    // The errors arg is a live ring buffer — entries keep arriving after the call.
+    // A referenced (non-copied) errorLog would grow with it and break byte-stability.
+    errors.push({ message: 'late-arriving error' });
+    expect(payload.errorLog).toHaveLength(1);
+    expect(JSON.stringify(payload)).toBe(snapshot);
   });
 });

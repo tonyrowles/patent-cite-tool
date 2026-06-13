@@ -41,7 +41,7 @@ Features:
 - Three-state toolbar icon shows extension readiness at a glance
 - Pre-computed position maps for fast repeat lookups
 - No account required, no personal data collected during normal citation use
-- Voluntary "report a problem" feature: if a citation fails, you can submit an optional diagnostic report to help the developer fix it. See the <a href="https://tonyrowles.github.io/patent-cite-tool/privacy">privacy policy</a> for full details of what is included.
+- Voluntary "report a problem" feature: if a citation fails, you can submit an optional diagnostic report to help the developer fix it. Full details: https://tonyrowles.github.io/patent-cite-tool/privacy
 
 Technical approach: the extension fetches the patent PDF from Google's public CDN, builds a text position map using PDF.js running locally in the browser, then maps your selection coordinates to column and line numbers. Position maps for previously-seen patents are cached via first-party Cloudflare KV infrastructure (pct.tonyrowles.com) to speed up repeat citations.
 ```
@@ -125,7 +125,7 @@ All JavaScript is bundled within the extension package. Remote HTTP requests to 
 
 ### Subsection 4: Data Use Practices
 
-**Data types collected:** For normal citation-only operation, select none / leave all checkboxes unchecked. If your users may submit voluntary bug reports, check **Website Content** — patent selection text (up to approximately 200 characters) may be included in a bug report when the user does not toggle it off before submitting.
+**Data types collected:** The extension includes a voluntary bug report feature, so check **Website Content** — patent selection text (up to approximately 200 characters) may be included in a bug report when the user does not toggle it off before submitting. Leave all other data type checkboxes unchecked.
 
 For normal citation-only operation, the extension does not collect: personally identifiable information, health information, financial information, authentication information, personal communications, location data, web history, user activity, or website content. The only stored data is three preference settings in chrome.storage.sync (trigger mode, display mode, patent number prefix) — this data is managed by Chrome and is not accessible to the developer.
 
@@ -154,7 +154,7 @@ Work through these items in order before clicking "Submit for review":
 - [ ] **Privacy tab — Single purpose:** Copy from Section 3 above
 - [ ] **Privacy tab — Permission justifications:** Copy each row from the table in Section 3
 - [ ] **Privacy tab — Remote code:** Select "No"
-- [ ] **Privacy tab — Data use:** All data type checkboxes unchecked; all three certification statements checked
+- [ ] **Privacy tab — Data use:** Check **Website Content** (bug report selection text); leave all other data type checkboxes unchecked; all three certification statements checked
 - [ ] Click **"Submit for review"**
 
 **Expected result:** Extension status changes to "Pending review" in the Developer Dashboard.
@@ -173,4 +173,4 @@ Work through these items in order before clicking "Submit for review":
 | Icon (store listing) | 128px — bundled in ZIP, no separate upload needed |
 | Category | Productivity |
 | Remote code | No |
-| Data collected | None |
+| Data collected | Website Content (voluntary bug reports only) |

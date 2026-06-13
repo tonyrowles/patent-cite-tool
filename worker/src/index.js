@@ -230,9 +230,9 @@ function buildKvRecord(body, fingerprint, timestamp) {
     browser:           body.browser || null,
     os:                body.os || null,
     xpathNode:         body.xpathNode || null,
-    scrollY:           body.scrollY || null,
-    viewportWidth:     body.viewportWidth || null,
-    viewportHeight:    body.viewportHeight || null,
+    scrollY:           body.scrollY ?? null,
+    viewportWidth:     body.viewportWidth ?? null,
+    viewportHeight:    body.viewportHeight ?? null,
     pdfParseStatus:    body.pdfParseStatus || null,
     triggerMode:       body.triggerMode || null,
     errorLog:          Array.isArray(body.errorLog) ? body.errorLog.slice(0, 20) : [],
@@ -293,7 +293,7 @@ async function checkAndHandleDuplication(env, fingerprint, now) {
   const mostRecent = recentKeys[recentKeys.length - 1];
   const existing = await env.BUG_REPORTS.get(mostRecent.name, { type: 'json' });
   if (existing) {
-    existing.duplicate_count = (existing.duplicate_count || 1) + 1;
+    existing.duplicate_count = (existing.duplicate_count ?? 0) + 1;
     await env.BUG_REPORTS.put(mostRecent.name, JSON.stringify(existing), {
       expirationTtl: 7776000,
     });

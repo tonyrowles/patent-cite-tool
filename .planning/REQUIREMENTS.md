@@ -50,7 +50,7 @@ Phase numbering RESET via `--reset-phase-numbers`. v5.0 starts at Phase 1; v4.3 
 **Transport — extension-side message passing:**
 
 - [x] **XPORT-05**: Background handler for `MSG.SUBMIT_REPORT` added IDENTICALLY to `src/chrome/background/service-worker.js` AND `src/firefox/background.js` (same dispatch shape — no Chrome/Firefox divergence in the report pipeline); receives payload from content script, performs `fetch(WORKER_REPORT_URL, { method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type':'application/json'} })`, returns `{ok, queued, fingerprint}` to the caller
-- [ ] **XPORT-06**: Content scripts NEVER make cross-origin POSTs directly (Chrome official-docs constraint cited in STACK research); all submissions route through background via `chrome.runtime.sendMessage`; Vitest static-grep guard asserts no `fetch(WORKER_REPORT_URL` literal in `src/content/` after compilation
+- [x] **XPORT-06**: Content scripts NEVER make cross-origin POSTs directly (Chrome official-docs constraint cited in STACK research); all submissions route through background via `chrome.runtime.sendMessage`; Vitest static-grep guard asserts no `fetch(WORKER_REPORT_URL` literal in `src/content/` after compilation
 
 **Limit — client-side sliding-window:**
 
@@ -176,7 +176,7 @@ Which phases cover which requirements. Updated during roadmap creation 2026-06-1
 | PAY-06 | Phase 2 | Pending |
 | PAY-07 | Phase 2 | Pending |
 | XPORT-05 | Phase 3 | Complete |
-| XPORT-06 | Phase 3 | Pending |
+| XPORT-06 | Phase 3 | Complete |
 | LIMIT-03 | Phase 3 | Complete |
 | QUEUE-01 | Phase 3 | Complete |
 | QUEUE-02 | Phase 3 | Complete |

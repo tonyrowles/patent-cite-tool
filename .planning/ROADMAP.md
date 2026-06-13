@@ -71,7 +71,7 @@
   3. A payload written to `chrome.storage.local reportQueue` before the fetch attempt is present in storage if the fetch throws; it is removed atomically on a 201 success response — simulating Chrome MV3 service-worker termination (by manually stopping + restarting the SW) leaves the queued report intact and retried on next `onStartup`
   4. An HTTP 4xx response (except 429) permanently drops the queue entry without retry; an HTTP 5xx retries up to 3 times with exponential backoff (2s / 8s / 30s); after 3 failures the entry is dropped silently; a 429 retries with the same backoff
 **Plans**: 3 plans
-- [ ] 03-01-PLAN.md — shared report-transport.js helper: rate-limit + disk-first queue + retry/backoff + drain + return contract (XPORT-05, LIMIT-03, QUEUE-01..04)
+- [x] 03-01-PLAN.md — shared report-transport.js helper: rate-limit + disk-first queue + retry/backoff + drain + return contract (XPORT-05, LIMIT-03, QUEUE-01..04)
 - [ ] 03-02-PLAN.md — per-target Vitest suites (chrome + firefox) covering SC1-SC4 incl. XPORT-06 static-grep guard + simulated SW termination; vitest.config include wiring (XPORT-06, QUEUE-01..04)
 - [ ] 03-03-PLAN.md — wire identical SUBMIT_REPORT branch + onStartup/onInstalled/opportunistic drain into service-worker.js + firefox/background.js (XPORT-05, XPORT-06)
 **UI hint**: no
@@ -107,6 +107,6 @@
 |-------|----------------|--------|-----------|
 | 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 3/3 | Complete   | 2026-06-13 |
 | 2. Shared Constants + Pure Payload Builder | 1/1 | Complete   | 2026-06-13 |
-| 3. Background Submission Handler + Rate Limit + Retry Queue | 0/3 | Planned | - |
+| 3. Background Submission Handler + Rate Limit + Retry Queue | 1/3 | In Progress|  |
 | 4. Report Dialog UI + Citation-UI Wiring | 0/TBD | Not started | - |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | 0/TBD | Not started | - |

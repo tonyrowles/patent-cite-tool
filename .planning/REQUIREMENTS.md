@@ -49,19 +49,19 @@ Phase numbering RESET via `--reset-phase-numbers`. v5.0 starts at Phase 1; v4.3 
 
 **Transport — extension-side message passing:**
 
-- [ ] **XPORT-05**: Background handler for `MSG.SUBMIT_REPORT` added IDENTICALLY to `src/chrome/background/service-worker.js` AND `src/firefox/background.js` (same dispatch shape — no Chrome/Firefox divergence in the report pipeline); receives payload from content script, performs `fetch(WORKER_REPORT_URL, { method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type':'application/json'} })`, returns `{ok, queued, fingerprint}` to the caller
+- [x] **XPORT-05**: Background handler for `MSG.SUBMIT_REPORT` added IDENTICALLY to `src/chrome/background/service-worker.js` AND `src/firefox/background.js` (same dispatch shape — no Chrome/Firefox divergence in the report pipeline); receives payload from content script, performs `fetch(WORKER_REPORT_URL, { method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type':'application/json'} })`, returns `{ok, queued, fingerprint}` to the caller
 - [ ] **XPORT-06**: Content scripts NEVER make cross-origin POSTs directly (Chrome official-docs constraint cited in STACK research); all submissions route through background via `chrome.runtime.sendMessage`; Vitest static-grep guard asserts no `fetch(WORKER_REPORT_URL` literal in `src/content/` after compilation
 
 **Limit — client-side sliding-window:**
 
-- [ ] **LIMIT-03**: Client-side sliding-window rate limit in `chrome.storage.local` — max 5 submissions per 10-minute rolling window per install; submission timestamps stored as an array under key `bugReportRateLimitWindow`; pruned on each new submit attempt; submit blocked with toast notification ("Too many reports in a short period — please wait a few minutes") when ceiling is reached
+- [x] **LIMIT-03**: Client-side sliding-window rate limit in `chrome.storage.local` — max 5 submissions per 10-minute rolling window per install; submission timestamps stored as an array under key `bugReportRateLimitWindow`; pruned on each new submit attempt; submit blocked with toast notification ("Too many reports in a short period — please wait a few minutes") when ceiling is reached
 
 **Queue — disk-first retry persistence:**
 
-- [ ] **QUEUE-01**: Disk-first persistence — payload written to `chrome.storage.local` under `bugReportQueue` BEFORE the fetch attempt (survives Chrome MV3 service-worker termination which can happen in ~30s of inactivity; Firefox non-persistent event page also benefits); removed atomically on successful submit
-- [ ] **QUEUE-02**: Retry policy — max 3 attempts, exponential backoff (2s / 8s / 30s), 7-day TTL on queued reports, queue cap of 20 entries (drops oldest when full); retried on next extension load if queue is non-empty (via `chrome.runtime.onInstalled` / `chrome.runtime.onStartup`)
-- [ ] **QUEUE-03**: Non-retryable failure handling — 4xx responses (except 429 rate-limit) drop the queue entry without retry (the report is malformed and won't succeed); 429 retries with full backoff; 5xx retries with backoff; network errors retry
-- [ ] **QUEUE-04**: User-visible feedback — toast on successful submit ("Report sent — thank you"), toast on queued-for-retry ("Report saved — will retry when online"), no toast on permanent-drop (failure is rare and visible failure adds noise); toast styling reuses existing yellow/green confidence toast pattern
+- [x] **QUEUE-01**: Disk-first persistence — payload written to `chrome.storage.local` under `bugReportQueue` BEFORE the fetch attempt (survives Chrome MV3 service-worker termination which can happen in ~30s of inactivity; Firefox non-persistent event page also benefits); removed atomically on successful submit
+- [x] **QUEUE-02**: Retry policy — max 3 attempts, exponential backoff (2s / 8s / 30s), 7-day TTL on queued reports, queue cap of 20 entries (drops oldest when full); retried on next extension load if queue is non-empty (via `chrome.runtime.onInstalled` / `chrome.runtime.onStartup`)
+- [x] **QUEUE-03**: Non-retryable failure handling — 4xx responses (except 429 rate-limit) drop the queue entry without retry (the report is malformed and won't succeed); 429 retries with full backoff; 5xx retries with backoff; network errors retry
+- [x] **QUEUE-04**: User-visible feedback — toast on successful submit ("Report sent — thank you"), toast on queued-for-retry ("Report saved — will retry when online"), no toast on permanent-drop (failure is rare and visible failure adds noise); toast styling reuses existing yellow/green confidence toast pattern
 
 ### Report Dialog UI + Citation-UI Wiring (Phase 4, user-facing capture)
 
@@ -175,13 +175,13 @@ Which phases cover which requirements. Updated during roadmap creation 2026-06-1
 | PAY-05 | Phase 2 | Pending |
 | PAY-06 | Phase 2 | Pending |
 | PAY-07 | Phase 2 | Pending |
-| XPORT-05 | Phase 3 | Pending |
+| XPORT-05 | Phase 3 | Complete |
 | XPORT-06 | Phase 3 | Pending |
-| LIMIT-03 | Phase 3 | Pending |
-| QUEUE-01 | Phase 3 | Pending |
-| QUEUE-02 | Phase 3 | Pending |
-| QUEUE-03 | Phase 3 | Pending |
-| QUEUE-04 | Phase 3 | Pending |
+| LIMIT-03 | Phase 3 | Complete |
+| QUEUE-01 | Phase 3 | Complete |
+| QUEUE-02 | Phase 3 | Complete |
+| QUEUE-03 | Phase 3 | Complete |
+| QUEUE-04 | Phase 3 | Complete |
 | CAP-01 | Phase 4 | Pending |
 | CAP-02 | Phase 4 | Pending |
 | CAP-03 | Phase 4 | Pending |

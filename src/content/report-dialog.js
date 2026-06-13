@@ -714,8 +714,8 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
     return row;
   }
 
-  // Patent number
-  const patentInfo = extractPatentInfo ? extractPatentInfo() : null;
+  // Patent number (WR-03: use typeof guard, consistent with submit handler at line ~940)
+  const patentInfo = typeof extractPatentInfo === 'function' ? extractPatentInfo() : null;
   const rawPatentNumber = (patentInfo?.patentId ?? '').replace(/^US/, '');
   fieldList.appendChild(makeFieldRow(FIELD_LABELS.patentNumber, rawPatentNumber || '—'));
 

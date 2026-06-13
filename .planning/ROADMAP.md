@@ -27,7 +27,7 @@
 - [x] **Phase 1: Worker Route + KV Schema + Privacy Compliance Groundwork** - New `POST /report` Cloudflare Worker route, `BUG_REPORTS` KV namespace, server-side rate-limit + fingerprint dedup, and all store-submission compliance gates (privacy policy, manifest `data_collection_permissions`, webhook URL as server-side secret) (completed 2026-06-13)
 - [x] **Phase 2: Shared Constants + Pure Payload Builder** - `src/shared/constants.js` additions and new `src/shared/report-payload-builder.js` pure function establish the payload schema contract between all extension surfaces and the Worker; Vitest-pinned before any UI work (completed 2026-06-13)
 - [x] **Phase 3: Background Submission Handler + Rate Limit + Retry Queue** - Extension-side transport layer: `MSG.SUBMIT_REPORT` handlers in Chrome SW + Firefox background, client-side sliding-window rate limit, disk-first retry queue with exponential backoff; full end-to-end submission path testable without UI (completed 2026-06-13)
-- [ ] **Phase 4: Report Dialog UI + Citation-UI Wiring** - Shadow DOM report dialog, Report button in citation popup, auto-surfacing on failure/yellow-confidence/Worker-error, error log ring buffer, DOM/PDF diagnostic enrichment
+- [x] **Phase 4: Report Dialog UI + Citation-UI Wiring** - Shadow DOM report dialog, Report button in citation popup, auto-surfacing on failure/yellow-confidence/Worker-error, error log ring buffer, DOM/PDF diagnostic enrichment (completed 2026-06-13)
 - [ ] **Phase 5: Options Page Debug Mode + Popup Fallback + Live UAT** - Debug Mode options toggle, popup "Report a problem" fallback, options page report section; milestone close with live UAT-01..06 DoD evidence
 
 ## Phase Details
@@ -89,7 +89,7 @@
 - [x] 04-01-PLAN.md — PAY-08 error ring buffer + PAY-09 capture helpers (xpathNode/scroll/viewport/pdfParseStatus/browser-OS) + installErrorBuffer wiring into content + both backgrounds (PAY-08, PAY-09)
 - [x] 04-02-PLAN.md — report-dialog.js Shadow DOM dialog per UI-SPEC: panel/radios/note+counter/What's-included + sticky [Remove selection text] toggle, focus trap + dismiss paths, submit→toast mapping (CAP-01, CAP-02, CAP-04)
 - [x] 04-03-PLAN.md — Report button in citation-ui.js .cite-row + content-script.js outcome→category/tier trigger wiring; green-hidden invariant (CAP-03, TRIG-01..04)
-- [ ] 04-04-PLAN.md — node-env Vitest suites proving SC1-SC4: PAY-08 buffer, PAY-09 derivation, [Remove selection text] omission, TRIG mapping + XPORT-06/getCitationHost static guards (PAY-08, PAY-09, CAP-02, TRIG-01..04)
+- [x] 04-04-PLAN.md — node-env Vitest suites proving SC1-SC4: PAY-08 buffer, PAY-09 derivation, [Remove selection text] omission, TRIG mapping + XPORT-06/getCitationHost static guards (PAY-08, PAY-09, CAP-02, TRIG-01..04)
 **UI hint**: yes
 
 ### Phase 5: Options Page Debug Mode + Popup Fallback + Live UAT
@@ -112,5 +112,5 @@
 | 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 3/3 | Complete   | 2026-06-13 |
 | 2. Shared Constants + Pure Payload Builder | 1/1 | Complete   | 2026-06-13 |
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 3/3 | Complete   | 2026-06-13 |
-| 4. Report Dialog UI + Citation-UI Wiring | 3/4 | In Progress|  |
+| 4. Report Dialog UI + Citation-UI Wiring | 4/4 | Complete   | 2026-06-13 |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | 0/TBD | Not started | - |

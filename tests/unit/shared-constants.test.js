@@ -7,8 +7,8 @@ describe('shared/constants.js', () => {
     expect(MSG).not.toBeNull();
   });
 
-  it('MSG has exactly 17 keys', () => {
-    expect(Object.keys(MSG).length).toBe(17);
+  it('MSG has exactly 18 keys', () => {
+    expect(Object.keys(MSG).length).toBe(18);
   });
 
   it('STATUS has exactly 8 keys', () => {

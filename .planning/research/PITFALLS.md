@@ -56,7 +56,7 @@ The specific vectors for this extension:
 
 **What goes wrong:**
 
-The extension source code is publicly visible on the Chrome Web Store and Firefox AMO after submission. Any string literal that looks like `https://discord.com/api/webhooks/1234567890/XXXXXXXXXXX` in the extension bundle can be extracted in under 60 seconds by anyone who downloads the CRX/XPI and runs `strings` on it.
+The extension source code is publicly visible on the Chrome Web Store and Firefox AMO after submission. Any string literal that looks like `https://discord.com/api/webhooks/<id>/<token>` in the extension bundle can be extracted in under 60 seconds by anyone who downloads the CRX/XPI and runs `strings` on it.
 
 Once the webhook URL is known:
 - Automated spam scripts can flood your Discord channel with fake reports

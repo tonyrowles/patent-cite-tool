@@ -72,11 +72,11 @@ chrome.runtime.onInstalled.addListener(() => {
     documentUrlPatterns: ['https://patents.google.com/patent/US*'],
   });
 
-  drainQueueOnce(); // drain on install/update (D-02) — fire-and-forget
+  drainQueueOnce().catch(() => {}); // drain on install/update (D-02) — fire-and-forget
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  drainQueueOnce(); // drain on browser restart (D-02/D-07) — fire-and-forget, silent
+  drainQueueOnce().catch(() => {}); // drain on browser restart (D-02/D-07) — fire-and-forget, silent
 });
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  drainQueueOnce(); // opportunistic drain on any SW wake (D-02) — fire-and-forget
+  drainQueueOnce().catch(() => {}); // opportunistic drain on any SW wake (D-02) — fire-and-forget
   const tabId = sender.tab?.id;
 
   if (message.type === MSG.PDF_LINK_FOUND) {

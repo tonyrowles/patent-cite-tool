@@ -16,7 +16,14 @@ findings:
   warning: 4
   info: 1
   total: 6
-status: issues_found
+resolutions:
+  CR-01: fixed (commit follows) — all bugReportQueue/rate-window RMW serialized through a single storageLock promise chain; regression test added (report-transport-chrome.test.js "CR-01 — concurrent submit + drain")
+  WR-03: fixed — fire-and-forget drainQueueOnce() call sites + internal setTimeout retry now .catch(() => {}) (D-07 silent; avoids MV3 SW termination on unhandled rejection)
+  WR-01: deferred (advisory) — enqueuedAt millisecond-collision identity; low real-world likelihood
+  WR-02: deferred (advisory) — PROXY_TOKEN triplication; pre-existing pattern (offscreen.js, pdf-pipeline.js), broader refactor
+  WR-04: deferred (advisory) — SC3 test uses sync timer advance; test-quality only, suite is green
+  IN-01: deferred (advisory) — explicit 3xx branch; unreachable (fetch auto-follows redirects)
+status: critical_resolved
 ---
 
 # Phase 03: Code Review Report

@@ -43,6 +43,33 @@ const QUEUE_TTL_MS = 604800000;            // 7 days in ms (QUEUE-02)
 let drainingQueue = null;
 
 // ---------------------------------------------------------------------------
+// Storage serialization lock (CR-01 fix)
+//
+// The drainingQueue mutex above only prevents drain-vs-drain races. A submit
+// (enqueue + success/failure RMW) can still interleave with a concurrent drain
+// — both do read-modify-write on bugReportQueue across an await boundary, so the
+// last writer silently clobbers the other's update (phantom retry of a delivered
+// report, or loss of a freshly-enqueued one). CONTEXT.md requires "the simplest
+// correct approach" to concurrent RMW protection on bugReportQueue /
+// bugReportRateLimitWindow — this serializes every storage RMW critical section
+// through a single promise chain so no two get-modify-set sequences interleave.
+//
+// IMPORTANT: only LEAF read-modify-write sections acquire this lock. _doDrain
+// holds it solely for its prune snapshot and releases it before calling
+// attemptEntry (which re-acquires it per write) — never nest withStorageLock
+// inside a held section or the chain self-deadlocks.
+// ---------------------------------------------------------------------------
+
+let storageLock = Promise.resolve();
+
+function withStorageLock(fn) {
+  const run = storageLock.then(fn, fn);
+  // Keep the chain alive regardless of fn's outcome; callers see the real result.
+  storageLock = run.then(() => {}, () => {});
+  return run;
+}
+
+// ---------------------------------------------------------------------------
 // Rate-limit check (LIMIT-03, D-05)
 // ---------------------------------------------------------------------------
 
@@ -57,18 +84,22 @@ let drainingQueue = null;
  * @returns {Promise<boolean>} true if the submit is allowed, false if blocked.
  */
 export async function checkAndUpdateRateLimit() {
-  const now = Date.now();
-  const stored = await chrome.storage.local.get(RATE_KEY);
-  const raw = stored[RATE_KEY];
-  const window = (Array.isArray(raw) ? raw : []).filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+  // Serialized RMW so two concurrent submits cannot both read a 4-entry window
+  // and each append, slipping a 6th submission past the ceiling (CR-01 class).
+  return withStorageLock(async () => {
+    const now = Date.now();
+    const stored = await chrome.storage.local.get(RATE_KEY);
+    const raw = stored[RATE_KEY];
+    const window = (Array.isArray(raw) ? raw : []).filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
 
-  if (window.length >= RATE_LIMIT_MAX) {
-    return false; // Rate-limited — caller returns { rateLimited: true }
-  }
+    if (window.length >= RATE_LIMIT_MAX) {
+      return false; // Rate-limited — caller returns { rateLimited: true }
+    }
 
-  window.push(now);
-  await chrome.storage.local.set({ [RATE_KEY]: window });
-  return true; // Allowed
+    window.push(now);
+    await chrome.storage.local.set({ [RATE_KEY]: window });
+    return true; // Allowed
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -108,22 +139,8 @@ export async function submitReport(payload) {
     enqueuedAt: Date.now(),
   };
 
-  const stored = await chrome.storage.local.get(QUEUE_KEY);
-  const raw = stored[QUEUE_KEY];
-  const now = Date.now();
-
-  // Prune TTL-expired entries on enqueue (QUEUE-02).
-  let queue = (Array.isArray(raw) ? raw : []).filter(e => now - e.enqueuedAt < QUEUE_TTL_MS);
-  queue.push(entry);
-
-  // Cap at QUEUE_CAP — drop oldest by enqueuedAt when over limit (QUEUE-02).
-  if (queue.length > QUEUE_CAP) {
-    queue.sort((a, b) => a.enqueuedAt - b.enqueuedAt);
-    queue = queue.slice(queue.length - QUEUE_CAP);
-  }
-
-  // await the set() before any fetch — this is the Pitfall 6 / Pitfall 1 mitigation.
-  await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  // Serialized RMW (CR-01) — await the set() before any fetch (Pitfall 6 / Pitfall 1).
+  await _enqueueEntry(entry);
 
   // 4. Attempt the fetch (via the shared attemptEntry helper).
   const result = await attemptEntry(entry);
@@ -215,7 +232,8 @@ async function attemptEntry(entry) {
   await _updateEntryInQueue(entry);
 
   // Schedule in-session retry (D-01 — setTimeout only; no alarms API permitted).
-  setTimeout(() => drainQueueOnce(), backoffMs);
+  // Swallow rejections (D-07 silent; an unhandled SW rejection can terminate the worker — WR-03).
+  setTimeout(() => { drainQueueOnce().catch(() => {}); }, backoffMs);
 
   return { outcome: 'queued' };
 }
@@ -225,25 +243,54 @@ async function attemptEntry(entry) {
 // ---------------------------------------------------------------------------
 
 /**
- * Remove an entry from bugReportQueue (read-modify-write, filtered by enqueuedAt identity).
+ * Disk-first enqueue (QUEUE-01/QUEUE-02) — serialized RMW (CR-01).
+ * Prunes TTL-expired entries, appends the new entry, and caps at QUEUE_CAP
+ * (oldest-drop by enqueuedAt).
  */
-async function _removeEntryFromQueue(entry) {
-  const stored = await chrome.storage.local.get(QUEUE_KEY);
-  const raw = stored[QUEUE_KEY];
-  const queue = (Array.isArray(raw) ? raw : []).filter(e => e.enqueuedAt !== entry.enqueuedAt);
-  await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+async function _enqueueEntry(entry) {
+  return withStorageLock(async () => {
+    const stored = await chrome.storage.local.get(QUEUE_KEY);
+    const raw = stored[QUEUE_KEY];
+    const now = Date.now();
+
+    // Prune TTL-expired entries on enqueue (QUEUE-02).
+    let queue = (Array.isArray(raw) ? raw : []).filter(e => now - e.enqueuedAt < QUEUE_TTL_MS);
+    queue.push(entry);
+
+    // Cap at QUEUE_CAP — drop oldest by enqueuedAt when over limit (QUEUE-02).
+    if (queue.length > QUEUE_CAP) {
+      queue.sort((a, b) => a.enqueuedAt - b.enqueuedAt);
+      queue = queue.slice(queue.length - QUEUE_CAP);
+    }
+
+    await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  });
 }
 
 /**
- * Update a modified entry in bugReportQueue (read-modify-write, matched by enqueuedAt).
+ * Remove an entry from bugReportQueue (serialized RMW, filtered by enqueuedAt identity).
+ */
+async function _removeEntryFromQueue(entry) {
+  return withStorageLock(async () => {
+    const stored = await chrome.storage.local.get(QUEUE_KEY);
+    const raw = stored[QUEUE_KEY];
+    const queue = (Array.isArray(raw) ? raw : []).filter(e => e.enqueuedAt !== entry.enqueuedAt);
+    await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  });
+}
+
+/**
+ * Update a modified entry in bugReportQueue (serialized RMW, matched by enqueuedAt).
  */
 async function _updateEntryInQueue(entry) {
-  const stored = await chrome.storage.local.get(QUEUE_KEY);
-  const raw = stored[QUEUE_KEY];
-  const queue = (Array.isArray(raw) ? raw : []).map(e =>
-    e.enqueuedAt === entry.enqueuedAt ? entry : e
-  );
-  await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  return withStorageLock(async () => {
+    const stored = await chrome.storage.local.get(QUEUE_KEY);
+    const raw = stored[QUEUE_KEY];
+    const queue = (Array.isArray(raw) ? raw : []).map(e =>
+      e.enqueuedAt === entry.enqueuedAt ? entry : e
+    );
+    await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -277,23 +324,31 @@ export async function drainQueueOnce() {
  * Internal drain implementation (called exclusively by drainQueueOnce).
  */
 async function _doDrain() {
-  const stored = await chrome.storage.local.get(QUEUE_KEY);
-  const raw = stored[QUEUE_KEY];
-  if (!Array.isArray(raw) || raw.length === 0) return;
+  // Take a consistent snapshot under the storage lock: prune TTL-expired entries
+  // (QUEUE-02) and compute the eligible set, then RELEASE the lock before any
+  // attemptEntry call. attemptEntry re-acquires the lock per write via the
+  // _removeEntryFromQueue / _updateEntryInQueue helpers — holding the lock across
+  // the loop (which awaits fetch) would self-deadlock the chain (CR-01).
+  const eligible = await withStorageLock(async () => {
+    const stored = await chrome.storage.local.get(QUEUE_KEY);
+    const raw = stored[QUEUE_KEY];
+    if (!Array.isArray(raw) || raw.length === 0) return [];
 
-  const now = Date.now();
+    const now = Date.now();
 
-  // Prune TTL-expired entries first (QUEUE-02 — 7-day TTL).
-  const live = raw.filter(e => now - e.enqueuedAt < QUEUE_TTL_MS);
-  if (live.length !== raw.length) {
-    await chrome.storage.local.set({ [QUEUE_KEY]: live });
-  }
+    // Prune TTL-expired entries first (QUEUE-02 — 7-day TTL).
+    const live = raw.filter(e => now - e.enqueuedAt < QUEUE_TTL_MS);
+    if (live.length !== raw.length) {
+      await chrome.storage.local.set({ [QUEUE_KEY]: live });
+    }
 
-  // Process each entry whose nextAttemptAt is in the past (D-03 — honor persisted backoff).
-  const eligible = live.filter(e => e.nextAttemptAt <= now);
+    // Entries whose nextAttemptAt is in the past (D-03 — honor persisted backoff).
+    return live.filter(e => e.nextAttemptAt <= now);
+  });
+
   for (const entry of eligible) {
-    // attemptEntry handles its own read-modify-write (remove on success/drop, update on retry).
-    // Ignore the return value — drain is silent (D-07).
+    // attemptEntry handles its own serialized read-modify-write (remove on
+    // success/drop, update on retry). Ignore the return value — drain is silent (D-07).
     await attemptEntry(entry);
   }
 }
@@ -309,4 +364,5 @@ async function _doDrain() {
  */
 export function _resetMutex() {
   drainingQueue = null;
+  storageLock = Promise.resolve();
 }

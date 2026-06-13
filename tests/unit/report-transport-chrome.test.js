@@ -249,6 +249,41 @@ describe('SC3 / QUEUE-01 — disk-first invariant and SW-death simulation', () =
 });
 
 // ---------------------------------------------------------------------------
+// CR-01 regression — concurrent submit + drain must not lose or resurrect entries.
+// The drainingQueue mutex only serializes drain-vs-drain; before the storageLock
+// fix, a submit's enqueue/remove RMW could interleave with a concurrent drain's
+// RMW and clobber an update (phantom retry of a delivered report, or loss of a
+// freshly-enqueued one). All storage RMW is now serialized through one lock.
+// ---------------------------------------------------------------------------
+
+describe('CR-01 — concurrent submit + drain serialize without lost updates', () => {
+  it('a queued entry drained concurrently with a new submit leaves no phantom/lost entry', async () => {
+    // Pre-seed an already-queued entry A, immediately eligible for drain.
+    _localStore.bugReportQueue = [{
+      payload: { ...SAMPLE_PAYLOAD, patentNumber: 'A0000001' },
+      attemptCount: 0,
+      nextAttemptAt: 0,
+      enqueuedAt: Date.now() - 1000,
+    }];
+
+    // Every fetch succeeds (201) — both the drain of A and the new submit B deliver.
+    fetch.mockResolvedValue(makeFetchResponse(true, 201, { fingerprint: 'fp' }));
+
+    // Fire the opportunistic drain and a fresh submit concurrently — the exact
+    // interleaving the wiring produces on a SUBMIT_REPORT message with a non-empty queue.
+    const [, submitResult] = await Promise.all([
+      drainQueueOnce(),
+      submitReport({ ...SAMPLE_PAYLOAD, patentNumber: 'B0000002' }),
+    ]);
+
+    // Both delivered → queue fully drained. A lost update would leave a resurrected
+    // A (length 1) or drop B; serialized RMW guarantees a clean empty queue.
+    expect(submitResult.ok).toBe(true);
+    expect(_localStore.bugReportQueue ?? []).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // SC4 / QUEUE-03 / D-04: failure handling — 4xx drop, 5xx backoff, 429 retry
 // ---------------------------------------------------------------------------
 

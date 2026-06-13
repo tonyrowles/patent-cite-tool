@@ -27,7 +27,7 @@ const ERROR_BUFFER_KEY = 'bugReportErrorBuffer';
 const BUFFER_MAX = 20;
 
 /** Extension-tagged prefix list per D-08. Only these trigger buffer writes. */
-const EXTENSION_PREFIXES = ['[SW]', '[PCT]', '[Offscreen]', '[Firefox]'];
+const EXTENSION_PREFIXES = ['[SW]', '[PCT]', '[Offscreen]', '[Firefox]', '[BG]'];
 
 /** Idempotency guard — prevents double-wrapping if installErrorBuffer() called twice. */
 let _bufferInstalled = false;

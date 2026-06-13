@@ -26,7 +26,7 @@ import { submitReport, drainQueueOnce } from '../shared/report-transport.js';
 import { installErrorBuffer } from '../content/report-dialog.js';
 
 // Install extension-tagged error ring buffer (PAY-08 / D-08)
-// Captures [Firefox]-prefixed console.error/warn from the Firefox background context.
+// Captures [BG]-prefixed console.error/warn from the Firefox background context.
 installErrorBuffer();
 
 // ---------------------------------------------------------------------------

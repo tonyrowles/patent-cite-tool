@@ -25,7 +25,7 @@
 ## Phases
 
 - [x] **Phase 1: Worker Route + KV Schema + Privacy Compliance Groundwork** - New `POST /report` Cloudflare Worker route, `BUG_REPORTS` KV namespace, server-side rate-limit + fingerprint dedup, and all store-submission compliance gates (privacy policy, manifest `data_collection_permissions`, webhook URL as server-side secret) (completed 2026-06-13)
-- [ ] **Phase 2: Shared Constants + Pure Payload Builder** - `src/shared/constants.js` additions and new `src/shared/report-payload-builder.js` pure function establish the payload schema contract between all extension surfaces and the Worker; Vitest-pinned before any UI work
+- [x] **Phase 2: Shared Constants + Pure Payload Builder** - `src/shared/constants.js` additions and new `src/shared/report-payload-builder.js` pure function establish the payload schema contract between all extension surfaces and the Worker; Vitest-pinned before any UI work (completed 2026-06-13)
 - [ ] **Phase 3: Background Submission Handler + Rate Limit + Retry Queue** - Extension-side transport layer: `MSG.SUBMIT_REPORT` handlers in Chrome SW + Firefox background, client-side sliding-window rate limit, disk-first retry queue with exponential backoff; full end-to-end submission path testable without UI
 - [ ] **Phase 4: Report Dialog UI + Citation-UI Wiring** - Shadow DOM report dialog, Report button in citation popup, auto-surfacing on failure/yellow-confidence/Worker-error, error log ring buffer, DOM/PDF diagnostic enrichment
 - [ ] **Phase 5: Options Page Debug Mode + Popup Fallback + Live UAT** - Debug Mode options toggle, popup "Report a problem" fallback, options page report section; milestone close with live UAT-01..06 DoD evidence
@@ -58,7 +58,7 @@
   3. Two calls to `buildReportPayload()` with identical inputs produce byte-identical JSON serialization (fingerprint reproducibility confirmed across runs)
   4. `REPORT_CATEGORIES`, `MSG.SUBMIT_REPORT`, and `WORKER_REPORT_URL` are importable from `src/shared/constants.js` and the constants module contains zero `chrome.*` calls (confirmed by static-grep Vitest assertion)
 **Plans**: 1 plan
-- [ ] 02-01-PLAN.md — Extend constants.js (MSG.SUBMIT_REPORT, frozen REPORT_CATEGORIES, WORKER_REPORT_URL) + new pure report-payload-builder.js + Vitest suite pinning all 4 Success Criteria (PAY-05, PAY-06, PAY-07)
+- [x] 02-01-PLAN.md — Extend constants.js (MSG.SUBMIT_REPORT, frozen REPORT_CATEGORIES, WORKER_REPORT_URL) + new pure report-payload-builder.js + Vitest suite pinning all 4 Success Criteria (PAY-05, PAY-06, PAY-07)
 **UI hint**: no
 
 ### Phase 3: Background Submission Handler + Rate Limit + Retry Queue
@@ -103,7 +103,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 3/3 | Complete   | 2026-06-13 |
-| 2. Shared Constants + Pure Payload Builder | 0/1 | Not started | - |
+| 2. Shared Constants + Pure Payload Builder | 1/1 | Complete   | 2026-06-13 |
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 0/TBD | Not started | - |
 | 4. Report Dialog UI + Citation-UI Wiring | 0/TBD | Not started | - |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | 0/TBD | Not started | - |

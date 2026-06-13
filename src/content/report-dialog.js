@@ -811,14 +811,18 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
   selectionToggleLabel.appendChild(selectionToggleText);
   whatsIncludedPanel.appendChild(selectionToggleLabel);
 
-  // Load sticky state from chrome.storage.local
+  // Load sticky state from chrome.storage.local (CR-03: hold Submit disabled
+  // until preference is loaded so the checkbox reflects saved state before
+  // the user can submit).
   chrome.storage.local.get('reportDialogRemoveSelectionText').then((stored) => {
     const saved = stored.reportDialogRemoveSelectionText === true;
     selectionToggle.checked = saved;
     includeSelectionText = !saved;
     selectionRow.style.display = saved ? 'none' : '';
+    submitBtn.disabled = false; // preference loaded — safe to submit
   }).catch(() => {
     // Default: include selection text
+    submitBtn.disabled = false; // unblock on storage error
   });
 
   selectionToggle.addEventListener('change', () => {
@@ -847,6 +851,9 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
   const submitBtn = document.createElement('button');
   submitBtn.className = 'cite-report-submit';
   submitBtn.textContent = 'Submit report';
+  // CR-03: disable until sticky preference has loaded so the checkbox reflects
+  // the user's saved choice before Submit becomes interactive.
+  submitBtn.disabled = true;
 
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'cite-report-cancel';

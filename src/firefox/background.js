@@ -184,6 +184,7 @@ async function handlePdfLinkFound(message, tabId) {
     if (!patent) return;
 
     patent.status = STATUS.PARSED;
+    patent.source = null; // WR-01: clear source so getPdfParseStatus returns 'cache-hit'
     patent.lineCount = cacheResult.lineCount;
     patent.columnCount = cacheResult.columnCount;
     patent.error = null;

@@ -400,6 +400,7 @@ async function handleCacheHitResult(message) {
   if (!patent) return;
 
   patent.status = STATUS.PARSED;
+  patent.source = null; // WR-01: clear source so getPdfParseStatus returns 'cache-hit'
   patent.lineCount = message.lineCount;
   patent.columnCount = message.columnCount;
   patent.error = null;

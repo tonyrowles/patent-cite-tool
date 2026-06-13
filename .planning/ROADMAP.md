@@ -85,7 +85,11 @@
   2. The expandable "What's included" panel renders the full to-be-submitted payload field-by-field before submission; the [Remove selection text] toggle, when activated, causes `selectionText` to be absent from the displayed preview and from the payload actually sent to the Worker — toggle state persists across dialog re-opens within the same install
   3. The dialog closes on Submit success (toast "Report sent — thank you" appears); Escape key, Cancel button, and click-outside all dismiss the dialog without submission; focus is trapped within the modal while open and restored to the trigger element on close
   4. The submitted payload includes `selected_node_xpath`, `scroll_y`, `viewport_width`, `viewport_height`, and `pdfParseStatus` fields populated from live page state; the `bugReportErrorBuffer` ring buffer (last 20 entries) is included in the payload when non-empty
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 04-01-PLAN.md — PAY-08 error ring buffer + PAY-09 capture helpers (xpathNode/scroll/viewport/pdfParseStatus/browser-OS) + installErrorBuffer wiring into content + both backgrounds (PAY-08, PAY-09)
+- [ ] 04-02-PLAN.md — report-dialog.js Shadow DOM dialog per UI-SPEC: panel/radios/note+counter/What's-included + sticky [Remove selection text] toggle, focus trap + dismiss paths, submit→toast mapping (CAP-01, CAP-02, CAP-04)
+- [ ] 04-03-PLAN.md — Report button in citation-ui.js .cite-row + content-script.js outcome→category/tier trigger wiring; green-hidden invariant (CAP-03, TRIG-01..04)
+- [ ] 04-04-PLAN.md — node-env Vitest suites proving SC1-SC4: PAY-08 buffer, PAY-09 derivation, [Remove selection text] omission, TRIG mapping + XPORT-06/getCitationHost static guards (PAY-08, PAY-09, CAP-02, TRIG-01..04)
 **UI hint**: yes
 
 ### Phase 5: Options Page Debug Mode + Popup Fallback + Live UAT
@@ -108,5 +112,5 @@
 | 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 3/3 | Complete   | 2026-06-13 |
 | 2. Shared Constants + Pure Payload Builder | 1/1 | Complete   | 2026-06-13 |
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 3/3 | Complete   | 2026-06-13 |
-| 4. Report Dialog UI + Citation-UI Wiring | 0/TBD | Not started | - |
+| 4. Report Dialog UI + Citation-UI Wiring | 0/4 | In progress | - |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | 0/TBD | Not started | - |

@@ -24,7 +24,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Worker Route + KV Schema + Privacy Compliance Groundwork** - New `POST /report` Cloudflare Worker route, `BUG_REPORTS` KV namespace, server-side rate-limit + fingerprint dedup, and all store-submission compliance gates (privacy policy, manifest `data_collection_permissions`, webhook URL as server-side secret)
+- [x] **Phase 1: Worker Route + KV Schema + Privacy Compliance Groundwork** - New `POST /report` Cloudflare Worker route, `BUG_REPORTS` KV namespace, server-side rate-limit + fingerprint dedup, and all store-submission compliance gates (privacy policy, manifest `data_collection_permissions`, webhook URL as server-side secret) (completed 2026-06-13)
 - [ ] **Phase 2: Shared Constants + Pure Payload Builder** - `src/shared/constants.js` additions and new `src/shared/report-payload-builder.js` pure function establish the payload schema contract between all extension surfaces and the Worker; Vitest-pinned before any UI work
 - [ ] **Phase 3: Background Submission Handler + Rate Limit + Retry Queue** - Extension-side transport layer: `MSG.SUBMIT_REPORT` handlers in Chrome SW + Firefox background, client-side sliding-window rate limit, disk-first retry queue with exponential backoff; full end-to-end submission path testable without UI
 - [ ] **Phase 4: Report Dialog UI + Citation-UI Wiring** - Shadow DOM report dialog, Report button in citation popup, auto-surfacing on failure/yellow-confidence/Worker-error, error log ring buffer, DOM/PDF diagnostic enrichment
@@ -43,8 +43,8 @@
   4. `web-ext lint` against `dist/firefox/` exits 0 with zero AMO-blocking warnings after the `data_collection_permissions` update to `manifest.firefox.json`; the privacy policy at the canonical URL includes a "Bug Report Submission" section describing the payload field-by-field
   5. `wrangler secret put DISCORD_WEBHOOK_URL` is the only mechanism that sets the webhook URL; `grep -r 'discord.com/api/webhooks' .` (excluding `.git/`) returns zero results across the entire repo
 **Plans**: 2 plans
-- [ ] 01-01-PLAN.md — POST /report Worker route, BUG_REPORTS KV namespace, fingerprint dedup + IP rate limit, Discord webhook, report-schema.md (XPORT-01..04, PAY-01..04, LIMIT-01/02)
-- [ ] 01-02-PLAN.md — Privacy compliance gates: Firefox manifest data_collection_permissions, privacy policy Bug Report section, store-listing data-use update (PRIV-01..05)
+- [x] 01-01-PLAN.md — POST /report Worker route, BUG_REPORTS KV namespace, fingerprint dedup + IP rate limit, Discord webhook, report-schema.md (XPORT-01..04, PAY-01..04, LIMIT-01/02)
+- [x] 01-02-PLAN.md — Privacy compliance gates: Firefox manifest data_collection_permissions, privacy policy Bug Report section, store-listing data-use update (PRIV-01..05)
 **UI hint**: no
 
 ### Phase 2: Shared Constants + Pure Payload Builder
@@ -100,7 +100,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 0/2 | Planned | - |
+| 1. Worker Route + KV Schema + Privacy Compliance Groundwork | 2/2 | Complete   | 2026-06-13 |
 | 2. Shared Constants + Pure Payload Builder | 0/TBD | Not started | - |
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 0/TBD | Not started | - |
 | 4. Report Dialog UI + Citation-UI Wiring | 0/TBD | Not started | - |

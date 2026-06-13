@@ -199,11 +199,11 @@ describe('PAY-03 — getBrowserString low-fidelity browser token (never full UA)
 });
 
 describe('PAY-03 — getOsString low-fidelity OS token (never full UA)', () => {
-  it('returns "Windows 10" short token from full Windows UA', () => {
+  it('returns "Windows 10/11" short token from full Windows UA (WR-02: both Win10 and Win11 report NT 10.0)', () => {
     const fullUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36';
     vi.stubGlobal('navigator', { userAgent: fullUA });
     const result = getOsString();
-    expect(result).toBe('Windows 10');
+    expect(result).toBe('Windows 10/11');
     expect(result).not.toBe(fullUA);
     expect(result.length).toBeLessThan(fullUA.length);
   });

@@ -239,8 +239,10 @@ export function getBrowserString() {
  */
 export function getOsString() {
   const ua = navigator.userAgent;
-  if (ua.includes('Windows NT 10')) return 'Windows 10';
-  if (ua.includes('Windows NT 11') || ua.includes('Windows NT 10.0')) return 'Windows';
+  // WR-02: Windows 10 and 11 both report 'Windows NT 10.0'; no reliable UA
+  // distinction exists. Return a neutral low-fidelity token rather than a
+  // wrong 'Windows 10' for half of Windows users.
+  if (ua.includes('Windows NT 10.0')) return 'Windows 10/11';
   if (ua.includes('Windows')) return 'Windows';
   if (ua.includes('Mac OS X') || ua.includes('macOS')) return 'macOS';
   if (ua.includes('Linux')) return 'Linux';

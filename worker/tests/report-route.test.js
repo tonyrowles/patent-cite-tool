@@ -33,6 +33,7 @@ const PATENT_STRIP       = '12505003';
 const PATENT_TESTMODE    = '12505004';
 const PATENT_DISCORD     = '12505005';
 const PATENT_VALIDATION  = '12505006';
+const PATENT_DEDUP_EXACT = '12505009'; // dedicated constant for exact duplicate_count test (WR-01)
 
 // Unique IPs per describe group — prevents cross-test rate-limit collisions
 const IP_VALID           = '10.0.0.1';
@@ -43,6 +44,7 @@ const IP_TESTMODE        = '10.0.0.5';
 const IP_DISCORD         = '10.0.0.6';
 const IP_DEDUP           = '10.0.0.7';
 const IP_STRIP           = '10.0.0.8';
+const IP_DEDUP_EXACT     = '10.0.0.9'; // dedicated IP for exact duplicate_count test (WR-01)
 
 function makeBody(patentNumber) {
   return {
@@ -209,6 +211,36 @@ describe('POST /report', () => {
       const listed = await env.BUG_REPORTS.list({ prefix: `report:${body.fingerprint}:` });
       const record = await env.BUG_REPORTS.get(listed.keys[0].name, { type: 'json' });
       expect(record.duplicate_count).toBeGreaterThanOrEqual(2);
+    });
+
+    it('duplicate_count is exactly 1 after a single first-then-duplicate sequence (WR-01)', async () => {
+      // Uses a fresh, dedicated patent number and IP — no accumulated state from other tests.
+      // First request: must return 201 with deduped:false (initialises duplicate_count to 0)
+      const ctx1 = createExecutionContext();
+      const resp1 = await worker.fetch(
+        makeReportRequest(makeBody(PATENT_DEDUP_EXACT), IP_DEDUP_EXACT),
+        env, ctx1
+      );
+      await waitOnExecutionContext(ctx1);
+      expect(resp1.status).toBe(201);
+      const body1 = await resp1.json();
+      expect(body1.deduped).toBe(false);
+
+      // Second request: must return 200 with deduped:true and increment duplicate_count 0 -> 1
+      const ctx2 = createExecutionContext();
+      const resp2 = await worker.fetch(
+        makeReportRequest(makeBody(PATENT_DEDUP_EXACT), IP_DEDUP_EXACT),
+        env, ctx2
+      );
+      await waitOnExecutionContext(ctx2);
+      expect(resp2.status).toBe(200);
+      const body2 = await resp2.json();
+      expect(body2.deduped).toBe(true);
+
+      // Verify the stored record has duplicate_count === 1 (not 2 as the || 1 bug produced)
+      const listed = await env.BUG_REPORTS.list({ prefix: `report:${body1.fingerprint}:` });
+      const record = await env.BUG_REPORTS.get(listed.keys[0].name, { type: 'json' });
+      expect(record.duplicate_count).toBe(1);
     });
   });
 

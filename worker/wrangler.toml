@@ -5,3 +5,7 @@ compatibility_date = "2025-01-01"
 [[kv_namespaces]]
 binding = "PATENT_CACHE"
 id = "6e7af6faa9c340fdb8120036913b00b5"
+
+[[kv_namespaces]]
+binding = "BUG_REPORTS"
+id = "cefe2733c0074fe2a28a49ff536de105"

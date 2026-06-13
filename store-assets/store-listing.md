@@ -40,7 +40,8 @@ Features:
 - Default and advanced display modes
 - Three-state toolbar icon shows extension readiness at a glance
 - Pre-computed position maps for fast repeat lookups
-- No account required, no personal data collected
+- No account required, no personal data collected during normal citation use
+- Voluntary "report a problem" feature: if a citation fails, you can submit an optional diagnostic report to help the developer fix it. See the <a href="https://tonyrowles.github.io/patent-cite-tool/privacy">privacy policy</a> for full details of what is included.
 
 Technical approach: the extension fetches the patent PDF from Google's public CDN, builds a text position map using PDF.js running locally in the browser, then maps your selection coordinates to column and line numbers. Position maps for previously-seen patents are cached via first-party Cloudflare KV infrastructure (pct.tonyrowles.com) to speed up repeat citations.
 ```
@@ -124,9 +125,11 @@ All JavaScript is bundled within the extension package. Remote HTTP requests to 
 
 ### Subsection 4: Data Use Practices
 
-**Data types collected:** Select none / leave all checkboxes unchecked.
+**Data types collected:** For normal citation-only operation, select none / leave all checkboxes unchecked. If your users may submit voluntary bug reports, check **Website Content** — patent selection text (up to approximately 200 characters) may be included in a bug report when the user does not toggle it off before submitting.
 
-The extension does not collect: personally identifiable information, health information, financial information, authentication information, personal communications, location data, web history, user activity, or website content. The only stored data is three preference settings in chrome.storage.sync (trigger mode, display mode, patent number prefix) — this data is managed by Chrome and is not accessible to the developer.
+For normal citation-only operation, the extension does not collect: personally identifiable information, health information, financial information, authentication information, personal communications, location data, web history, user activity, or website content. The only stored data is three preference settings in chrome.storage.sync (trigger mode, display mode, patent number prefix) — this data is managed by Chrome and is not accessible to the developer.
+
+When a user voluntarily submits a bug report (by explicitly clicking the Submit button in the report dialog), certain diagnostic fields are transmitted to first-party infrastructure (Cloudflare KV at pct.tonyrowles.com and a maintainer-only Discord channel). This includes the patent number, citation result, browser/OS, and optionally the selected text excerpt (which the user can remove before submitting). No IP address is stored in report records. Full details of the transmitted fields and 90-day retention period are documented in the [privacy policy](https://tonyrowles.github.io/patent-cite-tool/privacy).
 
 **Certification statements — check all three:**
 

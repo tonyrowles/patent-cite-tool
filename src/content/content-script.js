@@ -18,6 +18,41 @@ import { installErrorBuffer } from './report-dialog.js';
 // Install extension-tagged error ring buffer (PAY-08 / D-08)
 installErrorBuffer();
 
+// ---------------------------------------------------------------------------
+// Outcome → confidenceTier / reportCategory mapping helpers (TRIG-01..04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Map numeric confidence to tier string.
+ * Thresholds mirror citation-ui.js:124 (high >=0.95 / medium >=0.80 / low <0.80).
+ * Tier-5 gutter-tolerant match outputs exactly 0.85 → falls in yellow band (TRIG-02).
+ *
+ * @param {number} confidence - Match confidence (0-1)
+ * @returns {'green'|'yellow'|'red'}
+ */
+function mapConfidenceTier(confidence) {
+  if (confidence >= 0.95) return 'green';   // high — TRIG-04: hide Report button
+  if (confidence >= 0.80) return 'yellow';  // medium — TRIG-02: "Inaccurate citation"
+  return 'red';                             // low — TRIG-01/02: button shown
+}
+
+/**
+ * Map error code / confidence to report category string.
+ * Returns null for green-success outcomes (TRIG-04: no Report button).
+ *
+ * @param {string|null} errorCode - e.g. 'no-match', 'no-position-map', 'lookup-failed', null for success
+ * @param {number|null} confidence - Match confidence; only used for success path
+ * @returns {'no_match'|'inaccurate_citation'|'tool_not_working'|null}
+ */
+function mapOutcomeToReportCategory(errorCode, confidence) {
+  if (errorCode === 'no-match' || errorCode === 'paragraph-not-found') return 'no_match';
+  if (errorCode === 'no-position-map' || errorCode === 'lookup-failed' ||
+      errorCode === 'pdf-not-available') return 'tool_not_working';
+  // Success path: show button only for sub-green confidence (TRIG-02)
+  if (confidence !== null && confidence < 0.95) return 'inaccurate_citation';
+  return null; // green success (confidence >= 0.95) — TRIG-04: no Report button
+}
+
 /**
  * Extract patent ID, type, and kind code from the current URL.
  *
@@ -453,9 +488,23 @@ async function generateCitation(selectedText, rect) {
     citationInProgress = false;
     if (result) {
       const prefixedCitation = applyPatentPrefix(result.citation, patentId, patentType);
-      showCitationPopup(prefixedCitation, rect || currentSelectionRect, result.confidence, cachedSettings.displayMode);
+      showCitationPopup(
+        prefixedCitation,
+        rect || currentSelectionRect,
+        result.confidence,
+        cachedSettings.displayMode,
+        undefined,
+        {
+          category: mapOutcomeToReportCategory(null, result.confidence),
+          confidenceTier: mapConfidenceTier(result.confidence),
+        }
+      );
     } else {
-      showErrorPopup('Paragraph not found in application', rect || currentSelectionRect);
+      showErrorPopup(
+        'Paragraph not found in application',
+        rect || currentSelectionRect,
+        { category: 'no_match', confidenceTier: 'red' }
+      );
     }
   } else {
     // Granted patent: PositionMap-based citation via offscreen
@@ -464,13 +513,18 @@ async function generateCitation(selectedText, rect) {
     const patent = data.currentPatent;
 
     if (!patent || patent.status !== 'parsed') {
-      const statusMsg = patent?.status === 'fetching' || patent?.status === 'parsing'
+      const isTransient = patent?.status === 'fetching' || patent?.status === 'parsing';
+      const statusMsg = isTransient
         ? 'PDF is still being analyzed, please wait...'
         : patent?.status === 'error'
           ? 'PDF analysis failed'
           : 'PDF not available';
+      // TRIG-03: tool_not_working for PDF failures; NO button for transient state (not a failure)
+      const statusReportOutcome = isTransient
+        ? null
+        : { category: 'tool_not_working', confidenceTier: 'red' };
       citationInProgress = false;
-      showErrorPopup(statusMsg, rect || currentSelectionRect);
+      showErrorPopup(statusMsg, rect || currentSelectionRect, statusReportOutcome);
       return;
     }
 
@@ -541,7 +595,12 @@ function handleCitationResult(message) {
       prefixedCitation,
       rect,
       message.confidence,
-      cachedSettings.displayMode
+      cachedSettings.displayMode,
+      undefined,
+      {
+        category: mapOutcomeToReportCategory(null, message.confidence),
+        confidenceTier: mapConfidenceTier(message.confidence),
+      }
     );
   } else {
     const errorMsg = message.error === 'no-match'
@@ -549,6 +608,11 @@ function handleCitationResult(message) {
       : message.error === 'no-position-map'
         ? 'PDF has not been analyzed yet'
         : 'Citation lookup failed';
-    showErrorPopup(errorMsg, rect);
+    // TRIG-01: no-match → no_match; TRIG-03: no-position-map / other → tool_not_working
+    const errorReportOutcome = {
+      category: message.error === 'no-match' ? 'no_match' : 'tool_not_working',
+      confidenceTier: 'red',
+    };
+    showErrorPopup(errorMsg, rect, errorReportOutcome);
   }
 }

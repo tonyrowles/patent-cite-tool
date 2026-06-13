@@ -17,10 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const triggerSelect = document.getElementById('triggerMode');
   const displaySelect = document.getElementById('displayMode');
   const patentNumCheckbox = document.getElementById('includePatentNumber');
+  const debugModeCheckbox = document.getElementById('debugMode');
 
   const triggerSaved = document.getElementById('triggerSaved');
   const displaySaved = document.getElementById('displaySaved');
   const patentNumSaved = document.getElementById('patentNumSaved');
+  const debugModeSaved = document.getElementById('debugModeSaved');
 
   const silentHelp = document.getElementById('silentHelp');
 
@@ -46,11 +48,15 @@ document.addEventListener('DOMContentLoaded', () => {
     triggerMode: 'floating-button',
     displayMode: 'default',
     includePatentNumber: false,
+    debugMode: false,
   }, (settings) => {
     triggerSelect.value = settings.triggerMode;
     displaySelect.value = settings.displayMode;
     if (patentNumCheckbox) {
       patentNumCheckbox.checked = settings.includePatentNumber;
+    }
+    if (debugModeCheckbox) {
+      debugModeCheckbox.checked = settings.debugMode;
     }
     // Set silent help visibility based on loaded setting
     updateSilentHelp(settings.triggerMode);
@@ -74,6 +80,14 @@ document.addEventListener('DOMContentLoaded', () => {
     patentNumCheckbox.addEventListener('change', () => {
       chrome.storage.sync.set({ includePatentNumber: patentNumCheckbox.checked }, () => {
         showSaved(patentNumSaved);
+      });
+    });
+  }
+
+  if (debugModeCheckbox) {
+    debugModeCheckbox.addEventListener('change', () => {
+      chrome.storage.sync.set({ debugMode: debugModeCheckbox.checked }, () => {
+        showSaved(debugModeSaved);
       });
     });
   }

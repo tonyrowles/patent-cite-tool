@@ -186,7 +186,7 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
     }
     reportBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      showReportDialog(shadow, reportOutcome, rect, reportBtn);
+      showReportDialog({ mode: 'shadow', root: shadow }, reportOutcome, rect, reportBtn);
     });
     row.appendChild(reportBtn);
   }
@@ -312,7 +312,7 @@ export function showErrorPopup(errorMessage, rect, reportOutcome = null) {
     reportBtn.textContent = '⚑ Report a problem';
     reportBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      showReportDialog(shadow, reportOutcome, rect, reportBtn);
+      showReportDialog({ mode: 'shadow', root: shadow }, reportOutcome, rect, reportBtn);
     });
     popup.appendChild(reportBtn);
   }

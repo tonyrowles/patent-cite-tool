@@ -523,6 +523,74 @@ export function installFocusTrap(shadowRoot, panelEl, onEscape) {
 }
 
 /**
+ * Install a keyboard focus trap within the panel in page DOM (options-page mode).
+ *
+ * Identical to installFocusTrap except:
+ *   - Uses `document.activeElement` instead of `shadowRoot.activeElement` (Pitfall 2).
+ *   - Attaches the keydown listener to `document` instead of a shadow root.
+ *
+ * @param {Element} panelEl - The dialog panel element whose focusable
+ *   descendants define the trap boundary.
+ * @param {Function} onEscape - Callback invoked when Escape is pressed.
+ * @returns {Function} Teardown function that removes the keydown listener.
+ */
+export function installFocusTrapPage(panelEl, onEscape) {
+  const FOCUSABLE = [
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+    'a[href]',
+  ].join(', ');
+
+  function getFocusable() {
+    return Array.from(panelEl.querySelectorAll(FOCUSABLE));
+  }
+
+  function handleKeydown(e) {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      e.preventDefault();
+      onEscape();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+
+    e.stopPropagation();
+    const focusable = getFocusable();
+    if (focusable.length === 0) {
+      e.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement; // page mode: document.activeElement (not shadowRoot)
+
+    if (e.shiftKey) {
+      if (active === first || !focusable.includes(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (active === last || !focusable.includes(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  document.addEventListener('keydown', handleKeydown);
+
+  // Focus the first radio on open (setTimeout per UI-SPEC Accessibility Contract)
+  const focusable = getFocusable();
+  if (focusable.length > 0) {
+    setTimeout(() => focusable[0].focus(), 0);
+  }
+
+  return () => document.removeEventListener('keydown', handleKeydown);
+}
+
+/**
  * Friendly label mapping for the "What's included" field list rows.
  * Labels are from 04-UI-SPEC.md field-list table (D-03).
  */
@@ -550,25 +618,34 @@ const CATEGORY_LABELS = {
 };
 
 /**
- * Show the anchored report dialog panel inside the existing shadow root.
+ * Show the anchored report dialog panel inside the existing shadow root or a
+ * plain page-DOM container.
  *
  * CRITICAL RULES (RESEARCH):
- *   - Receives `shadow` as a param — NEVER calls getCitationHost (Pitfall 1).
+ *   - Receives `mountContext` as a param — NEVER calls getCitationHost (Pitfall 1).
  *   - Captures PAY-09 diagnostics at the TOP of this function (Pitfall 3).
  *   - Removes panel FIRST, then calls showSuccessToast/showFailureToast (Pitfall 1).
  *   - All user-note and page-derived values rendered as textContent (T-04-06).
  *
- * @param {ShadowRoot} shadow - The already-open closed shadow root.
- * @param {{ category: string|null, confidenceTier: string }} reportOutcome
- * @param {DOMRect} selectionRect - Bounding rect for positioning.
+ * @param {{ mode: 'shadow', root: ShadowRoot } | { mode: 'page', container: HTMLElement }} mountContext
+ *   - shadow mode: mounts into the closed Shadow DOM (in-citation path)
+ *   - page mode: mounts into a plain page-DOM container (options-page path)
+ * @param {{ category: string|null, confidenceTier: string|null }} reportOutcome
+ * @param {DOMRect|null} selectionRect - Bounding rect for positioning (shadow mode only; null in page mode).
  * @param {Element|null} [triggerEl] - The Report button that opened the dialog
- *   (focus is restored to this element on every dismiss path).
+ *   (focus is restored to this element on every dismiss path in shadow mode).
+ * @param {Object|null} [prebuiltContext] - Pre-assembled context for page mode (no extractPatentInfo).
+ *   When non-null, the submit handler does NOT call extractPatentInfo() (Pitfall 3 / D-08).
  */
-export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl) {
+export function showReportDialog(mountContext, reportOutcome, selectionRect, triggerEl, prebuiltContext = null) {
   // CR-02: Neutralise the popup's stale click-outside mousedown handler before
   // the dialog goes live, so an outside click cannot call dismissCitationUI()
   // and tear the host out from under the live dialog.
+  // In page mode, there is no popup click-outside handler, but the call is safe (no-op).
   cancelPopupClickOutside();
+
+  // Resolve the mount target from the discriminated union
+  const mountTarget = mountContext.mode === 'shadow' ? mountContext.root : mountContext.container;
 
   // -----------------------------------------------------------------------
   // PAY-09: Capture diagnostics IMMEDIATELY at button-click time
@@ -586,7 +663,7 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
   // -----------------------------------------------------------------------
   const styleEl = document.createElement('style');
   styleEl.textContent = getReportDialogCSS();
-  shadow.appendChild(styleEl);
+  mountTarget.appendChild(styleEl);
 
   // -----------------------------------------------------------------------
   // Build panel — ARIA: role="dialog" aria-modal="true" (UI-SPEC Accessibility Contract)
@@ -597,6 +674,19 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
   panel.setAttribute('aria-modal', 'true');
   panel.setAttribute('aria-label', 'Report a citation problem');
   panel.style.pointerEvents = 'auto';
+
+  // -----------------------------------------------------------------------
+  // Page mode: stale-context banner (D-01)
+  // Uses .textContent (never .innerHTML) — currentPatent.patentId is untrusted (T-05-04).
+  // -----------------------------------------------------------------------
+  if (mountContext.mode === 'page') {
+    const staleBanner = document.createElement('div');
+    staleBanner.className = 'cite-report-stale-banner';
+    staleBanner.style.cssText = 'font-size:12px; color:#6b7280; margin-bottom:8px; padding:6px 8px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:4px;';
+    // .textContent only — patentId is untrusted storage data
+    staleBanner.textContent = `Context from your most recent citation: US${prebuiltContext?.patentNumber || '(none)'}`;
+    panel.appendChild(staleBanner);
+  }
 
   // -----------------------------------------------------------------------
   // Radio group (4 categories)
@@ -714,13 +804,19 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
     return row;
   }
 
-  // Patent number (WR-03: use typeof guard, consistent with submit handler at line ~940)
+  // Patent number (WR-03: use typeof guard, consistent with submit handler at line ~940).
+  // In page mode, use prebuiltContext.patentNumber (no extractPatentInfo on options page).
   const patentInfo = typeof extractPatentInfo === 'function' ? extractPatentInfo() : null;
-  const rawPatentNumber = (patentInfo?.patentId ?? '').replace(/^US/, '');
+  const rawPatentNumber = mountContext.mode === 'page'
+    ? (prebuiltContext?.patentNumber ?? '')
+    : (patentInfo?.patentId ?? '').replace(/^US/, '');
   fieldList.appendChild(makeFieldRow(FIELD_LABELS.patentNumber, rawPatentNumber || '—'));
 
   // The text you selected (togglable)
-  const selectionTextValue = diagnostics.selectionText || '(none)';
+  // In page mode, use prebuiltContext.selectionText (no live selection on options page).
+  const selectionTextValue = (mountContext.mode === 'page'
+    ? (prebuiltContext?.selectionText ?? null)
+    : diagnostics.selectionText) || '(none)';
   const selectionRow = makeFieldRow(
     FIELD_LABELS.selectionText,
     selectionTextValue.length > 60
@@ -786,15 +882,22 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
     fieldList.appendChild(makeFieldRow(FIELD_LABELS.xpathNode, xpath));
   }
 
-  // PDF parse status (computed at open time — null is still shown as a value)
+  // PDF parse status.
+  // In page mode, use prebuiltContext.pdfParseStatus (no live storage read needed).
+  // In shadow mode, resolve async from chrome.storage.local.
   const pdfStatusRow = makeFieldRow(FIELD_LABELS.pdfParseStatus, '…');
   fieldList.appendChild(pdfStatusRow);
-  // Resolve async — update once available
-  const patentType = patentInfo?.patentType ?? null;
-  getPdfParseStatus(patentType).then((status) => {
+  if (mountContext.mode === 'page') {
     const pdfValEl = pdfStatusRow.querySelector('.cite-report-field-value');
-    if (pdfValEl) pdfValEl.textContent = status ?? 'unknown';
-  });
+    if (pdfValEl) pdfValEl.textContent = (prebuiltContext?.pdfParseStatus ?? null) ?? 'unknown';
+  } else {
+    // Shadow mode: resolve async — update once available
+    const patentType = patentInfo?.patentType ?? null;
+    getPdfParseStatus(patentType).then((status) => {
+      const pdfValEl = pdfStatusRow.querySelector('.cite-report-field-value');
+      if (pdfValEl) pdfValEl.textContent = status ?? 'unknown';
+    });
+  }
 
   whatsIncludedPanel.appendChild(fieldList);
 
@@ -812,6 +915,17 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
   selectionToggleLabel.appendChild(selectionToggle);
   selectionToggleLabel.appendChild(selectionToggleText);
   whatsIncludedPanel.appendChild(selectionToggleLabel);
+
+  // D-01: in page mode, when there is no selection text, hide the toggle and
+  // lock includeSelectionText to false (no selection to remove).
+  const effectiveSelectionText = mountContext.mode === 'shadow'
+    ? diagnostics.selectionText
+    : (prebuiltContext?.selectionText ?? null);
+  const hasSelection = !!effectiveSelectionText;
+  if (!hasSelection) {
+    selectionToggleLabel.style.display = 'none';
+    includeSelectionText = false;
+  }
 
   // Load sticky state from chrome.storage.local (CR-03: hold Submit disabled
   // until preference is loaded so the checkbox reflects saved state before
@@ -867,12 +981,14 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
 
   // -----------------------------------------------------------------------
   // Append panel + position (viewport clamping — mirrors citation-ui.js:203-214)
+  // Shadow mode only: page mode is inline in document flow (no absolute positioning).
   // -----------------------------------------------------------------------
-  shadow.appendChild(panel);
+  mountTarget.appendChild(panel);
 
-  // Position the citation host element (shadow root's host)
-  const citationHost = shadow.host;
-  if (citationHost && selectionRect) {
+  // Position the citation host element (shadow root's host) — shadow mode only.
+  // Guard: selectionRect is null in page mode (Pitfall 1 — avoids null.style crash).
+  if (selectionRect && mountContext.mode === 'shadow') {
+    const citationHost = mountContext.root.host;
     const panelWidth = 320;
     let top = selectionRect.bottom + 8;
     let left = selectionRect.left;
@@ -895,23 +1011,33 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
   // -----------------------------------------------------------------------
   // Dismiss logic (CAP-04 — removes panel+style only, never the host)
   // RESEARCH Pitfall 1: panel removed FIRST, then toast called safely.
+  // Mode-aware: shadow mode restores focus to triggerEl; page mode does not.
   // -----------------------------------------------------------------------
   function dismissDialog() {
     removeTrap();
     document.removeEventListener('mousedown', clickOutsideHandler);
     panel.remove();
     styleEl.remove();
-    // Restore focus to trigger element (RESEARCH Pitfall 5 / CAP-04)
-    if (triggerEl && typeof triggerEl.focus === 'function') {
+    // Restore focus to trigger element only in shadow mode (RESEARCH Pitfall 5 / CAP-04)
+    // Page mode has no trigger element (dialog is inline in the options page).
+    if (mountContext.mode === 'shadow' && triggerEl && typeof triggerEl.focus === 'function') {
       triggerEl.focus();
     }
   }
 
   // Click-outside dismiss (mirrors citation-ui.js:224-231)
-  // Shadow DOM retargets events to the host, so we check host.contains
+  // Shadow mode: shadow DOM retargets events to the host, so check host.contains.
+  // Page mode: check container.contains(e.target) directly.
   function clickOutsideHandler(e) {
-    if (!citationHost || !citationHost.contains(e.target)) {
-      dismissDialog();
+    if (mountContext.mode === 'shadow') {
+      const citationHost = mountContext.root.host;
+      if (!citationHost || !citationHost.contains(e.target)) {
+        dismissDialog();
+      }
+    } else {
+      if (!mountContext.container.contains(e.target)) {
+        dismissDialog();
+      }
     }
   }
 
@@ -925,8 +1051,11 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
     dismissDialog();
   });
 
-  // Install focus trap; Escape is handled inside installFocusTrap
-  const removeTrap = installFocusTrap(shadow, panel, () => dismissDialog());
+  // Install focus trap; Escape is handled inside installFocusTrap / installFocusTrapPage.
+  // Shadow mode uses shadowRoot.activeElement; page mode uses document.activeElement (Pitfall 2).
+  const removeTrap = mountContext.mode === 'shadow'
+    ? installFocusTrap(mountContext.root, panel, () => dismissDialog())
+    : installFocusTrapPage(panel, () => dismissDialog());
 
   // -----------------------------------------------------------------------
   // Submit handler (CAP-04 + D-06 omission + T-04-07 payload hygiene)
@@ -943,37 +1072,68 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
       }
     }
 
-    if (!selectedCategory) return; // defensive — should always be set
+    // In shadow mode, a category is always pre-selected by the caller (TRIG mapping).
+    // In page mode (D-02), no category is pre-selected; Submit is valid with null category.
+    // Only block submit in shadow mode when no category is somehow unset (defensive).
+    if (!selectedCategory && mountContext.mode === 'shadow') return;
 
     // Loading state (UI-SPEC Submit button loading)
     submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting…';
 
     try {
-      // Build context from closure-captured diagnostics (PAY-09 — captured at open)
-      const patentInfoNow = typeof extractPatentInfo === 'function' ? extractPatentInfo() : null;
-      const patentNumber = (patentInfoNow?.patentId ?? '').replace(/^US/, '');
-      const patentTypeNow = patentInfoNow?.patentType ?? null;
-      const pdfParseStatus = await getPdfParseStatus(patentTypeNow);
-      const errorsStored = await chrome.storage.local.get('bugReportErrorBuffer');
-      const errors = Array.isArray(errorsStored.bugReportErrorBuffer)
-        ? errorsStored.bugReportErrorBuffer
-        : [];
+      // Build context from closure-captured diagnostics (PAY-09 — captured at open).
+      // When prebuiltContext is provided (page mode), use it directly rather than
+      // calling extractPatentInfo() (which is undefined on the options page — Pitfall 3 / D-08).
+      let context;
+      let errors;
+      if (prebuiltContext) {
+        // Page mode: use the injected context supplied by the caller (options.js).
+        // Live-capture fields (xpathNode, scrollY, viewport) are null — no Google Patents DOM.
+        const errorsStored = await chrome.storage.local.get('bugReportErrorBuffer');
+        errors = Array.isArray(errorsStored.bugReportErrorBuffer)
+          ? errorsStored.bugReportErrorBuffer
+          : [];
+        context = {
+          patentNumber: prebuiltContext.patentNumber ?? '',
+          selectionText: prebuiltContext.selectionText ?? null,
+          returnedCitation: prebuiltContext.returnedCitation ?? null,
+          confidenceTier: prebuiltContext.confidenceTier ?? null,
+          extensionVersion: prebuiltContext.extensionVersion ?? chrome.runtime.getManifest().version,
+          browser: getBrowserString(),
+          os: getOsString(),
+          xpathNode: null,
+          scrollY: null,
+          viewportWidth: null,
+          viewportHeight: null,
+          pdfParseStatus: prebuiltContext.pdfParseStatus ?? null,
+        };
+      } else {
+        // Shadow mode: call extractPatentInfo() from the content-script bundle scope.
+        const patentInfoNow = typeof extractPatentInfo === 'function' ? extractPatentInfo() : null;
+        const patentNumber = (patentInfoNow?.patentId ?? '').replace(/^US/, '');
+        const patentTypeNow = patentInfoNow?.patentType ?? null;
+        const pdfParseStatus = await getPdfParseStatus(patentTypeNow);
+        const errorsStored = await chrome.storage.local.get('bugReportErrorBuffer');
+        errors = Array.isArray(errorsStored.bugReportErrorBuffer)
+          ? errorsStored.bugReportErrorBuffer
+          : [];
 
-      const context = {
-        patentNumber,
-        selectionText: diagnostics.selectionText,
-        returnedCitation: reportOutcome.returnedCitation ?? null,
-        confidenceTier: reportOutcome.confidenceTier,
-        extensionVersion: chrome.runtime.getManifest().version,
-        browser: getBrowserString(),
-        os: getOsString(),
-        xpathNode: diagnostics.xpathNode,
-        scrollY: diagnostics.scrollY,
-        viewportWidth: diagnostics.viewportWidth,
-        viewportHeight: diagnostics.viewportHeight,
-        pdfParseStatus,
-      };
+        context = {
+          patentNumber,
+          selectionText: diagnostics.selectionText,
+          returnedCitation: reportOutcome.returnedCitation ?? null,
+          confidenceTier: reportOutcome.confidenceTier,
+          extensionVersion: chrome.runtime.getManifest().version,
+          browser: getBrowserString(),
+          os: getOsString(),
+          xpathNode: diagnostics.xpathNode,
+          scrollY: diagnostics.scrollY,
+          viewportWidth: diagnostics.viewportWidth,
+          viewportHeight: diagnostics.viewportHeight,
+          pdfParseStatus,
+        };
+      }
 
       // triggerMode comes from whatever cachedSettings is in the surrounding context
       // We use an empty object here — content-script sets triggerMode in cachedSettings
@@ -997,34 +1157,80 @@ export function showReportDialog(shadow, reportOutcome, selectionRect, triggerEl
         payload,
       });
 
-      // Step 1: Dismiss dialog FIRST (RESEARCH Pitfall 1 — removes panel from shadow;
-      // toast functions re-enter the shadow host cleanly after panel removal)
-      dismissDialog();
+      if (mountContext.mode === 'shadow') {
+        // Shadow mode: Step 1 — Dismiss dialog FIRST (RESEARCH Pitfall 1 — removes panel
+        // from shadow; toast functions re-enter the shadow host cleanly after panel removal).
+        dismissDialog();
 
-      // Step 2: Map result flags to toast (UI-SPEC Submit→Toast Result Mapping)
-      if (result?.ok) {
-        showSuccessToast('Report sent — thank you', selectionRect);
-      } else if (result?.queued) {
-        showSuccessToast('Report saved — will retry when online', selectionRect);
-      } else if (result?.rateLimited) {
-        showFailureToast(
-          'Too many reports in a short period — please wait a few minutes',
-          selectionRect
-        );
+        // Step 2: Map result flags to toast (UI-SPEC Submit→Toast Result Mapping)
+        if (result?.ok) {
+          showSuccessToast('Report sent — thank you', selectionRect);
+        } else if (result?.queued) {
+          showSuccessToast('Report saved — will retry when online', selectionRect);
+        } else if (result?.rateLimited) {
+          showFailureToast(
+            'Too many reports in a short period — please wait a few minutes',
+            selectionRect
+          );
+        }
+        // result?.dropped → silent per Phase 3 D-07
+      } else {
+        // Page mode: inline confirmation — no toast (toasts require a citation-UI rect / UI-SPEC §4g).
+        // Rate-limited: keep the panel open and show an inline error above Submit.
+        if (result?.rateLimited) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit report';
+          // Show inline rate-limit error above the button row
+          const existingRateError = panel.querySelector('.cite-report-rate-error');
+          if (!existingRateError) {
+            const rateErrEl = document.createElement('p');
+            rateErrEl.className = 'cite-report-rate-error';
+            rateErrEl.style.cssText = 'font-size:13px; color:#991b1b; margin:8px 0 0;';
+            rateErrEl.textContent = 'Too many reports in a short period — please wait a few minutes.';
+            btnRow.insertAdjacentElement('beforebegin', rateErrEl);
+          }
+        } else {
+          // Success or queued: dismiss dialog panel and render inline confirmation paragraph.
+          dismissDialog();
+          const confirmEl = document.createElement('p');
+          if (result?.ok) {
+            confirmEl.style.cssText = 'font-size:13px; color:#059669; padding:12px 0;';
+            confirmEl.textContent = 'Report sent — thank you.';
+          } else if (result?.queued) {
+            confirmEl.style.cssText = 'font-size:13px; color:#64748b; padding:12px 0;';
+            confirmEl.textContent = 'Report saved — will retry when online.';
+          }
+          // result?.dropped → silent per Phase 3 D-07 (no confirmEl appended)
+          if (result?.ok || result?.queued) {
+            mountContext.container.appendChild(confirmEl);
+          }
+        }
       }
-      // result?.dropped → silent per Phase 3 D-07
 
     } catch (err) {
-      // Builder throw or sendMessage error — dismiss and show generic failure toast.
+      // Builder throw or sendMessage error.
       // WR-04: do NOT show the rate-limit string here — that is reserved for the
       // result?.rateLimited branch above. Builder validation errors (e.g. missing
       // patentNumber) would show a factually wrong "wait a few minutes" message.
       // (T-04-07: never expose internal error details to UI)
-      dismissDialog();
-      showFailureToast(
-        'Report could not be sent — please try again',
-        selectionRect
-      );
+      if (mountContext.mode === 'shadow') {
+        dismissDialog();
+        showFailureToast(
+          'Report could not be sent — please try again',
+          selectionRect
+        );
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit report';
+        const existingErr = panel.querySelector('.cite-report-rate-error');
+        if (!existingErr) {
+          const errEl = document.createElement('p');
+          errEl.className = 'cite-report-rate-error';
+          errEl.style.cssText = 'font-size:13px; color:#991b1b; margin:8px 0 0;';
+          errEl.textContent = 'Report could not be sent — please try again.';
+          btnRow.insertAdjacentElement('beforebegin', errEl);
+        }
+      }
     }
   });
 }

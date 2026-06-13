@@ -1,10 +1,11 @@
 ---
 phase: 5
 slug: options-page-debug-mode-popup-fallback-live-uat
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-06-13
+reviewed_at: 2026-06-13
 ---
 
 # Phase 5 — UI Design Contract: Options Page Debug Mode + Popup Fallback + Live UAT

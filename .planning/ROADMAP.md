@@ -28,7 +28,7 @@
 - [x] **Phase 2: Shared Constants + Pure Payload Builder** - `src/shared/constants.js` additions and new `src/shared/report-payload-builder.js` pure function establish the payload schema contract between all extension surfaces and the Worker; Vitest-pinned before any UI work (completed 2026-06-13)
 - [x] **Phase 3: Background Submission Handler + Rate Limit + Retry Queue** - Extension-side transport layer: `MSG.SUBMIT_REPORT` handlers in Chrome SW + Firefox background, client-side sliding-window rate limit, disk-first retry queue with exponential backoff; full end-to-end submission path testable without UI (completed 2026-06-13)
 - [x] **Phase 4: Report Dialog UI + Citation-UI Wiring** - Shadow DOM report dialog, Report button in citation popup, auto-surfacing on failure/yellow-confidence/Worker-error, error log ring buffer, DOM/PDF diagnostic enrichment (completed 2026-06-13)
-- [ ] **Phase 5: Options Page Debug Mode + Popup Fallback + Live UAT** - Debug Mode options toggle, popup "Report a problem" fallback, options page report section; milestone close with live UAT-01..06 DoD evidence
+- [x] **Phase 5: Options Page Debug Mode + Popup Fallback + Live UAT** - Debug Mode options toggle, popup "Report a problem" fallback, options page report section; milestone close with live UAT-01..06 DoD evidence (completed 2026-06-14)
 
 ## Phase Details
 
@@ -108,7 +108,7 @@
 - [x] 05-02-PLAN.md — showReportDialog mountContext refactor (shadow|page) + bundling resolution; keeps Phase-4 shadow path green (CAP-06)
 - [x] 05-03-PLAN.md — popup "Report a problem" link + options #report section + hash routing + page-mode dialog from currentPatent snapshot (CAP-05, CAP-06)
 - [x] 05-04-PLAN.md — node-env Vitest static-grep guards for DBG-01/02, CAP-05/06, D-01/D-05/D-08 (DBG-01, DBG-02, CAP-05, CAP-06)
-- [ ] 05-05-PLAN.md — operator-driven live UAT-01..06 against production Worker: 05-UAT-RUNBOOK.md + scripted KV/lint/grep evidence into 05-UAT-RESULTS.md (UAT-01..06)
+- [x] 05-05-PLAN.md — operator-driven live UAT-01..06 against production Worker: 05-UAT-RUNBOOK.md + scripted KV/lint/grep evidence into 05-UAT-RESULTS.md (UAT-01..06)
 
 ## Progress
 

@@ -176,7 +176,14 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
     const isGreenDebug = reportOutcome.confidenceTier === 'green';
     // D-05: plain icon on green debug; nudge text + amber only on non-green outcomes
     reportBtn.textContent = isGreenDebug ? '⚑' : '⚑ Report a problem';
-    if (!isGreenDebug) {
+    if (isGreenDebug) {
+      // WR-01: plain icon — reset to neutral styles so the base .cite-report-btn amber
+      // CSS does not bleed through. Low visual weight: transparent bg, muted color.
+      reportBtn.style.background = 'transparent';
+      reportBtn.style.color = '#6b7280';
+      reportBtn.style.fontWeight = '400';
+      reportBtn.style.padding = '2px 4px';
+    } else {
       reportBtn.style.background = 'rgba(245, 158, 11, 0.08)';
       reportBtn.style.color = '#92400e';
       reportBtn.style.fontSize = '13px';

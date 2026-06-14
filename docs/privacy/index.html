@@ -159,6 +159,13 @@
     <li><strong>Recent error log</strong> — up to 20 recent internal extension errors or warnings, if any occurred</li>
     <li><strong>Free-text note</strong> (optional) — any additional description you choose to provide</li>
   </ul>
+  <p><strong>Data collection categories (Firefox Add-ons):</strong> On Mozilla Add-ons (AMO), the fields above are declared under Firefox's standard data-collection categories. All of this data is collected <strong>only when you choose to submit a bug report</strong> — nothing is collected during ordinary citation use:</p>
+  <ul>
+    <li><strong>Website activity</strong> — the patent page context: patent number, patent URL, selected-node XPath, and scroll/viewport position.</li>
+    <li><strong>Technical and interaction data</strong> (optional) — extension diagnostics that help reproduce the failure: extension version, browser and operating system, trigger mode, PDF parse status, the returned citation and its confidence tier, the recent error log, and any free-text note you add. This category is declared as <strong>optional</strong> and is transmitted only as part of a report you submit.</li>
+    <li><strong>Website content</strong> (optional) — the text you had highlighted. You can exclude it from any individual report with the [Remove selection text] toggle, in which case it is not transmitted.</li>
+  </ul>
+  <p>Because the entire bug report feature is user-initiated, all of this data is <strong>opt-in</strong>: it is transmitted only when you explicitly click Submit. The extension never collects technical, interaction, website-activity, or website-content data in the background or during normal citation generation. If you include a free-text note, please avoid entering any personal information, as the note is sent verbatim.</p>
   <p><strong>No IP address is stored in bug report records.</strong> Your IP address is used only for transient server-side rate limiting (a short-lived counter that resets automatically) and is never written to any stored report record.</p>
   <p><strong>Retention:</strong> Bug reports are retained for 90 days and then automatically deleted.</p>
   <p><strong>Purpose:</strong> Reports are used solely for maintainer triage — to identify and fix citation failures. They are not used for advertising, analytics, or any other purpose.</p>

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: Bug Report Feature
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-06-14T00:09:58.076Z"
+stopped_at: "Completed 05-05-PLAN.md Task 1 (UAT-04 PASS; UAT-01/02/03/05/06 pending operator)"
+last_updated: "2026-06-14T01:00:00Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 5
@@ -191,13 +191,13 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 ## Session Continuity
 
-Last session: 2026-06-14T00:09:58.067Z
-Stopped at: Completed 05-03-PLAN.md
-Resume file: None
+Last session: 2026-06-14T01:00:00Z
+Stopped at: "05-05-PLAN.md Task 1 complete (UAT-04 PASS). Checkpoint: awaiting operator live browser steps for UAT-01/02/03/05/06."
+Resume file: .planning/phases/05-options-page-debug-mode-popup-fallback-live-uat/05-UAT-RESULTS.md
 
 ## Operator Next Steps
 
-- Run `/gsd:plan-phase 1` to begin Phase 1 (Worker Route + KV Schema + Privacy Compliance Groundwork). Phase 1 is entirely server-side + docs-side — no extension build changes. The three blocking gates (privacy compliance, webhook URL hygiene, IP-not-in-KV) must all land in this phase.
-- Before planning Phase 1: run `cd worker && npx wrangler kv namespace create "BUG_REPORTS"` to get the new namespace ID for `wrangler.toml`.
-- After Phase 1 ships: run `/gsd:plan-phase 2` (Shared Constants + Pure Payload Builder — pure function, Vitest-testable, no browser API deps).
-- Phases 4 and 5 are UI phases — consider `/gsd:ui-phase` for Shadow DOM dialog implementation.
+- IMMEDIATE: Follow 05-UAT-RUNBOOK.md and perform the live browser UAT steps against https://pct.tonyrowles.com/report. For each UAT item, collect the fingerprint from the Discord embed footer (fp:XXXXXXXXXXXXXXXX) and report outcomes back.
+- AFTER operator submits: Resume 05-05-PLAN.md Task 3 by running wrangler KV verifications with the operator-supplied fingerprints to record final PASS/FAIL evidence in 05-UAT-RESULTS.md.
+- PHASE CLOSE: Phase 05 and v5.0 milestone are NOT complete until UAT-01/02/03/05/06 have both operator + Claude evidence with final PASS/FAIL recorded.
+- UAT-04 is already PASS — no additional browser steps needed for privacy audit.

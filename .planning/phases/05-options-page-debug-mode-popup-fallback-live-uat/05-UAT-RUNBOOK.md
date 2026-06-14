@@ -18,7 +18,9 @@ Before starting any UAT item, the operator must have:
 3. [OPERATOR] In Firefox: about:debugging > This Firefox > Load Temporary Add-on > select `dist/firefox/manifest.json`
 4. [OPERATOR] Confirm the extension toolbar icon is visible in both browsers.
 5. [OPERATOR] Confirm you have access to the Discord channel receiving webhook notifications.
-6. [CLAUDE] Baseline KV check: namespace `cefe2733c0074fe2a28a49ff536de105` currently contains **0 records** (verified via `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105` → `[]`).
+6. [CLAUDE] Baseline KV check: namespace `cefe2733c0074fe2a28a49ff536de105` (verified via `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105`).
+
+> ⚠️ **CRITICAL — `--remote` is mandatory.** wrangler v4's `kv key get/list` default to the **local miniflare store**, which is empty, and will return `[]` for production records. Every KV command below uses `--remote`; if you drop it you'll get false-empty results. (This bit us during UAT-01: reports were landing in production KV the whole time but `[]` came back until `--remote` was added.)
 
 ---
 
@@ -35,8 +37,8 @@ Before starting any UAT item, the operator must have:
 | 3 | [OPERATOR] | When the Report button appears in the citation popup, click it. In the dialog: select any category, enter the note **exactly**: `v5.0 UAT-01 smoke`. Click Submit. |
 | 4 | [OPERATOR] | Read the Discord embed. At the bottom of the embed you will see a footer field with a fingerprint: `fp:XXXXXXXXXXXXXXXX`. Record the 16-char hex fingerprint. |
 | 5 | [OPERATOR] | Confirm: Discord rich-embed appeared? (yes/no). Record the embed URL and timestamp. |
-| 6 | [CLAUDE] | `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp>:"` → assert ≥ 1 record found. |
-| 7 | [CLAUDE] | `wrangler kv key get --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp>:<ts>"` → pipe to node assertion: `!('ip' in r) && !('clientIp' in r) && !('userAgent' in r) && r.fingerprint && r.duplicate_count === 0 && r.note === 'v5.0 UAT-01 smoke'`. |
+| 6 | [CLAUDE] | `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp>:"` → assert ≥ 1 record found. |
+| 7 | [CLAUDE] | `wrangler kv key get --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp>:<ts>"` → pipe to node assertion: `!('ip' in r) && !('clientIp' in r) && !('userAgent' in r) && r.fingerprint && r.duplicate_count === 0 && r.note === 'v5.0 UAT-01 smoke'`. |
 | 8 | [CLAUDE] | Assert the fingerprint in the KV key prefix matches the `fp:` value from the Discord embed footer (string equality). |
 
 **Operator must report:** fingerprint (16 hex chars), Discord embed appeared (yes/no), submission timestamp.  
@@ -54,9 +56,9 @@ Before starting any UAT item, the operator must have:
 |---|------|-----------------|
 | 1 | [OPERATOR] | On a Google Patents page, trigger the Report dialog and submit 5 reports in rapid succession (you may use different patents or the same patent — the rate limit is per-install, not per-fingerprint). Note the category for each. |
 | 2 | [OPERATOR] | Within the same 10-minute window, attempt a **6th submission**. You should see the toast: "Too many reports in a short period — please wait a few minutes". Confirm the toast appeared. |
-| 3 | [CLAUDE] | `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105` → count must equal exactly 5 (for the 5 successful submits) — the 6th blocked submit wrote no new record. |
+| 3 | [CLAUDE] | `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105` → count must equal exactly 5 (for the 5 successful submits) — the 6th blocked submit wrote no new record. |
 | 4 | [OPERATOR] | Wait 10 full minutes (the sliding window prunes entries older than 10 minutes). Then submit a **7th report** with note `v5.0 UAT-02 smoke`. Record the fingerprint from the Discord embed footer. |
-| 5 | [CLAUDE] | `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp7>:"` → assert 1 record for the 7th submit fingerprint. |
+| 5 | [CLAUDE] | `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp7>:"` → assert 1 record for the 7th submit fingerprint. |
 
 **Operator must report:** confirmation that the 6th submit showed the "Too many reports" toast and did NOT trigger a Discord notification; the fingerprint from the 7th (post-window) submit.  
 **Claude verifies after operator reports:** steps 3, 5 (KV record counts).
@@ -65,7 +67,9 @@ Before starting any UAT item, the operator must have:
 
 ## UAT-03: Server-Side Fingerprint Deduplication
 
-**Requirement:** Two submissions with identical fingerprint (same patent + same category + same selection text) within 15 minutes produce exactly ONE KV record with `duplicate_count: 2` and ONE primary Discord notification. A third submission after 15 minutes creates a NEW record.
+**Requirement:** Two submissions with identical fingerprint (same patent + same category + same selection text) within 15 minutes produce exactly ONE KV record with `duplicate_count: 1` and ONE primary Discord notification. A third submission after 15 minutes creates a NEW record.
+
+> **`duplicate_count` semantics (post-WR-01 fix, `worker/src/index.js`):** the original record initializes to `0`; each subsequent in-window duplicate increments by 1. So **2 submits → `1`**, 3 submits → `2`, etc. (`duplicate_count` = number of *repeat* submissions, not total). Unit-tested at `worker/tests/report-route.test.js:243` (`toBe(1)`) and confirmed in production by UAT-01's `fff0bbe6aef2f640` record. An earlier `|| 1` bug produced `2` here — the runbook previously asserted that stale value.
 
 ### Steps
 
@@ -73,10 +77,10 @@ Before starting any UAT item, the operator must have:
 |---|------|-----------------|
 | 1 | [OPERATOR] | On the same Google Patents page with the same text highlighted, submit a report with note `v5.0 UAT-03 smoke`. Record the fingerprint from the Discord embed footer (call it `<fp03>`). |
 | 2 | [OPERATOR] | **Within 15 minutes**, submit a second report with the SAME patent, SAME category, and SAME selection text. (You may use the options page `#report` section to submit again with the same patent as context.) Confirm whether a Discord notification fired for this second submit (it should be suppressed or sent as a thread reply — NOT a full new embed). |
-| 3 | [CLAUDE] | `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp03>:"` → assert exactly **1** key. |
-| 4 | [CLAUDE] | `wrangler kv key get --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp03>:<ts>"` → pipe to node: assert `r.duplicate_count === 2`. |
+| 3 | [CLAUDE] | `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp03>:"` → assert exactly **1** key. |
+| 4 | [CLAUDE] | `wrangler kv key get --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp03>:<ts>"` → pipe to node: assert `r.duplicate_count === 1`. |
 | 5 | [OPERATOR] | Wait **15+ minutes** after the second submit, then submit a **third** report with the same patent/category/selection. Note whether a new Discord embed fired. Record the fingerprint from this embed if a new one appeared. |
-| 6 | [CLAUDE] | `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp03>:"` → assert exactly **2** keys (the original record + a new one for the post-15-min submit). |
+| 6 | [CLAUDE] | `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp03>:"` → assert exactly **2** keys (the original record + a new one for the post-15-min submit). |
 | 7 | [CLAUDE] | Get the newest KV key for `<fp03>:` prefix → assert `r.duplicate_count === 0` on the new record. |
 
 **Operator must report:** fingerprint `<fp03>`, whether second Discord notification was suppressed, timestamp of second submit, whether a new Discord embed fired after 15-min wait.  
@@ -127,7 +131,7 @@ Before starting any UAT item, the operator must have:
 |---|------|-----------------|
 | 1 | [OPERATOR] | In Firefox with the extension loaded (about:debugging), navigate to a Google Patents page. Highlight text to trigger a no-match or yellow-confidence outcome. |
 | 2 | [OPERATOR] | Click Report, set note `v5.0 UAT-05 smoke (FF)`, Submit. Record the fingerprint from the Discord embed footer (`<fpFF>`). |
-| 3 | [CLAUDE] | `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fpFF>:"` → assert 1 record. |
+| 3 | [CLAUDE] | `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fpFF>:"` → assert 1 record. |
 
 ### Steps — Chrome SW stop/restart
 
@@ -137,7 +141,7 @@ Before starting any UAT item, the operator must have:
 | 5 | [OPERATOR] | Go to `chrome://extensions`, find the Patent Citation Tool, click Details. Find "Service worker" → click **Terminate**. The SW is now stopped. |
 | 6 | [OPERATOR] | Re-enable network (disable Offline mode in DevTools). Navigate back to the extension's background page or open a new Google Patents page to trigger the SW to restart. |
 | 7 | [OPERATOR] | Confirm whether the "Report sent — thank you" toast appeared after the SW restarted (confirming retry success). Record the fingerprint from the Discord embed that should now fire (`<fpSW>`). |
-| 8 | [CLAUDE] | `wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fpSW>:"` → assert 1 record (the retried report landed). |
+| 8 | [CLAUDE] | `wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fpSW>:"` → assert 1 record (the retried report landed). |
 
 **Operator must report:** fingerprint `<fpFF>` from Firefox submit; fingerprint `<fpSW>` from Chrome SW-restart retry; confirmation that "Report saved — will retry" toast appeared before SW termination; confirmation that "Report sent" toast appeared after SW restart.  
 **Phase-4 deferred items closed by UAT-05:** Focus trap live behavior (04-HUMAN-UAT test 1), click-outside + Escape dismiss (test 2), auto-surface trigger behavior on live page (test 4), live payload field values (test 5).
@@ -156,7 +160,7 @@ Before starting any UAT item, the operator must have:
 | 2 | [OPERATOR] | Click Report. Expand the "What's included" panel in the dialog. |
 | 3 | [OPERATOR] | Find the **[Remove selection text]** toggle. If it is currently OFF, toggle it **ON**. |
 | 4 | [OPERATOR] | Enter note `v5.0 UAT-06 smoke`. Click Submit. Record the fingerprint from the Discord embed footer (`<fp06>`). |
-| 5 | [CLAUDE] | `wrangler kv key get --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp06>:<ts>"` → pipe to node: assert `r.selectionText === null`. |
+| 5 | [CLAUDE] | `wrangler kv key get --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp06>:<ts>"` → pipe to node: assert `r.selectionText === null`. |
 | 6 | [OPERATOR] | In the Discord embed, confirm the embed does NOT contain a "Selection" or "Highlighted text" field (the selection text block should be absent). |
 | 7 | [OPERATOR] | **Without changing any extension settings**, close and re-open the Report dialog on the same citation. Check the "What's included" panel again. Confirm the [Remove selection text] toggle is still **ON** (sticky across re-opens). |
 
@@ -180,10 +184,10 @@ Copy the 16-character hex string after `fp:` and paste it in your report to Clau
 
 ```bash
 # List all keys for a fingerprint
-wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp>:"
+wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 --prefix "report:<fp>:"
 
 # Get a specific record (replace <fp> and <ts>)
-wrangler kv key get --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp>:<ts>"
+wrangler kv key get --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp>:<ts>"
 
 # Node assertion — pipe from key get:
 # wrangler kv key get ... "report:<fp>:<ts>" | \
@@ -195,7 +199,7 @@ wrangler kv key get --namespace-id=cefe2733c0074fe2a28a49ff536de105 "report:<fp>
 #     console.log('PAY-01 check: PASS — no ip, fingerprint present');"
 
 # KV baseline read (namespace-level — no filter)
-wrangler kv key list --namespace-id=cefe2733c0074fe2a28a49ff536de105
+wrangler kv key list --remote --namespace-id=cefe2733c0074fe2a28a49ff536de105
 ```
 
 ---

@@ -481,15 +481,20 @@ export function installFocusTrap(shadowRoot, panelEl, onEscape) {
   }
 
   function handleKeydown(e) {
+    // Modal dialog: stop EVERY keystroke from escaping the shadow root and
+    // reaching Google Patents' global Polymer key bindings. Otherwise single-key
+    // page shortcuts (e.g. "s") call preventDefault on the keystroke and the
+    // Notes textarea silently drops the character. stopPropagation does NOT
+    // preventDefault, so normal typing/editing inside the dialog is unaffected.
+    e.stopPropagation();
+
     if (e.key === 'Escape') {
-      e.stopPropagation();
       e.preventDefault();
       onEscape();
       return;
     }
     if (e.key !== 'Tab') return;
 
-    e.stopPropagation();
     const focusable = getFocusable();
     if (focusable.length === 0) {
       e.preventDefault();
@@ -549,15 +554,19 @@ export function installFocusTrapPage(panelEl, onEscape) {
   }
 
   function handleKeydown(e) {
+    // Modal dialog: stop keystrokes from leaking to any host-page global key
+    // bindings (parity with the shadow-DOM trap; prevents the Notes-textarea
+    // character-drop bug). stopPropagation does NOT preventDefault, so normal
+    // typing/editing inside the dialog is unaffected.
+    e.stopPropagation();
+
     if (e.key === 'Escape') {
-      e.stopPropagation();
       e.preventDefault();
       onEscape();
       return;
     }
     if (e.key !== 'Tab') return;
 
-    e.stopPropagation();
     const focusable = getFocusable();
     if (focusable.length === 0) {
       e.preventDefault();

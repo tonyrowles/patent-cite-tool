@@ -933,8 +933,12 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
   chrome.storage.local.get('reportDialogRemoveSelectionText').then((stored) => {
     const saved = stored.reportDialogRemoveSelectionText === true;
     selectionToggle.checked = saved;
-    includeSelectionText = !saved;
-    selectionRow.style.display = saved ? 'none' : '';
+    // CR-01: Only apply saved preference when there IS a selection to toggle.
+    // If hasSelection is false, includeSelectionText stays false (locked above).
+    if (hasSelection) {
+      includeSelectionText = !saved;
+      selectionRow.style.display = (saved && hasSelection) ? 'none' : '';
+    }
     submitBtn.disabled = false; // preference loaded — safe to submit
   }).catch(() => {
     // Default: include selection text

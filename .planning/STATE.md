@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: Bug Report Feature
 status: executing
-stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-06-13T23:57:24.570Z"
-last_activity: 2026-06-13
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-06-14T00:05:37.344Z"
+last_activity: 2026-06-14
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 16
-  completed_plans: 13
+  completed_plans: 14
   percent: 80
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 05 (options-page-debug-mode-popup-fallback-live-uat) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
-Last activity: 2026-06-13
+Last activity: 2026-06-14
 
 ## Budget
 
@@ -77,6 +77,7 @@ Each phase records per-phase spend in its VERIFICATION.md footer (probed against
 | Phase 03 P03 | 5min | 3 tasks | 2 files |
 | Phase 04 P01 | 25min | 3 tasks | 6 files |
 | Phase 05-options-page-debug-mode-popup-fallback-live-uat P02 | 30min | 2 tasks | 2 files |
+| Phase 05 P03 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,9 @@ Each phase records per-phase spend in its VERIFICATION.md footer (probed against
 - v5.0-roadmap: LOAD-BEARING — `manifest.firefox.json` `data_collection_permissions` must be updated in the SAME commit as the Worker route (Phase 1). A manifest with `data_collection_permissions: { required: ["none"] }` while the Worker route exists is a reviewable AMO contradiction.
 - v5.0-roadmap: LOAD-BEARING — IP address must NEVER appear in any stored report record (PAY-03). `CF-Connecting-IP` is used only for the transient `rl:{ip}` KV key (60s TTL, 5-request ceiling). Phase 1 success criteria explicitly verify zero `ip` field in the KV record.
 - v5.0-roadmap: Zero new npm dependencies (sixth consecutive milestone). All components use existing Worker/KV/extension primitives: `crypto.subtle.digest` (Web Crypto API) for fingerprinting, `chrome.storage.local` for queue/rate-limit, `fetch()` from background service worker, `wrangler secret put` for Discord URL.
+- [Phase ?]: pendingOptionsHash signal: popup writes #report to chrome.storage.local; options.js reads+deletes on DOMContentLoaded (openOptionsPage no-hash workaround)
+- [Phase ?]: import showReportDialog at module top in options.js; esbuild bundles via existing options.js ESM entry — zero build-config change (CAP-06)
+- [Phase ?]: D-02: { category: null } passed to page-mode showReportDialog; submit enabled with null category per Phase-4 D-07
 
 ### Pending Todos
 
@@ -187,8 +191,8 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 
 ## Session Continuity
 
-Last session: 2026-06-13T23:57:24.562Z
-Stopped at: Phase 5 UI-SPEC approved
+Last session: 2026-06-14T00:05:37.337Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

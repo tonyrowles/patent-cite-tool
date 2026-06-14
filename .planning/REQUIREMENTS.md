@@ -93,7 +93,7 @@ Phase numbering RESET via `--reset-phase-numbers`. v5.0 starts at Phase 1; v4.3 
 
 **Capture — fallback surfaces:**
 
-- [ ] **CAP-05**: Toolbar popup gains a "Report a problem" link (or button) — clicking it calls `chrome.runtime.openOptionsPage()` and the options page opens at the `#report` anchor (per Architecture research the options page uses `open_in_tab: true`, so this is a clean full-tab landing); rationale: the 280px popup is too narrow to host the full dialog without UX compromise
+- [x] **CAP-05**: Toolbar popup gains a "Report a problem" link (or button) — clicking it calls `chrome.runtime.openOptionsPage()` and the options page opens at the `#report` anchor (per Architecture research the options page uses `open_in_tab: true`, so this is a clean full-tab landing); rationale: the 280px popup is too narrow to host the full dialog without UX compromise
 - [x] **CAP-06**: Options page gains a dedicated Report section at the `#report` anchor — full report dialog rendered inline (page DOM, NOT Shadow DOM; the options page is already isolated from Google Patents Polymer) using the same `report-dialog.js` module rendered with a `'page'` mode flag (Shadow DOM bypass); same payload-builder, same `MSG.SUBMIT_REPORT` flow; `options.js` reads `location.hash === '#report'` on `DOMContentLoaded` and scrolls + focuses the Report section
 
 ### Live UAT — DoD evidence (Phase 5 close)
@@ -194,7 +194,7 @@ Which phases cover which requirements. Updated during roadmap creation 2026-06-1
 | PAY-09 | Phase 4 | Complete |
 | DBG-01 | Phase 5 | Complete |
 | DBG-02 | Phase 5 | Complete |
-| CAP-05 | Phase 5 | Pending |
+| CAP-05 | Phase 5 | Complete |
 | CAP-06 | Phase 5 | Complete |
 | UAT-01 | Phase 5 | Pending |
 | UAT-02 | Phase 5 | Pending |

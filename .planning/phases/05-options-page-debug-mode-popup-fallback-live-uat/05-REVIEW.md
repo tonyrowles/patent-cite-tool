@@ -16,7 +16,17 @@ findings:
   warning: 4
   info: 2
   total: 9
-status: issues_found
+resolutions:
+  CR-01: fixed (6cbf6d9) — storage-callback includeSelectionText override guarded behind if(hasSelection); no-selection lock preserved
+  CR-02: fixed (f52cfa3) — category required before submit in both modes (inline hint); page-mode empty-patentNumber renders a placeholder + blocks submit instead of crashing buildReportPayload
+  CR-03: fixed (1483a28) — chrome.storage.onChanged listener consumes pendingOptionsHash for the already-open-tab case; initPageModeDialog() idempotent (dialogMounted guard)
+  WR-01: fixed (c2ef112) — green-debug button forced to neutral plain-icon styles (no amber), achieving D-05
+  WR-02: fixed (c8e82e3) — page-mode "Page address" shows reconstructed patents.google.com URL, not the chrome-extension URL
+  WR-03: fixed (7f02e40) — click-outside dismiss installed in shadow mode only; page-mode inline dialog no longer discarded on outside clicks
+  WR-04: fixed (1483a28) — pendingOptionsHash remove() calls now have callbacks
+  IN-01: deferred (info) — pdfParseStatus null in options prebuiltContext (derivable from patent.status); minor diagnostic
+  IN-02: deferred (info) — duplicate display symptom of WR-02 (resolved by WR-02 fix)
+status: resolved
 ---
 
 # Phase 5: Code Review Report

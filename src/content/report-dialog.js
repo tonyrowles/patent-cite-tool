@@ -1053,9 +1053,14 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
     }
   }
 
-  // Install click-outside after a short delay (avoids same-click-as-open dismissal)
+  // Install click-outside after a short delay (avoids same-click-as-open dismissal).
+  // WR-03: page mode is an inline section — not a floating modal. Clicking elsewhere on
+  // the options page (e.g. the trigger-mode select) must NOT silently discard a composed
+  // report. Escape and Cancel are the dismiss paths in page mode.
   setTimeout(() => {
-    document.addEventListener('mousedown', clickOutsideHandler);
+    if (mountContext.mode === 'shadow') {
+      document.addEventListener('mousedown', clickOutsideHandler);
+    }
   }, 100);
 
   cancelBtn.addEventListener('click', (e) => {

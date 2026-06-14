@@ -6,6 +6,8 @@
  * and displays the extension version in the footer.
  */
 
+import { showReportDialog } from '../content/report-dialog.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   // --- Version display ---
   const versionEl = document.getElementById('version');
@@ -89,6 +91,52 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.storage.sync.set({ debugMode: debugModeCheckbox.checked }, () => {
         showSaved(debugModeSaved);
       });
+    });
+  }
+
+  // --- CAP-06 hash routing ---
+  // Read-and-delete pendingOptionsHash written by popup.js (CAP-05).
+  // chrome.runtime.openOptionsPage() accepts no hash fragment — pendingOptionsHash signals intent.
+  chrome.storage.local.get('pendingOptionsHash', (data) => {
+    if (data.pendingOptionsHash === '#report') {
+      chrome.storage.local.remove('pendingOptionsHash');
+      const reportSection = document.getElementById('report');
+      if (reportSection) reportSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+  // Also handle a direct URL hash (e.g. chrome.tabs.create({ url: ...+'#report' }))
+  if (location.hash === '#report') {
+    const reportSection = document.getElementById('report');
+    if (reportSection) reportSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // --- CAP-06 page-mode dialog init ---
+  // Build prebuiltContext from chrome.storage.local currentPatent (D-01 snapshot context).
+  // Live-capture fields (xpathNode, scrollY, viewport) are null — no Google Patents DOM here.
+  // D-02: no category pre-selected ({ category: null, confidenceTier: null }).
+  const reportMount = document.getElementById('reportDialogMount');
+  if (reportMount) {
+    chrome.storage.local.get('currentPatent', (data) => {
+      const patent = data.currentPatent || {};
+      const prebuiltContext = {
+        patentNumber: (patent.patentId || '').replace(/^US/, ''),
+        selectionText: null,           // D-01: no live selection on options page
+        returnedCitation: null,
+        confidenceTier: patent.confidenceTier || null,
+        extensionVersion: chrome.runtime.getManifest().version,
+        xpathNode: null,
+        scrollY: null,
+        viewportWidth: null,
+        viewportHeight: null,
+        pdfParseStatus: null,
+      };
+      showReportDialog(
+        { mode: 'page', container: reportMount },
+        { category: null, confidenceTier: null },  // D-02: no category pre-selected
+        null,                                       // no selectionRect — page mode, document flow
+        null,                                       // no triggerEl
+        prebuiltContext
+      );
     });
   }
 });

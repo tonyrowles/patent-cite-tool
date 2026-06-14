@@ -18,6 +18,7 @@
 import { MSG } from '../shared/constants.js';
 import { buildReportPayload } from '../shared/report-payload-builder.js';
 import { showSuccessToast, showFailureToast, cancelPopupClickOutside } from './citation-ui.js';
+import { extractPatentInfo } from './patent-info.js';
 
 // ---------------------------------------------------------------------------
 // PAY-08: Error ring buffer constants (D-08)
@@ -804,9 +805,9 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
     return row;
   }
 
-  // Patent number (WR-03: use typeof guard, consistent with submit handler at line ~940).
-  // In page mode, use prebuiltContext.patentNumber (no extractPatentInfo on options page).
-  const patentInfo = typeof extractPatentInfo === 'function' ? extractPatentInfo() : null;
+  // Patent number — extractPatentInfo() is imported (returns null off a /patent/ URL,
+  // e.g. the options page). In page mode, use prebuiltContext.patentNumber instead.
+  const patentInfo = extractPatentInfo();
   const rawPatentNumber = mountContext.mode === 'page'
     ? (prebuiltContext?.patentNumber ?? '')
     : (patentInfo?.patentId ?? '').replace(/^US/, '');
@@ -1138,8 +1139,9 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
           pdfParseStatus: prebuiltContext.pdfParseStatus ?? null,
         };
       } else {
-        // Shadow mode: call extractPatentInfo() from the content-script bundle scope.
-        const patentInfoNow = typeof extractPatentInfo === 'function' ? extractPatentInfo() : null;
+        // Shadow mode: extractPatentInfo() is imported (shared module) so it
+        // resolves correctly in the bundle and returns the live patent identity.
+        const patentInfoNow = extractPatentInfo();
         const patentNumber = (patentInfoNow?.patentId ?? '').replace(/^US/, '');
         const patentTypeNow = patentInfoNow?.patentType ?? null;
         const pdfParseStatus = await getPdfParseStatus(patentTypeNow);
@@ -1238,10 +1240,13 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
 
     } catch (err) {
       // Builder throw or sendMessage error.
+      // Log the real error ([PCT]-tagged so it lands in the PAY-08 buffer and is
+      // diagnosable) but keep the UI message generic (T-04-07: never expose
+      // internal error details to the user).
+      console.error('[PCT] report submit failed:', err?.message || err);
       // WR-04: do NOT show the rate-limit string here — that is reserved for the
       // result?.rateLimited branch above. Builder validation errors (e.g. missing
       // patentNumber) would show a factually wrong "wait a few minutes" message.
-      // (T-04-07: never expose internal error details to UI)
       if (mountContext.mode === 'shadow') {
         dismissDialog();
         showFailureToast(
@@ -1268,12 +1273,6 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
 // extractPatentInfo reference for dialog context assembly
 // ---------------------------------------------------------------------------
 // report-dialog.js is bundled into the IIFE alongside content-script.js where
-// extractPatentInfo is defined as a local function. To avoid coupling, we
-// attempt to read from window.location directly if the function is unavailable.
-// The submit handler calls extractPatentInfo() as a local reference; esbuild
-// bundles the whole IIFE so content-script's extractPatentInfo is in scope.
-// We declare a fallback here so this module is also importable in unit tests.
-/* istanbul ignore next */
-if (typeof extractPatentInfo === 'undefined') {
-  // no-op fallback for isolated module loading (tests, etc.)
-}
+// extractPatentInfo() is imported from ./patent-info.js (Phase 5 bugfix) — esbuild
+// resolves the import correctly across the bundle, unlike the previous bare-global
+// reference that resolved to undefined and broke every in-citation report submit.

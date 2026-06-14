@@ -7,6 +7,7 @@
  */
 
 import { MSG, PATENT_TYPE } from '../shared/constants.js';
+import { extractPatentInfo } from './patent-info.js';
 import { findParagraphCitation } from './paragraph-finder.js';
 import {
   showFloatingButton, showCitationPopup, showErrorPopup,
@@ -63,25 +64,9 @@ function mapOutcomeToReportCategory(errorCode, confidence) {
  *
  * @returns {{ patentId: string, patentType: string, kindCode: string } | null}
  */
-function extractPatentInfo() {
-  const pathname = window.location.pathname;
-  const match = pathname.match(/\/patent\/(US[\dA-Z]+)/);
-  if (!match) return null;
-
-  const patentId = match[1];
-
-  // Extract kind code suffix (e.g., B2, A1, B1)
-  const kindMatch = patentId.match(/([A-Z]\d?)$/);
-  const kindCode = kindMatch ? kindMatch[1] : null;
-
-  // A1, A2, A9 are published applications; everything else is a granted patent
-  const patentType =
-    kindCode && ['A1', 'A2', 'A9'].includes(kindCode)
-      ? PATENT_TYPE.APPLICATION
-      : PATENT_TYPE.GRANT;
-
-  return { patentId, patentType, kindCode };
-}
+// extractPatentInfo() moved to ./patent-info.js (Phase 5 bugfix) so report-dialog.js
+// can import the SAME definition — esbuild renamed the old in-module copy, leaving
+// report-dialog's bare reference undefined and breaking every in-citation report.
 
 /**
  * Search the DOM for a PDF download link pointing to Google's patent image storage.

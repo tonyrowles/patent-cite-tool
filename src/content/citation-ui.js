@@ -23,16 +23,26 @@ let citationShadow = null;
 
 /** Module-level handle for the popup click-outside mousedown handler (CR-02). */
 let _popupClickOutsideHandler = null;
+// Phase 5 bugfix: the error popup auto-dismisses after 4s. If the user opens the
+// Report dialog (mounted in the SAME shadow host) from an error popup, that timer
+// fires dismissCitationUI() and wipes the live dialog. Store the timer id so the
+// dialog open can cancel it (alongside the click-outside handler).
+let _popupDismissTimer = null;
 
 /**
- * Cancel the popup's click-outside mousedown handler.
- * Must be called before the Report dialog goes live to prevent the popup
- * handler from calling dismissCitationUI() while the dialog is open (CR-02).
+ * Cancel the popup's click-outside mousedown handler AND its pending auto-dismiss
+ * timer. Must be called before the Report dialog goes live so neither the popup
+ * handler nor its timer calls dismissCitationUI() while the dialog is open
+ * (CR-02 + the 4s error-popup auto-dismiss).
  */
 export function cancelPopupClickOutside() {
   if (_popupClickOutsideHandler) {
     document.removeEventListener('mousedown', _popupClickOutsideHandler);
     _popupClickOutsideHandler = null;
+  }
+  if (_popupDismissTimer !== null) {
+    clearTimeout(_popupDismissTimer);
+    _popupDismissTimer = null;
   }
 }
 
@@ -337,8 +347,12 @@ export function showErrorPopup(errorMessage, rect, reportOutcome = null) {
 
   shadow.appendChild(popup);
 
-  // Auto-dismiss after 4 seconds
-  setTimeout(() => dismissCitationUI(), 4000);
+  // Auto-dismiss after 4 seconds. Store the id so opening the Report dialog from
+  // this error popup can cancel it (otherwise it wipes the live dialog — Phase 5 bugfix).
+  _popupDismissTimer = setTimeout(() => {
+    dismissCitationUI();
+    _popupDismissTimer = null;
+  }, 4000);
 }
 
 /**

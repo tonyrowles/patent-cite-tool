@@ -45,8 +45,10 @@
 name: V40 Deps Update
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  # PAUSED (v4.3 auto-fix milestone): pull_request trigger removed so this workflow
+  # stops failing on every PR (it cannot open a fix-PR — "GitHub Actions is not
+  # permitted to create or approve pull requests" in this repo). Restore
+  # `pull_request: types: [opened, synchronize, reopened]` when v4.3 resumes.
   schedule:
     - cron: '0 9 * * 1'   # Monday 09:00 UTC — 40-CONTEXT locked decision #2
   workflow_dispatch: {}    # Manual trigger for testing

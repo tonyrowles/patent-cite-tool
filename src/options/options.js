@@ -117,9 +117,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const reportMount = document.getElementById('reportDialogMount');
   if (reportMount) {
     chrome.storage.local.get('currentPatent', (data) => {
-      const patent = data.currentPatent || {};
+      const patent = data.currentPatent;
+      // CR-02: guard against no prior citation — buildReportPayload requires patentNumber.
+      if (!patent || !patent.patentId) {
+        const placeholder = document.createElement('p');
+        placeholder.style.cssText = 'font-size:13px; color:#6b7280; padding:8px 0;';
+        placeholder.textContent =
+          'Visit a US patent on Google Patents and run a citation first — then return here to report a problem.';
+        reportMount.appendChild(placeholder);
+        return;
+      }
       const prebuiltContext = {
-        patentNumber: (patent.patentId || '').replace(/^US/, ''),
+        patentNumber: patent.patentId.replace(/^US/, ''),
         selectionText: null,           // D-01: no live selection on options page
         returnedCitation: null,
         confidenceTier: patent.confidenceTier || null,

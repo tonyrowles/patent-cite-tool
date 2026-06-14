@@ -1077,9 +1077,21 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
     }
 
     // In shadow mode, a category is always pre-selected by the caller (TRIG mapping).
-    // In page mode (D-02), no category is pre-selected; Submit is valid with null category.
-    // Only block submit in shadow mode when no category is somehow unset (defensive).
-    if (!selectedCategory && mountContext.mode === 'shadow') return;
+    // In page mode (D-02), no category is pre-selected; the user must select one before submit.
+    // CR-02: require a category in BOTH modes — buildReportPayload throws on null category.
+    if (!selectedCategory) {
+      // Surface a validation hint rather than throwing inside buildReportPayload.
+      const hint = panel.querySelector('.cite-report-category-hint')
+        || (() => {
+            const el = document.createElement('p');
+            el.className = 'cite-report-category-hint';
+            el.style.cssText = 'font-size:12px; color:#991b1b; margin:4px 0 0;';
+            radioGroup.insertAdjacentElement('afterend', el);
+            return el;
+          })();
+      hint.textContent = 'Please select a problem category.';
+      return;
+    }
 
     // Loading state (UI-SPEC Submit button loading)
     submitBtn.disabled = true;

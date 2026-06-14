@@ -826,7 +826,15 @@ export function showReportDialog(mountContext, reportOutcome, selectionRect, tri
   fieldList.appendChild(selectionRow);
 
   // Page address
-  fieldList.appendChild(makeFieldRow(FIELD_LABELS.patentUrl, window.location.href));
+  // WR-02: in page mode, show the reconstructed patent URL (what the payload sends), not
+  // the extension's own chrome-extension://…/options.html which leaks the extension ID
+  // and is meaningless to the maintainer.
+  const displayUrl = mountContext.mode === 'page'
+    ? (prebuiltContext?.patentNumber
+        ? `https://patents.google.com/patent/US${prebuiltContext.patentNumber}`
+        : '(no prior patent)')
+    : window.location.href;
+  fieldList.appendChild(makeFieldRow(FIELD_LABELS.patentUrl, displayUrl));
 
   // Browser & OS (computed at open time)
   const browserVal = getBrowserString() || '—';

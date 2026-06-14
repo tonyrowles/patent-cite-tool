@@ -9,8 +9,8 @@
       "id": "patent-cite-tool@example.com",
       "strict_min_version": "142.0",
       "data_collection_permissions": {
-        "required": ["technicalAndInteraction", "websiteActivity"],
-        "optional": ["websiteContent"]
+        "required": ["websiteActivity"],
+        "optional": ["technicalAndInteraction", "websiteContent"]
       }
     }
   },

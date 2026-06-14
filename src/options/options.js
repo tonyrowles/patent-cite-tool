@@ -99,7 +99,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // chrome.runtime.openOptionsPage() accepts no hash fragment — pendingOptionsHash signals intent.
   chrome.storage.local.get('pendingOptionsHash', (data) => {
     if (data.pendingOptionsHash === '#report') {
-      chrome.storage.local.remove('pendingOptionsHash');
+      chrome.storage.local.remove('pendingOptionsHash', () => {
+        // Fire-and-forget; ignore errors (stale flag is non-critical)
+      });
       const reportSection = document.getElementById('report');
       if (reportSection) reportSection.scrollIntoView({ behavior: 'smooth' });
     }
@@ -115,8 +117,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Live-capture fields (xpathNode, scrollY, viewport) are null — no Google Patents DOM here.
   // D-02: no category pre-selected ({ category: null, confidenceTier: null }).
   const reportMount = document.getElementById('reportDialogMount');
-  if (reportMount) {
+  // CR-03: idempotency guard — track whether the dialog (or placeholder) has been mounted
+  // so the DOMContentLoaded path and the onChanged path never double-mount it.
+  let dialogMounted = false;
+
+  function initPageModeDialog() {
+    if (dialogMounted) return;
+    if (!reportMount) return;
     chrome.storage.local.get('currentPatent', (data) => {
+      if (dialogMounted) return; // re-check after async gap
+      dialogMounted = true;
       const patent = data.currentPatent;
       // CR-02: guard against no prior citation — buildReportPayload requires patentNumber.
       if (!patent || !patent.patentId) {
@@ -148,4 +158,23 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     });
   }
+
+  // Run dialog init on fresh page load.
+  initPageModeDialog();
+
+  // CR-03: handle the already-open-tab case — DOMContentLoaded never re-fires when
+  // chrome.runtime.openOptionsPage() focuses an existing tab.  A storage.onChanged
+  // listener catches the pendingOptionsHash write from popup.js, consumes the flag,
+  // scrolls to #report, and (idempotently) initialises the dialog if needed.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.pendingOptionsHash?.newValue === '#report') {
+      chrome.storage.local.remove('pendingOptionsHash', () => {
+        // Fire-and-forget; ignore errors (stale flag is non-critical)
+      });
+      const reportSection = document.getElementById('report');
+      if (reportSection) reportSection.scrollIntoView({ behavior: 'smooth' });
+      // Ensure the page-mode dialog is initialised (idempotent — no-op if already mounted).
+      initPageModeDialog();
+    }
+  });
 });

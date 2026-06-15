@@ -148,7 +148,7 @@ When a user voluntarily submits a bug report (by explicitly clicking the Submit 
 
 Work through these items in order before clicking "Submit for review":
 
-- [ ] Extension ZIP uploaded: `store-assets/patent-cite-tool-v1.0.0.zip` (464 KB, manifest.json at ZIP root)
+- [ ] Extension ZIP uploaded: `store-assets/patent-cite-tool-chrome-v5.0.0.zip` (~466 KB, manifest.json at ZIP root; manifest version 5.0.0). Firefox/AMO uses `store-assets/patent-cite-tool-firefox-v5.0.0.zip` (separate submission).
 - [ ] **Listing tab — Title:** Copy from Section 1 above (39 chars)
 - [ ] **Listing tab — Summary:** Copy from Section 1 above (126 chars)
 - [ ] **Listing tab — Description:** Copy from Section 1 above
@@ -172,7 +172,9 @@ Work through these items in order before clicking "Submit for review":
 |---|---|
 | Developer Dashboard URL | https://chrome.google.com/webstore/devconsole |
 | Privacy policy URL | https://tonyrowles.github.io/patent-cite-tool/privacy |
-| Extension ZIP | store-assets/patent-cite-tool-v1.0.0.zip |
+| Extension ZIP (Chrome) | store-assets/patent-cite-tool-chrome-v5.0.0.zip |
+| Extension ZIP (Firefox/AMO) | store-assets/patent-cite-tool-firefox-v5.0.0.zip |
+| Manifest version | 5.0.0 |
 | Screenshot path | store-assets/screenshot-1280x800.png |
 | Promo tile path | store-assets/promo-tile-440x280.png |
 | Icon (store listing) | 128px — bundled in ZIP, no separate upload needed |

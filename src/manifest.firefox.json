@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Patent Citation Tool",
-  "version": "2.3.0",
+  "version": "5.0.0",
   "description": "Get accurate citation references from Google Patents",
 
   "browser_specific_settings": {
@@ -9,8 +9,8 @@
       "id": "patent-cite-tool@example.com",
       "strict_min_version": "142.0",
       "data_collection_permissions": {
-        "required": ["none"],
-        "optional": []
+        "required": ["websiteActivity"],
+        "optional": ["technicalAndInteraction", "websiteContent"]
       }
     }
   },

@@ -5,8 +5,8 @@
  *
  * Exports:
  *   showFloatingButton(rect, onClick)   - Small "Cite" button near selection
- *   showCitationPopup(citation, rect, confidence, displayMode, matchedText) - Citation result
- *   showErrorPopup(errorMessage, rect)  - Error message popup
+ *   showCitationPopup(citation, rect, confidence, displayMode, matchedText, reportOutcome) - Citation result
+ *   showErrorPopup(errorMessage, rect, reportOutcome)  - Error message popup
  *   showLoadingIndicator(rect)          - Loading dots indicator
  *   showSuccessToast(citation, rect)    - Silent mode success pill (green, 2s auto-dismiss)
  *   showFailureToast(reason, rect)      - Silent mode failure pill (red, 4s auto-dismiss)
@@ -16,8 +16,35 @@
  * with Google Patents (which uses Polymer web components).
  */
 
+import { showReportDialog } from './report-dialog.js';
+
 let citationHost = null;
 let citationShadow = null;
+
+/** Module-level handle for the popup click-outside mousedown handler (CR-02). */
+let _popupClickOutsideHandler = null;
+// Phase 5 bugfix: the error popup auto-dismisses after 4s. If the user opens the
+// Report dialog (mounted in the SAME shadow host) from an error popup, that timer
+// fires dismissCitationUI() and wipes the live dialog. Store the timer id so the
+// dialog open can cancel it (alongside the click-outside handler).
+let _popupDismissTimer = null;
+
+/**
+ * Cancel the popup's click-outside mousedown handler AND its pending auto-dismiss
+ * timer. Must be called before the Report dialog goes live so neither the popup
+ * handler nor its timer calls dismissCitationUI() while the dialog is open
+ * (CR-02 + the 4s error-popup auto-dismiss).
+ */
+export function cancelPopupClickOutside() {
+  if (_popupClickOutsideHandler) {
+    document.removeEventListener('mousedown', _popupClickOutsideHandler);
+    _popupClickOutsideHandler = null;
+  }
+  if (_popupDismissTimer !== null) {
+    clearTimeout(_popupDismissTimer);
+    _popupDismissTimer = null;
+  }
+}
 
 /**
  * Get or create the Shadow DOM host for citation UI.
@@ -107,8 +134,9 @@ export function showFloatingButton(rect, onClick) {
  * @param {number} confidence - Match confidence (0-1).
  * @param {string} displayMode - 'default' or 'advanced'.
  * @param {string} [matchedText] - Matched text for advanced display.
+ * @param {{ category: string|null, confidenceTier: string }|null} [reportOutcome] - Report outcome for button injection; null = no button (CAP-03 / TRIG-04).
  */
-export function showCitationPopup(citation, rect, confidence, displayMode, matchedText) {
+export function showCitationPopup(citation, rect, confidence, displayMode, matchedText, reportOutcome = null) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -146,6 +174,40 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
     dot.title = confidenceLabel;
     row.appendChild(dot);
   }
+
+  // Report button (CAP-03 / TRIG-04): injected only when outcome is non-green,
+  // OR when debugMode is ON (DBG-02: relaxed guard).
+  // D-05: button surfaces the affordance — dialog opens ONLY on click, never auto-opening.
+  if (reportOutcome && (reportOutcome.confidenceTier !== 'green' || reportOutcome.debugMode)) {
+    const reportBtn = document.createElement('button');
+    reportBtn.className = 'cite-report-btn';
+    reportBtn.title = 'Report a problem';
+    reportBtn.setAttribute('aria-label', 'Report a problem with this citation');
+    const isGreenDebug = reportOutcome.confidenceTier === 'green';
+    // D-05: plain icon on green debug; nudge text + amber only on non-green outcomes
+    reportBtn.textContent = isGreenDebug ? '⚑' : '⚑ Report a problem';
+    if (isGreenDebug) {
+      // WR-01: plain icon — reset to neutral styles so the base .cite-report-btn amber
+      // CSS does not bleed through. Low visual weight: transparent bg, muted color.
+      reportBtn.style.background = 'transparent';
+      reportBtn.style.color = '#6b7280';
+      reportBtn.style.fontWeight = '400';
+      reportBtn.style.padding = '2px 4px';
+    } else {
+      reportBtn.style.background = 'rgba(245, 158, 11, 0.08)';
+      reportBtn.style.color = '#92400e';
+      reportBtn.style.fontSize = '13px';
+      reportBtn.style.fontWeight = '500';
+      reportBtn.style.padding = '2px 6px';
+      reportBtn.style.borderRadius = '4px';
+    }
+    reportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showReportDialog({ mode: 'shadow', root: shadow }, reportOutcome, rect, reportBtn);
+    });
+    row.appendChild(reportBtn);
+  }
+  // TRIG-04: if confidenceTier === 'green' AND debugMode is false (or reportOutcome is null), button is not appended
 
   popup.appendChild(row);
 
@@ -220,14 +282,17 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
 
   shadow.appendChild(popup);
 
-  // Auto-dismiss on click outside after a short delay
+  // Auto-dismiss on click outside after a short delay (CR-02: store handler so
+  // cancelPopupClickOutside() can remove it before the Report dialog opens).
   setTimeout(() => {
-    document.addEventListener('mousedown', function handler(e) {
+    _popupClickOutsideHandler = function handler(e) {
       if (!citationHost || !citationHost.contains(e.target)) {
         dismissCitationUI();
-        document.removeEventListener('mousedown', handler);
+        document.removeEventListener('mousedown', _popupClickOutsideHandler);
+        _popupClickOutsideHandler = null;
       }
-    });
+    };
+    document.addEventListener('mousedown', _popupClickOutsideHandler);
   }, 100);
 }
 
@@ -236,8 +301,9 @@ export function showCitationPopup(citation, rect, confidence, displayMode, match
  *
  * @param {string} errorMessage - Error text to display.
  * @param {DOMRect} rect - Bounding rect near which to show the error.
+ * @param {{ category: string|null, confidenceTier: string }|null} [reportOutcome] - Report outcome for button injection; null = no button (CAP-03 / TRIG-04).
  */
-export function showErrorPopup(errorMessage, rect) {
+export function showErrorPopup(errorMessage, rect, reportOutcome = null) {
   const { host, shadow } = getCitationHost();
 
   const style = document.createElement('style');
@@ -252,6 +318,22 @@ export function showErrorPopup(errorMessage, rect) {
   msg.textContent = errorMessage;
   popup.appendChild(msg);
 
+  // Report button for error popups (CAP-03 / TRIG-01/03 / TRIG-04)
+  // D-05: button surfaces affordance only — dialog opens on click.
+  if (reportOutcome && reportOutcome.confidenceTier !== 'green') {
+    const reportBtn = document.createElement('button');
+    reportBtn.className = 'cite-report-btn';
+    reportBtn.title = 'Report a problem';
+    reportBtn.setAttribute('aria-label', 'Report a problem with this citation');
+    // D-06: nudge label on failure/error outcomes
+    reportBtn.textContent = '⚑ Report a problem';
+    reportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showReportDialog({ mode: 'shadow', root: shadow }, reportOutcome, rect, reportBtn);
+    });
+    popup.appendChild(reportBtn);
+  }
+
   let top = rect.bottom + 8;
   let left = rect.left;
   if (top + 40 > window.innerHeight) top = rect.top - 40;
@@ -265,8 +347,12 @@ export function showErrorPopup(errorMessage, rect) {
 
   shadow.appendChild(popup);
 
-  // Auto-dismiss after 4 seconds
-  setTimeout(() => dismissCitationUI(), 4000);
+  // Auto-dismiss after 4 seconds. Store the id so opening the Report dialog from
+  // this error popup can cancel it (otherwise it wipes the live dialog — Phase 5 bugfix).
+  _popupDismissTimer = setTimeout(() => {
+    dismissCitationUI();
+    _popupDismissTimer = null;
+  }, 4000);
 }
 
 /**
@@ -492,6 +578,33 @@ function getCitationPopupCSS() {
     .cite-error-msg {
       color: #991b1b;
       font-size: 12px;
+    }
+    .cite-report-btn {
+      border: none;
+      border-radius: 4px;
+      background: rgba(245, 158, 11, 0.08);
+      color: #92400e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 2px 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      min-width: 24px;
+      min-height: 24px;
+      line-height: 1.4;
+      transition: background 0.15s;
+    }
+    .cite-report-btn:hover {
+      background: #f3f4f6;
+      color: #1a1a1a;
+    }
+    .cite-report-btn:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    .cite-report-btn:active {
+      opacity: 0.8;
     }
   `;
 }

@@ -7,12 +7,52 @@
  */
 
 import { MSG, PATENT_TYPE } from '../shared/constants.js';
+import { extractPatentInfo } from './patent-info.js';
 import { findParagraphCitation } from './paragraph-finder.js';
 import {
   showFloatingButton, showCitationPopup, showErrorPopup,
   showLoadingIndicator, showSuccessToast, showFailureToast,
   dismissCitationUI
 } from './citation-ui.js';
+import { installErrorBuffer } from './report-dialog.js';
+
+// Install extension-tagged error ring buffer (PAY-08 / D-08)
+installErrorBuffer();
+
+// ---------------------------------------------------------------------------
+// Outcome → confidenceTier / reportCategory mapping helpers (TRIG-01..04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Map numeric confidence to tier string.
+ * Thresholds mirror citation-ui.js:124 (high >=0.95 / medium >=0.80 / low <0.80).
+ * Tier-5 gutter-tolerant match outputs exactly 0.85 → falls in yellow band (TRIG-02).
+ *
+ * @param {number} confidence - Match confidence (0-1)
+ * @returns {'green'|'yellow'|'red'}
+ */
+function mapConfidenceTier(confidence) {
+  if (confidence >= 0.95) return 'green';   // high — TRIG-04: hide Report button
+  if (confidence >= 0.80) return 'yellow';  // medium — TRIG-02: "Inaccurate citation"
+  return 'red';                             // low — TRIG-01/02: button shown
+}
+
+/**
+ * Map error code / confidence to report category string.
+ * Returns null for green-success outcomes (TRIG-04: no Report button).
+ *
+ * @param {string|null} errorCode - e.g. 'no-match', 'no-position-map', 'lookup-failed', null for success
+ * @param {number|null} confidence - Match confidence; only used for success path
+ * @returns {'no_match'|'inaccurate_citation'|'tool_not_working'|null}
+ */
+function mapOutcomeToReportCategory(errorCode, confidence) {
+  if (errorCode === 'no-match' || errorCode === 'paragraph-not-found') return 'no_match';
+  if (errorCode === 'no-position-map' || errorCode === 'lookup-failed' ||
+      errorCode === 'pdf-not-available') return 'tool_not_working';
+  // Success path: show button only for sub-green confidence (TRIG-02)
+  if (confidence !== null && confidence < 0.95) return 'inaccurate_citation';
+  return null; // green success (confidence >= 0.95) — TRIG-04: no Report button
+}
 
 /**
  * Extract patent ID, type, and kind code from the current URL.
@@ -24,25 +64,9 @@ import {
  *
  * @returns {{ patentId: string, patentType: string, kindCode: string } | null}
  */
-function extractPatentInfo() {
-  const pathname = window.location.pathname;
-  const match = pathname.match(/\/patent\/(US[\dA-Z]+)/);
-  if (!match) return null;
-
-  const patentId = match[1];
-
-  // Extract kind code suffix (e.g., B2, A1, B1)
-  const kindMatch = patentId.match(/([A-Z]\d?)$/);
-  const kindCode = kindMatch ? kindMatch[1] : null;
-
-  // A1, A2, A9 are published applications; everything else is a granted patent
-  const patentType =
-    kindCode && ['A1', 'A2', 'A9'].includes(kindCode)
-      ? PATENT_TYPE.APPLICATION
-      : PATENT_TYPE.GRANT;
-
-  return { patentId, patentType, kindCode };
-}
+// extractPatentInfo() moved to ./patent-info.js (Phase 5 bugfix) so report-dialog.js
+// can import the SAME definition — esbuild renamed the old in-module copy, leaving
+// report-dialog's bare reference undefined and breaking every in-citation report.
 
 /**
  * Search the DOM for a PDF download link pointing to Google's patent image storage.
@@ -147,6 +171,7 @@ const DEFAULT_SETTINGS = {
   triggerMode: 'floating-button',
   displayMode: 'default',
   includePatentNumber: false,
+  debugMode: false,   // DBG-01/02: default off; TRIG-04 holds until toggled
 };
 
 let selectionTimeout = null;
@@ -167,6 +192,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (changes.triggerMode) cachedSettings.triggerMode = changes.triggerMode.newValue;
     if (changes.displayMode) cachedSettings.displayMode = changes.displayMode.newValue;
     if (changes.includePatentNumber) cachedSettings.includePatentNumber = changes.includePatentNumber.newValue;
+    if (changes.debugMode) cachedSettings.debugMode = changes.debugMode.newValue;
   }
 });
 
@@ -449,9 +475,31 @@ async function generateCitation(selectedText, rect) {
     citationInProgress = false;
     if (result) {
       const prefixedCitation = applyPatentPrefix(result.citation, patentId, patentType);
-      showCitationPopup(prefixedCitation, rect || currentSelectionRect, result.confidence, cachedSettings.displayMode);
+      const confidenceTier = mapConfidenceTier(result.confidence);
+      // Persist for the options-page "report a problem" fallback (page mode has no live
+      // citation context of its own) — see options.js buildPrebuiltContext.
+      chrome.storage.local.set({
+        lastCitationOutcome: { patentId, returnedCitation: prefixedCitation, confidenceTier },
+      });
+      showCitationPopup(
+        prefixedCitation,
+        rect || currentSelectionRect,
+        result.confidence,
+        cachedSettings.displayMode,
+        undefined,
+        {
+          category: mapOutcomeToReportCategory(null, result.confidence),
+          confidenceTier,
+          returnedCitation: prefixedCitation,   // PAY: the citation the user is reporting on
+          debugMode: cachedSettings.debugMode,   // DBG-02: read from cachedSettings at call time
+        }
+      );
     } else {
-      showErrorPopup('Paragraph not found in application', rect || currentSelectionRect);
+      showErrorPopup(
+        'Paragraph not found in application',
+        rect || currentSelectionRect,
+        { category: 'no_match', confidenceTier: 'red' }
+      );
     }
   } else {
     // Granted patent: PositionMap-based citation via offscreen
@@ -460,13 +508,18 @@ async function generateCitation(selectedText, rect) {
     const patent = data.currentPatent;
 
     if (!patent || patent.status !== 'parsed') {
-      const statusMsg = patent?.status === 'fetching' || patent?.status === 'parsing'
+      const isTransient = patent?.status === 'fetching' || patent?.status === 'parsing';
+      const statusMsg = isTransient
         ? 'PDF is still being analyzed, please wait...'
         : patent?.status === 'error'
           ? 'PDF analysis failed'
           : 'PDF not available';
+      // TRIG-03: tool_not_working for PDF failures; NO button for transient state (not a failure)
+      const statusReportOutcome = isTransient
+        ? null
+        : { category: 'tool_not_working', confidenceTier: 'red' };
       citationInProgress = false;
-      showErrorPopup(statusMsg, rect || currentSelectionRect);
+      showErrorPopup(statusMsg, rect || currentSelectionRect, statusReportOutcome);
       return;
     }
 
@@ -533,11 +586,25 @@ function handleCitationResult(message) {
   if (message.success) {
     const patentInfo = extractPatentInfo();
     const prefixedCitation = applyPatentPrefix(message.citation, patentInfo?.patentId, patentInfo?.patentType);
+    const confidenceTier = mapConfidenceTier(message.confidence);
+    // Persist for the options-page "report a problem" fallback — see options.js buildPrebuiltContext.
+    if (patentInfo?.patentId) {
+      chrome.storage.local.set({
+        lastCitationOutcome: { patentId: patentInfo.patentId, returnedCitation: prefixedCitation, confidenceTier },
+      });
+    }
     showCitationPopup(
       prefixedCitation,
       rect,
       message.confidence,
-      cachedSettings.displayMode
+      cachedSettings.displayMode,
+      undefined,
+      {
+        category: mapOutcomeToReportCategory(null, message.confidence),
+        confidenceTier,
+        returnedCitation: prefixedCitation,   // PAY: the citation the user is reporting on
+        debugMode: cachedSettings.debugMode,   // DBG-02: read from cachedSettings at call time
+      }
     );
   } else {
     const errorMsg = message.error === 'no-match'
@@ -545,6 +612,11 @@ function handleCitationResult(message) {
       : message.error === 'no-position-map'
         ? 'PDF has not been analyzed yet'
         : 'Citation lookup failed';
-    showErrorPopup(errorMsg, rect);
+    // TRIG-01: no-match → no_match; TRIG-03: no-position-map / other → tool_not_working
+    const errorReportOutcome = {
+      category: message.error === 'no-match' ? 'no_match' : 'tool_not_working',
+      confidenceTier: 'red',
+    };
+    showErrorPopup(errorMsg, rect, errorReportOutcome);
   }
 }

@@ -56,7 +56,10 @@ describe('v40-auto-promote.yml contract (Phase 44)', () => {
   // A1-A18: load-bearing primitives
   // ---------------------------------------------------------------------------
 
-  it('A1 — trigger on.pull_request.types includes closed', () => {
+  // SKIP (v4.3 auto-fix milestone paused — see feat/bug-report): the pull_request:closed
+  // trigger was gated to workflow_dispatch-only while the auto-fix loop is dormant, so this
+  // contract assertion is intentionally stale. Restore alongside the trigger when v4.3 resumes.
+  it.skip('A1 — trigger on.pull_request.types includes closed', () => {
     // 44-CONTEXT locked decision: pull_request:[closed] (NOT issues)
     expect(yaml).toMatch(/on:\s*\n\s*pull_request:\s*\n\s*types:\s*\[closed\]/);
   });

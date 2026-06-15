@@ -42,8 +42,9 @@
 name: V40 Auto Promote
 
 on:
-  pull_request:
-    types: [closed]
+  # PAUSED (v4.3 auto-fix milestone): pull_request:closed trigger removed so this
+  # workflow stops auto-firing (and startup-failing) on PR/push events while the
+  # auto-fix loop is dormant. Restore `pull_request: types: [closed]` when v4.3 resumes.
   # Phase 59 SWEEP-05 / Decision C: workflow_dispatch trigger for UAT runs.
   # Operator invokes via:
   #   gh workflow run v40-auto-promote.yml \

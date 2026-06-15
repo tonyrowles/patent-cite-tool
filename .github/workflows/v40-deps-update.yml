@@ -45,6 +45,12 @@
 name: V40 Deps Update
 
 on:
+  # The `deps-update-gate` job is a REQUIRED status check on main (ruleset
+  # v4.0-main-protection, strict), so this workflow MUST run on pull_request to
+  # report it — without it, every PR to main is permanently un-mergeable.
+  # The noisy `dep-scan` job (opens dependency PRs; fails because "Actions is not
+  # permitted to create or approve pull requests" in this repo) is gated OFF
+  # pull_request via a job-level `if` below: the gate runs on PRs, the scan does not.
   pull_request:
     types: [opened, synchronize, reopened]
   schedule:
@@ -69,6 +75,10 @@ jobs:
   # Job 1: dep-scan — discovery + PR creation
   # ---------------------------------------------------------------------------
   dep-scan:
+    # Scan/PR-creation only makes sense on schedule/dispatch, and fails on PRs (Actions
+    # cannot open PRs in this repo). Skip it on pull_request — the required deps-update-gate
+    # job below still runs on PRs. (v5.0 fix: keep the gate, drop the noise.)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15   # npm ci + scan + 2 PR creates + 1 gh issue create
     env:

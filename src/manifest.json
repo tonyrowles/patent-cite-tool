@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Patent Citation Tool",
-  "version": "2.3.0",
+  "version": "5.0.0",
   "description": "Get accurate citation references from Google Patents",
 
   "permissions": [

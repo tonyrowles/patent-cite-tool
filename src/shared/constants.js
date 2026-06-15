@@ -1,9 +1,8 @@
 /**
  * Shared constants for the Patent Citation Tool extension.
  *
- * Pure ES module — import these in service worker and other ESM contexts.
- * Content scripts use src/content/constants-globals.js (classic script wrapper)
- * which defines MSG, STATUS, and PATENT_TYPE as globals without import/export.
+ * Single source of truth — bundled per-target by esbuild:
+ * IIFE for content scripts, ESM for background/offscreen workers.
  */
 
 export const MSG = {
@@ -24,6 +23,7 @@ export const MSG = {
   CACHE_HIT_RESULT: 'cache-hit-result',
   CACHE_MISS: 'cache-miss',
   UPLOAD_TO_CACHE: 'upload-to-cache',
+  SUBMIT_REPORT: 'submit-report',   // PAY-05
 };
 
 export const STATUS = {
@@ -41,3 +41,15 @@ export const PATENT_TYPE = {
   GRANT: 'grant',
   APPLICATION: 'application',
 };
+
+// PAY-05 — Bug-report feature constants (Phase 2, v5.0)
+// Frozen so callers cannot mutate the allowlist at runtime (T-02-03).
+// Idiom sourced from tests/e2e/lib/issue-payload-builder.js:51-54.
+export const REPORT_CATEGORIES = Object.freeze([
+  'inaccurate_citation',
+  'no_match',
+  'tool_not_working',
+  'other',
+]);
+
+export const WORKER_REPORT_URL = 'https://pct.tonyrowles.com/report';

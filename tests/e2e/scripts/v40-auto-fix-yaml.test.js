@@ -57,7 +57,10 @@ describe('v40-auto-fix.yml contract (Phase 43)', () => {
   // A1-A12: load-bearing primitives
   // ---------------------------------------------------------------------------
 
-  it('A1 — trigger on.issues.types includes labeled', () => {
+  // SKIP (v4.3 auto-fix milestone paused — see feat/bug-report): v40-auto-fix.yml was
+  // intentionally set to `on: workflow_dispatch:` (dormant) when the milestone paused,
+  // so the original `issues: [labeled]` trigger no longer matches. Restore when v4.3 resumes.
+  it.skip('A1 — trigger on.issues.types includes labeled', () => {
     // 43-CONTEXT locked decision: types: [labeled]
     expect(yaml).toMatch(/on:\s*\n\s*issues:\s*\n\s*types:\s*\[labeled\]/);
   });

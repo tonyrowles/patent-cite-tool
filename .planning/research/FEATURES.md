@@ -1,360 +1,493 @@
-# Feature Landscape
+# Feature Research
 
-**Domain:** LLM-CI auto-fix loop — closure + capability expansion (v4.3)
-**Researched:** 2026-06-08
-**Confidence:** HIGH (primary sources: live codebase grep + v4.2 MILESTONES.md + STATE.md Pending Todos + archived v4.2 FEATURES)
-
----
-
-## Scope note
-
-This document covers ONLY the v4.3 NEW capabilities (the 8 features enumerated in
-the milestone PROJECT.md). Everything already shipped (5 PROMPT_SCAFFOLDS,
-6-rule heuristic triage, MODEL_ROUTES frozen routing, FLAKE 5-state classifier,
-cost-ledger schema v2, `safeAppendLedger` leak guard, deterministic fixture
-mutator, `assertTripleGate` trust invariant, weekly digest with frozen
-`SUMMARY_KEYS`, A/B winner abstention probe) is NOT re-researched — those
-constraints land in PITFALLS.md as invariants.
-
-The 8 v4.3 features in scope (from PROJECT.md "Target features" + MILESTONE
-carry-over). All are evidence-anchored to specific file:line in the live tree:
-
-| # | Feature | Wave |
-|---|---------|------|
-| 1 | Diagnostic-injection mutator extension | Carry-over |
-| 2 | `--max-turns` relaxation (1 → 5 + `--allowed-tools Read,Glob,Grep`) | Carry-over |
-| 3 | Forensic-ledger schema hardening (`source` + `transport` required) | Carry-over |
-| 4 | Synthetic-issue cleanup (#20/21/22/23) | Carry-over |
-| 5 | A/B winner exit from abstention + markdown decision table | Capability expansion |
-| 6 | Expanded fix scaffolds (new `ERROR_CLASS` entries beyond the 5) | Capability expansion |
-| 7 | Better heuristic-first triage coverage (currently 6 fall-through classes) | Capability expansion |
-| 8 | Prompt-iter loop (closed-loop scaffold rewriting from failed attempts) | Capability expansion |
+**Domain:** In-product bug-report UX for a professional browser extension (Chrome + Firefox)
+**Researched:** 2026-06-12
+**Confidence:** HIGH for table stakes and privacy requirements; MEDIUM for specific category-picker labeling conventions (no single authoritative source; synthesized from multiple patterns)
 
 ---
 
-## Canonical ERROR_CLASS evidence (from live tree)
+## Scope Note
 
-Single source of truth: `tests/e2e/lib/error-codes.js:98-110`
-(`ERROR_CLASSES = Object.freeze([...])` — 11 entries):
+This document covers ONLY the NEW v5.0 features (in-product bug-report UX). The existing
+citation result UI, toast notifications, options page settings, and extension infrastructure
+are NOT re-researched — those are constraints anchored in:
 
-```
-EXTENSION_NOT_LOADED, NO_CITATION_PRODUCED, WRONG_CITATION, UI_BROKEN,
-VERIFIER_DISAGREE, GOOGLE_DOM_DRIFT, USPTO_API_DRIFT, FLAKE,
-WORKER_FALLBACK_FAILED, LLM_HALLUCINATED_SELECTION, LLM_API_ERROR
-```
+- `src/content/citation-ui.js` — Shadow DOM popup components (showCitationPopup, showErrorPopup, showSuccessToast, showFailureToast)
+- `src/content/content-script.js` — citation flow, `lastCitationResult` state, message handlers
+- `src/options/options.js` — options page auto-save pattern, `chrome.storage.sync`
+- `src/popup/popup.js` — toolbar popup status display
+- `src/shared/constants.js` — MSG, STATUS, PATENT_TYPE
+- `docs/privacy/index.html` — existing privacy policy (currently: "no personal data collected")
 
-Plus `HARNESS_ERROR` (`error-codes.js:85`, exported but **deliberately NOT** in
-the frozen array — only the LLM exploratory report tallies it; `by_error_class`
-in regression reports does not count it).
+The existing privacy policy is a LOAD-BEARING constraint. Adding bug-report submission
+introduces a FIRST transmission of user-supplied + auto-captured data to a developer server.
+The privacy policy MUST be updated, and both CWS and AMO review processes have explicit
+requirements for this. See "Privacy Disclosure" section below.
 
-`RECOGNIZED_LABELS` at `scripts/auto-fix.mjs:225` =
-`new Set([...ERROR_CLASSES, 'PASS'])` — the dispatcher accepts all 11 array
-entries + `PASS`.
+---
 
-### How each class is handled (cross-referenced from live grep)
+## Production Extension Survey
 
-| ERROR_CLASS | `fix-prompt-builder.js` | `triage-classifier.js` heuristic? | `llm-router.js` |
-|-------------|-------------------------|----------------------------------|-----------------|
-| `WRONG_CITATION` | SCAFFOLD (line 358) | YES — Rule 2 (CONFIRMED + Tier A/B) | sonnet (default) |
-| `LLM_HALLUCINATED_SELECTION` | SCAFFOLD (line 359) | YES — Rule 3 (NOT_REPLAYABLE) | **opus** (line 62) |
-| `WORKER_FALLBACK_FAILED` | SCAFFOLD (line 360) | NO — Rule 4 (LLM cluster/single) | sonnet (default) |
-| `GOOGLE_DOM_DRIFT` | SCAFFOLD (line 361) | NO — Rule 4 (LLM cluster/single) | **opus** (line 61) |
-| `HARNESS_ERROR` | SCAFFOLD (line 362) | YES — Rule 3 (NOT_REPLAYABLE) | sonnet (default) |
-| `VERIFIER_DISAGREE` | NONE → `unsupported-class:` (line 417) | YES — Rule 2 (CONFIRMED + Tier A/B) | sonnet (default) |
-| `FLAKE` | SKIP → `re-quarantine` (line 379) | YES — Rule 1 short-circuit | n/a (dispatcher branches to `dispatchFlakeState`) |
-| `LLM_API_ERROR` | SKIP → `retry` (line 380) | YES — Rule 3 (NOT_REPLAYABLE) | n/a (skip) |
-| `PASS` | SKIP → `close-as-pass` (line 381) | YES — Rule 3 (NOT_REPLAYABLE) | n/a (skip) |
-| `EXTENSION_NOT_LOADED` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
-| `NO_CITATION_PRODUCED` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
-| `UI_BROKEN` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
-| `USPTO_API_DRIFT` | NONE → `unsupported-class:` | NO — Rule 4 fall-through | sonnet (default) |
+### How production extensions handle in-product bug reporting
 
-### Heuristic coverage reality check
+**uBlock Origin**
+- Trigger: "chat" icon in the popup toolbar (row of action icons below the main toggle)
+- Affordance: always visible in popup when uBO is enabled on the page
+- What it does: opens a structured GitHub issue form in a new tab via the
+  "Report a filter issue" form (https://github.com/uBlockOrigin/uBlock-issues/wiki/The-%22Report-a-filter-issue%22-form)
+- Auto-captured: current page URL (pre-filled)
+- User fills: dropdown for address specificity, dropdown for issue type, NSFW checkbox
+- Time in dialog: ~15-30 seconds (structured dropdowns, minimal free text)
+- Requires: GitHub account — "uBO does not have a home server through which reports could be sent"
+- Key lesson: **affordance always in popup, minimal friction, structured dropdowns route
+  to correct issue tracker automatically**
 
-The milestone framing "push classifier from 6/8 → toward 8/8" is anchored in
-the v3.1 RESEARCH-era 8-class taxonomy (pre-extension). Against the **current
-11-entry `ERROR_CLASSES` array** the picture is:
+**Grammarly**
+- Trigger: no in-extension report button; routes to external support portal at support.grammarly.com
+- User must manually describe the error and copy-paste the problematic text
+- Zero auto-capture: burden entirely on user
+- Key lesson: **this is the anti-pattern** — high friction, no auto-capture, out-of-product
 
-- **Heuristic-resolved** (Rule 1/2/3): `FLAKE`, `WRONG_CITATION`,
-  `VERIFIER_DISAGREE`, `LLM_HALLUCINATED_SELECTION`, `LLM_API_ERROR`,
-  `HARNESS_ERROR`, `PASS` — 7 classes (`PASS` and `HARNESS_ERROR` are not in the
-  ERROR_CLASSES array but flow through the chain anyway)
-- **LLM Rule-4 fall-through**: `EXTENSION_NOT_LOADED`, `NO_CITATION_PRODUCED`,
-  `UI_BROKEN`, `GOOGLE_DOM_DRIFT`, `USPTO_API_DRIFT`, `WORKER_FALLBACK_FAILED`
-  — **6 classes** (not 2)
+**Jam (bug-reporting extension for devs)**
+- Trigger: toolbar icon pinned to browser chrome
+- Auto-captured: URL, browser type and version, device type, OS type and version,
+  screen/viewport size, console logs, network requests, user events
+- User fills: description + capture method (screenshot, video, instant replay)
+- Time in dialog: ~30-60 seconds (select capture type, add description)
+- Key lesson: **toolbar trigger + auto-capture of technical context is the baseline
+  for professional bug-reporting tools**
 
-The "6/8 → 8/8" terminology is internally consistent with v3.1's audit but
-misleading against the v4.x array. Feature 7 should track Rule-4 fall-through
-classes by **name**, not by ratio. See Feature 7 in Differentiators below.
+**BetterBugs**
+- Trigger: toolbar icon, opens step-by-step stepper inside popup
+- Auto-captured: system info, console logs, network requests, device info, browser cookies,
+  page navigation steps, devtools info
+- User fills: title/summary, steps to reproduce, priority/assignee metadata
+- Time in dialog: ~2-5 minutes (more structured, aimed at QA teams)
+- Key lesson: **for end-user reports, BetterBugs-level detail is overkill; Jam-level is right**
 
-### Scaffold coverage reality check
+**Windows Error Reporting (WER) — reference pattern**
+- Trigger: automatic on application crash; no user decision needed for minimal report
+- Consent model: "sends minimum required data to check for solutions automatically,
+  then prompts for consent before sending additional data"
+- Key lesson: **split minimum-always vs additional-with-consent is the correct model
+  for failure auto-detection**
 
-`PROMPT_SCAFFOLDS` (frozen registry at `fix-prompt-builder.js:357-363`) has 5
-keys. `SKIP_CLASS_ESCALATIONS` (frozen, line 378-382) has 3 keys. Every other
-`ERROR_CLASS` in the recognized set returns
-`{ok:false, escalate:'unsupported-class:<class>'}` from `buildFixPrompt`. That
-means today, an auto-fix run against an issue labeled e.g. `USPTO_API_DRIFT`
-exits at Step 7 with no SDK call attempted (line 740-744 of `auto-fix.mjs`,
-the skip-class branch writes a ledger entry with `escalate: built.escalate`
-and returns 0). For these classes the loop is intentionally a no-op.
+**Firefox built-in "Report a Site Issue"**
+- Trigger: accessible through the extensions toolbar panel (unified extensions button)
+- Auto-captured: page URL, browser version, optionally screenshot
+- User fills: description of the issue
+- Key lesson: **browser-native pattern validates toolbar-accessible affordance + minimal fields**
+
+**Bitwarden / 1Password**
+- No dedicated in-extension bug-report button; rely on external community forums
+  (community.bitwarden.com) and support portals
+- Key lesson: **established SaaS extensions route to external support; this is acceptable
+  for those products but wrong for a solo-maintained professional tool that needs
+  diagnostic data to fix edge cases**
+
+### Summary of production extension patterns
+
+| Dimension | Common Pattern | Outlier |
+|-----------|----------------|---------|
+| Trigger location | Popup toolbar icon / inline button in result UI | External support portal (Grammarly) |
+| Time in dialog | 15-60 seconds | 2-5 min (BetterBugs — QA-focused) |
+| Auto-capture | URL, browser+OS, version at minimum | Nothing (Grammarly), everything including network (Jam) |
+| Category picker | 2-4 dropdowns or radio options | Free-text only |
+| Submission confirmation | Toast or inline "submitted" message | Redirect to external page |
+| Privacy disclosure | Inline text near submit button | Privacy policy link only |
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes
+### Table Stakes (Users Expect These)
 
-Features required for v4.3 DoD: "live UAT-47-a/b/SWEEP-03/04/06 PROVEN on
-`origin/main` + at least one real production fix flowing through the expanded
-surface." Missing any of these = DoD not met. All are CARRY-OVER from v4.2's
-deferred architectural deferral (per `STATE.md ## Deferred Items
-(acknowledged at v4.2 milestone close 2026-06-09)`).
+Features users assume exist. Missing these = product feels incomplete or untrustworthy.
 
-| # | Feature | Why Required | Complexity | Notes |
-|---|---------|-------------|------------|-------|
-| 1 | **Diagnostic-injection mutator extension** — embed `GOOGLE_DOM_DRIFT` DOM snippet + `WRONG_CITATION` Verifier Disagreement block into synthetic issue bodies; co-design with `fix-prompt-builder.js:252-268` GOOGLE_DOM_DRIFT contract ("issue body should include a snippet of the new DOM"); pin via Vitest fixture (deterministic same-seed → same-snippet) | Without this, scaffolds correctly refuse to fabricate fixes (`apply-check-failed` on SWEEP-03 attempts 2026-06-07/08); end-to-end loop never produces a live fix | **MEDIUM** | Extends `inject-defect.mjs:277-298` `buildBody` to take a per-class diagnostic payload. Must keep MUTATOR-04 source-tag `fixture-mutator-uat-47b` (line 75) unchanged so `quarantine-append.mjs:239` suppression still fires. Pinned by Vitest synthetic-DOM fixture file (new). Must NOT add `node_modules` deps |
-| 2 | **`--max-turns` relaxation + `--allowed-tools`** — bump `llm-driver.js:94` from `'1'` to `'5'`; add `--allowed-tools Read,Glob,Grep` (no `Edit`/`Bash`); update both `invokeClaudeP` (subscription) AND `invokeAnthropicSdkWithLedger` SDK call (line 576-584) | `error_max_turns` blocked SWEEP-03 attempt 2026-06-08 on issue #3 (WRONG_CITATION needed source-file reads to understand real diagnostic-rich issues). Required for both transport paths to handle real issue bodies | **LOW** | Single argv array change at `llm-driver.js:91-97`. SDK path: model already gets file-read context via systemBlocks but Read-tool extension may need explicit `allowed_tools` field in SDK call (verify against `@anthropic-ai/sdk@0.100.1` API). Cost-discipline gate substitute: `--allowed-tools` whitelist (no `Edit`/`Bash`) replaces the `--max-turns 1` budget guard |
-| 3 | **Forensic-ledger schema hardening** — require `source` + `transport` on ALL ledger entries. Audit and patch every `appendLedgerEntry` call site that lacks one or both | 3 orphan `claude-opus-4-7[1m]` ledger entries surfaced 2026-06-08 with no `source`/`transport` fields; closes auxiliary-leak path that PRE-02 + safeAppendLedger don't cover (MEMORY.md `auto_fix_ledger_leak_vector`). Required for A/B winner accuracy (Feature 5) since `a-b-winner.mjs:185-188` filter drops entries lacking attribution metadata | **MEDIUM** | Two-tier defense: (a) ESLint or static-grep test enforcing every `appendLedgerEntry(...)` literal must pass `source:` + `transport:` keys; (b) **defensive runtime assertion** inside `appendLedgerEntry` body (`llm-ledger.js`) that throws on missing field. Both layers required — static check covers code paths, runtime check covers dynamic callers (e.g. `auto-fix.mjs:438`, `:535`, `:691`). DO NOT collapse to runtime-only — would break audit trail of pre-existing entries; need static migration first |
-| 4 | **Synthetic-issue cleanup** — close issues #20/21/22/23 (mutator-injected GOOGLE_DOM_DRIFT triage issues from SWEEP-03 attempts); execute the documented `gh issue close <n> --reason "not planned"` runbook from `inject-defect.mjs:emitCleanupEvidence` (line 396-428) | Live UAT-47-a/b cannot rerun against a polluted issue tracker; SWEEP-06 cleanup automation depends on these issues being closed before re-injection | **LOW** | Already-authored runbook in `.planning/phases/59-fixture-mutator-4-uat-re-sweep/56-MUTATOR-CLEANUP.md`. Can be done via `gh` script invocation or manual. Idempotent (closing an already-closed issue is harmless) |
+| Feature | Why Expected | Complexity | Existing Primitive to Reuse |
+|---------|--------------|------------|------------------------------|
+| **Report button in citation result UI** — appears in the existing Shadow DOM popup when confidence is yellow/red or citation fails (no-match, worker error) | User is already looking at the failure; they want a one-tap action there and then. Requiring them to open a separate page breaks the moment | MEDIUM | `src/content/citation-ui.js:showCitationPopup()` and `showErrorPopup()` — add button to existing DOM construction; same `getCitationHost()` Shadow DOM host |
+| **Auto-captured core context** — patent number, Google Patents URL, selected text, returned citation (or no-match flag), confidence tier, extension version, browser+OS string | This is the diagnostic minimum without which no maintainer can reproduce the issue. Jam captures exactly this. Users expect "it just knows what was broken" | MEDIUM | `src/content/content-script.js:extractPatentInfo()` for patent ID/type; `navigator.userAgent` for browser+OS; `chrome.runtime.getManifest().version` for version; `lastCitationResult` state already contains citation + confidence |
+| **Category picker with 4 options** — pre-set radio/button group, one tap required | Users do not write bug reports with full context. Structured categories route to correct triage class. 4 options is the sweet spot: fewer than 3 is too vague; more than 5 causes decision paralysis | LOW | No existing primitive; new DOM in Shadow DOM |
+| **Optional free-text note field** — single-line or short textarea | Users occasionally have critical context ("this patent has special characters") that no auto-capture can detect | LOW | New DOM element; no existing primitive |
+| **Inline privacy disclosure** — one-line "What's included" statement before the submit button | CWS and AMO both REQUIRE in-product disclosure before data transmission. Privacy policy link alone is insufficient per Chrome Web Store program policies: "The disclosure, however, must not be located only in a privacy policy" | LOW | New DOM text; update to `docs/privacy/index.html` required |
+| **Submit confirmation toast** — "Report sent" transient feedback, auto-dismiss in 2-3s | Standard UX contract: users need confirmation that their tap did something. Toast is the established pattern in this codebase (`showSuccessToast`, `showFailureToast`) | LOW | `src/content/citation-ui.js` — add `showReportSubmittedToast()` following exact pattern of existing toast functions |
+| **Toolbar popup fallback trigger** — a "Report a problem" link or button in the existing toolbar popup for "tool didn't load" cases where the citation UI never appeared | Users whose extension silently fails with no citation popup have no in-context affordance; toolbar popup is the fallback surface. uBlock Origin uses this pattern | MEDIUM | `src/popup/popup.html` + `src/popup/popup.js` — add to existing status display |
+| **Client-side rate limit** — ~5 reports per 10 minutes per install, persisted in `chrome.storage.local` | Prevents accidental rage-click spam to the Cloudflare Worker. `chrome.storage.local` persists across browser restarts (per Chrome docs) | LOW | `chrome.storage.local` — same IDB-graceful-degradation pattern the codebase already uses for `currentPatent` state |
+| **Settings snapshot in payload** — trigger mode, citation format (display mode), prefix toggle | Critical for reproducing class of issues where the problem only occurs in specific configuration (e.g., silent mode no-match). These are already in `chrome.storage.sync` | LOW | `src/content/content-script.js:cachedSettings` — already loaded from `chrome.storage.sync`; serialize to payload |
 
-### Differentiators
+### Differentiators (Competitive Advantage)
 
-Features that make v4.3 trustworthy/observable/scalable beyond the bare DoD.
-Each is independently shippable but DEPENDS on at least one Table Stake.
+Features that distinguish this tool's bug report UX from the production baseline.
 
-| # | Feature | Value Proposition | Complexity | Notes |
-|---|---------|------------------|------------|-------|
-| 5 | **A/B winner exit from abstention + markdown decision table** | Once Feature 3 lands forensic schema, plus 1 real merged PR per arm per class (≥20 per N_PER_ARM_REQUIRED at `a-b-winner.mjs:86`), the script auto-exits abstention via the `outcomeUnavailable` probe (`a-b-winner.mjs:259-266`) and emits the table via `formatMarkdownTable` (line 332-348). NEW work needed: (a) decision-surface — where the markdown table lands (weekly digest section vs standalone GH Discussion vs committed `.md` artifact); (b) threshold lowering — `N_PER_ARM_REQUIRED=20` is high for a sole-maintainer corpus where total fix attempts may run in single digits per month. Recommend conditional emission (table renders if ANY class has ≥N; per-class abstention rows for the rest) | **LOW** for emission wiring; **MEDIUM** if dropping the N threshold requires re-pinning Vitest tests at `tests/unit/a-b-winner.test.js` | Depends on: Feature 3 (schema hardening MUST be live so `errorClass` + outcome populated). Recommend the table land as a Phase 55-pattern section appended to the existing weekly digest (mirrors Phase 55 DASH-02 `renderAutoFixPipelineSection` pattern at `weekly-digest.mjs`). DO NOT make this a Discord/Slack push — operator-driven decision tool, not realtime alert |
-| 6 | **Expanded fix scaffolds** — add NEW `PROMPT_SCAFFOLDS` entries for currently-unsupported classes. Concrete candidates (anchored in evidence): see "Concrete scaffold candidates" section below | Today 4 in-array `ERROR_CLASS` values (`EXTENSION_NOT_LOADED`, `NO_CITATION_PRODUCED`, `UI_BROKEN`, `USPTO_API_DRIFT`) route to `unsupported-class:` and silently no-op. Auto-fix loop has zero coverage for them. Adding scaffolds + Verifier Disagreement scaffold (already heuristically triaged but lacks fix template) widens the loop's surface | **MEDIUM** per scaffold (each adds ~30-line CONTRACT string + Object.freeze registry entry + Vitest pin); **LOW** marginal once the first one shipped | Depends on: Feature 1 (diagnostic-injection mutator) for end-to-end testability of any new scaffold; Feature 2 (`--max-turns 5`) so the scaffold can actually read source files. Recommend NOT shipping all candidates in v4.3 — pick 2-3 with highest evidence and defer rest to v4.4 |
-| 7 | **Better heuristic-first triage coverage** — add Rule-1/2/3-equivalent heuristic short-circuits for the 6 LLM-routed fall-through classes (`EXTENSION_NOT_LOADED`, `NO_CITATION_PRODUCED`, `UI_BROKEN`, `GOOGLE_DOM_DRIFT`, `USPTO_API_DRIFT`, `WORKER_FALLBACK_FAILED`) | Currently each Rule-4 fall-through class triggers a cluster (N≥5) or per-finding LLM call (`triage-classifier.js:517-561`). Heuristic resolution = zero LLM cost + faster turnaround. Several of these have deterministic signals: e.g. `GOOGLE_DOM_DRIFT` ↔ pre-flight DOM probe failure result; `WORKER_FALLBACK_FAILED` ↔ verifier returned `tier='D'` AND non-2xx Worker status; `EXTENSION_NOT_LOADED` / `UI_BROKEN` ↔ harness threw before the verifier ran. Concrete rules: see "Concrete heuristic rules" section below | **MEDIUM** (one new rule + RULE_*_CLASSIFICATIONS map per class; each ~10-20 lines + Vitest pin) | Depends on: nothing (pure-function classifier). Recommend tackling 2-3 highest-signal classes in v4.3 (`GOOGLE_DOM_DRIFT`, `WORKER_FALLBACK_FAILED`, `EXTENSION_NOT_LOADED`) and deferring `UI_BROKEN` / `USPTO_API_DRIFT` to v4.4 where signal is more ambiguous |
-| 8 | **Prompt-iter loop — CAPTURE-AND-SURFACE shape** | Failed fix attempts (Step 5 `fix_attempts >= FIX_ATTEMPT_CAP=3` branch at `auto-fix.mjs:648-666`; label-flap to `auto-fix:failed`; or `apply-check-failed` events) emit a NEW ledger row with `source: 'fix-attempt-failed'` + `errorClass` + `escalate_reason` + truncated `llm_text` snippet. A weekly digest section enumerates these for human review. Operator decides whether the scaffold needs rewriting | **MEDIUM** (one new ledger source string + 1 digest section + `auto-fix.mjs` minor surface change to write the failed-attempt entry) | Depends on: Feature 3 (forensic schema for the failed-attempt ledger row to be queryable). RECOMMEND THIS SHAPE for v4.3. Full automation (variant below) is rejected — see Anti-Features |
+| Feature | Value Proposition | Complexity | Existing Primitive to Reuse |
+|---------|-------------------|------------|------------------------------|
+| **Auto-surface on failure** — Report button/prompt appears automatically on no-match (red), yellow confidence (Tier 5 cap), and worker-fallback error, without user having to find it | Most extensions (uBlock, Bitwarden) only offer always-available affordances; user must choose to report. Auto-surface at the exact failure moment captures reports when frustration is highest and context is freshest | MEDIUM | `src/content/content-script.js:handleCitationResult()` — detect failure conditions already present (`message.error === 'no-match'`, confidence < 0.80, worker fallback flag); add Report button to existing `showErrorPopup()` / `showCitationPopup()` render path |
+| **DOM/PDF diagnostics** — selected-node xpath, viewport/scroll position, PDF parse status | This is the differentiating diagnostic data vs every other extension. The v3.1 `llm-report.json` schema already captures `scroll_y`, `viewport_*`, `selected_node_xpath`. Reusing this schema directly means zero new field design | MEDIUM | `src/content/content-script.js:getSelectionContext()` for selection context; `window.scrollY` + `window.innerWidth/Height` for viewport/scroll; `currentPatent.status` from `chrome.storage.local` for PDF parse status |
+| **Recent error log ring buffer** — last N console errors / extension-internal warnings captured in service worker, included in report payload | Patent parsing failures often produce console errors that are invisible to users. Sentry's breadcrumb pattern (auto-buffered events until an error is reported) is the industry model | MEDIUM | `src/background/service-worker.js` — add `console.error` interception + ring buffer in memory (last 10 entries); service worker already handles all message routing |
+| **Expandable payload preview** — "View full payload" toggle in the report dialog shows exactly what JSON will be sent, field by field | Differentiates from competitors who only show a generic "we collect browser info" disclosure. Patent professionals (lawyers, agents) are privacy-sensitive. Showing the exact payload builds trust and satisfies CWS's "within the Product's user interface" consent requirement concretely | MEDIUM | No existing primitive; new DOM in Shadow DOM; JSON.stringify(payload) already available at send time |
+| **Debug Mode toggle** — options-page toggle; when ON, Report button is always visible in citation result UI regardless of confidence outcome | Maintainer/power-user feature for testing the report flow and for users who want to report even high-confidence results that feel wrong | LOW | `src/options/options.js` + `chrome.storage.sync` — follows exact auto-save pattern of existing settings; Report button rendered based on `cachedSettings.debugMode` flag |
+| **Local queue + retry on Worker failure** — failed submissions persist in `chrome.storage.local` and retry on next extension load | Matches existing graceful-degradation pattern (`idbAvailable` flag). Prevents lost reports when the Cloudflare Worker is briefly unreachable | MEDIUM | `src/background/service-worker.js` install/activate event — check for queued reports on startup; same `chrome.storage.local` pattern used for `currentPatent` |
+| **Server-side fingerprint dedup** — Worker computes fingerprint (patent # + category + selection hash) and deduplicates within a time window in KV | Prevents same user reporting the same failure multiple times from filling KV with duplicate entries. Cloudflare KV `expirationTtl` handles time-window expiry natively | LOW (server-side only) | Existing Cloudflare Worker + KV infrastructure; new route, no client changes |
 
-### Anti-Features
+### Anti-Features (Commonly Requested, Often Problematic)
 
-These are features the pipeline MUST NOT have. They are explicit design invariants.
+Features to explicitly NOT build in v5.0.
 
-| Anti-Feature | Why It Seems Attractive | Why Prohibited | What to Do Instead |
-|--------------|------------------------|---------------|--------------------|
-| **Prompt-iter loop — FULL AUTOMATION shape** (failure → LLM analyzes scaffold → LLM rewrites scaffold → auto-commits scaffold change → retries) | Closes the loop; removes human latency entirely | (a) `fix-prompt-builder.js` is FORBIDDEN_PATH-adjacent (`tests/e2e/lib/` is excluded from diff-guard but `fix-prompt-builder.js` is the production scaffold registry — meta-loop attacking it = uncontrolled trust boundary expansion). (b) The 5 scaffolds are LOAD-BEARING (`fix-prompt-builder.js:117-178` `buildScaffoldSystemPrompt` helper guarantees byte-stable forbidden-paths enumeration); a wayward LLM rewrite could drift the path list and let downstream auto-fixes touch FORBIDDEN_PATHS. (c) Defeats Phase 53 `assertTripleGate` byte-unchanged invariant by indirection. (d) No clear cost-cap on the meta-loop — could runaway-spend chasing a bad scaffold | **Capture-and-surface** (Feature 8 above). Operator reads weekly digest, manually authors scaffold revision PRs |
-| **Auto-merging A/B winner-decision-driven `MODEL_ROUTES` edits** | Once the table declares a winner, route the routing-table to use it automatically | `MODEL_ROUTES` is `Object.freeze`'d at `llm-router.js:60-63` and the freeze is LOAD-BEARING for the A/B comparison invariant (`llm-router.js:30-37`). Mutating mid-experiment invalidates the ledger entries before/after the edit. Even if the table declares a winner, the routing edit must be a human-reviewed PR | Emit the table only; human authors the `MODEL_ROUTES` PR after reading it |
-| **Bumping `--max-turns` to unbounded** (e.g., `--max-turns 50`) | Maximum freedom for the model to explore the codebase | (a) Cost-discipline: each turn is an SDK round-trip. (b) The `--max-turns 5` figure from STATE.md Pending Todos was researched and locked. (c) Empirically Claude resolves most fix tasks in 2-4 turns; 5 gives 1-2 turns of headroom. (d) Unbounded turns + Read tool can fan out into reading the entire `src/` tree, blowing the prompt-token budget | Keep `--max-turns 5`. If a class genuinely needs more, raise it per-class via the dispatcher, not globally |
-| **Allowing `--allowed-tools Edit,Bash`** | Faster — the model could apply the fix in-process | (a) Defeats the entire dispatcher architecture (parse-fenced-diff at `auto-fix.mjs:279-298` exists for a reason: humans audit a diff, not a multi-step tool trace). (b) `Bash` tool inside the SDK call could run arbitrary commands against the CI runner's filesystem, bypassing the FORBIDDEN_PATHS diff-guard regex bank. (c) `Edit` tool could mutate the working copy without leaving a unified-diff audit trail | Whitelist ONLY `Read,Glob,Grep`. The model proposes a diff via the existing fence-bracketed output format (`fix-prompt-builder.js:167-176`); the dispatcher applies it via `git apply --check` |
-| **Adding a 6th scaffold for a class that the heuristic triage cannot route** | Coverage at any cost | A scaffold without a path through triage is dead code — the dispatcher never invokes it. E.g., adding a `TIER_C_DISAGREEMENT` scaffold without a corresponding ERROR_CLASS string in `error-codes.js` and a triage rule that emits it means `buildFixPrompt({errorClass:'TIER_C_DISAGREEMENT'})` returns `{ok:false, escalate:'unsupported-class:TIER_C_DISAGREEMENT'}`. Useless | Verify the candidate ERROR_CLASS already exists in `ERROR_CLASSES` (lines 98-110) OR can be added with a co-designed triage rule (e.g. Rule 2/3 extension) and a producer site in regression spec / verifier output. Co-design in same commit per Phase 56 LEDGER-01 pattern |
-| **A/B winner table on the auto-fix PR body** (instead of weekly digest) | Decision context next to the PR | (a) PR body has size limits + already crowded with affected-cases HTML comment. (b) The table is decision-surface for *future* MODEL_ROUTES edits, not for the current PR. (c) Same misclassification as `cost_per_fix` would be if it were per-PR (the metric only makes sense aggregated) | Land in the weekly digest as a Phase-55-pattern `<details>` section, OR in a standalone committed `docs/a-b-winner-latest.md` artifact |
-| **Backfilling old ledger entries with synthetic `source`/`transport` defaults** (e.g., scripted patch to retroactively tag the 3 orphan `claude-opus-4-7[1m]` entries) | Cleaner audit trail | Falsifies the forensic record — those 3 entries genuinely lack provenance metadata. Inserting fake `source: 'unknown-pre-v4.3'` tags makes future grep audits unreliable | Leave them as-is. The Feature 3 schema hardening should be **forward-only**: enforce on new writes; allow but flag the 3 known orphans in a documented allowlist (Vitest pin) |
-| **Treating GOOGLE_DOM_DRIFT as a routinely heuristic-resolvable class** | The DOM snippet pattern in mutator synthetics suggests it's recognizable | The diagnostic data shape is what makes Rule-4 LLM-routing the right call: the snippet itself needs LLM reasoning to map "old selector → new selector". A naive heuristic could fire on any "no patent body found" string and mis-route a genuinely-LLM-needing case to a no-op | If shipping Feature 7 for `GOOGLE_DOM_DRIFT`, the heuristic should be **selector-extraction-only** (recognize that the issue body has a `data-testid=` snippet pre-injected by Feature 1's mutator extension); fall through to LLM for any non-mutator GOOGLE_DOM_DRIFT |
-
----
-
-## Concrete scaffold candidates (for Feature 6)
-
-The milestone PROJECT.md lists 10 candidate names. Each is graded against three
-criteria from grep evidence:
-
-1. **Triage-emittable?** Is there an existing producer site in the regression
-   suite or verifier that emits this ERROR_CLASS? (Grep for the string literal.)
-2. **In `ERROR_CLASSES`?** Adding new entries requires extending the frozen
-   array — that's a co-design across `error-codes.js`, `report.js`,
-   `auto-fix.mjs`'s `RECOGNIZED_LABELS`, and at least one Vitest pin.
-3. **Fix-surface plausibility?** Is there a coherent fix surface (production
-   src/ files + tests/) for the LLM to actually edit?
-
-| Candidate | Triage-emittable? | In ERROR_CLASSES? | Fix-surface? | Recommendation |
-|-----------|-------------------|-------------------|--------------|----------------|
-| `TIER_C_DISAGREEMENT` | NO — no producer site found. Tier C is a verifier status (`triage-classifier.js:43-44` `VERIFIER_STRONG_AGREEMENT` returns false), not an emitted class | NO | Marginal — the fix would be in the verifier independence layer; complex | **DEFER** — needs taxonomy extension first; not v4.3 scope |
-| `PDF_PARSE_ERROR` | NO direct producer in grep; closest is `error_max_turns` (unrelated) and `pdf-verifier.js` exceptions | NO | YES — fix surface in `src/offscreen/position-map-builder.js` / `src/shared/matching.js` | **DEFER** — needs ERROR_CLASS taxonomy extension; high value but big surface |
-| `WORKER_TIMEOUT` | PARTIAL — `WORKER_FALLBACK_FAILED` covers this today (`error-codes.js:64`); a sub-class would split the existing bucket | NO (would be sub-class of WORKER_FALLBACK_FAILED) | YES — `src/cf-worker/index.js` retry policy | **DEFER** — over-specification; existing WORKER_FALLBACK_FAILED scaffold already covers the fix surface |
-| `IDB_FAILURE` | NO producer in grep; IndexedDB has detect-once degradation (`idbAvailable` flag) but no error-class emission | NO | YES — `src/shared/idb-helper.js` (if exists) or wherever IDB calls live | **DEFER** — needs new producer site + taxonomy extension |
-| `CACHE_MISS_TIMEOUT` | NO producer; closest is the Worker 3s cache timeout handling | NO | YES — Worker cache path | **REJECT** — current behavior (silent fallthrough) is intentional per Key Decisions; no scaffold needed |
-| `COLUMN_INFERENCE_FAIL` | NO producer for this specific error; column-inference is in `position-map-builder.js` | NO | YES — narrow fix surface in column-inference logic | **DEFER** — needs producer; v4.4 candidate when accuracy regression evidence accumulates |
-| `OCR_TIER0B_REGRESSION` | NO producer; Tier 0b is `normalizeOcr` preprocessing (`src/shared/matching.js`) | NO | YES | **REJECT** — this would be a `WRONG_CITATION` sub-case with specific root-cause; existing WRONG_CITATION scaffold already addresses |
-| `GUTTER_TIER5_REGRESSION` | NO producer | NO | YES | **REJECT** — same as OCR_TIER0B; subsumed by WRONG_CITATION |
-| `FRAME_SHIFT_DETECTED` | YES — `v40-pdfjs-frame-shift.yml` workflow exits with sentinel `FRAME-SHIFT DETECTED` on citation divergence between old/new pdfjs (Phase 47 work, referenced in MILESTONES) | NO | YES — fix surface is the pdfjs pin in `package.json` `verifierDeps.pdfjs-dist` | **PRIMARY CANDIDATE** — has producer, has fix surface (pin bump or rollback), aligns with v4.0 DEPS-04 architecture |
-| `AB_WINNER_FLIP` | NO producer (would need to be detected from successive A/B winner emissions); chicken-and-egg with Feature 5 | NO | Marginal — fix surface is `MODEL_ROUTES` which is frozen | **REJECT** — meta-feature; A/B winner emission is itself the signal; no auto-fix needed |
-| `VERIFIER_DISAGREE` *(already in ERROR_CLASSES)* | YES — heuristically triaged today via Rule 2 | YES (in array) | YES — verifier or matching tier logic | **PRIMARY CANDIDATE** — most leveraged add: existing producer, existing triage row, just no fix scaffold. Fix surface: `tests/e2e/lib/pdf-verifier.js` (tier classification thresholds) + `src/shared/matching.js` (when matching tier disagrees with verifier) |
-| `WORKER_FALLBACK_FAILED` *(already has scaffold)* | YES today | YES | YES today | **already scaffolded** — not a candidate, listed for completeness |
-
-### Recommended v4.3 scaffold additions (concrete)
-
-**Ship 2 scaffolds in v4.3** (paired with Feature 7 heuristic rules):
-
-1. **`VERIFIER_DISAGREE`** — already in `ERROR_CLASSES` array; already produced
-   by Rule 2 of the heuristic triage; needs only a new entry in
-   `PROMPT_SCAFFOLDS` registry at `fix-prompt-builder.js:357-363` + a CONTRACT
-   string mirroring the existing 5. Fix surface: `tests/e2e/lib/pdf-verifier.js`
-   (tier classification + window matching). Co-design with `llm-router.js`
-   decision: stays on sonnet default (no opus needed; the fix surface is
-   well-bounded).
-
-2. **`FRAME_SHIFT_DETECTED`** — needs a NEW `ERROR_CLASS` entry in
-   `error-codes.js:98-110` (after `LLM_API_ERROR`), a producer in
-   `v40-pdfjs-frame-shift.yml` workflow (file the GH issue with
-   `FRAME_SHIFT_DETECTED` label when the sentinel fires), and a scaffold whose
-   CONTRACT names the fix surface (`package.json` `verifierDeps.pdfjs-dist`
-   pin + the `v40-pdfjs-frame-shift.yml` workflow assertion). This is the
-   HIGHEST-leverage add: closes the loop on the dep-update flow.
-
-**Defer** the other candidates to v4.4 — they need producer sites OR taxonomy
-extension that exceed v4.3 budget.
+| Anti-Feature | Why It Seems Attractive | Why Problematic | What to Do Instead |
+|--------------|------------------------|-----------------|---------------------|
+| **Full screenshot capture** | Provides visual context for the failure | (a) Screenshots of Google Patents pages may contain confidential patent search queries or attorney work product. (b) Screenshot blobs are 100-500 KB; KV per-key limit is not designed for large blobs. (c) CWS/AMO escalate data-collection review for image capture. (d) Increases report bundle to problematic sizes for Discord notification | Use `selected_node_xpath` + viewport dimensions for context instead |
+| **Full page DOM snapshot** | Complete rendering context | (a) DOM of a Google Patents page can be 1-2 MB. (b) Contains full patent text which may be PII-adjacent for attorney clients. (c) Triggers CWS `websiteContent` data category which requires prominent installation-time disclosure | Capture `selected_node_xpath` (single node identifier) and the selected text only |
+| **IP address or geo-location** | Geographically-clustered failures | (a) IP address is personally identifying by definition. (b) AMO `locationInfo` category requires explicit opt-in consent. (c) Cloudflare Workers already receive the client IP via `request.headers.get('CF-Connecting-IP')` server-side — do NOT pass it through to the payload | Cloudflare Worker can log IP separately if needed; never embed in extension payload |
+| **Browsing history or cross-tab context** | Might explain why the extension behaved differently | (a) AMO `browsingActivity` category = high-sensitivity; CWS classifies this as personal/sensitive user data. (b) `activeTab` permission only covers the current tab — accessing other tabs' data would require `tabs` permission, which triggers store review scrutiny | Limit context to the current Google Patents page only |
+| **User email or account association** | Allows maintainer to follow up | (a) Collecting PII requires explicit opt-in per both AMO and CWS. (b) Adds account infrastructure that is out of scope. (c) Creates GDPR obligations. (d) Patent professionals are unlikely to want their identity associated with tool failure reports | Use anonymous install fingerprint (hash of extension ID + install timestamp) if follow-up correlation is needed |
+| **Auto-send on failure without user tap** | Zero-friction capture | (a) Both CWS and AMO require "affirmative consent" before transmission of data not described as core functionality. Silent auto-send is a policy violation that can cause removal. (b) Even Windows Error Reporting (the canonical auto-send model) requires a user-facing modal before sending non-minimal data | Auto-surface the Report button; require one user tap to submit |
+| **CAPTCHA** | Prevents abuse | Adds severe friction to voluntary reports; the 5/10min client-side rate limit + server-side fingerprint dedup is sufficient for v1 | Layer in ONLY if abuse materializes post-launch |
+| **Promotion to GitHub Issues automatically** | Closes the loop immediately | Premature for v5.0; GitHub API credentials would need to be embedded or proxied; adds complexity. The v3.1 `lib/issue-payload-builder.js` is the eventual target but only after report volume is understood | Manual `gh issue create` from KV data; v5.1 auto-promotion |
+| **Discord webhook URL in extension code** | Simpler implementation | Exposes the webhook to anyone who inspects the extension bundle. A malicious actor could spam the channel trivially | Webhook URL stays in Cloudflare Worker environment binding; extension only hits the Worker endpoint |
+| **Sentry/third-party error tracking SDK** | Battle-tested auto-capture | (a) Zero new npm dependencies target (fifth consecutive milestone). (b) Sentry SDK in an extension context has known issues with shared-environment injection (see https://docs.sentry.io/platforms/javascript/best-practices/shared-environments/). (c) Sentry captures referrer URL, console logs including PII, and breadcrumbs by default — requires aggressive scrubbing configuration. (d) Adds 60-100 KB to bundle | Custom lightweight ring buffer + Worker endpoint; equivalent functionality, zero dependency cost |
 
 ---
 
-## Concrete heuristic rules (for Feature 7)
+## Category Picker: Recommended 4-Label Set
 
-For each LLM-routed fall-through class, the rule's signal source must be
-already-present in `inputLlmReport.iterations[*]` or `inputRerunReport.replays[*]`
-(no new harness data collection). Grep evidence:
+Research finding: the v5.0 PROJECT.md already specifies 4 categories. Research validates this count as optimal for the use case. Specific label copy recommendations:
 
-| Class | Signal source | Heuristic | Complexity |
-|-------|---------------|-----------|------------|
-| `GOOGLE_DOM_DRIFT` | `iter.classification === 'GOOGLE_DOM_DRIFT'` AND issue body contains a `data-testid=` substring (Feature 1's mutator pre-injects this) | If diagnostic snippet present AND NOT_REPLAYABLE → emit heuristic finding with severity `medium`, rationale "DOM probe failed; diagnostic snippet pre-injected". If snippet absent → fall through to existing Rule 4 (LLM-needed) | **LOW** (one more `if` branch in `triage-classifier.js` after Rule 3) |
-| `WORKER_FALLBACK_FAILED` | `iter.classification === 'WORKER_FALLBACK_FAILED'` AND `iter.verifier_verdict.tier_used === 'D'` (verifier could not match) AND `iter.fault_injection_status` ∈ {`worker_404`, `worker_5xx`, `worker_html_response`} | If CONFIRMED + above signals → emit heuristic finding with severity `high`, rationale "Worker fallback path broke deterministically (status: X)". If only some signals match → Rule 4 fallthrough | **MEDIUM** (requires producer site at `tests/e2e/specs/fault-injection.spec.js` to write `fault_injection_status` into the iteration record — additive but co-design) |
-| `EXTENSION_NOT_LOADED` | `iter.classification === 'EXTENSION_NOT_LOADED'` (harness threw before verifier ran) | Always heuristic — this class is binary (loaded or not); LLM cannot help with extension-load failures. Severity `low` (almost always a fixture/CI runner issue, not a product bug), rationale "Extension failed to attach; check CI fixture" | **LOW** (one `if` branch; no signal extraction needed) |
-| `UI_BROKEN` | `iter.classification === 'UI_BROKEN'` (Shadow DOM closed-mode not accessible OR pill never attached) | Two sub-signals: shadow-DOM-blocked vs pill-attach-timeout. Heuristic: severity `medium`, rationale "Shadow DOM probe failed — selector update likely needed". Subsumed under GOOGLE_DOM_DRIFT heuristic if the page-level DOM probe ALSO failed | **MEDIUM** — needs disambiguation logic; can co-route with GOOGLE_DOM_DRIFT |
-| `USPTO_API_DRIFT` | `iter.classification === 'USPTO_API_DRIFT'` AND iter has a `worker_response_shape` mismatch flag | Heuristic feasible only if Worker spec writes the shape-mismatch flag. Without that producer, fall-through is correct | **MEDIUM** — depends on Worker spec extension; **DEFER** to v4.4 |
-| `NO_CITATION_PRODUCED` | `iter.classification === 'NO_CITATION_PRODUCED'` (extension ran but produced no citation) | Tier-D verifier verdict + production no-citation = symptom of matching-tier exhaustion. Recommend Rule 4 fallthrough (LLM cluster) — heuristic risks false-positive route to "do nothing" | **REJECT** — Rule 4 LLM-routing is correct; heuristic would hide real product bugs |
+### Recommended Labels
 
-### Recommended v4.3 heuristic additions (concrete)
+| Label | Maps to (internal) | When auto-selected? | Notes |
+|-------|-------------------|---------------------|-------|
+| **Inaccurate citation** | `WRONG_CITATION` | Yellow confidence (0.80-0.84, Tier 5 cap) | User got a citation but it's wrong. This is the highest-value failure mode for a legal-filing tool |
+| **No match found** | `NO_MATCH` | Red confidence / no-match error | Extension ran but couldn't find the text in the PDF |
+| **Tool not working** | `EXTENSION_NOT_LOADED` / `WORKER_FALLBACK_FAILED` | Worker-fallback error, PDF parse failure, "PDF not available" error | Covers all infrastructure failures |
+| **Other** | `OTHER` | Never auto-selected | Catch-all; always available |
 
-**Ship 3 heuristic rules in v4.3** (covers 3 of 6 fall-through classes):
+### Why these 4 labels (evidence from research)
 
-1. **`GOOGLE_DOM_DRIFT` mutator-aware** (LOW complexity) — depends on Feature 1
-2. **`EXTENSION_NOT_LOADED`** (LOW complexity, no deps)
-3. **`WORKER_FALLBACK_FAILED`** (MEDIUM complexity, needs co-design with
-   fault-injection spec producer)
+- **"Bug" vs "Feedback" vs "Feature request" taxonomy** is wrong for this use case. A patent attorney filing a citation doesn't think in developer terms. They experienced a specific output failure class.
+- **Outcome-focused labels** ("Inaccurate citation", "No match") map directly to the v3.1 `ERROR_CLASSES` taxonomy (`WRONG_CITATION`, `NO_CITATION_PRODUCED`) — direct path from user report to triage classifier.
+- **"Other" is always included** across all surveyed tools (uBlock filter report type dropdown, BetterBugs category picker, every SaaS in-app feedback widget). Omitting it causes users to force-fit their problem into the wrong category.
+- **4 categories** matches the PROJECT.md spec and is validated as the sweet spot by the in-app feedback research: fewer = too vague; more = decision paralysis.
+- **Auto-selection** at the point the Report button appears provides a default without locking the user in — reduces interaction time to near-zero for the common case.
 
-**Defer** `UI_BROKEN`, `USPTO_API_DRIFT`, `NO_CITATION_PRODUCED` to v4.4 (signal
-ambiguity or absent producer sites).
+### What to avoid in label copy
 
-**Result**: 7-of-11 heuristic-resolved → 10-of-11 heuristic-resolved
-(`NO_CITATION_PRODUCED` deliberately remains LLM-routed by Anti-Feature
-decision above).
+- "Bug" — feels technical, not outcome-focused
+- "Wrong answer" — ambiguous (wrong patent? wrong format?)
+- "Error" — too generic
+- "Feature request" — wrong venue; this is a bug reporter, not a feature board
+
+---
+
+## Privacy Disclosure: CWS + AMO Requirements
+
+### Chrome Web Store (CWS) Requirements
+
+Source: developer.chrome.com/docs/webstore/program-policies/user-data-faq (HIGH confidence — official docs)
+
+The key requirement: **"The disclosure must not be located only in a privacy policy, terms of service, or similar document."**
+
+For v5.0 bug reporting, the in-product disclosure must:
+1. Appear within the Product's user interface (the report dialog)
+2. Be presented prominently before the user agrees (before they tap Submit)
+3. Require a specific action to agree (the Submit tap itself constitutes consent for voluntary user-initiated reports, per the "closely related to described functionality" carve-out IF the store listing describes bug reporting)
+4. The privacy policy URL must be updated in the CWS Developer Dashboard to reflect the new data collection
+
+**Recommended disclosure text** (one line, expandable for full payload preview):
+> "What's included: Patent URL, selected text, citation result, confidence level, browser version, extension version, trigger mode. No personal information. [View full payload ▶]"
+
+### Firefox AMO Requirements
+
+Sources: extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/ + blog.mozilla.org/addons/2025/10/23/data-collection-consent-changes-for-new-firefox-extensions/ (HIGH confidence — official Mozilla docs, November 2025 effective date)
+
+As of November 3, 2025, new Firefox extensions must declare `data_collection_permissions` in `browser_specific_settings.gecko.data_collection_permissions` in manifest.json. Since v5.0 is adding new data collection to an existing extension, Mozilla requires this field to be added when the extension is updated.
+
+For the v5.0 bug-report payload, the required categories are:
+
+```json
+"browser_specific_settings": {
+  "gecko": {
+    "id": "patent-cite-tool@tonyrowles.com",
+    "data_collection_permissions": {
+      "required": ["technicalAndInteraction"],
+      "optional": ["browsingActivity", "websiteContent"]
+    }
+  }
+}
+```
+
+- `technicalAndInteraction` covers: "Device and browser info, extension usage and settings data, crash and error reports" — this covers extension version, browser/OS, settings snapshot, error logs
+- `browsingActivity` covers: URLs visited — covers the current patent URL being reported
+- `websiteContent` covers: page text, images — covers the selected text and citation result
+
+**Critical AMO distinction**: voluntary user-initiated bug reports that transmit to a remote server still require the `data_collection_permissions` declaration. The FAQ confirms: "Sending this same export file to a remote server would require that the extension follow the Add-on Policies' Data Collection and Consent provisions."
+
+**Personally Identifying Information (PII) rule**: "personally identifying information may only be collected after receiving explicit consent." The bug-report payload must NOT include email, user account info, or IP address embedded in the extension payload. Cloudflare Worker's server-side IP access is distinct and fine.
+
+### Privacy Policy Update Required
+
+The existing `docs/privacy/index.html` currently states: "Patent Citation Tool does not collect, store, or transmit any personal data."
+
+This statement becomes FALSE with v5.0 bug reporting. Required additions:
+1. New section: "Bug Report Submission (Optional)"
+2. What's sent: patent URL, selected text excerpt, citation result, confidence tier, extension version, browser/OS string, settings snapshot, recent error log
+3. When: only when user explicitly taps the Report button
+4. Storage: Cloudflare KV (same developer-operated infrastructure as existing cache)
+5. Retention policy: need to define (suggest: 90 days then KV TTL expiry)
+6. Update the CWS Developer Dashboard to reflect new data collection categories
+
+**Complexity**: LOW for the text update; MEDIUM for CWS dashboard update + manifest.json addition.
+
+---
+
+## Auto-Captured Diagnostic Bundle: Payload Recommendations
+
+### Table Stakes Content (always send, zero user friction)
+
+| Field | Source | Why | PII risk |
+|-------|--------|-----|----------|
+| `patent_id` | `extractPatentInfo()` in content-script.js | Primary key for reproduction | None |
+| `page_url` | `window.location.href` | Exact URL including query params | LOW (URL of a public patent page is public) |
+| `selected_text` | From `lastCitationResult` or current selection | Critical for matching-tier reproduction | LOW (excerpt from a public patent) |
+| `returned_citation` | From `lastCitationResult.citation` | What the user saw | None |
+| `confidence_tier` | From `lastCitationResult.confidence` | Tier 5 vs exact match matters enormously for triage | None |
+| `patent_type` | From `extractPatentInfo().patentType` | Grant vs Application changes the entire code path | None |
+| `extension_version` | `chrome.runtime.getManifest().version` | Bug may be version-specific | None |
+| `browser_ua` | `navigator.userAgent` | Chrome vs Firefox, version, OS | LOW (standard web platform data) |
+| `timestamp` | `Date.toISOString()` | KV ordering + dedup window | None |
+| `category` | User-selected category | Triage routing | None |
+| `note` | User-typed note (optional) | Additional context | User-controlled; minimal risk |
+
+### Differentiating Content (include, explain in disclosure)
+
+| Field | Source | Why | PII risk |
+|-------|--------|-----|----------|
+| `settings_snapshot` | `cachedSettings` object (triggerMode, displayMode, includePatentNumber) | "Only fails in silent mode" is a real class of bugs | LOW (user preferences, not identity) |
+| `selected_node_xpath` | Already in v3.1 llm-report.json schema; captured via `getSelectionContext()` in content-script.js | Identifies the DOM node where selection occurred; critical for `GOOGLE_DOM_DRIFT` class | None |
+| `viewport` | `{width: window.innerWidth, height: window.innerHeight, scrollY: window.scrollY}` | Already in v3.1 schema | None |
+| `pdf_status` | `currentPatent.status` from `chrome.storage.local` | Distinguishes "PDF not parsed" from "matched but wrong" | None |
+| `recent_errors` | Ring buffer from service worker (last 10 console.error calls) | Critical for silent failures where no user-visible error appeared | LOW (error messages from extension code; may contain patent IDs but not user identity) |
+
+### Anti-Features in Payload (never include)
+
+| Field | Why Excluded |
+|-------|--------------|
+| Full page DOM | Too large (1-2 MB); contains full patent text; triggers CWS websiteContent high-sensitivity category |
+| Screenshot / screen recording | CWS/AMO image-capture triggers elevated review; large blob; confidentiality risk for attorney screens |
+| IP address | PII; never embed in extension payload; Worker sees it server-side if needed |
+| User email or identity | PII; requires opt-in consent; out of scope for v1 |
+| Browsing history / other tabs | Requires `tabs` permission; AMO `browsingActivity` high-sensitivity |
+| Network request logs | Full network logs expose all API calls; exceeds diagnostic need; Sentry-style capture is overkill |
+| `chrome.storage` full dump | Could contain cached position maps, old patent data; unnecessary; use targeted field extraction |
+| IndexedDB cache contents | 10-100 KB per patent; excessive for a report payload |
+
+---
+
+## Submit Feedback UX: Interaction Pattern
+
+### Recommended Pattern: Inline Modal Within Shadow DOM
+
+**Why not a separate tab/page:**
+- Opening a tab breaks the user's workflow on the current patent page
+- Shadow DOM popup is already the established pattern for all citation UI in this codebase
+- The existing `getCitationHost()` + `attachShadow({mode:'closed'})` infrastructure handles CSS isolation from Google Patents
+
+**Why not a sidebar:**
+- Google Patents has no sidebar affordance; a floating sidebar over the page would interfere with the two-column patent text
+- Shadow DOM popup is more dismissable
+
+**Recommended flow:**
+
+```
+[Report button tap in citation popup / error popup / toolbar popup]
+  ↓
+[Report dialog within Shadow DOM popup]
+  - Title: "Report a Citation Issue"
+  - 4-button category picker (radio style, taps)
+  - Optional: one-line text input ("Add a note (optional)")
+  - Privacy disclosure line: "What's included: [list]  [View payload ▼]"
+  - Optional: expandable payload preview (JSON)
+  - [Cancel] [Submit Report] buttons
+  ↓ (on Submit tap)
+[Loading state: "Sending..."]
+  ↓ (on success)
+[Dismiss dialog]
+[showSuccessToast-style confirmation: "Report sent — thank you"]
+  ↓ (on failure)
+[showFailureToast-style: "Could not send report — queued for retry"]
+```
+
+**User time in dialog**: target < 10 seconds for the auto-surfaced failure case
+(category pre-selected, user just taps Submit). Free-text adds ~15-30 seconds.
+
+**Confirmation pattern**: inline toast (2-3s auto-dismiss) using existing
+`showSuccessToast` / `showFailureToast` CSS patterns from `citation-ui.js`.
+Do NOT navigate away from the patent page on submit.
+
+### Trigger Model: When Does the Report Button Appear?
+
+| Scenario | Report button behavior | Why |
+|----------|----------------------|-----|
+| Red confidence / no-match error popup | Auto-surfaces with "No match found" pre-selected | Highest frustration moment; user has nothing to show for their work |
+| Yellow confidence (Tier 5 / 0.85 cap) | Auto-surfaces with "Inaccurate citation" pre-selected | 0.85 cap signals gutter-tolerant match — known approximate result |
+| Worker-fallback error / PDF parse failure | Auto-surfaces with "Tool not working" pre-selected | Infrastructure failure; user can't proceed |
+| Green confidence (> 0.95) | NOT auto-surfaced | No failure to report; don't interrupt success |
+| Debug Mode ON (options toggle) | Always visible in citation result UI | Power-user / maintainer testing path |
+| Toolbar popup (always) | "Report a problem" link always visible as fallback | "Tool didn't load at all" case |
+
+---
+
+## Debug Mode Patterns
+
+### What "Debug Mode" Should Unlock
+
+Based on research (PostHog chrome extension debug mode pattern; GitLab VS Code extension debug:true setting; Oracle/Adobe application debug mode patterns):
+
+| Debug Mode Feature | Why Include | Complexity |
+|-------------------|-------------|------------|
+| **Report button always visible** regardless of confidence tier | Lets maintainer and power users report anything | LOW (check `debugMode` in Report button render logic) |
+| **Raw payload preview visible by default** (not collapsed) | Debugging the reporter itself requires seeing what's sent | LOW (CSS toggle) |
+| **Verbose console logging** for citation pipeline events | Aids maintainer diagnosis without requiring Sentry SDK | LOW (gate log statements on `debugMode` flag) |
+| **Version info display** in toolbar popup | Confirms which build is running | LOW (already has version display; enhance) |
+
+**What Debug Mode should NOT unlock:**
+- Additional data collection beyond what the base report sends
+- Remote admin access or metrics aggregation view (v5.1 scope)
+- Build-time devtools (keep production bundle unchanged)
+
+**Storage**: `chrome.storage.sync` key `debugMode: false` (boolean), following exact pattern of existing options settings at `src/options/options.js`.
+
+**Privacy note**: Debug Mode does NOT change what data is sent in a report — it only changes the display and trigger behavior. The payload content is identical.
 
 ---
 
 ## Feature Dependencies
 
 ```
-Feature 1 (diagnostic-injection mutator)
-  ├─ blocks Feature 6.GOOGLE_DOM_DRIFT testability (mutator-injected DOM snippet)
-  ├─ blocks Feature 7.GOOGLE_DOM_DRIFT heuristic (mutator-aware signal)
-  └─ co-designed with fix-prompt-builder.js:252-268 GOOGLE_DOM_DRIFT contract
+[Report button in citation UI]
+  ├─ requires: citation-ui.js Shadow DOM infrastructure (EXISTING)
+  ├─ requires: handleCitationResult() failure-detection logic (EXISTING)
+  └─ requires: cachedSettings.debugMode for Debug Mode always-visible path
 
-Feature 2 (--max-turns 5 + --allowed-tools Read,Glob,Grep)
-  ├─ blocks Feature 6.WRONG_CITATION live testability (already-shipped scaffold)
-  ├─ blocks Feature 6.VERIFIER_DISAGREE testability (new scaffold)
-  └─ blocks ANY scaffold attempt against real production issues
-     (without it, dispatcher hits error_max_turns)
+[Auto-capture diagnostic payload]
+  ├─ requires: extractPatentInfo() (EXISTING)
+  ├─ requires: lastCitationResult state (EXISTING)
+  ├─ requires: cachedSettings settings snapshot (EXISTING)
+  ├─ requires: selected_node_xpath + viewport (EXISTING in v3.1 schema)
+  └─ requires: error ring buffer (NEW in service worker)
 
-Feature 3 (forensic schema source + transport required)
-  ├─ blocks Feature 5 (a-b-winner.mjs:185-188 isAttributable filter)
-  ├─ blocks Feature 8 (capture-and-surface needs ledger entries with source)
-  └─ closes the 3-orphan claude-opus-4-7[1m] leak path
+[Cloudflare Worker submission endpoint]
+  ├─ requires: new route on existing Worker (NEW server-side)
+  ├─ requires: KV durable storage (EXISTING KV namespace, new binding)
+  └─ requires: Discord webhook (server-side env binding, not in extension)
 
-Feature 4 (synthetic-issue cleanup #20/21/22/23)
-  └─ blocks UAT-47-a/b re-execution (cannot rerun against polluted tracker)
+[Rate limit]
+  └─ requires: chrome.storage.local (EXISTING pattern)
 
-Feature 5 (A/B winner table emission)
-  ├─ depends on Feature 3 (schema)
-  └─ depends on ≥1 real merged auto-fix PR per arm per class
-     (which depends on Features 1+2+4)
+[Privacy disclosure]
+  ├─ requires: inline disclosure text in report dialog (NEW DOM)
+  ├─ requires: updated docs/privacy/index.html (EXISTING file, update)
+  ├─ requires: manifest.json data_collection_permissions (NEW — AMO requirement)
+  └─ requires: CWS dashboard privacy fields update (manual step)
 
-Feature 6 (new scaffolds)
-  ├─ depends on Feature 1 + Feature 2 for testability
-  ├─ co-design with error-codes.js ERROR_CLASSES array (if new class added)
-  └─ co-design with Feature 7 (need matching producer for triage routing)
+[Debug Mode toggle]
+  ├─ requires: options.html + options.js (EXISTING pattern)
+  └─ requires: cachedSettings loaded in content-script.js (EXISTING)
 
-Feature 7 (new heuristic rules)
-  ├─ Rule for GOOGLE_DOM_DRIFT depends on Feature 1 (mutator-injected snippet signal)
-  ├─ Rule for WORKER_FALLBACK_FAILED depends on fault-injection spec producer update
-  └─ Rule for EXTENSION_NOT_LOADED — no deps
-
-Feature 8 (prompt-iter loop — capture-and-surface shape)
-  ├─ depends on Feature 3 (schema for failed-attempt ledger row)
-  └─ co-shipped with weekly-digest.mjs section addition
+[Toolbar popup fallback trigger]
+  └─ requires: popup.html + popup.js (EXISTING pattern)
 ```
 
-### Topological sequencing recommendation
+### Dependency Notes
 
-Wave 0 (Carry-over closure, must all land before Wave 1):
-- Feature 1 (mutator extension)
-- Feature 2 (`--max-turns 5`)
-- Feature 3 (forensic schema)
-- Feature 4 (synthetic-issue cleanup)
-
-Wave 1 (Capability expansion, parallelizable post-Wave-0):
-- Feature 5 (A/B winner table emission) — independent post-Wave-0
-- Feature 7.{EXTENSION_NOT_LOADED} — fully independent
-- Feature 7.{GOOGLE_DOM_DRIFT} — depends on Feature 1
-- Feature 8 (prompt-iter capture-and-surface) — depends on Feature 3
-
-Wave 2 (Scaffold expansion + remaining triage rules, sequential after Wave 1
-evidence accumulates):
-- Feature 6.{VERIFIER_DISAGREE} — low risk, just registry add
-- Feature 6.{FRAME_SHIFT_DETECTED} — needs taxonomy extension + producer
-- Feature 7.{WORKER_FALLBACK_FAILED} — needs fault-injection spec co-design
+- **All report features depend on privacy disclosure being implemented first**: shipping the Report button without inline disclosure is a CWS policy violation.
+- **Rate limit is independent** and can be implemented in the same phase as the submit path.
+- **Debug Mode is independent** from the core report flow — can ship in a later phase.
+- **Server-side (Worker) changes are independent** from client-side changes and can be implemented in a parallel phase.
+- **Error ring buffer in service worker is independent** from the report dialog and can be shipped after the core report flow.
 
 ---
 
-## MVP Recommendation for v4.3
+## MVP Definition
 
-**Mandatory (Wave 0 — all 4):**
-1. Diagnostic-injection mutator extension
-2. `--max-turns 5` + `--allowed-tools Read,Glob,Grep`
-3. Forensic-ledger schema hardening
-4. Synthetic-issue cleanup
+### Launch With (v5.0)
 
-**High-value (Wave 1 — pick 2-3):**
-5. A/B winner table emission to weekly digest
-6. Feature 7 heuristic rules: `EXTENSION_NOT_LOADED` + `GOOGLE_DOM_DRIFT`
-   (mutator-aware)
-7. Feature 8 prompt-iter capture-and-surface
+Minimum viable product — what's needed for maintainer to receive actionable triage reports.
 
-**Stretch (Wave 2 — defer if Wave 0+1 consumes the phase budget):**
-8. Feature 6 scaffold: `VERIFIER_DISAGREE`
-9. Feature 6 scaffold: `FRAME_SHIFT_DETECTED`
-10. Feature 7 heuristic rule: `WORKER_FALLBACK_FAILED`
+- [ ] Report button in citation error popup + no-match error popup — auto-surfaced on failure
+- [ ] 4-category picker (Inaccurate citation / No match found / Tool not working / Other)
+- [ ] Auto-captured core context: patent ID, URL, selected text, citation result, confidence, version, browser+OS
+- [ ] Settings snapshot: trigger mode, display mode, prefix toggle
+- [ ] Inline privacy disclosure (one-line + expandable)
+- [ ] Cloudflare Worker submission endpoint + KV durable storage
+- [ ] Discord webhook notification (server-side)
+- [ ] Client-side rate limit (5 / 10 min)
+- [ ] Server-side fingerprint dedup
+- [ ] Submit confirmation toast (success + failure)
+- [ ] Updated privacy policy (`docs/privacy/index.html`)
+- [ ] Manifest.json `data_collection_permissions` (AMO requirement)
+- [ ] Toolbar popup fallback trigger
+- [ ] Options page Debug Mode toggle
 
-**Defer to v4.4:**
-- Feature 6 scaffolds for PDF_PARSE_ERROR / COLUMN_INFERENCE_FAIL / IDB_FAILURE
-  (need new producer sites)
-- Feature 7 heuristic for UI_BROKEN / USPTO_API_DRIFT (signal ambiguity)
-- Full-automation prompt-iter loop (rejected outright as Anti-Feature)
+### Add After Validation (v5.1)
 
-Per PROJECT.md: "Research convergence will likely propose 7–9 phases. If too
-big, Prompt-iter loop or scaffold expansion can be deferred to v4.4 at
-requirements-scoping time." This MVP shape lands 7 features in v4.3 (Wave 0 +
-Wave 1) and explicitly carries 3 to v4.4 (Wave 2) — leaving roadmap a clean
-"ship or defer" decision per feature.
+Features to add once core is working and report volume provides signal.
+
+- [ ] Local queue + retry on Worker failure — implement after v1 launch reveals how often the Worker is unreachable
+- [ ] Error log ring buffer in service worker — implement after first batch of reports shows whether missing error log context is blocking triage
+- [ ] GitHub Issues auto-promotion — once report volume justifies automation (v5.1 carries the existing `lib/issue-payload-builder.js` pattern)
+- [ ] Reports view in options page — once there are reports to view
+
+### Future Consideration (v2+)
+
+Features to defer until report volume establishes patterns.
+
+- [ ] AI-powered report triage / categorization
+- [ ] Per-user report history
+- [ ] Public status page or known-issues feed
+
+---
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Report button in citation UI (auto-surfaced on failure) | HIGH | MEDIUM | P1 |
+| 4-category picker + auto-selection | HIGH | LOW | P1 |
+| Auto-captured core context | HIGH | MEDIUM | P1 |
+| Inline privacy disclosure | HIGH (compliance) | LOW | P1 |
+| Cloudflare Worker endpoint + KV | HIGH | MEDIUM | P1 |
+| Submit confirmation toast | HIGH | LOW | P1 |
+| Settings snapshot in payload | MEDIUM | LOW | P1 |
+| Client-side rate limit | MEDIUM | LOW | P1 |
+| Server-side fingerprint dedup | MEDIUM | LOW | P1 |
+| Privacy policy update + manifest `data_collection_permissions` | HIGH (compliance) | LOW | P1 |
+| Toolbar popup fallback trigger | MEDIUM | LOW | P1 |
+| Options page Debug Mode toggle | MEDIUM | LOW | P1 |
+| DOM/PDF diagnostics (xpath, viewport) | MEDIUM | LOW (reuses v3.1 schema) | P2 |
+| Expandable payload preview | MEDIUM | LOW | P2 |
+| Error log ring buffer | MEDIUM | MEDIUM | P2 |
+| Local queue + retry | LOW (v1) | MEDIUM | P3 |
+| GitHub Issues auto-promotion | LOW (v5.0) | HIGH | P3 |
 
 ---
 
 ## Sources
 
-Primary (HIGH confidence — live tree grep):
-- `tests/e2e/lib/error-codes.js:51-110` — canonical `ERROR_CLASSES` taxonomy
-- `tests/e2e/lib/fix-prompt-builder.js:357-363, 378-382, 406-434` — 5
-  PROMPT_SCAFFOLDS + 3 SKIP_CLASS_ESCALATIONS + `buildFixPrompt` dispatch
-- `tests/e2e/lib/triage-classifier.js:428-505` — D-03 rule chain (Rules 1-4)
-- `tests/e2e/lib/llm-router.js:60-85` — MODEL_ROUTES freeze + routeModel
-- `tests/e2e/lib/llm-driver.js:89-146` — `invokeClaudeP` argv (line 94
-  `--max-turns 1`); `:506-647` `invokeAnthropicSdkWithLedger` SDK path
-- `tests/e2e/scripts/inject-defect.mjs:64-75, 277-298, 396-428` — mutator
-  ERROR_CLASSES allowlist + buildBody + cleanup runbook emitter
-- `scripts/auto-fix.mjs:219-270, 600-746` — RECOGNIZED_LABELS, errorClass
-  extraction, Step 7 dispatch + skip-class ledger entry
-- `scripts/a-b-winner.mjs:78-285, 332-389` — N_PER_ARM_REQUIRED, abstention
-  probe, formatMarkdownTable, main flow
+- uBlock Origin "Report a filter issue" wiki: https://github.com/uBlockOrigin/uBlock-issues/wiki/The-%22Report-a-filter-issue%22-form (HIGH confidence — official docs)
+- uBlock Origin popup guide: https://github.com/gorhill/uBlock/wiki/Quick-guide:-popup-user-interface (HIGH confidence)
+- Jam bug-reporting extension documentation: https://jam.dev/docs/creating-a-jam (HIGH confidence — official docs)
+- BetterBugs quickstart: https://docs.betterbugs.io/getting-started/quickstart (HIGH confidence — official docs)
+- Chrome Web Store User Data Policy FAQ: https://developer.chrome.com/docs/webstore/program-policies/user-data-faq (HIGH confidence — official Google docs)
+- Chrome Web Store Disclosure Requirements: https://developer.chrome.com/docs/webstore/program-policies/disclosure-requirements (HIGH confidence)
+- Firefox Extension Workshop — Best Practices for User Data Consents: https://extensionworkshop.com/documentation/develop/best-practices-for-collecting-user-data-consents/ (HIGH confidence — official Mozilla docs)
+- Firefox Built-in Data Consent documentation: https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/ (HIGH confidence — official Mozilla docs, November 2025 effective)
+- Mozilla AMO Blog — Data Collection Consent Changes: https://blog.mozilla.org/addons/2025/10/23/data-collection-consent-changes-for-new-firefox-extensions/ (HIGH confidence — official Mozilla announcement)
+- AMO Policies FAQ: https://extensionworkshop.com/documentation/publish/add-on-policies-faq/ (HIGH confidence)
+- Top Chrome Extensions for Bug Reporting (Shake): https://www.shakebugs.com/blog/bug-reporting-chrome-extensions/ (MEDIUM confidence — vendor blog, but surveys the space accurately)
+- Grammarly error reporting: https://support.grammarly.com/hc/en-us/articles/115000090772 (HIGH confidence — official support page)
 
-Secondary (HIGH confidence — planning artifacts):
-- `.planning/STATE.md` lines 81-85 — v4.3 carry-over Pending Todos with
-  exact line refs
-- `.planning/MILESTONES.md` line 26 — Architectural finding (SWEEP-03
-  attempts root-cause)
-- `.planning/PROJECT.md` lines 11-38 — milestone scope + DoD
-- `.planning/research-v4.2-archive/FEATURES.md` — v4.2 feature framing
-  (consulted for style, not duplicated)
+---
 
-Tertiary (MEDIUM confidence — operator memory):
-- MEMORY.md `auto_fix_ledger_leak_vector.md` — orphan ledger entry leak
-  vector context for Feature 3
+*Feature research for: v5.0 Bug Report Feature — Patent Citation Tool*
+*Researched: 2026-06-12*

@@ -9,6 +9,12 @@
  */
 
 import { MSG, STATUS, PATENT_TYPE } from '../shared/constants.js';
+import { submitReport, drainQueueOnce } from '../shared/report-transport.js';
+import { installErrorBuffer } from '../content/report-dialog.js';
+
+// Install extension-tagged error ring buffer (PAY-08 / D-08)
+// Captures [SW]-prefixed console.error/warn from the service worker context.
+installErrorBuffer();
 
 // ---------------------------------------------------------------------------
 // Icon state paths — used by chrome.action.setIcon for three-state toolbar icon
@@ -110,6 +116,12 @@ chrome.runtime.onInstalled.addListener(() => {
     contexts: ['selection'],
     documentUrlPatterns: ['https://patents.google.com/patent/US*'],
   });
+
+  drainQueueOnce().catch(() => {}); // drain on install/update (D-02) — fire-and-forget
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  drainQueueOnce().catch(() => {}); // drain on browser restart (D-02/D-07) — fire-and-forget, silent
 });
 
 // ---------------------------------------------------------------------------
@@ -130,6 +142,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  drainQueueOnce().catch(() => {}); // opportunistic drain on any SW wake (D-02) — fire-and-forget
   const tabId = sender.tab?.id;
 
   if (message.type === MSG.PDF_LINK_FOUND) {
@@ -152,6 +165,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleCacheMiss(message);
   } else if (message.type === MSG.GET_STATUS) {
     handleGetStatus(sendResponse);
+    return true; // Keep channel open for async sendResponse
+  } else if (message.type === MSG.SUBMIT_REPORT) {
+    submitReport(message.payload).then(result => sendResponse(result)).catch(() => sendResponse({ ok: false, queued: false, fingerprint: null, rateLimited: false, dropped: true }));
     return true; // Keep channel open for async sendResponse
   }
 });
@@ -384,6 +400,7 @@ async function handleCacheHitResult(message) {
   if (!patent) return;
 
   patent.status = STATUS.PARSED;
+  patent.source = null; // WR-01: clear source so getPdfParseStatus returns 'cache-hit'
   patent.lineCount = message.lineCount;
   patent.columnCount = message.columnCount;
   patent.error = null;

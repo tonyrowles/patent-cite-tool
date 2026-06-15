@@ -7,6 +7,7 @@
  */
 
 import { showReportDialog } from '../content/report-dialog.js';
+import { buildPrebuiltContext } from './prebuilt-context.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // --- Version display ---
@@ -124,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function initPageModeDialog() {
     if (dialogMounted) return;
     if (!reportMount) return;
-    chrome.storage.local.get('currentPatent', (data) => {
+    chrome.storage.local.get(['currentPatent', 'lastCitationOutcome'], (data) => {
       if (dialogMounted) return; // re-check after async gap
       dialogMounted = true;
       const patent = data.currentPatent;
@@ -137,18 +138,13 @@ document.addEventListener('DOMContentLoaded', () => {
         reportMount.appendChild(placeholder);
         return;
       }
-      const prebuiltContext = {
-        patentNumber: patent.patentId.replace(/^US/, ''),
-        selectionText: null,           // D-01: no live selection on options page
-        returnedCitation: null,
-        confidenceTier: patent.confidenceTier || null,
-        extensionVersion: chrome.runtime.getManifest().version,
-        xpathNode: null,
-        scrollY: null,
-        viewportWidth: null,
-        viewportHeight: null,
-        pdfParseStatus: null,
-      };
+      // returnedCitation + confidenceTier come from the last citation the content-script
+      // persisted (lastCitationOutcome), matched to this patent — see prebuilt-context.js.
+      const prebuiltContext = buildPrebuiltContext(
+        patent,
+        data.lastCitationOutcome,
+        chrome.runtime.getManifest().version
+      );
       showReportDialog(
         { mode: 'page', container: reportMount },
         { category: null, confidenceTier: null },  // D-02: no category pre-selected

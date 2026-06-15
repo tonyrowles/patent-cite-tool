@@ -198,6 +198,14 @@ function validateReportBody(body) {
   if (!body.patentNumber || typeof body.patentNumber !== 'string') {
     return 'Missing required field: patentNumber';
   }
+  // Format guard (parity with the /cache + USPTO proxy routes, which both enforce a
+  // patent-number pattern). Alphanumerics only — patent/publication numbers with an
+  // optional kind-code suffix (e.g. "12505414", "10617174B1", "20210123456A1"). Blocks
+  // markdown/link injection into the Discord triage card via the [US${patentNumber}](url)
+  // field, and rejects malformed records.
+  if (!/^[A-Za-z0-9]{6,20}$/.test(body.patentNumber)) {
+    return 'Invalid patentNumber format';
+  }
   if (!REPORT_CATEGORIES.includes(body.category)) {
     return `Invalid category. Must be one of: ${REPORT_CATEGORIES.join(', ')}`;
   }
@@ -274,7 +282,7 @@ async function checkIpRateLimit(env, clientIp) {
  * @param {number} now - Date.now()
  * @returns {Promise<{isDuplicate: boolean, fingerprint?: string}>}
  */
-async function checkAndHandleDuplication(env, fingerprint, now) {
+async function checkAndHandleDuplication(env, fingerprint, now, testMode = false) {
   const { keys } = await env.BUG_REPORTS.list({ prefix: `report:${fingerprint}:` });
 
   // Filter to records within the 15-minute window (Pitfall 3: only in-window keys are dups)
@@ -294,9 +302,13 @@ async function checkAndHandleDuplication(env, fingerprint, now) {
   const existing = await env.BUG_REPORTS.get(mostRecent.name, { type: 'json' });
   if (existing) {
     existing.duplicate_count = (existing.duplicate_count ?? 0) + 1;
-    await env.BUG_REPORTS.put(mostRecent.name, JSON.stringify(existing), {
-      expirationTtl: 7776000,
-    });
+    // INJ-01: suppress the KV write in test mode so test/CI submissions never mutate
+    // production records via the dedup path (parity with the canonical write guard below).
+    if (!testMode) {
+      await env.BUG_REPORTS.put(mostRecent.name, JSON.stringify(existing), {
+        expirationTtl: 7776000,
+      });
+    }
   }
 
   return { isDuplicate: true, fingerprint };
@@ -444,8 +456,11 @@ async function handleReport(request, env, ctx) {
   const fingerprint = await computeFingerprint(body.patentNumber, body.category, body.selectionText);
   const now = Date.now();
 
+  // INJ-01: X-PCT-Test-Mode suppresses ALL KV writes (canonical + dedup increment) and Discord.
+  const testMode = request.headers.get('X-PCT-Test-Mode') === 'true';
+
   // 6. Dedup check (LIMIT-01, D-02)
-  const { isDuplicate } = await checkAndHandleDuplication(env, fingerprint, now);
+  const { isDuplicate } = await checkAndHandleDuplication(env, fingerprint, now, testMode);
   if (isDuplicate) {
     // Write the incremented record (unless test-mode); Discord SUPPRESSED for dups (D-03)
     return new Response(
@@ -462,7 +477,7 @@ async function handleReport(request, env, ctx) {
   const kvKey = `report:${fingerprint}:${now}`;
 
   // INJ-01: X-PCT-Test-Mode suppresses KV write AND Discord POST
-  if (request.headers.get('X-PCT-Test-Mode') !== 'true') {
+  if (!testMode) {
     await env.BUG_REPORTS.put(kvKey, JSON.stringify(record), { expirationTtl: 7776000 });
   }
 
@@ -476,7 +491,7 @@ async function handleReport(request, env, ctx) {
   );
 
   // Discord POST runs after response is queued; outage/misconfiguration never costs a report
-  if (request.headers.get('X-PCT-Test-Mode') !== 'true') {
+  if (!testMode) {
     ctx.waitUntil(postToDiscord(env.DISCORD_WEBHOOK_URL, record, fingerprint));
   }
 

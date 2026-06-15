@@ -475,6 +475,12 @@ async function generateCitation(selectedText, rect) {
     citationInProgress = false;
     if (result) {
       const prefixedCitation = applyPatentPrefix(result.citation, patentId, patentType);
+      const confidenceTier = mapConfidenceTier(result.confidence);
+      // Persist for the options-page "report a problem" fallback (page mode has no live
+      // citation context of its own) — see options.js buildPrebuiltContext.
+      chrome.storage.local.set({
+        lastCitationOutcome: { patentId, returnedCitation: prefixedCitation, confidenceTier },
+      });
       showCitationPopup(
         prefixedCitation,
         rect || currentSelectionRect,
@@ -483,7 +489,8 @@ async function generateCitation(selectedText, rect) {
         undefined,
         {
           category: mapOutcomeToReportCategory(null, result.confidence),
-          confidenceTier: mapConfidenceTier(result.confidence),
+          confidenceTier,
+          returnedCitation: prefixedCitation,   // PAY: the citation the user is reporting on
           debugMode: cachedSettings.debugMode,   // DBG-02: read from cachedSettings at call time
         }
       );
@@ -579,6 +586,13 @@ function handleCitationResult(message) {
   if (message.success) {
     const patentInfo = extractPatentInfo();
     const prefixedCitation = applyPatentPrefix(message.citation, patentInfo?.patentId, patentInfo?.patentType);
+    const confidenceTier = mapConfidenceTier(message.confidence);
+    // Persist for the options-page "report a problem" fallback — see options.js buildPrebuiltContext.
+    if (patentInfo?.patentId) {
+      chrome.storage.local.set({
+        lastCitationOutcome: { patentId: patentInfo.patentId, returnedCitation: prefixedCitation, confidenceTier },
+      });
+    }
     showCitationPopup(
       prefixedCitation,
       rect,
@@ -587,7 +601,8 @@ function handleCitationResult(message) {
       undefined,
       {
         category: mapOutcomeToReportCategory(null, message.confidence),
-        confidenceTier: mapConfidenceTier(message.confidence),
+        confidenceTier,
+        returnedCitation: prefixedCitation,   // PAY: the citation the user is reporting on
         debugMode: cachedSettings.debugMode,   // DBG-02: read from cachedSettings at call time
       }
     );

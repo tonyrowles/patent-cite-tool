@@ -293,6 +293,32 @@ describe('POST /report', () => {
       await waitOnExecutionContext(ctx);
       expect(response.status).toBe(400);
     });
+
+    it('malformed patentNumber with markdown/link chars → 400 (injection guard)', async () => {
+      const ctx = createExecutionContext();
+      const response = await worker.fetch(
+        makeReportRequest(
+          { ...makeBody(PATENT_VALIDATION), patentNumber: '12505](https://evil.example)' },
+          IP_VALIDATION
+        ),
+        env, ctx
+      );
+      await waitOnExecutionContext(ctx);
+      expect(response.status).toBe(400);
+      const text = await response.text();
+      expect(text).toMatch(/patentNumber/i);
+    });
+
+    it('valid patentNumber with kind-code suffix (e.g. 10617174B1) → not rejected', async () => {
+      const ctx = createExecutionContext();
+      const response = await worker.fetch(
+        // distinct IP/fingerprint: this one must pass validation (201), not 400
+        makeReportRequest({ ...makeBody('10617174B1') }, '10.0.0.12'),
+        env, ctx
+      );
+      await waitOnExecutionContext(ctx);
+      expect(response.status).toBe(201);
+    });
   });
 
   describe('body size limit (D-10)', () => {
@@ -368,6 +394,35 @@ describe('POST /report', () => {
       // KV should NOT have a record for this patent's fingerprint
       const listed = await env.BUG_REPORTS.list({ prefix: `report:${body.fingerprint}:` });
       expect(listed.keys.length).toBe(0);
+    });
+
+    it('X-PCT-Test-Mode: true suppresses the dedup-path KV increment write (INJ-01)', async () => {
+      // distinct patent/IP so this test owns its fingerprint
+      const PATENT = '12505011';
+      const IP = '10.0.0.11';
+
+      // 1) Write a real (non-test-mode) record so an in-window duplicate exists.
+      const ctx1 = createExecutionContext();
+      const r1 = await worker.fetch(makeReportRequest(makeBody(PATENT), IP), env, ctx1);
+      await waitOnExecutionContext(ctx1);
+      expect(r1.status).toBe(201);
+      const { fingerprint } = await r1.json();
+
+      // 2) Submit an identical report in TEST MODE → dedup hit, but the increment is suppressed.
+      const ctx2 = createExecutionContext();
+      const r2 = await worker.fetch(
+        makeReportRequest(makeBody(PATENT), IP, { 'X-PCT-Test-Mode': 'true' }),
+        env, ctx2
+      );
+      await waitOnExecutionContext(ctx2);
+      expect(r2.status).toBe(200);
+      expect((await r2.json()).deduped).toBe(true);
+
+      // 3) The original record's duplicate_count stays 0 — the test-mode dedup write was suppressed.
+      const listed = await env.BUG_REPORTS.list({ prefix: `report:${fingerprint}:` });
+      expect(listed.keys.length).toBe(1);
+      const rec = await env.BUG_REPORTS.get(listed.keys[0].name, { type: 'json' });
+      expect(rec.duplicate_count).toBe(0);
     });
   });
 

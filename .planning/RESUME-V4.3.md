@@ -7,26 +7,31 @@
 
 ---
 
-## 1. Re-enable the disabled workflows (GitHub repo state — NOT in git)
+> **NOTE (corrected 2026-06-15):** `v40-deps-update.yml` is NOT fully paused — its
+> `deps-update-gate` job is a REQUIRED status check on `main`, so the workflow stays
+> **active** and runs on `pull_request` (the gate fast-paths non-deps PRs to SUCCESS).
+> Only its noisy `dep-scan` job is gated off PRs. `v40-auto-promote.yml` is the only
+> workflow left fully disabled. The steps below reflect that.
 
-These were disabled with `gh workflow disable` this session, so the state is **not** carried in any branch/commit — it must be flipped back on GitHub:
+## 1. Re-enable the disabled workflow (GitHub repo state — NOT in git)
+
+Only `v40-auto-promote.yml` is disabled (state not carried in git — flip it on GitHub):
 
 ```bash
 gh workflow enable v40-auto-promote.yml
-gh workflow enable v40-deps-update.yml
-# verify:
-gh workflow list --all | grep -iE "auto-promote|deps"   # expect: active
+gh workflow list --all | grep -iE "auto-promote"   # expect: active
 ```
 
-Note: `v40-deps-update` will still fail to open its dependency PR until the repo setting **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"** is enabled. Turn that on (or keep deps-update on `workflow_dispatch`/cron-only) when resuming.
+For the dependency scanner to actually open PRs again, also enable **Settings → Actions →
+General → "Allow GitHub Actions to create and approve pull requests"**, then revert the
+`dep-scan` job's `if: github.event_name != 'pull_request'` guard (added in v5.0 to silence
+its create-PR failure) so it runs on PRs again if you want that.
 
 ## 2. Restore the gated workflow triggers (in git — edit the files)
 
-Each `on:` block has a `PAUSED (v4.3 auto-fix milestone)` comment with the exact line to restore:
-
-- **`.github/workflows/v40-auto-promote.yml`** → restore `pull_request:` `types: [closed]`
-- **`.github/workflows/v40-deps-update.yml`** → restore `pull_request:` `types: [opened, synchronize, reopened]`
-- **`.github/workflows/v40-auto-fix.yml`** → restore `on: issues: types: [labeled]` (this one was made `workflow_dispatch:`-only at the *start* of the pause — the original block is preserved in that file's header comment).
+- **`.github/workflows/v40-auto-promote.yml`** → restore `pull_request:` `types: [closed]` (the `on:` block has a `PAUSED` comment with the exact line).
+- **`.github/workflows/v40-deps-update.yml`** → already restored; just remove the `dep-scan` `if:` guard (see step 1) when the repo can create PRs.
+- **`.github/workflows/v40-auto-fix.yml`** → restore `on: issues: types: [labeled]` (made `workflow_dispatch:`-only at the *start* of the pause — original block preserved in that file's header comment).
 
 ## 3. Un-skip the 6 stale contract tests (in git)
 

@@ -53,13 +53,14 @@ describe('CACHE_VERSION invariant (Phase 23 / ACCY-05)', () => {
     expect(firefoxVer).toBe(chromeVer);
   });
 
-  it("CACHE_VERSION is 'v4' (post-v5.0.0 column-sequence regression cache bust)", () => {
-    // v4 evicts position maps poisoned by the v5.0.0 buildPositionMap regression
-    // (loosened column-sequence validation dropped real columns). v3 maps cached
-    // in production KV are stale/poisoned and must not be served to fixed clients.
-    // If this fails because a later phase bumped to 'v5' (or higher),
+  it("CACHE_VERSION is 'v5' (evicts maps from the v5.0.x position-map fix window)", () => {
+    // v5 evicts maps built during the fix window for two distinct bugs: the
+    // v5.0.0 column-sequence regression AND the cross-column merged-line dropout
+    // in stripCrossBoundaryText. POST /cache is write-once, so stale maps under
+    // older versions must be abandoned via this bump.
+    // If this fails because a later phase bumped to 'v6' (or higher),
     // update the expected value below AND ensure both files were bumped.
-    expect(extractCacheVersion(CHROME_PATH)).toBe('v4');
-    expect(extractCacheVersion(FIREFOX_PATH)).toBe('v4');
+    expect(extractCacheVersion(CHROME_PATH)).toBe('v5');
+    expect(extractCacheVersion(FIREFOX_PATH)).toBe('v5');
   });
 });

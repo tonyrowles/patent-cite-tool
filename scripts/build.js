@@ -44,6 +44,11 @@ function loadDotEnv() {
     let val = trimmed.slice(eq + 1).trim();
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
       val = val.slice(1, -1);
+    } else {
+      // Unquoted value: strip a trailing inline comment (code-review IN-01) so
+      // `PROXY_TOKEN=abc # note` yields `abc`, not `abc # note` (which would fail auth).
+      const hash = val.indexOf(' #');
+      if (hash !== -1) val = val.slice(0, hash).trim();
     }
     if (key && process.env[key] === undefined) process.env[key] = val;
   }

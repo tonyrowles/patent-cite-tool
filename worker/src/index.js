@@ -281,7 +281,11 @@ function matchOrigin(request) {
  */
 function resolveAuth(request, env) {
   const auth = request.headers.get('Authorization') || '';
-  if (auth === `Bearer ${env.PROXY_TOKEN}`) return { method: 'bearer' };
+  // Defense-in-depth (code-review WR-01): never let an unset/empty PROXY_TOKEN
+  // produce a matchable `Bearer undefined` / `Bearer ` value. Without this guard,
+  // a misconfigured Worker (no secret bound) would authenticate any client that
+  // sends `Authorization: Bearer undefined`.
+  if (env.PROXY_TOKEN && auth === `Bearer ${env.PROXY_TOKEN}`) return { method: 'bearer' };
   const origin = matchOrigin(request);
   if (origin) return { method: 'origin', origin };
   return null;

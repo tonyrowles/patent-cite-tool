@@ -633,10 +633,12 @@ export default {
   async fetch(request, env, ctx) {
     // 1. CORS preflight — must be handled before auth check (preflight has no Authorization)
     if (request.method === 'OPTIONS') {
+      const preflightOrigin = matchOrigin(request);
       return new Response(null, {
         status: 204,
         headers: {
-          ...corsHeaders(),
+          // Reflect specific origin for webapp callers; fall back to wildcard for extension
+          ...(preflightOrigin ? webappCorsHeaders(preflightOrigin) : corsHeaders()),
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-PCT-Test-Mode',
           'Access-Control-Max-Age': '86400',
@@ -644,37 +646,113 @@ export default {
       });
     }
 
-    // 2. Bearer token validation
-    const authHeader = request.headers.get('Authorization') || '';
-    if (authHeader !== `Bearer ${env.PROXY_TOKEN}`) {
-      return new Response('Unauthorized', {
-        status: 401,
-        headers: {
-          ...corsHeaders(),
-          'Content-Type': 'text/plain',
-        },
-      });
-    }
-
-    // 3. Route dispatch — parse URL once for all routes
+    // 2. Route dispatch — parse URL once for all routes
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // Cache routes: GET /cache (read) and POST /cache (write with existence check)
-    if (path === '/cache') {
-      const rawPatent = url.searchParams.get('patent') || '';
-      const version = url.searchParams.get('v') || 'v1';
-      const patentNumber = cleanPatentNumber(rawPatent);
+    // Shared request context (cheapest-first: header reads are zero-I/O)
+    const testMode = request.headers.get('X-PCT-Test-Mode') === 'true';
+    const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const auth = resolveAuth(request, env);
 
+    // 3. GET /webapp/pdf — Origin-only PDF proxy (WRKR-01)
+    if (path === '/webapp/pdf') {
+      const rawPatent = url.searchParams.get('patent') || '';
+
+      // WRKR-04: published-application check runs FIRST (zero-I/O) before auth/rate-limit
+      if (isPublishedApplication(rawPatent)) {
+        const corsH = auth && auth.method === 'origin'
+          ? webappCorsHeaders(auth.origin)
+          : corsHeaders();
+        return new Response('Published application numbers are not supported', {
+          status: 400,
+          headers: { ...corsH, 'Content-Type': 'text/plain' },
+        });
+      }
+
+      // SEC-03: require Origin auth (no Bearer on this route)
+      if (!auth || auth.method !== 'origin') {
+        return new Response('Forbidden', {
+          status: 403,
+          headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
+        });
+      }
+
+      // SEC-04: webapp rate limit
+      const { allowed: rlAllowed } = await checkWebappRateLimit(env, clientIp, testMode);
+      if (!rlAllowed) {
+        return new Response('Too Many Requests', {
+          status: 429,
+          headers: {
+            ...webappCorsHeaders(auth.origin),
+            'Content-Type': 'text/plain',
+            'Retry-After': '60',
+          },
+        });
+      }
+
+      // Validate patent number (after published-app guard and after cleaning)
+      const patentNumber = cleanPatentNumber(rawPatent);
       if (!/^\d{6,8}$/.test(patentNumber)) {
         return new Response(
           `Invalid patent number: "${rawPatent}". Expected 6-8 digits.`,
           {
             status: 400,
-            headers: {
-              ...corsHeaders(),
-              'Content-Type': 'text/plain',
-            },
+            headers: { ...webappCorsHeaders(auth.origin), 'Content-Type': 'text/plain' },
+          }
+        );
+      }
+
+      // Proxy the USPTO PDF
+      try {
+        const pdfResponse = await fetchEgrantPdf(patentNumber, env.USPTO_API_KEY);
+        return new Response(pdfResponse.body, {
+          status: 200,
+          headers: {
+            ...webappCorsHeaders(auth.origin),
+            'Content-Type': 'application/pdf',
+          },
+        });
+      } catch (err) {
+        return new Response(`USPTO lookup failed: ${err.message}`, {
+          status: 502,
+          headers: { ...webappCorsHeaders(auth.origin), 'Content-Type': 'text/plain' },
+        });
+      }
+    }
+
+    // 4. Cache routes: GET /cache (read) and POST /cache (write with existence check)
+    if (path === '/cache') {
+      const rawPatent = url.searchParams.get('patent') || '';
+      const version = url.searchParams.get('v') || 'v1';
+
+      // WRKR-04: published-application check FIRST (zero-I/O)
+      if (isPublishedApplication(rawPatent)) {
+        const corsH = auth && auth.method === 'origin'
+          ? webappCorsHeaders(auth.origin)
+          : corsHeaders();
+        return new Response('Published application numbers are not supported', {
+          status: 400,
+          headers: { ...corsH, 'Content-Type': 'text/plain' },
+        });
+      }
+
+      // WRKR-02: dual-auth — require Bearer OR Origin; neither → 403/401
+      if (!auth) {
+        return new Response('Forbidden', {
+          status: 403,
+          headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
+        });
+      }
+
+      const patentNumber = cleanPatentNumber(rawPatent);
+      if (!/^\d{6,8}$/.test(patentNumber)) {
+        const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
+        return new Response(
+          `Invalid patent number: "${rawPatent}". Expected 6-8 digits.`,
+          {
+            status: 400,
+            headers: { ...corsH, 'Content-Type': 'text/plain' },
           }
         );
       }
@@ -682,37 +760,72 @@ export default {
       const key = `${version}:${patentNumber}`;
 
       if (request.method === 'GET') {
-        // Read from KV — return cached position map or 404
-        const cached = await env.PATENT_CACHE.get(key, { type: 'json' });
-        if (cached === null) {
-          return new Response('Not found', {
-            status: 404,
-            headers: {
-              ...corsHeaders(),
-              'Content-Type': 'text/plain',
-            },
+        if (auth.method === 'origin') {
+          // SEC-04: webapp per-IP rate limit on GET /cache Origin path
+          const { allowed: rlAllowed } = await checkWebappRateLimit(env, clientIp, testMode);
+          if (!rlAllowed) {
+            return new Response('Too Many Requests', {
+              status: 429,
+              headers: {
+                ...webappCorsHeaders(auth.origin),
+                'Content-Type': 'text/plain',
+                'Retry-After': '60',
+              },
+            });
+          }
+
+          // Read from KV — return cached position map or 404 with webappCorsHeaders (WRKR-02)
+          const cached = await env.PATENT_CACHE.get(key, { type: 'json' });
+          if (cached === null) {
+            return new Response('Not found', {
+              status: 404,
+              headers: { ...webappCorsHeaders(auth.origin), 'Content-Type': 'text/plain' },
+            });
+          }
+          return new Response(JSON.stringify(cached), {
+            status: 200,
+            headers: { ...webappCorsHeaders(auth.origin), 'Content-Type': 'application/json' },
+          });
+        } else {
+          // Bearer path (extension) — wildcard CORS, unchanged behavior
+          const cached = await env.PATENT_CACHE.get(key, { type: 'json' });
+          if (cached === null) {
+            return new Response('Not found', {
+              status: 404,
+              headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
+            });
+          }
+          return new Response(JSON.stringify(cached), {
+            status: 200,
+            headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
           });
         }
-        return new Response(JSON.stringify(cached), {
-          status: 200,
-          headers: {
-            ...corsHeaders(),
-            'Content-Type': 'application/json',
-          },
-        });
       }
 
       if (request.method === 'POST') {
-        // Existence check before write (CACH-04: protect KV write quota)
+        // Existence check FIRST (before write guard — Pitfall 6)
         const existing = await env.PATENT_CACHE.get(key);
         if (existing !== null) {
+          const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
           return new Response('Already cached', {
             status: 200,
-            headers: {
-              ...corsHeaders(),
-              'Content-Type': 'text/plain',
-            },
+            headers: { ...corsH, 'Content-Type': 'text/plain' },
           });
+        }
+
+        // SEC-04: webapp rate limit on POST /cache Origin path
+        if (auth.method === 'origin') {
+          const { allowed: rlAllowed } = await checkWebappRateLimit(env, clientIp, testMode);
+          if (!rlAllowed) {
+            return new Response('Too Many Requests', {
+              status: 429,
+              headers: {
+                ...webappCorsHeaders(auth.origin),
+                'Content-Type': 'text/plain',
+                'Retry-After': '60',
+              },
+            });
+          }
         }
 
         // Parse request body
@@ -720,48 +833,78 @@ export default {
         try {
           payload = await request.json();
         } catch (_) {
+          const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
           return new Response('Invalid JSON body', {
             status: 400,
-            headers: {
-              ...corsHeaders(),
-              'Content-Type': 'text/plain',
-            },
+            headers: { ...corsH, 'Content-Type': 'text/plain' },
           });
         }
 
+        // SEC-05: daily write guard — only for new writes (after existence check, Pitfall 6)
+        const { allowed: wgAllowed } = await checkDailyWriteGuard(env, testMode);
+        if (!wgAllowed) {
+          const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
+          return new Response('Service Unavailable', {
+            status: 503,
+            headers: { ...corsH, 'Content-Type': 'text/plain' },
+          });
+        }
+
+        // WRKR-03: inject source:"webapp" provenance field for Origin callers
+        if (auth.method === 'origin') {
+          payload.source = 'webapp';
+        }
+
         // Write to KV (no TTL per design decision)
-        // INJ-01: X-PCT-Test-Mode header suppresses KV write so CI E2E
-        // runs don't pollute the shared production cache. Response
-        // semantics are unchanged — still returns 201 "Cached" below.
-        if (request.headers.get('X-PCT-Test-Mode') !== 'true') {
+        // INJ-01: X-PCT-Test-Mode suppresses KV write; daily write guard also suppressed above
+        if (!testMode) {
           await env.PATENT_CACHE.put(key, JSON.stringify(payload));
         }
+
+        const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
         return new Response('Cached', {
           status: 201,
-          headers: {
-            ...corsHeaders(),
-            'Content-Type': 'text/plain',
-          },
+          headers: { ...corsH, 'Content-Type': 'text/plain' },
         });
       }
 
       // Method not allowed for /cache path
+      const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
       return new Response('Method Not Allowed', {
         status: 405,
-        headers: {
-          ...corsHeaders(),
-          'Content-Type': 'text/plain',
-        },
+        headers: { ...corsH, 'Content-Type': 'text/plain' },
       });
     }
 
-    // Bug report route: POST /report — behind the existing Bearer PROXY_TOKEN gate (D-01)
+    // 5. Bug report route: POST /report — Bearer-only (D-01)
     if (path === '/report') {
+      if (!auth || auth.method !== 'bearer') {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
+        });
+      }
       return handleReport(request, env, ctx);
     }
 
-    // USPTO proxy route: GET /?patent={number}
+    // 6. USPTO proxy route: GET / — Bearer-only (extension)
+    if (!auth || auth.method !== 'bearer') {
+      return new Response('Unauthorized', {
+        status: 401,
+        headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
+      });
+    }
+
     const rawPatent = url.searchParams.get('patent') || '';
+
+    // WRKR-04: published-application check FIRST on the extension path too
+    if (isPublishedApplication(rawPatent)) {
+      return new Response('Published application numbers are not supported', {
+        status: 400,
+        headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
+      });
+    }
+
     const patentNumber = cleanPatentNumber(rawPatent);
 
     if (!/^\d{6,8}$/.test(patentNumber)) {
@@ -769,33 +912,23 @@ export default {
         `Invalid patent number: "${rawPatent}". Expected 6-8 digits (e.g. 12505414 or US12505414B2).`,
         {
           status: 400,
-          headers: {
-            ...corsHeaders(),
-            'Content-Type': 'text/plain',
-          },
+          headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
         }
       );
     }
 
-    // 4-5. Orchestrate ODP lookup and stream PDF back
+    // Orchestrate ODP lookup and stream PDF back
     try {
       const pdfResponse = await fetchEgrantPdf(patentNumber, env.USPTO_API_KEY);
-
       return new Response(pdfResponse.body, {
         status: 200,
-        headers: {
-          ...corsHeaders(),
-          'Content-Type': 'application/pdf',
-        },
+        headers: { ...corsHeaders(), 'Content-Type': 'application/pdf' },
       });
     } catch (err) {
-      // 6. Error response — CORS header is critical so extension gets HTTP status not opaque error
+      // CORS header is critical so extension gets HTTP status not opaque error
       return new Response(`USPTO lookup failed: ${err.message}`, {
         status: 502,
-        headers: {
-          ...corsHeaders(),
-          'Content-Type': 'text/plain',
-        },
+        headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
       });
     }
   },

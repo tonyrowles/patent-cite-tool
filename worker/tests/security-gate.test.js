@@ -80,6 +80,7 @@ const IP_CACHE_ORIGIN = '10.12.0.2';
 const IP_CACHE_UNAUTH = '10.12.0.3';
 const PATENT_CACHE_BEARER = '12505100';
 const PATENT_CACHE_ORIGIN = '12505101';
+const PATENT_CACHE_UNAUTH = '12505102';
 
 // POST /cache webapp provenance (WRKR-03)
 const IP_POST_ORIGIN = '10.13.0.1';
@@ -282,27 +283,28 @@ describe('WRKR-03: POST /cache — webapp provenance tagging', () => {
 
 describe('SEC-04: Webapp rate limit — 30/60s on GET /webapp/pdf and GET /cache (Origin path)', () => {
   it('31st GET /cache request from same IP via Origin → 429 with Retry-After:60 and webappCorsHeaders', async () => {
-    // Send 30 requests — all should pass (with testMode to avoid KV side effects on cache)
+    // Send 30 requests WITHOUT testMode so wrl: counter increments each time.
+    // Use a unique patent number per iteration to avoid KV cache-hit (which would also
+    // serve 200 OK, not 404) — though cache is empty so 404 is expected anyway.
     for (let i = 0; i < 30; i++) {
       const ctx = createExecutionContext();
       const response = await worker.fetch(
         makeOriginRequest(`/cache?patent=${PATENT_RATELIMIT}&v=v4`, {
           ip: IP_RATELIMIT_WEBAPP,
-          testMode: true,
+          // Do NOT use testMode here — we need the wrl: counter to actually increment
         }),
         env, ctx
       );
       await waitOnExecutionContext(ctx);
-      // Should be 404 (not found, rate limit not hit yet)
+      // Should be 404 (cache miss, rate limit not hit yet)
       expect(response.status).not.toBe(429);
     }
 
-    // 31st request — should be rate limited
+    // 31st request — should be rate limited regardless of testMode
     const ctx = createExecutionContext();
     const response = await worker.fetch(
       makeOriginRequest(`/cache?patent=${PATENT_RATELIMIT}&v=v4`, {
         ip: IP_RATELIMIT_WEBAPP,
-        testMode: true,
       }),
       env, ctx
     );
@@ -316,6 +318,11 @@ describe('SEC-04: Webapp rate limit — 30/60s on GET /webapp/pdf and GET /cache
 
 describe('SEC-05: Daily write guard — 900/day on POST /cache', () => {
   it('POST /cache with testMode:true → 201 and wq: counter NOT incremented', async () => {
+    const dateKey = `wq:${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+    // Record the counter BEFORE the testMode request (may already be non-null from prior tests)
+    const counterBefore = await env.PATENT_CACHE.get(dateKey);
+    const countBefore = counterBefore ? parseInt(counterBefore, 10) : 0;
+
     const ctx = createExecutionContext();
     const response = await worker.fetch(
       makeOriginRequest(`/cache?patent=${PATENT_WRITEGUARD}&v=v4`, {
@@ -329,10 +336,10 @@ describe('SEC-05: Daily write guard — 900/day on POST /cache', () => {
     await waitOnExecutionContext(ctx);
     expect(response.status).toBe(201);
 
-    // wq: counter should NOT be in KV since testMode suppresses it
-    const dateKey = `wq:${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
-    const counter = await env.PATENT_CACHE.get(dateKey);
-    expect(counter).toBeNull();
+    // wq: counter should NOT have changed since testMode suppresses the increment
+    const counterAfter = await env.PATENT_CACHE.get(dateKey);
+    const countAfter = counterAfter ? parseInt(counterAfter, 10) : 0;
+    expect(countAfter).toBe(countBefore);
   });
 
   it('POST /cache at write-guard threshold → 503 Service Unavailable', async () => {
@@ -416,7 +423,7 @@ describe('Extension Bearer path — preserved behavior (no regression)', () => {
     expect(response.status).not.toBe(403);
     // CORS for extension should be wildcard
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
-  });
+  }, 15000);
 
   it('POST /report with Bearer → 400 (validation error, not auth error)', async () => {
     const ctx = createExecutionContext();

@@ -8,10 +8,19 @@
 
 import { getDocument, GlobalWorkerOptions } from '../lib/pdf.mjs';
 
-// Configure worker source for Chrome extension context.
-// If the worker fails to load (e.g., CSP blocks it), PDF.js falls back
-// to main-thread parsing, which is acceptable for patent PDFs.
-GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs');
+/**
+ * Configure the PDF.js worker source URL.
+ * Must be called once before any extractTextFromPdf() calls.
+ *
+ * Extension callers:  configurePdfWorker(chrome.runtime.getURL('lib/pdf.worker.mjs'))
+ * Webapp callers:     configurePdfWorker('/assets/pdf.worker.mjs')
+ *
+ * Importing this module without calling configurePdfWorker is safe — PDF.js
+ * falls back to main-thread parsing if workerSrc is not set.
+ */
+export function configurePdfWorker(url) {
+  GlobalWorkerOptions.workerSrc = url;
+}
 
 /**
  * Check whether the PDF has a meaningful text layer.

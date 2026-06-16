@@ -7,40 +7,56 @@
  *   3. configurePdfWorker(url) can be called without throwing
  *
  * Design: chrome-stub.js runs for all test:src specs (setupFiles in vitest.config.js).
- * This test explicitly removes the chrome global to simulate a non-extension context,
- * then dynamically imports the module to verify import-time safety.
+ * This test explicitly removes the chrome global to simulate a non-extension context.
+ *
+ * pdf.mjs (the full PDF.js bundle) requires browser-only APIs (DOMMatrix, etc.) and
+ * cannot load in a plain Node environment. We mock it here so the import-safety test
+ * can verify that pdf-parser.js itself has no module-scope chrome dependency —
+ * independent of the PDF.js browser requirement.
+ *
  * Globals are restored in afterEach so other specs are unaffected.
  */
 
-import { vi, afterEach, it, expect, describe } from 'vitest';
+import { vi, afterEach, beforeAll, it, expect, describe } from 'vitest';
+
+// Mock pdf.mjs so Node can load pdf-parser.js without browser APIs.
+// This isolates the chrome-dependency test from the PDF.js browser requirement.
+vi.mock('../../src/lib/pdf.mjs', () => ({
+  getDocument: vi.fn(),
+  GlobalWorkerOptions: { workerSrc: '' },
+}));
 
 describe('pdf-parser import safety (CORE-02)', () => {
-  let originalChrome;
+  let savedChrome;
 
   afterEach(() => {
     // Restore chrome global so other specs are unaffected
-    if (originalChrome !== undefined) {
-      vi.stubGlobal('chrome', originalChrome);
+    if (savedChrome !== undefined) {
+      vi.stubGlobal('chrome', savedChrome);
     } else {
-      // chrome was absent before; remove the stub
       delete globalThis.chrome;
     }
   });
 
   it('imports without throwing when chrome global is absent', async () => {
-    // Save original chrome (set by chrome-stub.js setup file)
-    originalChrome = globalThis.chrome;
-
-    // Remove chrome global — simulates plain web page / Node context
+    // Save and remove chrome global — simulates plain web page / Node context
+    savedChrome = globalThis.chrome;
     vi.unstubAllGlobals();
     delete globalThis.chrome;
 
     // Dynamic import avoids module-level evaluation at spec parse time.
     // The module must load cleanly with no chrome global present.
+    // Use a try/catch to assert no throw, then verify exports.
     let mod;
-    await expect(async () => {
+    let importError;
+    try {
       mod = await import('../../src/shared/pdf-parser.js');
-    }).not.toThrow();
+    } catch (e) {
+      importError = e;
+    }
+
+    // Must not have thrown
+    expect(importError).toBeUndefined();
 
     // Both exports must be present and callable
     expect(typeof mod.configurePdfWorker).toBe('function');
@@ -50,12 +66,11 @@ describe('pdf-parser import safety (CORE-02)', () => {
   it('configurePdfWorker(url) sets worker source without throwing', async () => {
     // Even with chrome absent, calling configurePdfWorker with a URL must not throw
     // (it only sets GlobalWorkerOptions.workerSrc — no chrome access)
-    originalChrome = globalThis.chrome;
+    savedChrome = globalThis.chrome;
     vi.unstubAllGlobals();
     delete globalThis.chrome;
 
     const mod = await import('../../src/shared/pdf-parser.js');
-
     expect(() => mod.configurePdfWorker('about:blank')).not.toThrow();
   });
 });

@@ -53,7 +53,8 @@ describe('POST /cache — X-PCT-Test-Mode header guard (INJ-01)', () => {
     expect(await response.text()).toBe('Cached');
 
     // KV DID get written — the existence check + put() path was taken
-    const listed = await env.PATENT_CACHE.list();
+    // Filter to v3: prefix to isolate from daily write guard keys (wq:YYYYMMDD)
+    const listed = await env.PATENT_CACHE.list({ prefix: 'v3:' });
     expect(listed.keys.length).toBe(1);
     expect(listed.keys[0].name).toBe('v3:11427642');
   });

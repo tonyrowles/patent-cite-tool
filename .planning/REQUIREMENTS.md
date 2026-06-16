@@ -33,27 +33,27 @@ Blocking preconditions — must close before any public URL is announced.
 
 ### Webapp Core Flow
 
-- [ ] **APP-01**: User can enter a patent number; the webapp normalizes it (strips commas/spaces/hyphens, uppercases, adds the `US` prefix, accepts it with or without a kind code)
-- [ ] **APP-02**: Published-application numbers are rejected at the input stage with a clear "not supported yet" message before any network call
-- [ ] **APP-03**: The webapp fetches the patent PDF exclusively via the Worker proxy (no direct `patentimages.storage.googleapis.com` / USPTO fetch — CORS-blocked)
-- [ ] **APP-04**: The webapp checks the Worker `/cache` before fetching+parsing; a cache hit skips client-side parsing entirely
-- [ ] **APP-05**: On a cache miss, the webapp parses the PDF client-side via PDF.js and computes the citation through the shared `matchAndCite` core
-- [ ] **APP-06**: User can enter a passage and receive the column:line citation with a green/yellow/red confidence indicator using the same thresholds as the extension (≥0.95 green, ≥0.80 yellow, <0.80 red)
-- [ ] **APP-07**: A no-match shows a helpful message; a network/parse failure shows an error state with a retry affordance
-- [ ] **APP-08**: A loading/progress UI shows named stages ("Fetching patent PDF…", "Parsing PDF…", "Matching passage…")
-- [ ] **APP-09**: User can copy the citation to the clipboard
-- [ ] **APP-10**: The page shows trust signals — "deterministic, no AI inference" and a "no data stored" disclosure
+- [x] **APP-01**: User can enter a patent number; the webapp normalizes it (strips commas/spaces/hyphens, uppercases, adds the `US` prefix, accepts it with or without a kind code)
+- [x] **APP-02**: Published-application numbers are rejected at the input stage with a clear "not supported yet" message before any network call
+- [x] **APP-03**: The webapp fetches the patent PDF exclusively via the Worker proxy (no direct `patentimages.storage.googleapis.com` / USPTO fetch — CORS-blocked)
+- [x] **APP-04**: The webapp checks the Worker `/cache` before fetching+parsing; a cache hit skips client-side parsing entirely
+- [x] **APP-05**: On a cache miss, the webapp parses the PDF client-side via PDF.js and computes the citation through the shared `matchAndCite` core
+- [x] **APP-06**: User can enter a passage and receive the column:line citation with a green/yellow/red confidence indicator using the same thresholds as the extension (≥0.95 green, ≥0.80 yellow, <0.80 red)
+- [x] **APP-07**: A no-match shows a helpful message; a network/parse failure shows an error state with a retry affordance
+- [x] **APP-08**: A loading/progress UI shows named stages ("Fetching patent PDF…", "Parsing PDF…", "Matching passage…")
+- [x] **APP-09**: User can copy the citation to the clipboard
+- [x] **APP-10**: The page shows trust signals — "deterministic, no AI inference" and a "no data stored" disclosure
 
 ### Citation Format & Prefix
 
-- [ ] **FMT-01**: User can toggle the citation format between shorthand (`4:15-22`) and long form (`Col. 4, ll. 15-22`) — long form is a new code path, a pure transformation of the existing column/line integers
-- [ ] **FMT-02**: User can toggle an optional patent-number prefix on the produced citation
+- [x] **FMT-01**: User can toggle the citation format between shorthand (`4:15-22`) and long form (`Col. 4, ll. 15-22`) — long form is a new code path, a pure transformation of the existing column/line integers
+- [x] **FMT-02**: User can toggle an optional patent-number prefix on the produced citation
 
 ### Batch Mode
 
-- [ ] **BATCH-01**: User can enter multiple passages for a single patent and receive all citations at once via one fetch + one parse + N `matchAndCite` calls (no re-parse per passage)
-- [ ] **BATCH-02**: Each batch result row shows its own confidence indicator
-- [ ] **BATCH-03**: User can copy all batch citations at once
+- [x] **BATCH-01**: User can enter multiple passages for a single patent and receive all citations at once via one fetch + one parse + N `matchAndCite` calls (no re-parse per passage)
+- [x] **BATCH-02**: Each batch result row shows its own confidence indicator
+- [x] **BATCH-03**: User can copy all batch citations at once
 
 ### Deploy & Live UAT
 
@@ -111,21 +111,21 @@ Which phases cover which requirements. **Populated by the roadmapper.**
 | CORE-02 | Phase 7 | Verified |
 | CORE-03 | Phase 7 | Verified |
 | CORE-04 | Phase 7 | Verified |
-| APP-01 | Phase 8 | Pending |
-| APP-02 | Phase 8 | Pending |
-| APP-03 | Phase 8 | Pending |
-| APP-04 | Phase 8 | Pending |
-| APP-05 | Phase 8 | Pending |
-| APP-06 | Phase 8 | Pending |
-| APP-07 | Phase 8 | Pending |
-| APP-08 | Phase 8 | Pending |
-| APP-09 | Phase 8 | Pending |
-| APP-10 | Phase 8 | Pending |
-| FMT-01 | Phase 8 | Pending |
-| FMT-02 | Phase 8 | Pending |
-| BATCH-01 | Phase 8 | Pending |
-| BATCH-02 | Phase 8 | Pending |
-| BATCH-03 | Phase 8 | Pending |
+| APP-01 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-02 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-03 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-04 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-05 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-06 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-07 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-08 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-09 | Phase 8 | Verified (code; live UAT→Ph9) |
+| APP-10 | Phase 8 | Verified (code; live UAT→Ph9) |
+| FMT-01 | Phase 8 | Verified (code; live UAT→Ph9) |
+| FMT-02 | Phase 8 | Verified (code; live UAT→Ph9) |
+| BATCH-01 | Phase 8 | Verified (code; live UAT→Ph9) |
+| BATCH-02 | Phase 8 | Verified (code; live UAT→Ph9) |
+| BATCH-03 | Phase 8 | Verified (code; live UAT→Ph9) |
 | DEPLOY-01 | Phase 9 | Pending |
 | DEPLOY-02 | Phase 9 | Pending |
 | DEPLOY-03 | Phase 9 | Pending |

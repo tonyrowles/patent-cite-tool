@@ -64,7 +64,7 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
 
 - [x] **Phase 6: Security Gate + Worker Auth Split** - Rotate compromised PROXY_TOKEN, add rate limiting on all webapp-accessible Worker routes, and add public Origin-auth routes for the webapp (no token in browser JS) (completed 2026-06-16)
 - [x] **Phase 7: Shared Core Extraction + Corpus Guard** - Extract matching.js, position-map-builder.js, pdf-parser.js into src/shared/ with a configurePdfWorker(url) seam; golden corpus passes 100% on both builds (completed 2026-06-16)
-- [ ] **Phase 8: Webapp Core Build** - Build the standalone webapp (patent number entry, cache-first pipeline, client-side PDF.js parsing, citation display, batch mode, format toggle, copy-to-clipboard) (3 plans)
+- [x] **Phase 8: Webapp Core Build** - Build the standalone webapp (patent number entry, cache-first pipeline, client-side PDF.js parsing, citation display, batch mode, format toggle, copy-to-clipboard) (3 plans) (completed 2026-06-16)
 - [ ] **Phase 9: Deploy + Live UAT + Privacy** - Deploy dist/webapp/ to cite.tonyrowles.com via Workers Assets; run live end-to-end UAT; update privacy policy
 
 ## Phase Details
@@ -111,9 +111,9 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
   4. Network inspector shows no `Authorization: Bearer` header in any webapp request to `pct.tonyrowles.com`; all PDF fetches go through `GET /webapp/pdf?patent=` (not `patentimages.storage.googleapis.com`)
   5. `scripts/build.js --webapp-only` produces `dist/webapp/` with `index.html`, the JS bundle, `lib/pdf.mjs`, and `lib/pdf.worker.mjs`; `webapp/wrangler.toml` references `dist/webapp/` as the Workers Assets directory
 **Plans**: 3 plans
-  - [ ] 08-01-PLAN.md — Build target + scaffold: scripts/build.js --webapp-only (token-bypass), webapp/index.html (full UI-SPEC + inline styles), wrangler.toml [assets], zero-dep guard [APP-10; success criterion 5]
-  - [ ] 08-02-PLAN.md — Core pure logic + unit tests: normalizePatentInput, isPublishedApplication, formatCitationLong (cross-column resolved), BATCH-01 single-parse/N-match invariant [APP-01/02, FMT-01, BATCH-01]
-  - [ ] 08-03-PLAN.md — Orchestration + results UI: cache-first pipeline, confidence chips, copy/copy-all, no-match/error/retry, named-stage loading, format/prefix toggles (localStorage) [APP-03..09, FMT-02, BATCH-02/03]
+  - [x] 08-01-PLAN.md — Build target + scaffold: scripts/build.js --webapp-only (token-bypass), webapp/index.html (full UI-SPEC + inline styles), wrangler.toml [assets], zero-dep guard [APP-10; success criterion 5]
+  - [x] 08-02-PLAN.md — Core pure logic + unit tests: normalizePatentInput, isPublishedApplication, formatCitationLong (cross-column resolved), BATCH-01 single-parse/N-match invariant [APP-01/02, FMT-01, BATCH-01]
+  - [x] 08-03-PLAN.md — Orchestration + results UI: cache-first pipeline, confidence chips, copy/copy-all, no-match/error/retry, named-stage loading, format/prefix toggles (localStorage) [APP-03..09, FMT-02, BATCH-02/03]
 **UI hint**: yes
 
 ### Phase 9: Deploy + Live UAT + Privacy
@@ -140,7 +140,7 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | v5.0 | 5/5 | Complete | 2026-06-14 |
 | 6. Security Gate + Worker Auth Split | v6.0 | 4/4 | Complete   | 2026-06-16 |
 | 7. Shared Core Extraction + Corpus Guard | v6.0 | 2/2 | Complete   | 2026-06-16 |
-| 8. Webapp Core Build | v6.0 | 0/3 | Not started | - |
+| 8. Webapp Core Build | v6.0 | 3/3 | Complete   | 2026-06-16 |
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Not started | - |
 
 ## Backlog

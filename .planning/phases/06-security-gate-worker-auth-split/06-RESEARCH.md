@@ -653,22 +653,25 @@ Opening Origin-authenticated routes introduces the following threats that the pl
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Root-level `.dev.vars` vs `.env` naming**
    - What we know: `worker/.dev.vars` exists and is gitignored; project root has no such file yet
    - What's unclear: Should the local token file be named `.dev.vars` (matching the worker convention) or `.env` (common Node.js convention)?
    - Recommendation: Name it `.env` at the project root (aligns with `process.env.PROXY_TOKEN` reading pattern in `scripts/build.js`); add `.env` to root `.gitignore`
+   - RESOLVED: `.env` chosen — 06-01 Task 3 uses `.env` and adds both `.env` and `.dev.vars` to root `.gitignore`.
 
 2. **`POST /cache` from webapp: should the existing `extension` source be tagged retroactively?**
    - What we know: Existing cache entries from the extension have no `source` field
    - What's unclear: Whether the Worker should inject `source: "extension"` on Bearer POST /cache calls (symmetric with `source: "webapp"`)
    - Recommendation: Do NOT add `source: "extension"` retroactively — CONTEXT.md only requires `source: "webapp"` (WRKR-03); extension-uploaded entries pre-date this field and the absence of `source` implicitly means "extension"
+   - RESOLVED: No retroactive tagging — 06-02 injects `source:"webapp"` only on the Origin POST /cache path; Bearer (extension) writes are left untagged, absence ⇒ extension by convention.
 
 3. **`GET /cache` response CORS headers when called by the webapp**
    - What we know: The webapp will call `GET /cache` with Origin auth; the response must have the reflected origin CORS headers
    - What's unclear: What if the cached entry doesn't exist (404)? The 404 response also needs CORS headers, or the browser gets an opaque error.
    - Recommendation: All responses on Origin-auth paths, including 404 and 503, must include `webappCorsHeaders(auth.origin)` + `Vary: Origin`
+   - RESOLVED: All Origin-path responses (incl. 404/429/503) carry `webappCorsHeaders(auth.origin)` + `Vary: Origin` — locked into 06-02 Task 2 behavior.
 
 ---
 

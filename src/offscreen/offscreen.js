@@ -24,9 +24,12 @@ const WORKER_URL = 'https://pct.tonyrowles.com';
 const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
 
 // Cache version — bump to invalidate all cached entries.
-// v4 (post-v5.0.0): evicts position maps poisoned by the v5.0.0 column-sequence
-// regression (loosened validation dropped real columns; see position-map-builder.js).
-const CACHE_VERSION = 'v4';
+// v5: evicts maps built during the v5.0.x fix window — both the v5.0.0
+// column-sequence regression AND the cross-column merged-line dropout
+// (stripCrossBoundaryText) that dropped right-column lines. POST /cache is
+// write-once, so any map cached under an older version must be abandoned by
+// bumping here. See position-map-builder.js.
+const CACHE_VERSION = 'v5';
 
 // ---------------------------------------------------------------------------
 // Test-mode hook — Phase 30 E2E fault-injection support

@@ -95,7 +95,9 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
   2. `pdf-parser.js` exports a `configurePdfWorker(url)` function; importing the module in a plain web page (no `chrome` global) does NOT throw — the `chrome.runtime.getURL` call is not at module scope
   3. `npm test` passes at 100% (all four suites: test:src, test:chrome, test:firefox, test:lint); `tests/golden/baseline.json` is byte-identical to the pre-extraction baseline
   4. A full-pipeline browser integration test (PDF bytes → `extractTextFromPdf` → `buildPositionMap` → `matchAndCite`) is green; Chrome DevTools Threads panel confirms PDF.js runs in a worker thread (not main thread) during the test
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 07-01-PLAN.md — Relocate position-map-builder.js + pdf-parser.js to src/shared/ with configurePdfWorker seam; rewire callers; import-safety test; corpus byte-identical [CORE-01/02/03]
+  - [ ] 07-02-PLAN.md — CORE-04 full-pipeline browser integration test (Playwright page.on('worker') asserts pdf.worker.mjs; citation 1:37) [CORE-04]
 **UI hint**: no
 
 ### Phase 8: Webapp Core Build

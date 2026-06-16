@@ -252,23 +252,53 @@ export function filterGutterLineNumbers(items, boundary, pageWidth) {
  * Pattern stripped: " [5–65, mult of 5] " followed by right-column text
  * This is applied only to items that physically cross the column boundary.
  *
+ * When PDF.js merges a whole row into one wide item, that item holds
+ * "<left-column text> <gutter line#> <right-column text>". Stripping the
+ * right-column text is correct ONLY when the right column also emitted that
+ * text as its own item. When the merged item is the ONLY copy (PDF.js did not
+ * emit a separate right item), discarding it silently drops the right column's
+ * line — so any passage spanning that line fails to match while single words
+ * elsewhere still resolve. To prevent that, the stripped right-column text is
+ * re-emitted as a separate right-column fragment (returned in `rightFragments`)
+ * positioned just inside the right column at the same y, so the caller can
+ * fold it back into the right column's items.
+ *
  * @param {Array} items - Text items assigned to the left column.
  * @param {number} boundary - The x-coordinate of the column boundary.
- * @returns {Array} Items with cross-boundary contamination removed.
+ * @returns {{ items: Array, rightFragments: Array }} Cleaned left items plus
+ *   any recovered right-column fragments.
  */
 export function stripCrossBoundaryText(items, boundary) {
-  return items.map(item => {
+  const rightFragments = [];
+  // " [5-65 mult-of-5] " gutter number, then the right-column remainder.
+  // Anchored to word boundaries so we don't split on e.g. "25%" or "25-".
+  const gutterRe = /\s+\b(?:5|10|15|20|25|30|35|40|45|50|55|60|65)\b\s+(.*)$/;
+
+  const cleaned = items.map(item => {
     // Only process items that extend significantly past the column boundary
     const itemEnd = item.x + item.width;
     if (itemEnd <= boundary + 20) return item;
 
-    // Strip embedded gutter line number and following text.
-    // Pattern: " [5-65 mult-of-5] " followed by remainder (right-column text)
-    // Anchored to word boundary so we don't strip e.g. "25%" or "25-"
-    const stripped = item.text.replace(/\s+\b(5|10|15|20|25|30|35|40|45|50|55|60|65)\b\s+.*$/, '');
+    const m = item.text.match(gutterRe);
+    const stripped = item.text.replace(gutterRe, '');
 
-    if (stripped !== item.text) {
-      // Return a copy with stripped text and updated width (approximate)
+    if (m && stripped !== item.text) {
+      const rightText = m[1];
+      if (rightText && rightText.trim().length > 0) {
+        // Recover the right-column text PDF.js merged into this left item.
+        const beforeLen = item.text.length - rightText.length;
+        const rightX = Math.max(
+          item.x + (beforeLen / item.text.length) * item.width,
+          boundary + 1
+        );
+        rightFragments.push({
+          ...item,
+          text: rightText,
+          x: rightX,
+          width: (rightText.length / item.text.length) * item.width,
+        });
+      }
+      // Left copy with stripped text and updated width (approximate)
       return { ...item, text: stripped, width: stripped.length / item.text.length * item.width };
     }
 
@@ -277,6 +307,8 @@ export function stripCrossBoundaryText(items, boundary) {
     // The caller (filterGutterLineNumbers) will handle obvious number-only items.
     return item;
   });
+
+  return { items: cleaned, rightFragments };
 }
 
 // ---------------------------------------------------------------------------
@@ -701,15 +733,14 @@ function processPageColumns(pageResult, colNums, entries) {
 
   const grid = extractGutterLineGrid(filtered, boundary, pageWidth);
 
-  const leftItems = filterGutterLineNumbers(
-    stripCrossBoundaryText(
-      filtered.filter(item => item.x < boundary),
-      boundary
-    ),
-    boundary, pageWidth
+  const { items: strippedLeft, rightFragments } = stripCrossBoundaryText(
+    filtered.filter(item => item.x < boundary),
+    boundary
   );
+  const leftItems = filterGutterLineNumbers(strippedLeft, boundary, pageWidth);
   const rightItems = filterGutterLineNumbers(
-    filtered.filter(item => item.x >= boundary), boundary, pageWidth
+    [...filtered.filter(item => item.x >= boundary), ...rightFragments],
+    boundary, pageWidth
   );
 
   const leftLines = clusterIntoLines(leftItems);

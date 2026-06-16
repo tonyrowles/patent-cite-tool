@@ -10,6 +10,7 @@ import {
   buildLineEntry,
   extractPrintedColumnNumbers,
   isLikelySpecPage,
+  stripCrossBoundaryText,
   buildPositionMap,
 } from '../../src/offscreen/position-map-builder.js';
 
@@ -403,6 +404,47 @@ describe('buildPositionMap sequential column validation', () => {
     expect(cols).toContain(2);
     expect(cols).not.toContain(25);
     expect(cols).not.toContain(26);
+  });
+});
+
+// ============================================================================
+// stripCrossBoundaryText — cross-column merged-line recovery
+// ============================================================================
+
+describe('stripCrossBoundaryText', () => {
+  const boundary = 306;
+
+  it('recovers right-column text PDF.js merged into a left-column item', () => {
+    // Real signature from US10617174: one wide item holds left-col text, the
+    // gutter line number, and right-col text. Without recovery the right line
+    // (col 6 line 44) is dropped and long passages spanning it fail to match.
+    const items = [
+      { text: ', flexibility, wicking, water 45 to move the ankle collar 336 from the',
+        x: 192, y: 259.8, width: 250, height: 12 },
+    ];
+    const { items: left, rightFragments } = stripCrossBoundaryText(items, boundary);
+    // Left column keeps only its own text (gutter number + right text stripped)
+    expect(left[0].text).toBe(', flexibility, wicking, water');
+    // Right-column text is recovered, not discarded
+    expect(rightFragments).toHaveLength(1);
+    expect(rightFragments[0].text).toBe('to move the ankle collar 336 from the');
+    // ...positioned inside the right column at the same row
+    expect(rightFragments[0].x).toBeGreaterThan(boundary);
+    expect(rightFragments[0].y).toBe(259.8);
+  });
+
+  it('emits no fragments for items that stay within the left column', () => {
+    const items = [{ text: 'ordinary left-column text', x: 60, y: 100, width: 120, height: 12 }];
+    const { items: left, rightFragments } = stripCrossBoundaryText(items, boundary);
+    expect(left[0].text).toBe('ordinary left-column text');
+    expect(rightFragments).toEqual([]);
+  });
+
+  it('does not split on in-text multiples of five lacking the gutter pattern', () => {
+    // "25%" / "25-" must not be treated as a gutter number (no surrounding spaces).
+    const items = [{ text: 'reduced by 25% across the boundary region here', x: 200, y: 100, width: 200, height: 12 }];
+    const { rightFragments } = stripCrossBoundaryText(items, boundary);
+    expect(rightFragments).toEqual([]);
   });
 });
 

@@ -121,13 +121,13 @@ jobs:
 
       - name: Checkout
         if: steps.precheck.outputs.error_class != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0   # full history for git apply --check
 
       - name: Setup Node
         if: steps.precheck.outputs.error_class != ''
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}

@@ -731,12 +731,16 @@ export function buildPositionMap(pageResults) {
   const entries = [];
 
   // --- Primary pass: use printed column numbers with sequential validation ---
-  // Columns must advance monotonically, allowing small forward gaps (figure
-  // pages between spec/claims pages drop column numbers without breaking the
-  // patent's numbering). Reject backward jumps and implausibly large forward
-  // jumps — the latter catches patent-number fragments like "203" from
-  // US10203551 that slip past per-page checks.
-  const MAX_PAGE_GAP = 20; // up to ~10 missing column-pairs (5+ figure pages)
+  // Sequential validation: columns must proceed in exact order (1,2 → 3,4 → 5,6).
+  // Rejects patent-number fragments like "203" from US10203551, and — critically —
+  // any spurious-but-valid odd column-pair misread on a figure/front-matter page.
+  // A forward-tolerant window here is unsafe: accepting a too-high column poisons
+  // expectedLeftCol, after which every genuinely-later (lower-numbered) real page
+  // is rejected, dropping most of the map (regression seen in v5.0.0 — long
+  // passages returned "no match", short passages returned spurious hits). Real
+  // granted US patents number columns continuously, so strict equality is correct;
+  // pages whose column numbers are unreadable yield null above and are skipped
+  // without advancing the expectation, letting the next real page re-sync.
   let expectedLeftCol = 1; // spec always starts at col 1
   for (const pageResult of pageResults) {
     const { items, pageWidth, pageHeight } = pageResult;
@@ -745,8 +749,7 @@ export function buildPositionMap(pageResults) {
     const colNums = extractPrintedColumnNumbers(items, pageHeight, pageWidth);
     if (!colNums) continue;
 
-    if (colNums.left < expectedLeftCol) continue;
-    if (colNums.left - expectedLeftCol > MAX_PAGE_GAP) continue;
+    if (colNums.left !== expectedLeftCol) continue;
     expectedLeftCol = colNums.right + 1;
 
     processPageColumns(pageResult, colNums, entries);

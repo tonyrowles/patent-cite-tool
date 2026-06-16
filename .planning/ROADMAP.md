@@ -62,7 +62,7 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
 
 ## Phase Summary
 
-- [ ] **Phase 6: Security Gate + Worker Auth Split** - Rotate compromised PROXY_TOKEN, add rate limiting on all webapp-accessible Worker routes, and add public Origin-auth routes for the webapp (no token in browser JS)
+- [x] **Phase 6: Security Gate + Worker Auth Split** - Rotate compromised PROXY_TOKEN, add rate limiting on all webapp-accessible Worker routes, and add public Origin-auth routes for the webapp (no token in browser JS) (completed 2026-06-16)
 - [ ] **Phase 7: Shared Core Extraction + Corpus Guard** - Extract matching.js, position-map-builder.js, pdf-parser.js into src/shared/ with a configurePdfWorker(url) seam; golden corpus passes 100% on both builds
 - [ ] **Phase 8: Webapp Core Build** - Build the standalone webapp (patent number entry, cache-first pipeline, client-side PDF.js parsing, citation display, batch mode, format toggle, copy-to-clipboard)
 - [ ] **Phase 9: Deploy + Live UAT + Privacy** - Deploy dist/webapp/ to cite.tonyrowles.com via Workers Assets; run live end-to-end UAT; update privacy policy
@@ -80,10 +80,10 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
   4. `POST /cache` and `POST /report` continue to require a valid Bearer PROXY_TOKEN; a request with no token returns 401
   5. A request to any Worker route with a published-application number (kind code A1/A2/A9) returns HTTP 400 before any USPTO fetch
 **Plans**: 4 plans
-  - [ ] 06-01-PLAN.md — Token rotation code: esbuild __PROXY_TOKEN__ define + fail-loud guard, remove 3 literals, .gitignore + CI env wiring (SEC-01 code, SEC-02)
-  - [ ] 06-02-PLAN.md — Worker per-route auth split: Origin auth + webappCorsHeaders, GET /webapp/pdf, dual-auth GET /cache, POST /cache source:"webapp", webapp rate limit + daily write guard + published-app 400 (SEC-03/04/05, WRKR-01..04)
-  - [ ] 06-03-PLAN.md — Miniflare security-gate integration tests + SEC-02 build-smoke (WRKR-01..04, SEC-02/04/05)
-  - [ ] 06-04-PLAN.md — Human verification: GitHub secret + live wrangler secret put rotation + grep gate + auth smoke (SEC-01 live)
+  - [x] 06-01-PLAN.md — Token rotation code: esbuild __PROXY_TOKEN__ define + fail-loud guard, remove 3 literals, .gitignore + CI env wiring (SEC-01 code, SEC-02)
+  - [x] 06-02-PLAN.md — Worker per-route auth split: Origin auth + webappCorsHeaders, GET /webapp/pdf, dual-auth GET /cache, POST /cache source:"webapp", webapp rate limit + daily write guard + published-app 400 (SEC-03/04/05, WRKR-01..04)
+  - [x] 06-03-PLAN.md — Miniflare security-gate integration tests + SEC-02 build-smoke (WRKR-01..04, SEC-02/04/05)
+  - [x] 06-04-PLAN.md — Human verification: GitHub secret + live wrangler secret put rotation + grep gate + auth smoke (SEC-01 live)
 **UI hint**: no
 
 ### Phase 7: Shared Core Extraction + Corpus Guard
@@ -133,7 +133,7 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
 | 3. Background Submission Handler + Rate Limit + Retry Queue | v5.0 | 3/3 | Complete | 2026-06-13 |
 | 4. Report Dialog UI + Citation-UI Wiring | v5.0 | 4/4 | Complete | 2026-06-13 |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | v5.0 | 5/5 | Complete | 2026-06-14 |
-| 6. Security Gate + Worker Auth Split | v6.0 | 0/4 | Planned | - |
+| 6. Security Gate + Worker Auth Split | v6.0 | 4/4 | Complete   | 2026-06-16 |
 | 7. Shared Core Extraction + Corpus Guard | v6.0 | 0/TBD | Not started | - |
 | 8. Webapp Core Build | v6.0 | 0/TBD | Not started | - |
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Not started | - |

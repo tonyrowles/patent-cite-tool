@@ -11,11 +11,11 @@ Requirements for the v6.0 release. Each maps to exactly one roadmap phase.
 
 Blocking preconditions — must close before any public URL is announced.
 
-- [ ] **SEC-01**: Compromised `PROXY_TOKEN` is rotated via `wrangler secret put`; the old token is invalidated and no token literal remains in committed source (`src/offscreen/offscreen.js`)
-- [ ] **SEC-02**: The extension build injects `PROXY_TOKEN` from a CI secret at build time (esbuild `define`) instead of from a committed constant
-- [ ] **SEC-03**: The webapp authenticates to the Worker via an Origin-header check — no `Authorization: Bearer` token appears in any browser-side webapp code
-- [ ] **SEC-04**: IP rate limiting (the existing `checkIpRateLimit` pattern) is applied to every webapp-accessible Worker route (USPTO proxy, cache GET, cache POST) before those routes are opened
-- [ ] **SEC-05**: A global daily KV-write guard protects the shared write quota (blocks new writes at a safe threshold below the free-tier 1,000/day limit)
+- [x] **SEC-01**: Compromised `PROXY_TOKEN` is rotated via `wrangler secret put`; the old token is invalidated and no token literal remains in committed source (`src/offscreen/offscreen.js`)
+- [x] **SEC-02**: The extension build injects `PROXY_TOKEN` from a CI secret at build time (esbuild `define`) instead of from a committed constant
+- [x] **SEC-03**: The webapp authenticates to the Worker via an Origin-header check — no `Authorization: Bearer` token appears in any browser-side webapp code
+- [x] **SEC-04**: IP rate limiting (the existing `checkIpRateLimit` pattern) is applied to every webapp-accessible Worker route (USPTO proxy, cache GET, cache POST) before those routes are opened
+- [x] **SEC-05**: A global daily KV-write guard protects the shared write quota (blocks new writes at a safe threshold below the free-tier 1,000/day limit)
 
 ### Shared Core Extraction
 
@@ -26,10 +26,10 @@ Blocking preconditions — must close before any public URL is announced.
 
 ### Worker Public Routes
 
-- [ ] **WRKR-01**: `GET /webapp/pdf?patent=` public route proxies the USPTO PDF with Origin-header auth + IP rate limit
-- [ ] **WRKR-02**: `GET /cache?patent=` accepts an Origin header (webapp) OR a Bearer token (extension) and returns the cached position-map JSON
-- [ ] **WRKR-03**: `POST /cache` accepts webapp uploads tagged with a `source: "webapp"` provenance field, under rate limit
-- [ ] **WRKR-04**: The Worker rejects published-application numbers (kind code A1/A2/A9) with HTTP 400 before any USPTO fetch
+- [x] **WRKR-01**: `GET /webapp/pdf?patent=` public route proxies the USPTO PDF with Origin-header auth + IP rate limit
+- [x] **WRKR-02**: `GET /cache?patent=` accepts an Origin header (webapp) OR a Bearer token (extension) and returns the cached position-map JSON
+- [x] **WRKR-03**: `POST /cache` accepts webapp uploads tagged with a `source: "webapp"` provenance field, under rate limit
+- [x] **WRKR-04**: The Worker rejects published-application numbers (kind code A1/A2/A9) with HTTP 400 before any USPTO fetch
 
 ### Webapp Core Flow
 
@@ -98,15 +98,15 @@ Which phases cover which requirements. **Populated by the roadmapper.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | Phase 6 | Pending |
-| SEC-02 | Phase 6 | Pending |
-| SEC-03 | Phase 6 | Pending |
-| SEC-04 | Phase 6 | Pending |
-| SEC-05 | Phase 6 | Pending |
-| WRKR-01 | Phase 6 | Pending |
-| WRKR-02 | Phase 6 | Pending |
-| WRKR-03 | Phase 6 | Pending |
-| WRKR-04 | Phase 6 | Pending |
+| SEC-01 | Phase 6 | Verified |
+| SEC-02 | Phase 6 | Verified |
+| SEC-03 | Phase 6 | Verified |
+| SEC-04 | Phase 6 | Verified |
+| SEC-05 | Phase 6 | Verified |
+| WRKR-01 | Phase 6 | Verified |
+| WRKR-02 | Phase 6 | Verified |
+| WRKR-03 | Phase 6 | Verified |
+| WRKR-04 | Phase 6 | Verified |
 | CORE-01 | Phase 7 | Pending |
 | CORE-02 | Phase 7 | Pending |
 | CORE-03 | Phase 7 | Pending |

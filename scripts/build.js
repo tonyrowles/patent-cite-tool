@@ -29,9 +29,31 @@ const firefoxOnly = args.includes('--firefox-only');
 // Build-time token guard (SEC-02)
 // ---------------------------------------------------------------------------
 
+// Local-dev convenience: load the git-ignored root `.env` so `npm run build`
+// works without exporting PROXY_TOKEN by hand. Zero-dep (no `dotenv`) — a real
+// process.env value (e.g. the CI secret) always wins and is never overwritten.
+function loadDotEnv() {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (!fs.existsSync(envPath)) return;
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let val = trimmed.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (key && process.env[key] === undefined) process.env[key] = val;
+  }
+}
+loadDotEnv();
+
 const PROXY_TOKEN = process.env.PROXY_TOKEN;
 if (!PROXY_TOKEN) {
-  console.error('ERROR: PROXY_TOKEN environment variable is not set. Build aborted.');
+  console.error('ERROR: PROXY_TOKEN environment variable is not set.');
+  console.error('Set it in a git-ignored root `.env` (PROXY_TOKEN=...) or export it before building. Build aborted.');
   process.exit(1);
 }
 

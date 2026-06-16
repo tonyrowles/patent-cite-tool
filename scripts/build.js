@@ -26,6 +26,16 @@ const chromeOnly = args.includes('--chrome-only') || watchMode;
 const firefoxOnly = args.includes('--firefox-only');
 
 // ---------------------------------------------------------------------------
+// Build-time token guard (SEC-02)
+// ---------------------------------------------------------------------------
+
+const PROXY_TOKEN = process.env.PROXY_TOKEN;
+if (!PROXY_TOKEN) {
+  console.error('ERROR: PROXY_TOKEN environment variable is not set. Build aborted.');
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
 // Shared esbuild entry configs
 // ---------------------------------------------------------------------------
 
@@ -37,6 +47,9 @@ function getIifeConfig({ sourcemap = false } = {}) {
     platform: 'browser',
     outfile: 'dist/chrome/content/content.js',
     sourcemap,
+    define: {
+      '__PROXY_TOKEN__': JSON.stringify(PROXY_TOKEN),
+    },
   };
 }
 
@@ -57,6 +70,9 @@ function getEsmConfig({ sourcemap = false } = {}) {
     // CRITICAL: prevent esbuild from bundling the 3MB PDF.js library.
     // offscreen.js imports it at runtime from the copied dist/chrome/lib/ directory.
     external: ['../lib/pdf.mjs'],
+    define: {
+      '__PROXY_TOKEN__': JSON.stringify(PROXY_TOKEN),
+    },
   };
 }
 
@@ -123,6 +139,9 @@ function getFirefoxIifeConfig({ sourcemap = false } = {}) {
     platform: 'browser',
     outfile: 'dist/firefox/content/content.js',
     sourcemap,
+    define: {
+      '__PROXY_TOKEN__': JSON.stringify(PROXY_TOKEN),
+    },
   };
 }
 
@@ -143,6 +162,9 @@ function getFirefoxEsmConfig({ sourcemap = false } = {}) {
     // NOTE: Do NOT use outbase here — object entry point syntax controls output paths directly.
     // With outbase:'src', src/firefox/background.js would output to dist/firefox/firefox/background.js (WRONG).
     external: ['../lib/pdf.mjs'],
+    define: {
+      '__PROXY_TOKEN__': JSON.stringify(PROXY_TOKEN),
+    },
   };
 }
 
@@ -201,6 +223,9 @@ async function buildTestExports({ chrome = true, firefox = true } = {}) {
         format: 'esm',
         platform: 'browser',
         outfile: 'dist/chrome/matching-exports.js',
+        define: {
+          '__PROXY_TOKEN__': JSON.stringify(PROXY_TOKEN),
+        },
       }),
     );
   }
@@ -213,6 +238,9 @@ async function buildTestExports({ chrome = true, firefox = true } = {}) {
         format: 'esm',
         platform: 'browser',
         outfile: 'dist/firefox/matching-exports.js',
+        define: {
+          '__PROXY_TOKEN__': JSON.stringify(PROXY_TOKEN),
+        },
       }),
     );
   }

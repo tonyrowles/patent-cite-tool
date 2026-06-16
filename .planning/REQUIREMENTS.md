@@ -98,45 +98,52 @@ Which phases cover which requirements. **Populated by the roadmapper.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
-| SEC-05 | TBD | Pending |
-| CORE-01 | TBD | Pending |
-| CORE-02 | TBD | Pending |
-| CORE-03 | TBD | Pending |
-| CORE-04 | TBD | Pending |
-| WRKR-01 | TBD | Pending |
-| WRKR-02 | TBD | Pending |
-| WRKR-03 | TBD | Pending |
-| WRKR-04 | TBD | Pending |
-| APP-01 | TBD | Pending |
-| APP-02 | TBD | Pending |
-| APP-03 | TBD | Pending |
-| APP-04 | TBD | Pending |
-| APP-05 | TBD | Pending |
-| APP-06 | TBD | Pending |
-| APP-07 | TBD | Pending |
-| APP-08 | TBD | Pending |
-| APP-09 | TBD | Pending |
-| APP-10 | TBD | Pending |
-| FMT-01 | TBD | Pending |
-| FMT-02 | TBD | Pending |
-| BATCH-01 | TBD | Pending |
-| BATCH-02 | TBD | Pending |
-| BATCH-03 | TBD | Pending |
-| DEPLOY-01 | TBD | Pending |
-| DEPLOY-02 | TBD | Pending |
-| DEPLOY-03 | TBD | Pending |
-| DEPLOY-04 | TBD | Pending |
-| PRIV-01 | TBD | Pending |
+| SEC-01 | Phase 6 | Pending |
+| SEC-02 | Phase 6 | Pending |
+| SEC-03 | Phase 6 | Pending |
+| SEC-04 | Phase 6 | Pending |
+| SEC-05 | Phase 6 | Pending |
+| WRKR-01 | Phase 6 | Pending |
+| WRKR-02 | Phase 6 | Pending |
+| WRKR-03 | Phase 6 | Pending |
+| WRKR-04 | Phase 6 | Pending |
+| CORE-01 | Phase 7 | Pending |
+| CORE-02 | Phase 7 | Pending |
+| CORE-03 | Phase 7 | Pending |
+| CORE-04 | Phase 7 | Pending |
+| APP-01 | Phase 8 | Pending |
+| APP-02 | Phase 8 | Pending |
+| APP-03 | Phase 8 | Pending |
+| APP-04 | Phase 8 | Pending |
+| APP-05 | Phase 8 | Pending |
+| APP-06 | Phase 8 | Pending |
+| APP-07 | Phase 8 | Pending |
+| APP-08 | Phase 8 | Pending |
+| APP-09 | Phase 8 | Pending |
+| APP-10 | Phase 8 | Pending |
+| FMT-01 | Phase 8 | Pending |
+| FMT-02 | Phase 8 | Pending |
+| BATCH-01 | Phase 8 | Pending |
+| BATCH-02 | Phase 8 | Pending |
+| BATCH-03 | Phase 8 | Pending |
+| DEPLOY-01 | Phase 9 | Pending |
+| DEPLOY-02 | Phase 9 | Pending |
+| DEPLOY-03 | Phase 9 | Pending |
+| DEPLOY-04 | Phase 9 | Pending |
+| PRIV-01 | Phase 9 | Pending |
 
 **Coverage:**
 - v1 requirements: 33 total
-- Mapped to phases: 0 (roadmapper to fill)
-- Unmapped: 33 ⚠️ (resolved at roadmap creation)
+- Mapped to phases: 33 (roadmapper complete)
+- Unmapped: 0 ✓
+
+| Phase | Requirements | Count |
+|-------|-------------|-------|
+| Phase 6: Security Gate + Worker Auth Split | SEC-01..05, WRKR-01..04 | 9 |
+| Phase 7: Shared Core Extraction + Corpus Guard | CORE-01..04 | 4 |
+| Phase 8: Webapp Core Build | APP-01..10, FMT-01..02, BATCH-01..03 | 15 |
+| Phase 9: Deploy + Live UAT + Privacy | DEPLOY-01..04, PRIV-01 | 5 |
 
 ---
 *Requirements defined: 2026-06-16*
-*Last updated: 2026-06-16 after initial v6.0 definition*
+*Last updated: 2026-06-16 — traceability filled by roadmapper; 33/33 requirements mapped to Phases 6-9*

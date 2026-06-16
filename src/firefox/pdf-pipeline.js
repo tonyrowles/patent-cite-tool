@@ -13,8 +13,10 @@
  * This file is an ES module — no chrome.runtime.sendMessage calls.
  */
 
-import { extractTextFromPdf } from '../offscreen/pdf-parser.js';
-import { buildPositionMap } from '../offscreen/position-map-builder.js';
+import { extractTextFromPdf, configurePdfWorker } from '../shared/pdf-parser.js';
+import { buildPositionMap } from '../shared/position-map-builder.js';
+
+configurePdfWorker(chrome.runtime.getURL('lib/pdf.worker.mjs'));
 import { matchAndCite } from '../shared/matching.js';
 import { MSG } from '../shared/constants.js';
 

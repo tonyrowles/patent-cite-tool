@@ -14,8 +14,10 @@
  * This file is an ES module (loaded via <script type="module">).
  */
 
-import { extractTextFromPdf } from './pdf-parser.js';
-import { buildPositionMap } from './position-map-builder.js';
+import { extractTextFromPdf, configurePdfWorker } from '../shared/pdf-parser.js';
+import { buildPositionMap } from '../shared/position-map-builder.js';
+
+configurePdfWorker(chrome.runtime.getURL('lib/pdf.worker.mjs'));
 import { MSG } from '../shared/constants.js';
 import { matchAndCite } from '../shared/matching.js';
 

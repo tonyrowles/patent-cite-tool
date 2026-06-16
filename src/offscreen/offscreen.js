@@ -23,8 +23,10 @@ import { matchAndCite } from '../shared/matching.js';
 const WORKER_URL = 'https://pct.tonyrowles.com';
 const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
 
-// Cache version — bump to invalidate all cached entries
-const CACHE_VERSION = 'v3';
+// Cache version — bump to invalidate all cached entries.
+// v4 (post-v5.0.0): evicts position maps poisoned by the v5.0.0 column-sequence
+// regression (loosened validation dropped real columns; see position-map-builder.js).
+const CACHE_VERSION = 'v4';
 
 // ---------------------------------------------------------------------------
 // Test-mode hook — Phase 30 E2E fault-injection support

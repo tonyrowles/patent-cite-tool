@@ -343,46 +343,60 @@ describe('buildPositionMap sequential column validation', () => {
     expect(cols).not.toContain(204);
   });
 
-  it('accepts a small forward gap (1,2 → 5,6) — figure pages between spec and claims', () => {
+  it('rejects a forward gap (1,2 → 5,6) — columns must advance in exact order', () => {
+    // Granted US patents number columns continuously; a printed-column gap means
+    // the "5,6" read is spurious (figure/front-matter contamination), not a real
+    // column. Strict validation rejects it rather than trusting it.
     const result = buildPositionMap([
       makeSpecPage(1, 1, 2),
-      makeSpecPage(2, 5, 6), // gap of 2 missing columns (one figure page pair)
+      makeSpecPage(2, 5, 6),
     ]);
     const cols = [...new Set(result.map(e => e.column))];
     expect(cols).toContain(1);
     expect(cols).toContain(2);
-    expect(cols).toContain(5);
-    expect(cols).toContain(6);
+    expect(cols).not.toContain(5);
+    expect(cols).not.toContain(6);
   });
 
-  it('accepts gap and continues to next valid page (1,2 → 5,6 → 7,8)', () => {
+  it('REGRESSION (v5.0.0): a spurious odd-pair read must not poison the column expectation', () => {
+    // v5.0.0 loosened the sequential check to a ±20 forward window. A spurious
+    // but per-page-valid odd column-pair (7,8) appearing before the real cols
+    // 3,4,5,6 was accepted, advanced expectedLeftCol to 9, and then caused every
+    // genuinely-later real page (left < 9) to be rejected — dropping cols 3-6.
+    // Long passages spanning those columns returned "no match"; short passages in
+    // surviving columns returned spurious hits. Strict validation rejects (7,8)
+    // (7 ≠ expected 3) and keeps the expectation re-synced for the real pages.
     const result = buildPositionMap([
       makeSpecPage(1, 1, 2),
-      makeSpecPage(2, 5, 6),
-      makeSpecPage(3, 7, 8),
+      makeSpecPage(2, 7, 8), // spurious — does not match expected col 3
+      makeSpecPage(3, 3, 4),
+      makeSpecPage(4, 5, 6),
     ]);
     const cols = [...new Set(result.map(e => e.column))];
-    expect(cols).toEqual(expect.arrayContaining([1, 2, 5, 6, 7, 8]));
+    // The real columns must all survive...
+    expect(cols).toEqual(expect.arrayContaining([1, 2, 3, 4, 5, 6]));
+    // ...and the spurious out-of-order pair must be rejected.
+    expect(cols).not.toContain(7);
+    expect(cols).not.toContain(8);
   });
 
-  it('rejects backward jump (3,4 → 1,2) — pages must advance, not retreat', () => {
-    const result = buildPositionMap([
-      makeSpecPage(1, 3, 4),
-      makeSpecPage(2, 1, 2),
-    ]);
-    const cols = [...new Set(result.map(e => e.column))];
-    expect(cols).toContain(3);
-    expect(cols).toContain(4);
-    // Second page rejected — only the first page's columns appear after
-    // dedupe (assumes col 1 from the second page does not also appear).
-    expect(result.filter(e => e.column === 1).length).toBe(0);
-    expect(result.filter(e => e.column === 2).length).toBe(0);
-  });
-
-  it('rejects implausibly large forward gap (1,2 → 25,26) — patent-number contamination', () => {
+  it('rejects backward jump (1,2 → 3,4 → back to 1,2) — pages must advance, not retreat', () => {
     const result = buildPositionMap([
       makeSpecPage(1, 1, 2),
-      makeSpecPage(2, 25, 26), // gap of 22 > MAX_PAGE_GAP=20
+      makeSpecPage(2, 3, 4),
+      makeSpecPage(3, 1, 2), // retreat — expectedLeftCol is now 5, so 1 < 5 is rejected
+    ]);
+    // Each real column appears exactly once (the retreating page 3 is dropped).
+    expect(result.filter(e => e.column === 1).length).toBeGreaterThan(0);
+    expect(result.filter(e => e.column === 3).length).toBeGreaterThan(0);
+    const page3Entries = result.filter(e => e.pageNum === 3);
+    expect(page3Entries.length).toBe(0);
+  });
+
+  it('rejects implausibly large forward jump (1,2 → 25,26) — patent-number contamination', () => {
+    const result = buildPositionMap([
+      makeSpecPage(1, 1, 2),
+      makeSpecPage(2, 25, 26), // 25 ≠ expected 3 — rejected by strict validation
     ]);
     const cols = [...new Set(result.map(e => e.column))];
     expect(cols).toContain(1);

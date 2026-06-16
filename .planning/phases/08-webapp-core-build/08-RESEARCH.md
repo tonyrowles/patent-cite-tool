@@ -606,7 +606,7 @@ async function copyToClipboard(text) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED — cross-column long-form locked in 08-02; wrangler-dev HTTPS needs no action)
 
 1. **Cross-column long-form format spec**
    - What we know: same-column long-form is `Col. 4, ll. 15-22` (UI-SPEC example, FMT-01). The `formatCitation` shorthand for cross-column is `4:15-22:3` style.

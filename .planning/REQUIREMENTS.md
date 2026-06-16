@@ -19,10 +19,10 @@ Blocking preconditions — must close before any public URL is announced.
 
 ### Shared Core Extraction
 
-- [ ] **CORE-01**: `matching.js` and `position-map-builder.js` are relocated into `src/shared/` and consumed by the extension via the existing esbuild alias pattern — verbatim, no behavior change
-- [ ] **CORE-02**: `pdf-parser.js` is relocated into `src/shared/` with its module-scope `chrome.runtime.getURL(...)` replaced by an injectable `configurePdfWorker(url)` seam (extension injects `chrome.runtime.getURL`, webapp injects its asset path) — importing the module in a plain web page no longer throws
-- [ ] **CORE-03**: The 75-case golden corpus passes at 100% on the extension build after extraction, with the golden baseline snapshot byte-unchanged
-- [ ] **CORE-04**: A full-pipeline browser-context integration test (PDF bytes → `extractTextFromPdf` → `buildPositionMap` → `matchAndCite`) is green, and PDF.js is confirmed running in a worker thread (not the main thread)
+- [x] **CORE-01**: `matching.js` and `position-map-builder.js` are relocated into `src/shared/` and consumed by the extension via the existing esbuild alias pattern — verbatim, no behavior change
+- [x] **CORE-02**: `pdf-parser.js` is relocated into `src/shared/` with its module-scope `chrome.runtime.getURL(...)` replaced by an injectable `configurePdfWorker(url)` seam (extension injects `chrome.runtime.getURL`, webapp injects its asset path) — importing the module in a plain web page no longer throws
+- [x] **CORE-03**: The 75-case golden corpus passes at 100% on the extension build after extraction, with the golden baseline snapshot byte-unchanged
+- [x] **CORE-04**: A full-pipeline browser-context integration test (PDF bytes → `extractTextFromPdf` → `buildPositionMap` → `matchAndCite`) is green, and PDF.js is confirmed running in a worker thread (not the main thread)
 
 ### Worker Public Routes
 
@@ -107,10 +107,10 @@ Which phases cover which requirements. **Populated by the roadmapper.**
 | WRKR-02 | Phase 6 | Verified |
 | WRKR-03 | Phase 6 | Verified |
 | WRKR-04 | Phase 6 | Verified |
-| CORE-01 | Phase 7 | Pending |
-| CORE-02 | Phase 7 | Pending |
-| CORE-03 | Phase 7 | Pending |
-| CORE-04 | Phase 7 | Pending |
+| CORE-01 | Phase 7 | Verified |
+| CORE-02 | Phase 7 | Verified |
+| CORE-03 | Phase 7 | Verified |
+| CORE-04 | Phase 7 | Verified |
 | APP-01 | Phase 8 | Pending |
 | APP-02 | Phase 8 | Pending |
 | APP-03 | Phase 8 | Pending |

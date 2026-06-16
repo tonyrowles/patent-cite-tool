@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: Standalone Citation Webapp
-status: executing
+status: completed
 stopped_at: Roadmap created, REQUIREMENTS.md traceability filled, STATE.md updated. Ready to plan Phase 6.
-last_updated: "2026-06-16T21:37:08.864Z"
-last_activity: 2026-06-16 -- Phase 7 planning complete
+last_updated: "2026-06-16T22:00:19.319Z"
+last_activity: 2026-06-16 -- Phase 7 marked complete
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 4
-  percent: 25
+  completed_plans: 6
+  percent: 50
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-16)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — extended in v6.0 to a standalone web page: enter a patent number + passage, get the exact column:line citation, no LLM.
-**Current focus:** Phase 6 — Security Gate + Worker Auth Split
+**Current focus:** Phase 7 — Shared Core Extraction + Corpus Guard
 
 ## Current Position
 
-Phase: 6 — COMPLETE
-Plan: 1 of 4
-Status: Ready to execute
-Last activity: 2026-06-16 -- Phase 7 planning complete
+Phase: 7 — COMPLETE
+Plan: 1 of 2
+Status: Phase 7 complete
+Last activity: 2026-06-16 -- Phase 7 marked complete
 
 Progress: [░░░░░░░░░░] 0%
 

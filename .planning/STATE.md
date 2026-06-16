@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v5.0
 milestone_name: Bug Report Feature
-status: milestone_complete
-stopped_at: Milestone complete (Phase 05 was final phase)
-last_updated: 2026-06-14T20:05:54.254Z
-last_activity: 2026-06-14
+status: Awaiting next milestone
+stopped_at: v5.0 milestone complete (Phase 05 final; live UAT-01..06 PROVEN against production pct.tonyrowles.com)
+last_updated: "2026-06-16T06:44:07.669Z"
+last_activity: 2026-06-16 — Milestone v5.0 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 05
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-06-14
+Phase: Milestone v5.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-16 — Milestone v5.0 completed and archived
 
 ## Budget
 
@@ -189,15 +189,29 @@ Items carried forward from v4.0 milestone close on 2026-06-02 — resolved by v4
 | verification_gap | Phase 68: destructive UAT-03 + final spend tally | paused | Blocked on `.planning/sweep-03-04-pass-evidence.yaml` sentinel; deferred to v5.1 alongside bug-report ingestion reqs |
 | carry_over | AFIX-DEF-01..03: v4.3 Phase 68 work | paused | 17 unpushed Phase 67 commits (5a6630a..5b749b1) stay local; v5.1 resumes with these + bug-report ingestion requirements |
 
+## Deferred Items (acknowledged at v5.0 milestone close 2026-06-16)
+
+Items surfaced by `gsd-sdk query audit-open` and acknowledged as benign/deferred at close. The v5.0 DoD (live UAT-01..06) is PROVEN in `.planning/milestones/v5.0-phases/05-.../05-UAT-RESULTS.md`; no formal `v5.0-MILESTONE-AUDIT.md` was run.
+
+| Category | Item | Status | Resolution |
+|----------|------|--------|------------|
+| uat_gap | Phase 01: 01-HUMAN-UAT.md (WR-06, CR-01, PRIV-05) | partial | Resolved by Phase 5 live UAT: WR-06 manifest placement (`technicalAndInteraction` → optional) confirmed by UAT-04; PRIV-05 `web-ext lint` clean (errors 0/warnings 0) in UAT-04; CR-01 patentNumber-validation accepted as documented scope decision. File never re-stamped. |
+| uat_gap | Phase 04: 04-HUMAN-UAT.md | partial | 0 pending scenarios; Tests 1-5 closed by Phase 5 live UAT-05/UAT-06 (focus trap, dismiss paths, auto-surface, live payload, sticky toggle proven across Chrome/149 + Firefox/151). |
+| uat_gap | Phase 05: 05-UAT-RESULTS / 05-UAT-RUNBOOK / 05-UAT-HANDOFF | unknown→passed | Parser cannot classify format; all 6 UAT items PASS with documented evidence (KV records, Discord embeds, no-ip asserts, dedup, cross-browser parity). |
+| verification_gap | Phase 01: 01-VERIFICATION.md | human_needed | Expected for the privacy/lint-deferred phase; closed by Phase 5 UAT-04. |
+| verification_gap | Phase 04: 04-VERIFICATION.md | human_needed | Expected convention for UI phases (live Shadow-DOM/focus/page behavior → UAT); closed by Phase 5 UAT-05/06. |
+| quick_task | 1-fix-off-by-2-error-in-patent-column-line | missing | Stale pre-v5.0 debris (Mar 2026); already acknowledged at v4.1/v4.2 close; directory retained as historical record. |
+| quick_task | 2-fix-ci-commit-package-lock-json-currentl | missing | Same — stale pre-v5.0 debris (Mar 2026). |
+| quick_task | 260412-fde-fix-spurious-results-reporting-impossibl | missing | Same — stale pre-v5.0 debris (Apr 2026). |
+
+**Non-blocking follow-up bug (file in v5.1):** Notes-textarea drops characters during typing in the report dialog — likely a content-script keydown handler intercepting single-key input before it reaches the textarea (missing `stopPropagation`). UAT criteria still met (note text persisted via paste).
+
 ## Session Continuity
 
-Last session: 2026-06-14T04:13:04.268Z
-Stopped at: Phase 5 UAT — blocked on Worker deploy (/report not deployed); 2 extension bugs fixed+pushed
-Resume file: .planning/phases/05-options-page-debug-mode-popup-fallback-live-uat/05-UAT-HANDOFF.md
+Last session: 2026-06-16 — v5.0 milestone close
+Stopped at: v5.0 milestone complete and archived (live UAT-01..06 PROVEN)
+Resume file: — (start next milestone with /gsd-new-milestone)
 
 ## Operator Next Steps
 
-- IMMEDIATE: Follow 05-UAT-RUNBOOK.md and perform the live browser UAT steps against https://pct.tonyrowles.com/report. For each UAT item, collect the fingerprint from the Discord embed footer (fp:XXXXXXXXXXXXXXXX) and report outcomes back.
-- AFTER operator submits: Resume 05-05-PLAN.md Task 3 by running wrangler KV verifications with the operator-supplied fingerprints to record final PASS/FAIL evidence in 05-UAT-RESULTS.md.
-- PHASE CLOSE: Phase 05 and v5.0 milestone are NOT complete until UAT-01/02/03/05/06 have both operator + Claude evidence with final PASS/FAIL recorded.
-- UAT-04 is already PASS — no additional browser steps needed for privacy audit.
+- Start the next milestone with /gsd-new-milestone

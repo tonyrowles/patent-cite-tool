@@ -2,51 +2,19 @@
 
 ## What This Is
 
-A cross-browser extension (Chrome + Firefox) for patent professionals that generates precise column:line citations (for granted patents) or paragraph citations (for published applications) by highlighting text on Google Patents. Built with an esbuild pipeline from shared source code, supports silent clipboard mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker, shared server-side cache via Cloudflare KV, OCR-aware normalization (Tier 0b) and gutter-tolerant matching (Tier 5), and 100% accuracy on a 75-case cross-browser golden baseline.
+A cross-browser extension (Chrome + Firefox) for patent professionals that generates precise column:line citations (for granted patents) or paragraph citations (for published applications) by highlighting text on Google Patents. Built with an esbuild pipeline from shared source code, supports silent clipboard mode (Ctrl+C), USPTO eGrant API fallback via Cloudflare Worker, shared server-side cache via Cloudflare KV, OCR-aware normalization (Tier 0b) and gutter-tolerant matching (Tier 5), and 100% accuracy on a 75-case cross-browser golden baseline. Ships an in-product bug-report affordance that routes auto-captured diagnostic bundles to a private Cloudflare-backed observability pipeline (KV + Discord) for maintainer triage.
 
 ## Core Value
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v5.0 Bug Report Feature
+## Last Shipped: v5.0 Bug Report Feature (Shipped 2026-06-15)
 
-**Goal:** Give extension users a low-friction in-product affordance to report citation failures (inaccurate / no-match / non-functioning), routing rich auto-captured diagnostic bundles to a private Cloudflare-backed observability pipeline (KV durable + Discord notify) for maintainer triage — establishing the inbound signal channel that v5.1's resumed auto-fix work will eventually ingest.
+Gave extension users a low-friction in-product affordance to report citation failures, routing rich auto-captured diagnostic bundles to a private Cloudflare-backed observability pipeline (`BUG_REPORTS` KV durable + Discord webhook notify) for maintainer triage — the inbound signal channel that v5.1's resumed auto-fix work will ingest. **Live UAT-01..06 PROVEN against production `pct.tonyrowles.com` before close** (Discord embeds + KV records verified, no IP stored, server-side dedup + cross-browser parity on Chrome/149 + Firefox/151).
 
-**Target features:**
+The shipped pipeline: (1) a `POST /report` Cloudflare Worker route with an explicit PAY-01 field allowlist (no `ip`/`clientIp`/`userAgent` stored), `BUG_REPORTS` KV namespace at `report:{fingerprint}:{timestamp}` keys (90-day TTL), SHA-256 fingerprint dedup over a 15-min window (`duplicate_count`), IP-keyed transient rate limit (`rl:{ip}`, 5/60s), and a server-side-only Discord webhook URL; (2) a pure `src/shared/report-payload-builder.js` schema-contract module (zero `chrome.*`, Vitest-pinned for schema conformance + [Remove selection text] omission + fingerprint reproducibility); (3) a shared `report-transport.js` transport layer with disk-first `chrome.storage.local` queue, sliding-window client rate limit (5/10 min), 2s/8s/30s backoff, and byte-identical `SUBMIT_REPORT` dispatch across Chrome SW + Firefox background (content scripts never POST cross-origin — XPORT-06 guard); (4) a Shadow DOM report dialog auto-surfacing on no-match/yellow/Worker-error with a green-hidden invariant (TRIG-04), "What's included" payload preview, sticky [Remove selection text] toggle, focus trap, 20-entry error ring buffer, and DOM/PDF diagnostic enrichment; (5) options Debug Mode toggle + popup "Report a problem" → options `#report` page-mode dialog (same builder + flow). 5 phases (1-5), 16 plans, 26 tasks, ~4 days. 45/45 v1 requirements shipped. Zero new npm dependencies (sixth consecutive milestone). `assertTripleGate` body byte-unchanged; v40-auto-fix CI stayed `workflow_dispatch:`-only throughout. Privacy model: inline disclosure + expandable payload preview, no separate consent modal, user sees exactly what's sent before submitting.
 
-*User-facing capture surface:*
-- In-citation Report button — unobtrusive affordance in the existing citation result UI (Shadow DOM); auto-surfaces on No-match/failure, Yellow confidence (Tier 5 fallback / 0.85 cap), and Worker-fallback errors
-- Toolbar popup + options page fallback — secondary surfaces for "tool didn't load at all" cases where the citation UI never appears
-- Debug Mode — options-page toggle; when ON, Report button is always available regardless of citation outcome (placeholder for future observability surfaces — metrics, last-N-reports view, possibly access-limited)
-- One-tap category picker — 4 categories (Inaccurate citation / No match found / Tool not working / Other) + optional free-text note
-- Inline privacy disclosure — one-line "what's included" with expandable full-payload preview before submit
-
-*Auto-captured diagnostic payload:*
-- Core context — patent #, Google Patents URL, user's selected text, returned citation (or no-match flag), confidence tier (green/yellow/red), extension version, browser+OS
-- DOM/PDF diagnostics — selected-node xpath, viewport/scroll position, PDF parse status (reuses v3.1 `llm-report.json` schema where applicable)
-- Settings snapshot — trigger mode, citation format, prefix on/off
-- Recent error log ring buffer — last N console errors / extension-internal warnings
-
-*Transport & observability:*
-- Cloudflare Worker submission endpoint — new route on existing Worker (same provider as USPTO proxy + KV cache)
-- KV durable storage — every report persisted, queryable, dedup-able; survives Discord channel changes
-- Discord webhook notification — real-time observation channel; webhook URL stays server-side (Worker env binding), NEVER embedded in extension code
-
-*Guardrails:*
-- Client-side rate limit — ~5 reports / 10 min per install, persisted in extension storage; defends against accidental rage-click loops
-- Server-side fingerprint dedup — Worker computes fingerprint (patent # + category + selection hash) and dedups within an N-minute window in KV
-- Local queue + retry on Worker failure — report sits in extension storage and retries on next extension load (matches existing graceful-degradation pattern from `idbAvailable` flag)
-- No CAPTCHA for v1 — layer in only if abuse shows up
-
-**Key context:**
-- Phase numbering RESET — `--reset-phase-numbers` active; v5.0 starts at **Phase 1** (v4.3 paused at Phases 61-67; auto-fix carry-over resumes in v5.1 picking up wherever the deferred Phase 68 work lands)
-- v4.3 paused phases archived at `.planning/milestones/v4.3-phases-paused/` (init JSON's `phase_archive_path` pointed at the stale `v4.2-phases/` path; overridden to keep v4.3's audit trail distinct from v4.2's)
-- Promotion to GitHub Issues OUT of scope for v1 — manual `gh issue create` for now; v5.1 auto-promotion will tie bug-report observability into the resumed auto-fix triage classifier (existing v3.1 ISSUE-01..04 `issue-payload-builder` is the eventual reuse target)
-- Privacy model — inline disclosure + expandable payload preview; no separate consent modal; user sees exactly what's sent before submitting; PII review of the auto-captured payload is a load-bearing requirement
-- Pattern B versioning — v4.3 carry-over scope (Phase 68 destructive UAT-03 + scaffold expansion follow-on + ongoing A/B winner observability + prompt-iter loop refinement) pulls forward into **v5.1** alongside bug-report ingestion requirements derived from v5.0 report volume
-- v40-auto-fix CI workflow currently `workflow_dispatch:` only (commit `d8d54c4`); stays dormant for the v5.0 cycle to remove a noise vector while bug-report ships
-- Zero new npm dependencies target (sixth consecutive milestone if held — relies on existing Cloudflare Worker + KV + extension primitives + Discord webhook HTTP POST)
-- DoD: end-user can submit a report from the in-citation UI, it lands in KV + Discord, maintainer can observe + manually triage. Live UAT against a real failed-citation scenario before milestone close
+**What's NOT in v5.0 (deferred to v5.1):** auto-promotion of KV reports to GitHub Issues (v5.0 ships the inbound signal channel; v5.1 wires it to the auto-fix triage classifier reusing v3.1 `issue-payload-builder`); the v4.3 auto-fix carry-over (Phase 68 destructive UAT-03 + final spend tally + 17 unpushed Phase 67 commits) per Pattern B versioning. One non-blocking follow-up bug logged: the report-dialog Notes textarea drops characters during typing (likely a content-script keydown handler missing `stopPropagation`) — UAT criteria still met. Full close evidence in `.planning/milestones/v5.0-phases/05-.../05-UAT-RESULTS.md`; deferred-items ledger in STATE.md.
 
 ## Paused Milestone: v4.3 Auto-Fix Loop Closure + Capability Expansion (Paused 2026-06-12)
 
@@ -139,7 +107,11 @@ v4.1 landed v4.0's 215 commits on origin/main and hardened the ruleset trust bou
 ### Validated (v5.0)
 
 - ✓ **XPORT-01..04, PAY-01..04, LIMIT-01..02**: `POST /report` Cloudflare Worker route behind the existing Bearer `PROXY_TOKEN` gate; `BUG_REPORTS` KV namespace with `report:{fingerprint}:{timestamp}` keys at 90-day TTL; explicit field allowlist (no `ip`/`clientIp`/`userAgent` stored); SHA-256 fingerprint dedup (15-min window, increments `duplicate_count`); IP-keyed transient rate limit (5 req/60s via `rl:{ip}`); best-effort Discord webhook notification with the URL kept server-side only; `report-schema.md` Phase 2 contract; 23-case Vitest suite — Phase 1 (BLOCK-02 webhook hygiene, BLOCK-03 IP-not-in-KV resolved)
-- ✓ **PRIV-01..05**: Firefox manifest `data_collection_permissions` declared; privacy policy "Bug Report Feature" section with field-by-field disclosure; "no personal information" claims qualified to normal citation use; Data Sharing names Cloudflare/Discord as processors; CWS store-listing data-use declaration internally consistent across checklist, quick-reference, and body — Phase 1 (BLOCK-01 privacy compliance resolved). Human-judgment items carried to `01-HUMAN-UAT.md`: AMO required-vs-optional permission placement (WR-06), patentNumber input-validation scope (CR-01), and `web-ext lint` on a built `dist/firefox/` (PRIV-05, owned by Phase 5 UAT-04)
+- ✓ **PRIV-01..05**: Firefox manifest `data_collection_permissions` declared; privacy policy "Bug Report Feature" section with field-by-field disclosure; "no personal information" claims qualified to normal citation use; Data Sharing names Cloudflare/Discord as processors; CWS store-listing data-use declaration internally consistent across checklist, quick-reference, and body — Phase 1 (BLOCK-01 privacy compliance resolved). Human-judgment items resolved by Phase 5 UAT: AMO required-vs-optional placement (WR-06 — `technicalAndInteraction` → optional, UAT-04-confirmed), patentNumber input-validation scope (CR-01 — accepted as documented scope decision), `web-ext lint` clean on built `dist/firefox/` (PRIV-05 — errors 0/warnings 0 in UAT-04)
+- ✓ **PAY-05..07**: `src/shared/report-payload-builder.js` pure function (zero `chrome.*`) establishes the canonical payload schema contract; `MSG.SUBMIT_REPORT` / frozen `REPORT_CATEGORIES` / `WORKER_REPORT_URL` in `constants.js`; Vitest-pinned for schema conformance, [Remove selection text] omission, and byte-stable fingerprint reproducibility — Phase 2
+- ✓ **XPORT-05..06, LIMIT-03, QUEUE-01..04**: shared `report-transport.js` with disk-first `chrome.storage.local` queue, sliding-window client rate limit (5/10 min), 2s/8s/30s exponential backoff, byte-identical `SUBMIT_REPORT` dispatch across Chrome SW + Firefox background; content scripts never POST cross-origin (XPORT-06 static-grep guard); 29 per-target tests incl. SW-death simulation — Phase 3
+- ✓ **CAP-01..04, TRIG-01..04, PAY-08..09**: Shadow DOM report dialog (4-category picker, note + counter, "What's included" payload preview, sticky [Remove selection text] toggle, focus trap + dismiss paths), Report button auto-surfacing on no-match/yellow/Worker-error with green-hidden invariant (TRIG-04), 20-entry error ring buffer, DOM/PDF diagnostic enrichment — Phase 4
+- ✓ **DBG-01..02, CAP-05..06, UAT-01..06**: options `debugMode` toggle (live per-citation read), popup "Report a problem" → options `#report` page-mode dialog (same builder + flow, no Shadow DOM); live UAT-01..06 PROVEN against production Worker (Discord embeds + KV records, no `ip`, server-side dedup, cross-browser parity Chrome/149 + Firefox/151) — Phase 5
 
 ### Future
 
@@ -294,4 +266,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-13 — v5.0 Phase 1 complete (Worker route + KV schema + privacy compliance groundwork; 3/3 plans, re-verified 15/15 after gap closure, BLOCK-01/02/03 resolved). v4.3 paused at Phase 67 (6/7 shipped) — carry-over scope flows to v5.1 per Pattern B versioning. Phase numbering reset for v5.0 (`--reset-phase-numbers`); v4.3 paused-phase artifacts archived to `.planning/milestones/v4.3-phases-paused/`*
+*Last updated: 2026-06-16 after v5.0 Bug Report Feature milestone (5 phases, 16 plans, 26 tasks; 45/45 v1 requirements shipped; live UAT-01..06 PROVEN against production `pct.tonyrowles.com`). v4.3 remains paused at Phase 67 (6/7 shipped) — auto-fix carry-over + bug-report ingestion resume in v5.1 per Pattern B versioning. Next: `/gsd-new-milestone`.*

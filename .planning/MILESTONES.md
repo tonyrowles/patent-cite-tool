@@ -1,5 +1,28 @@
 # Milestones
 
+## v5.0 Bug Report Feature (Shipped: 2026-06-16)
+
+**Phases completed:** 5 phases (1-5), 16 plans, 26 tasks
+**Timeline:** 4 days (2026-06-12 → 2026-06-15)
+**Lines of code:** ~2,700 source LOC (`src/` + `worker/src/`, +2704 / -43); 177 files incl. planning across full branch
+**Git range:** 6ed5207 → 6abeff5 (branch `feat/bug-report`)
+
+**Delivered:** End users can report citation failures from an in-product affordance; rich auto-captured diagnostic bundles route to a private Cloudflare-backed observability pipeline (`BUG_REPORTS` KV durable + Discord webhook notify) for maintainer triage — the inbound signal channel that v5.1's resumed auto-fix work will ingest. Live UAT-01..06 PROVEN against production `pct.tonyrowles.com` before close.
+
+**Key accomplishments:**
+
+1. **Worker route + KV schema + privacy compliance (Phase 1)** — `POST /report` Cloudflare Worker route with explicit PAY-01 field allowlist (no `ip`/`clientIp`/`userAgent` stored), `BUG_REPORTS` KV namespace at `report:{fingerprint}:{timestamp}` keys (90-day TTL), SHA-256 fingerprint dedup over a 15-min window (`duplicate_count`), IP-keyed transient rate limit (`rl:{ip}`, 5/60s), server-side-only Discord webhook URL; Firefox manifest `data_collection_permissions` + privacy-policy "Bug Report Feature" section + CWS store-listing reconciled (BLOCK-01/02/03 resolved)
+2. **Shared constants + pure payload builder (Phase 2)** — `src/shared/report-payload-builder.js` pure function (zero `chrome.*`) establishes the canonical payload schema contract; `MSG.SUBMIT_REPORT` / frozen `REPORT_CATEGORIES` / `WORKER_REPORT_URL` constants; Vitest-pinned for schema conformance, [Remove selection text] omission, and fingerprint reproducibility
+3. **Background transport + rate limit + retry queue (Phase 3)** — shared `report-transport.js` with disk-first `chrome.storage.local` queue, sliding-window client rate limit (5/10 min), 2s/8s/30s exponential backoff, byte-identical `SUBMIT_REPORT` dispatch across Chrome SW + Firefox background; content scripts never POST cross-origin (XPORT-06 static-grep guard); 29 new per-target tests incl. SW-death simulation
+4. **Report dialog UI + citation-UI wiring (Phase 4)** — Shadow DOM report dialog (4-category picker, note + counter, "What's included" payload preview, sticky [Remove selection text] toggle, focus trap + dismiss paths), Report button auto-surfacing on no-match/yellow/Worker-error with green-hidden invariant (TRIG-04), 20-entry error ring buffer, DOM/PDF diagnostic enrichment
+5. **Options Debug Mode + popup fallback + live UAT (Phase 5)** — options `debugMode` toggle (live per-citation read, shows Report on green), popup "Report a problem" → options `#report` page-mode dialog (same builder + flow, no Shadow DOM); live UAT-01..06 against production Worker — Discord embeds + KV records verified, no `ip` stored, `web-ext lint` clean, server-side dedup + cross-browser parity (Chrome/149 + Firefox/151) proven
+
+**Requirements:** 45/45 v1 requirements shipped. Zero new npm dependencies (sixth consecutive milestone). `assertTripleGate` body byte-unchanged; v40-auto-fix CI workflow stayed `workflow_dispatch:`-only throughout.
+
+**Known deferred items at close:** 10 items acknowledged as benign/deferred (see STATE.md `## Deferred Items (acknowledged at v5.0 milestone close 2026-06-16)`). Plus one non-blocking follow-up bug: Notes-textarea drops characters during typing (likely a missing `stopPropagation` on a content-script keydown handler) — UAT criteria still met (note text persisted). No formal `v5.0-MILESTONE-AUDIT.md` was run; close proceeded on the documented live-UAT PASS evidence in `05-UAT-RESULTS.md`.
+
+---
+
 ## v4.2 Auto-Fix Loop Live (Shipped: 2026-06-09)
 
 **Phases completed:** 5 phases (56-60), 11 plans, 11 tasks

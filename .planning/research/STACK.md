@@ -1,417 +1,393 @@
-# Stack Research — v5.0 Bug Report Feature
+# Stack Research — v6.0 Standalone Citation Webapp
 
-**Domain:** In-extension bug-report feature — Cloudflare Worker new `/report` route, KV durable storage of reports, Discord webhook notification, extension-side UI capture + background-script transport, local retry queue, options page Debug Mode
-**Researched:** 2026-06-12
-**Scope:** NEW work for v5.0 ONLY — existing Worker/KV/extension surfaces verified from direct source reads; nothing re-architected
-**Overall confidence:** HIGH (Worker source, manifests, options page, background scripts, and constants all read directly; Discord limits verified from official docs + well-cited secondary; Cloudflare KV and secrets verified from official docs; Chrome storage limits verified from Chrome for Developers)
+**Domain:** Client-side PDF.js webapp reusing the extension's deterministic matching core; hosted on Cloudflare; talking to the existing pct.tonyrowles.com Worker.
+**Researched:** 2026-06-16
+**Scope:** NEW work for v6.0 ONLY — five specific questions from milestone context.
+**Overall confidence:** HIGH (all existing sources read directly; Cloudflare docs verified via Context7 + official pages; PDF.js verified via npm package inspection; CORS verified from Worker source; key constraint about Pages+Workers domain conflict confirmed from official Cloudflare known-issues doc).
 
 ---
 
-## What Was Verified vs Already Known
-
-The milestone context asserted several facts about the existing codebase. All were confirmed by reading source directly before doing any external research.
+## Pre-Research: Codebase Facts Confirmed by Direct Read
 
 | Claim | Verified | Source |
 |-------|---------|--------|
-| Worker is ES Modules syntax (`export default { async fetch(...) }`) | YES | `worker/src/index.js:120` |
-| Route dispatch already uses `if (path === '/cache')` pattern | YES | `worker/src/index.js:157` |
-| CORS preflight handled BEFORE auth check | YES | `worker/src/index.js:131-141` |
-| `PATENT_CACHE` KV binding in `wrangler.toml` with `id` | YES | `worker/wrangler.toml:5-7` |
-| `PROXY_TOKEN` and `USPTO_API_KEY` accessed via `env.*` params | YES | `worker/src/index.js:273, 126` |
-| Existing routes: `GET /cache`, `POST /cache`, `GET /?patent=` | YES | `worker/src/index.js` |
-| `WORKER_URL = 'https://pct.tonyrowles.com'` in offscreen | YES | `src/offscreen/offscreen.js:23` |
-| `PROXY_TOKEN` embedded in extension source (known debt) | YES | `src/offscreen/offscreen.js:24` |
-| `https://pct.tonyrowles.com/*` already in `host_permissions` (both manifests) | YES | `src/manifest.json:17`, `src/manifest.firefox.json:17` |
-| `chrome.storage.sync` used for options settings | YES | `src/options/options.js:45` |
-| `chrome.storage.local` used for `currentPatent` state | YES | `src/background/service-worker.js` throughout |
-| Firefox background.js does Worker fetches (via pdf-pipeline) | YES | `src/firefox/background.js:20-21` |
-| `compatibility_date = "2025-01-01"` in wrangler.toml | YES | `worker/wrangler.toml:3` |
+| `PROXY_TOKEN` is hardcoded string in extension source | YES | `src/offscreen/offscreen.js:24` |
+| Worker already returns `Access-Control-Allow-Origin: *` | YES | `worker/src/index.js:30` |
+| Worker validates `Authorization: Bearer ${env.PROXY_TOKEN}` | YES | `worker/src/index.js:525-526` |
+| CORS preflight allows `GET, POST, OPTIONS` + `Authorization, Content-Type` | YES | `worker/src/index.js:517-518` |
+| pdf-parser.js sets `GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs')` | YES | `src/offscreen/pdf-parser.js:14` |
+| pdf-parser.js imports from `'../lib/pdf.mjs'` (local copy, not npm import) | YES | `src/offscreen/pdf-parser.js:9` |
+| `src/lib/` contains `pdf.mjs` (424 KB) and `pdf.worker.mjs` (1.05 MB) | YES | `ls src/lib/` |
+| pdfjs-dist version: `5.5.207` | YES | `node_modules/pdfjs-dist/package.json` |
+| pdfjs-dist build files available: `pdf.mjs`, `pdf.min.mjs`, `pdf.worker.mjs`, `pdf.worker.min.mjs` | YES | `ls node_modules/pdfjs-dist/build/` |
+| `matching.js`, `position-map-builder.js`, `pdf-parser.js` have zero `chrome.*` or DOM dependencies | YES | Direct source reads — pure arithmetic/text processing |
+| Worker sits at `pct.tonyrowles.com` (custom domain) | YES | `src/offscreen/offscreen.js:23` |
+| Repo has no npm workspaces configured | YES | root `package.json` — no `workspaces` field |
+| `worker/` is a separate npm package with its own `package.json` | YES | `worker/package.json` |
+| esbuild pipeline bundles `src/` → `dist/chrome/` + `dist/firefox/`; PDF.js is `external` | YES | `scripts/build.js:57,145` — `external: ['../lib/pdf.mjs']` |
+| Existing esbuild version: `^0.27.3` | YES | root `package.json` |
 
 ---
 
-## Q1: Cloudflare Worker — Current State and Adding `/report`
+## Q1: Static Hosting on Cloudflare — Pages vs. Workers Assets vs. Existing Worker
 
-### Syntax Confirmed: ES Modules
+### Critical Constraint: Pages Cannot Share a Custom Domain With a Routed Worker
 
-`worker/src/index.js` uses `export default { async fetch(request, env, ctx) {} }`. This is the Workers Modules format. No syntax migration needed.
+Cloudflare's own known-issues doc states: **"Custom domains cannot be added if a Worker is already routed on that domain."**
 
-### How to Add the `/report` Route
+The existing `pct.tonyrowles.com` has a Worker routed on it. Cloudflare Pages cannot be given `pct.tonyrowles.com` as a custom domain while that Worker exists. You also cannot put the webapp at `tonyrowles.com` if it needs to share a subdomain with the Worker.
 
-The Worker dispatches on `path` at line 157. The `/report` POST handler slots in immediately after the `/cache` block and BEFORE the fallthrough USPTO proxy route (which uses `url.searchParams.get('patent')` for `GET /`). The insertion point is critical: if the handler is placed after the fallthrough, POST requests to `/report` will hit the patent-number validator and 400.
+This eliminates Cloudflare Pages on `pct.tonyrowles.com` entirely.
 
-```javascript
-// worker/src/index.js — insert after the /cache block (~line 253), before USPTO fallthrough
+**Confidence: HIGH** — [Cloudflare Pages known issues](https://developers.cloudflare.com/pages/platform/known-issues/) confirmed.
 
-if (path === '/report' && request.method === 'POST') {
-  return handleReport(request, env, ctx);
-}
-```
+### Option A: Workers Assets on a New Subdomain (RECOMMENDED)
 
-Auth is automatically shared — the existing bearer check at line 144 runs before route dispatch. `/report` inherits `PROXY_TOKEN` auth with zero additional auth code. This is intentional: the Worker token is already in the extension's offscreen document source, so the report endpoint is protected from arbitrary internet POST spam.
+Deploy a second Cloudflare Worker (asset-only, no JS script) at a new subdomain — e.g., `cite.tonyrowles.com`. Workers Assets is the current Cloudflare offering for serving static files from a Worker.
 
-**`handleReport` responsibilities (all in `worker/src/index.js`):**
-1. Parse and validate JSON body (same pattern as `/cache` POST at line 215)
-2. Compute fingerprint: `crypto.subtle.digest('SHA-256', ...)` over `patentNumber + category + selectionText.slice(0,64)`
-3. Dedup check: `env.BUG_REPORTS.get('report:${fingerprint}:*')` via `list({ prefix: \`report:${fingerprint}:\` })` — if any key exists within the last N minutes, return 409 Conflict
-4. Write to `BUG_REPORTS`: `await env.BUG_REPORTS.put(key, JSON.stringify(report), { expirationTtl: 7776000 })`
-5. POST to Discord webhook: `await fetch(env.DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(discordPayload) })`
-6. Return 201 or appropriate error — Discord failure should NOT cause a 5xx to the extension (swallow Discord errors, log to console; KV write already succeeded)
+**How it works:** During `wrangler deploy`, Wrangler uploads the files from your `[assets] directory` to Cloudflare's infrastructure. On request, Cloudflare serves them directly from the edge with full caching. No Worker script is needed for static-only content.
 
-**CORS:** The existing `corsHeaders()` helper applies to all responses. `/report` needs `POST` in `Access-Control-Allow-Methods` (already present in the preflight at line 138: `'GET, POST, OPTIONS'`). No CORS change needed.
-
-### `wrangler.toml` Changes
-
-Add a second `[[kv_namespaces]]` block. The `[[double-bracket]]` TOML syntax means "append to array" — repeating the block is the correct pattern per Cloudflare docs.
-
+**wrangler.toml for the webapp Worker:**
 ```toml
-name = "patent-cite-worker"
-main = "src/index.js"
+name = "patent-cite-webapp"
 compatibility_date = "2025-01-01"
 
-[[kv_namespaces]]
-binding = "PATENT_CACHE"
-id = "6e7af6faa9c340fdb8120036913b00b5"
+[[routes]]
+pattern = "cite.tonyrowles.com"
+custom_domain = true
 
-[[kv_namespaces]]
-binding = "BUG_REPORTS"
-id = "<output of: npx wrangler kv namespace create 'BUG_REPORTS'>"
+[assets]
+directory = "./dist/webapp"
+not_found_handling = "404-page"
 ```
 
-Create the namespace before editing the file:
-```bash
-cd worker && npx wrangler kv namespace create "BUG_REPORTS"
-# Output: id = "xxxxxxxxxxxx" — paste that id above
-```
+**Coexistence with pct.tonyrowles.com:** Confirmed compatible. Cloudflare docs explicitly state: "Custom Domains can stack on top of each other. For example, if you have Worker A attached to `app.example.com` and Worker B attached to `api.example.com`, Worker A can call `fetch()` on `api.example.com` and invoke Worker B." Two Workers on different subdomains of `tonyrowles.com` is the standard pattern.
 
-### Adding the Discord Webhook URL as a Worker Secret
+**Deploy command:** `cd worker-webapp && npx wrangler deploy`
 
-Secrets are set via `wrangler secret put` and appear in `env.*` at runtime. They are never in `wrangler.toml` or any committed file.
+**Confidence: HIGH** — [Cloudflare Workers Static Assets docs](https://developers.cloudflare.com/workers/static-assets/), [Custom Domains docs](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
 
-```bash
-cd worker && npx wrangler secret put DISCORD_WEBHOOK_URL
-# Interactive prompt — paste the full webhook URL
-```
+### Option B: Cloudflare Pages (NEW *.pages.dev or different domain)
 
-In the Worker handler: `env.DISCORD_WEBHOOK_URL` is the full Discord webhook URL string at runtime.
+Pages would work IF hosted on a `*.pages.dev` subdomain or a completely separate domain that has no existing Worker routes. However:
+- There's no clean existing separate domain to use for this.
+- Pages has its own deployment CLI (`wrangler pages deploy`) and separate project config vs. Workers.
+- Pages Functions (equivalent to Workers) would be needed anyway if dynamic routes are added.
+- Migrating later from Pages to Workers Assets is a known-supported path.
 
-For local development, create `worker/.dev.vars` (must be gitignored — verify `.gitignore` covers `worker/.dev.vars`):
-```
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-```
+**Verdict:** Skip Pages. Workers Assets is the current Cloudflare recommendation for full-stack apps and is simpler to configure given the existing Worker infrastructure.
 
-The extension code NEVER sees the Discord webhook URL. The URL lives exclusively in the Worker deployment. This is the load-bearing security property of the design.
+### Option C: Serve Static Assets From The Existing pct.tonyrowles.com Worker
 
-**Confidence: HIGH** — verified against [Cloudflare Workers Secrets docs](https://developers.cloudflare.com/workers/configuration/secrets/).
+You could add `[assets]` to the existing `worker/wrangler.toml` and add `binding = "ASSETS"` to serve the webapp at `pct.tonyrowles.com/cite/...`. This avoids a new subdomain but:
+- Conflates the API proxy (which should be thin and high-availability) with webapp static assets.
+- Makes the existing Worker's wrangler.toml significantly more complex.
+- The webapp at `pct.tonyrowles.com/cite/` shares the same origin as the API, complicating future security changes (e.g., adding CORS origin restrictions).
+- Harder to deploy independently.
+
+**Verdict:** Do not use this option. Keep concerns separate.
+
+### Recommended Approach: Workers Assets at cite.tonyrowles.com
+
+| Criterion | Workers Assets (new subdomain) | Pages | Same Worker |
+|-----------|-------------------------------|-------|-------------|
+| Coexists with pct.tonyrowles.com | YES (different subdomain) | BLOCKED (domain conflict) | YES |
+| Deployment complexity | Low (one `wrangler.toml`) | Medium (separate Pages project) | Low but messy |
+| Future dynamic routes | Easy (add `main =`) | Easy (Pages Functions) | Mixed into API Worker |
+| Zero new npm deps | YES | YES | YES |
+| CDN edge caching | YES | YES | YES |
 
 ---
 
-## Q2: KV Schema for Reports
+## Q2: Loading PDF.js v5 in a Browser Web Page
 
-### Key Structure: Fingerprint-First
+### What Changes From the Extension
 
-Use `report:{fingerprint}:{timestamp-ms}` — **fingerprint as prefix, timestamp as suffix**.
-
-**Why fingerprint-first:** KV's primary query API is `list({ prefix })`. Server-side dedup needs `list({ prefix: 'report:${fingerprint}:' })` to find prior reports for the same fingerprint in one call. If keys were `report:{timestamp}:{fingerprint}`, the fingerprint dedup check would require listing the entire namespace, which hits KV list limits on volume and is O(n) expensive.
-
-**Fingerprint construction (Worker-side, never extension-side):**
+The extension sets:
 ```javascript
-async function computeFingerprint(patentNumber, category, selectionText) {
-  const input = `${patentNumber}:${category}:${selectionText.slice(0, 64).toLowerCase().replace(/\s+/g, ' ')}`;
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf)).slice(0, 5).map(b => b.toString(16).padStart(2, '0')).join('');
-  // 10-hex chars = 5 bytes = 1,099,511,627,776 unique values — sufficient for dedup
-}
+GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs');
 ```
 
-`crypto.subtle` is available natively in the Cloudflare Workers runtime (Web Crypto API). No library needed.
+In a plain web page, `chrome.runtime.getURL` does not exist. The workerSrc must be a plain URL string pointing to `pdf.worker.mjs` served by the webapp.
 
-**Key example:**
-```
-report:a3f9b12c4d:1749734400000
-```
+### Recommended Approach: Copy PDF.js Files to dist/webapp/lib/, Set workerSrc to Absolute URL
 
-### Value Structure
+The extension already vendors `src/lib/pdf.mjs` and `src/lib/pdf.worker.mjs` (local copies from pdfjs-dist 5.5.207). The webapp build should copy the same files to `dist/webapp/lib/` and set workerSrc to the served path.
 
-```json
-{
-  "fingerprint": "a3f9b12c4d",
-  "timestamp": 1749734400000,
-  "category": "inaccurate",
-  "note": "Column number is off by one",
-  "patentNumber": "12505414",
-  "patentUrl": "https://patents.google.com/patent/US12505414",
-  "selectedText": "...",
-  "returnedCitation": "4:32-4:45",
-  "confidenceTier": "green",
-  "extensionVersion": "5.0.0",
-  "browser": "Chrome/125",
-  "os": "Windows 10",
-  "xpathNode": "...",
-  "scrollY": 1200,
-  "viewportWidth": 1920,
-  "viewportHeight": 1080,
-  "pdfParseStatus": "success",
-  "triggerMode": "floating-button",
-  "includePatentNumber": false,
-  "errorLog": ["...", "..."]
-}
-```
-
-This reuses the v3.1 `llm-report.json` schema fields (`selected_node_xpath`, `scroll_y`, `viewport_*`) remapped to camelCase for consistency with the extension's existing `chrome.storage.local` shape. Realistic payload: 2–5 KB. KV value max is 25 MB — no constraint applies here.
-
-### TTL Strategy
-
-Use `expirationTtl: 7776000` (90 days = 90 × 86400 seconds) on all `BUG_REPORTS.put()` calls. Rationale: 90 days covers any realistic triage cycle for a solo-maintainer tool. Bug reports are observability data, not authoritative cache — indefinite storage wastes free-tier KV quota (1 GB) for data that's irrelevant after 90 days. Contrast with `PATENT_CACHE` (no TTL, by design — position maps are immutable and benefit all users indefinitely).
-
+**In the webapp's pdf-parser adaptation:**
 ```javascript
-await env.BUG_REPORTS.put(key, JSON.stringify(report), { expirationTtl: 7776000 });
+import { getDocument, GlobalWorkerOptions } from './lib/pdf.mjs';
+// No chrome.runtime.getURL — set a static path relative to the served origin
+GlobalWorkerOptions.workerSrc = '/lib/pdf.worker.mjs';
 ```
 
-Minimum `expirationTtl` is 60 seconds per Cloudflare docs. 90 days (7,776,000 seconds) is well above that.
+This approach:
+- Reuses the already-vendored `src/lib/pdf.mjs` and `src/lib/pdf.worker.mjs` (no new download).
+- Consistent with how the extension handles it — same files, different path resolution.
+- Works for both local dev (wrangler dev serves `/lib/pdf.worker.mjs`) and production (Workers Assets serves it).
+- Version is pinned (5.5.207) — no CDN version drift.
 
-**Confidence: HIGH** — [Cloudflare KV Write docs](https://developers.cloudflare.com/kv/api/write-key-value-pairs/) confirm `expirationTtl` minimum 60s and 25 MB value limit.
+**Alternative (CDN URL):** `GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.5.207/build/pdf.worker.min.mjs'` — works but adds CDN dependency and external network call on every page load. Avoid given the zero-dependency culture.
+
+**Confidence: HIGH** — verified by reading `src/offscreen/pdf-parser.js:14`, inspecting `src/lib/` file listing, and pdfjs-dist npm package structure. CDN pattern from web search (MEDIUM confidence, not used).
+
+### Module Import Pattern
+
+`pdf-parser.js` currently imports from `'../lib/pdf.mjs'` (a relative path to the local vendored copy). A webapp-specific `webapp-pdf-parser.js` will:
+1. Import from the webapp's local lib path (e.g., `'./lib/pdf.mjs'` or via the shared package).
+2. Set `GlobalWorkerOptions.workerSrc` to the static path (not `chrome.runtime.getURL`).
+3. Everything else in `extractTextFromPdf` is pure — no changes needed.
+
+This is the only browser-vs-extension difference in the PDF parsing layer.
+
+### Cross-Origin PDF Fetch: CORS Implications
+
+The webapp fetches PDFs in two ways:
+
+**Path 1: Google Patents PDF URL (patentimages.storage.googleapis.com)**
+The extension currently fetches these directly in the offscreen document. In the webapp, a browser `fetch()` to `patentimages.storage.googleapis.com` requires CORS headers from Google's servers. Google Cloud Storage does not enable CORS by default, and `patentimages.storage.googleapis.com` is a public bucket that does appear to allow broad public access (it's publicly readable), but CORS headers for arbitrary origins are not guaranteed.
+
+**Resolution:** Route all PDF fetches through the existing pct.tonyrowles.com Worker, which already acts as a proxy and streams PDFs back with `Access-Control-Allow-Origin: *`. The webapp never fetches from Google's storage directly — it always goes through the Worker.
+
+The existing Worker proxy flow (`GET /?patent={number}`) already handles the 3-step ODP lookup and returns the PDF binary. The webapp uses the same `?patent=` query parameter.
+
+**Path 2: USPTO eGrant API (via Worker) — same flow as extension.**
+
+**CORS from cite.tonyrowles.com to pct.tonyrowles.com:** The Worker already returns `Access-Control-Allow-Origin: *` on all responses (including CORS preflight). The webapp at `cite.tonyrowles.com` is a different origin, so CORS applies — but `*` covers it. No Worker changes needed for CORS.
+
+**Security note:** The `Authorization: Bearer PROXY_TOKEN` header is a CORS "non-simple" header, which triggers a preflight. The Worker's preflight handler already includes `Authorization` in `Access-Control-Allow-Headers`. No change needed.
+
+**Confidence: HIGH** — all verified from Worker source directly.
 
 ---
 
-## Q3: Discord Webhook Payload
+## Q3: Monorepo/Workspace Mechanics for Shared Core Extraction
 
-### Exact Fetch Shape
+### What Needs Extracting
 
+Three files in `src/offscreen/` are pure JS with zero `chrome.*`/DOM dependencies and are candidates for extraction into a shared package:
+- `src/offscreen/pdf-parser.js` — one `chrome.*` line (`GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(...)`) that MUST be extracted/abstracted
+- `src/offscreen/position-map-builder.js` — 100% pure, no browser APIs
+- `src/shared/matching.js` — already in `src/shared/`, 100% pure
+
+### Recommended Approach: Plain `src/shared/` Extension + esbuild `alias` (No npm Workspaces)
+
+**Do not introduce npm workspaces.** Workspaces add complexity (workspace hoisting, symlinks, altered `node_modules` resolution) that interacts poorly with esbuild's external handling and would require changes to how Vitest aliases are configured. The project has six consecutive milestones with zero new npm dependencies; this is not the place to introduce monorepo tooling.
+
+**Instead: move the three files into `src/shared/`, abstract the chrome-specific line.**
+
+1. Move `src/offscreen/position-map-builder.js` → `src/shared/position-map-builder.js` (no changes needed, it's pure).
+2. Move `pdf-parser.js` to `src/shared/pdf-parser.js` with the `chrome.runtime.getURL` line removed — instead, accept `workerSrc` as a parameter or via `GlobalWorkerOptions` set externally by the caller.
+3. `src/shared/matching.js` is already shared — no move needed.
+
+**Caller pattern for webapp:**
 ```javascript
-async function postToDiscord(webhookUrl, report, fingerprint) {
-  const category = report.category;
-  const colorMap = {
-    inaccurate: 0xF59E0B,   // amber
-    'no-match':  0xEF4444,   // red
-    'not-working': 0x8B5CF6, // purple
-    other:       0x6B7280,   // gray
-  };
+// webapp/src/webapp-core.js
+import { GlobalWorkerOptions } from './lib/pdf.mjs';
+import { extractTextFromPdf } from '../../src/shared/pdf-parser.js';
 
-  const body = JSON.stringify({
-    username: 'Patent Bug Report',
-    embeds: [{
-      title: `[${category}] US${report.patentNumber}`.slice(0, 256),
-      color: colorMap[category] ?? 0x6B7280,
-      fields: [
-        { name: 'Citation', value: (report.returnedCitation || 'none').slice(0, 100), inline: true },
-        { name: 'Confidence', value: report.confidenceTier, inline: true },
-        { name: 'Browser', value: `${report.browser} / ${report.os}`.slice(0, 100), inline: true },
-        { name: 'Selected Text', value: (report.selectedText || '').slice(0, 500), inline: false },
-        { name: 'Note', value: (report.note || '(none)').slice(0, 500), inline: false },
-      ],
-      footer: { text: `fp:${fingerprint} | v${report.extensionVersion}` },
-      timestamp: new Date(report.timestamp).toISOString(),
-    }],
+GlobalWorkerOptions.workerSrc = '/lib/pdf.worker.mjs';  // webapp sets this
+```
+
+**Caller pattern for extension (no behavior change):**
+```javascript
+// src/offscreen/offscreen.js (or new per-target init file)
+import { GlobalWorkerOptions } from '../lib/pdf.mjs';
+GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs');  // extension sets this
+import { extractTextFromPdf } from '../shared/pdf-parser.js';
+```
+
+**esbuild alias for webapp bundle:**
+```javascript
+// scripts/build-webapp.js
+esbuild.build({
+  entryPoints: ['webapp/src/main.js'],
+  bundle: true,
+  format: 'esm',
+  outdir: 'dist/webapp',
+  external: ['./lib/pdf.mjs'],  // serve as static asset, not bundled
+  alias: {
+    // If the shared modules need remapping, add here
+  }
+})
+```
+
+**Why not npm workspaces:** The existing build already handles `src/shared/` perfectly. The extension bundles treat `src/shared/` modules via normal esbuild import resolution. The webapp build would do the same. No symlinks, no workspace hoisting complexity, no `package.json` in every package. The zero-dependency culture is preserved.
+
+**Confidence: HIGH** — confirmed by reading `scripts/build.js` (no workspace setup, direct `src/` import resolution), `package.json` (no `workspaces` field), and esbuild documentation on `alias` and `external`.
+
+---
+
+## Q4: Build Pipeline for the Webapp
+
+### Recommended Approach: Add a New esbuild Config in `scripts/build.js`
+
+The existing `scripts/build.js` already has `buildChrome()` and `buildFirefox()` functions. Add `buildWebapp()` as a third target, following the same pattern.
+
+**Key differences from extension build:**
+
+| Aspect | Extension | Webapp |
+|--------|-----------|--------|
+| Format | IIFE (content scripts) + ESM (background) | ESM (single bundle, no extension APIs) |
+| Output | `dist/chrome/` and `dist/firefox/` | `dist/webapp/` |
+| External | `'../lib/pdf.mjs'` (served from `dist/*/lib/`) | `'./lib/pdf.mjs'` (served from `dist/webapp/lib/`) |
+| HTML | Extension popup/options HTML | Plain `index.html` (static asset, not bundled by esbuild) |
+| chrome.* APIs | Used throughout | NOT present — pure web APIs only |
+| Entry point | Multiple (content, background, offscreen, popup, options) | Single entry: `webapp/src/main.js` |
+
+**What the webapp esbuild config looks like:**
+```javascript
+function buildWebapp() {
+  return esbuild.build({
+    entryPoints: ['webapp/src/main.js'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    outdir: 'dist/webapp/js',
+    external: ['../lib/pdf.mjs'],  // served separately from dist/webapp/lib/
+    // No minification — consistent with extension build (store review legibility)
   });
-
-  const resp = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  });
-
-  if (!resp.ok && resp.status !== 429) {
-    console.error(`[Worker] Discord webhook failed: ${resp.status}`);
-  }
-  // Discord 429 rate limit: log and swallow — KV write already succeeded
 }
 ```
 
-**Total character count for this embed:** title (≤80) + 5 field names (≤50) + 5 field values (≤1400 worst case) + footer (≤40) ≈ 1570 chars. Well under the 6000-char total-across-all-embeds limit.
+**Static assets copy for webapp:**
+```javascript
+function copyWebappStaticAssets() {
+  fs.mkdirSync('dist/webapp', { recursive: true });
+  fs.cpSync('src/lib', 'dist/webapp/lib', { recursive: true });  // pdf.mjs + pdf.worker.mjs
+  fs.copyFileSync('webapp/src/index.html', 'dist/webapp/index.html');
+}
+```
 
-### Hard Limits (All Verified)
-
-| Limit | Value | Notes |
-|-------|-------|-------|
-| `content` field | 2,000 chars | Not using `content` — using `embeds` instead |
-| Embed title | 256 chars | Truncate with `.slice(0, 256)` |
-| Embed description | 4,096 chars | Not used in this design |
-| Embed field name | 256 chars | All field names well under this |
-| Embed field value | 1,024 chars | Truncate `selectedText` and `note` to 500 chars each for margin |
-| Embed footer text | 2,048 chars | Fingerprint + version is ~30 chars |
-| **Total chars across ALL embeds** | **6,000 chars** | **Binding constraint** — single embed at ~1570 chars is safe |
-| Max embeds per message | 10 | Using 1 |
-| Max fields per embed | 25 | Using 5 |
-| **Rate limit per webhook URL** | **5 requests / 2 seconds** | Applies per webhook endpoint URL |
-| Rate limit per minute | 30 requests/min | Well above v5.0 expected volume |
-
-### Rate Limit Reality for v5.0
-
-The client-side rate limit caps users at 5 reports per 10 minutes per install. Even with 50 concurrent users hitting the same webhook, that's at most 250 reports per 10 minutes = ~0.4/second, well under 5/2s. The rate limit is not a practical concern at this scale. If Discord returns 429, the Worker should swallow the error (the report is already in KV) rather than failing the request to the extension.
-
-**Confidence: MEDIUM** — rate limit figures from [birdie0 Discord Webhooks guide](https://birdie0.github.io/discord-webhooks-guide/other/rate_limits.html) (well-cited community reference; official Discord docs confirmed field-level limits but the specific webhook sub-limit was in a secondary source).
-
----
-
-## Q4: Extension-Side Fetch — Content Script vs Background Script
-
-### Answer: Background Script (Service Worker), NOT Content Script
-
-**Content scripts cannot make cross-origin requests even if the domain is in `host_permissions`.** Per [Chrome cross-origin network requests docs](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests):
-
-> "Cross-origin requests are always treated as such in content scripts, even if the extension has host permissions."
-
-The background service worker CAN call `fetch()` to `https://pct.tonyrowles.com/*` because that origin is in `host_permissions` AND the background context runs in the extension origin (not the web page origin that content scripts inherit).
-
-### `host_permissions`: Already Covered — No Manifest Change
-
-Both `src/manifest.json:16-19` and `src/manifest.firefox.json:16-19` already have:
+**npm script:**
 ```json
-"host_permissions": [
-  "https://patentimages.storage.googleapis.com/*",
-  "https://pct.tonyrowles.com/*"
-]
+"build:webapp": "node scripts/build.js --webapp-only",
+"build": "node scripts/build.js"  // extend to also build webapp
 ```
 
-`https://pct.tonyrowles.com/*` covers `POST /report` with no path restriction — no manifest change needed.
+**CLI arg pattern:** Add `--webapp-only` arg alongside existing `--chrome-only` / `--firefox-only`.
 
-### Message-Passing Architecture
+**Workers Assets wrangler.toml** (separate from `worker/wrangler.toml`):
+```toml
+# webapp/wrangler.toml
+name = "patent-cite-webapp"
+compatibility_date = "2025-01-01"
 
-The report submission flow follows the exact existing pattern for `MSG.FETCH_USPTO_PDF`:
+[[routes]]
+pattern = "cite.tonyrowles.com"
+custom_domain = true
 
-1. **Content script** (`src/content/citation-ui.js`) collects report payload, sends `chrome.runtime.sendMessage({ type: MSG.SUBMIT_REPORT, payload })`.
-2. **Background service worker** (`src/background/service-worker.js`) handles `MSG.SUBMIT_REPORT`: checks rate limit from `chrome.storage.local`, calls `fetch('https://pct.tonyrowles.com/report', { method: 'POST', headers: { Authorization: 'Bearer ...', 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })`, writes/reads retry queue.
-3. **Background → Content** sends `chrome.runtime.sendMessage({ type: MSG.REPORT_RESULT, success: true/false })` back (or `chrome.tabs.sendMessage` if sender tab context is needed).
+[assets]
+directory = "../dist/webapp"
+not_found_handling = "404-page"
+```
 
-For **Firefox**: `src/firefox/background.js` already uses the same `chrome.storage.local` and `fetch()` pattern (confirmed by reading lines 146, 166, 176, 198, etc.). The same message handler added to `service-worker.js` needs to be mirrored in `src/firefox/background.js`.
+**Vitest:** The shared core is already unit-tested via Vitest. No new test infrastructure needed — `position-map-builder.js` and `matching.js` tests continue to work after moving files; only `vitest.config.chrome.js` / `vitest.config.firefox.js` alias paths need to point to the new shared locations.
 
-**Offscreen document is NOT needed for report submission.** The offscreen document exists for PDF parsing (which requires a Blob URL and `pdf.worker.mjs`). A plain JSON POST needs no offscreen context. The background service worker (Chrome) and Firefox background.js both can `fetch()` directly.
-
-**Confidence: HIGH** — verified against official Chrome extension network request docs.
+**Confidence: HIGH** — derived directly from reading `scripts/build.js` structure and confirmed esbuild supports this pattern.
 
 ---
 
-## Q5: Local Queue / Retry Persistence
+## Q5: PROXY_TOKEN — Server-Side Migration (Blocking Security Gate)
 
-### Use `chrome.storage.local`, NOT IndexedDB
+### Current State (Critical Vulnerability)
 
-**Rationale:**
-- IndexedDB already has the `idbAvailable` graceful-degradation flag — it can silently fail in Firefox private browsing. A retry queue that silently discards reports on IDB failure defeats the queue's purpose.
-- `chrome.storage.local` is the established extension state pattern: `currentPatent` key is already read/written in 30+ places across `service-worker.js` and `firefox/background.js`. The API is Promise-based with no open/close lifecycle, survives service worker restarts, and has straightforward error handling.
-- Report queue entries are small (~3–6 KB each). The 10 MB `chrome.storage.local` quota (Chrome 114+; 5 MB on Chrome ≤113) is not a concern for a queue capped at 5 items.
-
-**Queue storage shape:**
+`src/offscreen/offscreen.js:24`:
 ```javascript
-// Key: 'reportQueue'
-// Value: array of pending report objects
-[
-  {
-    payload: { /* full report payload */ },
-    attempts: 1,
-    queuedAt: 1749734400000,
-    lastAttemptAt: 1749734500000,
-  }
-]
+const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
 ```
 
-**Retry trigger:** `chrome.runtime.onStartup` and `chrome.runtime.onInstalled` event handlers in both `service-worker.js` and `firefox/background.js`. On each trigger, read `reportQueue`, attempt to submit each item, remove items that succeed or have `attempts >= 3`.
+This 64-hex-char string is committed in plaintext to the git repo and bundled into the distributed extension package. Anyone who downloads the Chrome or Firefox extension can extract it in under 30 seconds with a text editor. The token is already compromised — it must be rotated before any public webapp exposure.
 
-**Quota math:** 5 queued reports × 6 KB each = 30 KB. The 10 MB quota has a 99.97% margin.
+### The Core Problem: The Webapp Cannot Carry Any Token
 
-**Firefox parity:** `chrome.storage.local` is natively supported in Firefox without polyfill — confirmed by the existing `PROJECT.md` "No webextension-polyfill" key decision.
+The extension is a trusted installed application — even if the token is extractable, it requires deliberate effort and affects a download that users choose to install. A public webpage is a different threat model: the JavaScript source is trivially visible to anyone via browser DevTools. Any token embedded in the webapp JS will be scraped.
 
-**Confidence: HIGH** — [Chrome Storage API docs](https://developer.chrome.com/docs/extensions/reference/api/storage) confirm `QUOTA_BYTES = 10,485,760` (10 MB, Chrome 114+; 5 MB pre-Chrome 114).
+Therefore the webapp must access the Worker API endpoints WITHOUT a bearer token, OR with a different authentication mechanism that is safe to embed in public JS.
 
----
+### Recommended Architecture: Two-Tier Authentication After Token Rotation
 
-## Q6: Rate Limit Implementation
+**Step 1 (Blocking): Rotate the PROXY_TOKEN.**
+```bash
+cd worker && npx wrangler secret put PROXY_TOKEN
+# Enter a new random 64-hex token at the prompt
+# (openssl rand -hex 32 to generate)
+```
 
-### Pattern: Sliding-Window Counter in `chrome.storage.local`
+Remove the hardcoded constant from `src/offscreen/offscreen.js` and replace with a build-time environment variable injected by esbuild's `--define` flag, OR use a different token for the extension vs. webapp.
 
-No library. Pure JS in the background service worker.
+**Step 2: Add a separate token for the webapp-vs-Worker channel.**
+
+The cleanest approach that preserves the zero-dependency culture and requires no new infrastructure:
+
+**Option A — IP-rate-limited public endpoints (no token for webapp):**
+Add new Worker routes for the webapp (`GET /api/patent?id=...` for PDF proxy, `GET /api/cache?patent=...`) that do NOT require a bearer token but are protected by Cloudflare's built-in IP rate limiting. The Worker applies its own rate limit (e.g., 10 requests/minute/IP via KV counter, same pattern as the `/report` IP rate limit already implemented). This is the simplest path with zero new npm deps.
+
+The existing `PROXY_TOKEN`-gated endpoints remain for the extension. The new public endpoints are rate-limited at the Worker level. The USPTO API key stays server-side (never exposed). The KV cache hit path is the common case for popular patents — actual USPTO API calls are rare.
 
 ```javascript
-// Storage key: 'reportRateLimit'
-// Value shape: { timestamps: [number, ...] }
-
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;  // 10 minutes
-const RATE_LIMIT_MAX = 5;
-
-async function checkAndRecordRateLimit() {
-  const now = Date.now();
-  const data = await chrome.storage.local.get('reportRateLimit');
-  const timestamps = (data.reportRateLimit?.timestamps ?? [])
-    .filter(t => now - t < RATE_LIMIT_WINDOW_MS);  // prune expired entries
-
-  if (timestamps.length >= RATE_LIMIT_MAX) {
-    return { allowed: false, remainingMs: RATE_LIMIT_WINDOW_MS - (now - timestamps[0]) };
-  }
-
-  timestamps.push(now);
-  await chrome.storage.local.set({ reportRateLimit: { timestamps } });
-  return { allowed: true };
+// New Worker route: GET /api/patent?id=US12505414B2
+// No bearer token required; IP rate limited; proxies to USPTO or returns KV cache
+if (path === '/api/patent') {
+  return handlePublicPatentFetch(request, env, ctx);
 }
 ```
 
-This runs atomically in the background SW message handler for `MSG.SUBMIT_REPORT` — the rate check and the fetch happen in sequence in the same async function. No race condition risk because the extension's background context is single-threaded in practice (one message processed at a time per the Chrome extension event model).
+**Option B — HMAC-signed tokens with short TTL (webapp gets a session token):**
+The webapp page fetches a short-lived HMAC token from a `/token` endpoint (public, rate-limited), then uses that token for subsequent API calls within a TTL window (e.g., 5 minutes). This is more complex and requires state management in the webapp.
 
-**Pattern precedent:** The existing `service-worker.js` already does `chrome.storage.local.get('currentPatent')` / `chrome.storage.local.set({ currentPatent })` pairs in every message handler. The rate limit counter follows identical structure.
+**Verdict: Use Option A** (public rate-limited endpoints for webapp). Rationale:
+- The Worker's KV-backed IP rate limiter is already built and tested for `/report`.
+- The webapp's use case is inherently rate-limited by user behavior (one patent per flow).
+- No new token management complexity in the webapp JS.
+- The PROXY_TOKEN continues protecting the extension endpoints unchanged.
+- Zero new npm deps.
 
-**Confidence: HIGH** — this is a pure-JS pattern with no external dependencies, verified against existing codebase patterns.
+**What NOT to do:**
+- Do NOT embed the new PROXY_TOKEN in the webapp JS. This defeats the rotation.
+- Do NOT use client-side session tokens or JWTs stored in localStorage. Adds complexity for no benefit vs. IP rate limiting.
+- Do NOT add Cloudflare Turnstile. Adds a UI widget, a `<script>` tag from Cloudflare's CDN, and a new external dependency for a use case (patent citation) that is not a bot-abuse target.
 
----
-
-## Q7: What NOT to Add
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `axios` | HTTP client library (~40 KB); does nothing `fetch()` doesn't already do; would be the first runtime npm dep in the extension build | `fetch()` — already used at `src/offscreen/offscreen.js:199, 246, 295, 427`; available natively in Workers runtime and extension background contexts |
-| `uuid` / `nanoid` | Random ID generation libraries | `crypto.randomUUID()` — available natively in MV3 service workers and Cloudflare Workers runtime; zero bundle cost |
-| `discord.js` / any Discord SDK | Server-side bot library with massive dependencies; designed for persistent WebSocket connections, not one-off webhook POSTs | Plain `fetch()` POST to the webhook URL — Discord webhooks are stateless HTTP, no persistent connection needed |
-| `node-fetch` / `cross-fetch` | Node.js fetch compatibility shims | `fetch` is native in Cloudflare Workers runtime AND in extension service workers (MV3) — no shim needed |
-| `date-fns` / `dayjs` / `moment` | Date formatting | `new Date(timestamp).toISOString()` for Discord `timestamp` field; `Date.now()` for all other timestamps |
-| `crypto-js` / `sha.js` / `js-sha256` | SHA-256 for fingerprint computation | `crypto.subtle.digest('SHA-256', ...)` — available natively in Cloudflare Workers runtime (Web Crypto API) |
-| `ky` | Fetch wrapper with retry/timeout | Manual retry is 10 lines; adding a library dependency for this violates the zero-new-deps constraint |
-| `zod` / `joi` / `ajv` | Schema validation of report payload | A 3-field structural check at the Worker is sufficient (`typeof report.patentNumber === 'string'`); full schema validation is overkill for a solo-maintainer observability payload |
-| `p-retry` / `async-retry` / `cockatiel` | Retry logic with backoff | The retry interval is "on next extension load" — not time-based backoff. A simple loop over `reportQueue` on `onStartup` is 10 lines. |
-| `webextension-polyfill` | Chrome API compatibility for Firefox | Firefox natively supports `chrome.*` namespace — this is an explicit "Out of Scope" decision in `PROJECT.md` |
-| Durable Objects / D1 | More capable Cloudflare persistence options | KV is already deployed and sufficient; adding a new Cloudflare product class breaks the free-tier assumption and introduces Wrangler migration complexity |
-
----
-
-## Integration Points: Exact Files for New Code
-
-| Component | File | Nature of Change |
-|-----------|------|-----------------|
-| Worker route + handlers | `worker/src/index.js` | Add `handleReport()` + `computeFingerprint()` + `postToDiscord()` functions; add dispatch at ~line 253 BEFORE USPTO fallthrough |
-| Worker KV namespace | `worker/wrangler.toml` | Add second `[[kv_namespaces]]` block for `BUG_REPORTS` |
-| Worker Discord secret | CLI only (`wrangler secret put DISCORD_WEBHOOK_URL`) | Never appears in any file |
-| Message type constants | `src/shared/constants.js` | Add `SUBMIT_REPORT: 'submit-report'` and `REPORT_RESULT: 'report-result'` to `MSG` object |
-| Chrome background handler | `src/background/service-worker.js` | Add `MSG.SUBMIT_REPORT` branch to the `onMessage.addListener` at line 132; add `onStartup` queue-retry handler; add `checkAndRecordRateLimit()` helper |
-| Firefox background handler | `src/firefox/background.js` | Mirror the same `SUBMIT_REPORT` handler — Firefox background already does Worker fetches; same storage patterns |
-| Citation UI — Report button | `src/content/citation-ui.js` | Report button affordance in Shadow DOM; collect diagnostic payload; `chrome.runtime.sendMessage(MSG.SUBMIT_REPORT, ...)` |
-| Options page JS | `src/options/options.js` | Add `debugMode` checkbox handler using `chrome.storage.sync.set({ debugMode: checked })` — same auto-save + showSaved pattern as existing controls |
-| Options page HTML | `src/options/options.html` | Add Debug Mode section with checkbox + `<span id="debugModeSaved">` element |
-| Popup | `src/popup/popup.html` + popup JS | Secondary "Report a problem" affordance for the "tool didn't load at all" case |
+**Confidence: HIGH** — Worker source read directly; rate-limiting pattern already exists in `/report` handler; Cloudflare secret rotation via `wrangler secret put` verified from official docs.
 
 ---
 
 ## Recommended Stack Summary
 
-### Core Technologies (Zero New Deps — Sixth Consecutive Milestone)
+### Core Technologies (Zero New npm Dependencies)
 
 | Technology | Version | Purpose | Why |
 |------------|---------|---------|-----|
-| Cloudflare Workers (ES Modules) | existing deployed | New `/report` route handler | Already running; same `export default { fetch }` syntax; zero new infrastructure |
-| Cloudflare KV — `BUG_REPORTS` namespace | new namespace, existing service | 90-day durable report storage | Already used for `PATENT_CACHE`; `expirationTtl: 7776000` for auto-expiry; free-tier compatible |
-| Discord Webhook HTTP POST | N/A (HTTP only) | Real-time maintainer notification | Stateless HTTP; no SDK; webhook URL stays in Worker secret, never in extension code |
-| `wrangler secret put` | existing CLI | Discord webhook URL secret management | Encrypted at rest in Cloudflare; accessed as `env.DISCORD_WEBHOOK_URL` at runtime |
-| `crypto.subtle.digest` (Web Crypto) | built-in Workers runtime | Server-side SHA-256 fingerprint | Available natively; no library |
-| `chrome.storage.local` | built-in extension API | Rate-limit timestamp ring + retry queue | Already used for `currentPatent`; 10 MB quota; survives SW restarts; works in private browsing |
-| `chrome.storage.sync` | built-in extension API | Debug Mode toggle (syncs across devices) | Already used for all options settings in `src/options/options.js` |
-| `fetch()` from background service worker | built-in | Report submission POST to Worker | Content scripts cannot cross-origin fetch; background can; `pct.tonyrowles.com/*` already in `host_permissions` |
-| `crypto.randomUUID()` | built-in | Client-side report ID for retry queue | Available in MV3 service workers natively |
+| pdfjs-dist (vendored, not new) | 5.5.207 | Client-side PDF parsing in browser | Already vendored in `src/lib/`; same files copied to `dist/webapp/lib/` |
+| esbuild (existing) | ^0.27.3 | Build webapp JS bundle | Already in pipeline; add `buildWebapp()` function to `scripts/build.js` |
+| Cloudflare Workers Assets | N/A (Cloudflare infra) | Static hosting at cite.tonyrowles.com | Current Cloudflare static hosting model; coexists with pct.tonyrowles.com |
+| Wrangler (existing) | ^4.69.0 (worker/) | Deploy webapp Worker | Already used for the API Worker; add webapp wrangler.toml |
+| Cloudflare KV PATENT_CACHE (existing) | N/A | Shared position map cache | Already deployed; webapp uses same cache via Worker API |
 
 ### What Does NOT Change
 
 | Item | Reason |
 |------|--------|
-| `wrangler.toml` `compatibility_date` | Stays `2025-01-01` — no new Workers APIs needed |
-| `PATENT_CACHE` KV binding | Untouched — separate namespace, no TTL change |
-| `PROXY_TOKEN` auth check | `/report` inherits existing bearer auth, no change needed |
-| Both manifests `host_permissions` | `pct.tonyrowles.com/*` already covers `/report` endpoint |
-| esbuild pipeline structure | No structural change — new source files drop into existing `src/` directories |
-| `PROXY_TOKEN` embedding in offscreen.js | Existing known debt; v5.0 does not fix it (that would be a security refactor out of scope) |
+| pct.tonyrowles.com Worker | Stays as-is; webapp calls it via new public rate-limited endpoints |
+| `src/shared/matching.js` | Already shared; no move needed |
+| pdfjs-dist version | 5.5.207 stays pinned; no upgrade |
+| esbuild pipeline structure | Extend `scripts/build.js`; no new build tool |
+| Vitest harness | Shared core tests continue to pass after file moves |
+| wrangler.toml (worker/) | Unchanged; webapp gets its own wrangler.toml |
+
+### What Changes
+
+| Item | Change |
+|------|--------|
+| `src/offscreen/pdf-parser.js` | Move to `src/shared/pdf-parser.js`; remove `chrome.runtime.getURL` line; caller sets `GlobalWorkerOptions.workerSrc` |
+| `src/offscreen/position-map-builder.js` | Move to `src/shared/position-map-builder.js`; no code changes |
+| `src/offscreen/offscreen.js` | Update imports to `../shared/pdf-parser.js`, `../shared/position-map-builder.js`; keep `GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(...)` in offscreen |
+| `src/firefox/background.js` | Update imports similarly |
+| `PROXY_TOKEN` in offscreen.js | REMOVE hardcoded value; rotate via `wrangler secret put` |
+| `worker/src/index.js` | Add public rate-limited endpoints (`/api/patent`, `/api/cache`) for webapp |
+| `webapp/wrangler.toml` (new) | Workers Assets config for cite.tonyrowles.com |
+| `webapp/src/main.js` (new) | Webapp entry point; sets `GlobalWorkerOptions.workerSrc = '/lib/pdf.worker.mjs'` |
+| `scripts/build.js` | Add `buildWebapp()` function + `--webapp-only` CLI arg |
 
 ---
 
@@ -419,53 +395,82 @@ This runs atomically in the background SW message handler for `MSG.SUBMIT_REPORT
 
 | Recommended | Alternative | Why Not |
 |-------------|-------------|---------|
-| `chrome.storage.local` for retry queue | IndexedDB | IDB has `idbAvailable` graceful-degradation flag — silently fails in Firefox private browsing; a retry queue that silently drops reports on IDB failure is broken by design |
-| Background service worker for report `fetch()` | Content script fetch | Chrome docs are explicit: "Cross-origin requests are always treated as such in content scripts, even if the extension has host permissions." |
-| Fingerprint-first KV key `report:{fp}:{ts}` | Timestamp-first `report:{ts}:{fp}` | Dedup check requires `list({ prefix: 'report:{fp}:' })` — only works if fingerprint is the prefix component; timestamp-first forces full namespace scan |
-| 90-day KV TTL | Indefinite storage | Reports are transient observability data; indefinite storage wastes free-tier KV quota with no benefit after triage window; contrast with position maps which are immutable and beneficial indefinitely |
-| Worker-side Discord POST | Extension-side Discord POST | Webhook URL must NEVER be in extension code — it's extractable from the extension package by any user. Worker keeps it server-side as an encrypted secret. |
-| Single embed, field-level truncation | Multi-embed rich layout | 6000-char total-across-all-embeds limit is a hard ceiling; single embed with truncated fields stays safely under 2000 chars and is sufficient for at-a-glance triage |
-| `crypto.subtle.digest` for fingerprint | Embedding a SHA-256 library | Web Crypto API is available natively in both Workers runtime and MV3 service workers; adding a library would be the first runtime npm dependency in the Worker |
+| Workers Assets at cite.tonyrowles.com | Cloudflare Pages | Pages cannot share domain with existing Worker at pct.tonyrowles.com (Cloudflare known limitation); separate subdomain required anyway |
+| Workers Assets at cite.tonyrowles.com | Static assets on existing Worker | Conflates thin API proxy with webapp delivery; harder to deploy independently; same-origin issues for future security tightening |
+| Plain `src/shared/` extension + esbuild alias | npm workspaces | Workspaces add symlink complexity and alter esbuild module resolution; six consecutive milestones zero new deps — not the place to introduce monorepo tooling |
+| `buildWebapp()` in existing `scripts/build.js` | Separate build script | Existing script already handles multi-target (chrome, firefox); webapp is a third target; consistent pattern |
+| Vendored `pdf.worker.mjs` static asset (served from dist/webapp/lib/) | CDN URL for workerSrc | CDN adds external dependency + version drift risk; vendored copy already exists in `src/lib/` |
+| Public rate-limited Worker endpoints (no token in webapp) | Embed new token in webapp JS | Any token in public JS is immediately extractable; IP rate limiting sufficient for low-volume citation use case |
 
 ---
 
-## Confidence Assessment
+## What NOT to Add
 
-| Area | Confidence | Basis |
-|------|------------|-------|
-| Worker route insertion point | HIGH | Read `worker/src/index.js` directly; exact line numbers identified |
-| `wrangler.toml` KV binding syntax | HIGH | Cloudflare official docs confirmed `[[kv_namespaces]]` repeat syntax |
-| Worker secret mechanism | HIGH | Cloudflare official docs for `wrangler secret put` |
-| `host_permissions` coverage | HIGH | Both manifests read directly; `pct.tonyrowles.com/*` confirmed |
-| Background-vs-content fetch CORS | HIGH | Chrome official extension docs quote confirmed |
-| Discord webhook payload format | HIGH | Discord official docs confirmed field list; field character limits from embed docs |
-| Discord webhook character limits | MEDIUM | 6000-char total-embeds limit confirmed from secondary source (Discord docs confirmed individual field limits; total-across-embeds limit from [discord-webhook.com](https://discord-webhook.com/en/blog/discord-webhook-embed-limits/)) |
-| Discord rate limits | MEDIUM | 5/2sec confirmed from [birdie0 guide](https://birdie0.github.io/discord-webhooks-guide/other/rate_limits.html); Discord official rate-limit docs confirmed the header names but the webhook-specific sub-limit was secondary |
-| `chrome.storage.local` quota | HIGH | Chrome for Developers API reference confirmed 10 MB (Chrome 114+), 5 MB (≤113) |
-| KV TTL minimum and value size limit | HIGH | Cloudflare official KV docs confirmed 60s minimum TTL, 25 MB value limit |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| React / Vue / any UI framework | No interactive state machine needed; static HTML + vanilla JS for patent number input + result display; adding a framework = adding build complexity + runtime deps | Vanilla HTML/CSS/JS |
+| Vite | Replaces esbuild — adds config files, different plugin ecosystem, alters external/alias handling; breaks consistency with existing pipeline | Extend existing `scripts/build.js` |
+| npm workspaces | Symlinks + hoisting complexity interact badly with esbuild's external handling; disrupts per-target Vitest alias configs | Plain `src/shared/` directory, relative imports |
+| Cloudflare Turnstile | Adds `<script>` CDN dependency, widget UI, backend verify call; citation webapp is not a bot-abuse target | IP rate limiting at Worker |
+| Any new runtime npm dep | Six consecutive milestones zero new deps; all required functionality (PDF parsing, matching, HTTP fetch, DOM manipulation) is already available or native | Existing tools |
+| `node-fetch` / `cross-fetch` | Shims not needed; `fetch` is native in all modern browsers and Cloudflare Workers runtime | Native `fetch` |
+| Durable Objects / D1 | Heavier Cloudflare primitives; KV already deployed and sufficient for this use case | Existing PATENT_CACHE KV |
+
+---
+
+## Version Compatibility
+
+| Package | Version | Compatibility Note |
+|---------|---------|-------------------|
+| pdfjs-dist | 5.5.207 | Already in devDependencies; `pdf.mjs` + `pdf.worker.mjs` in `src/lib/` (same files reused for webapp) |
+| esbuild | ^0.27.3 | Supports `external`, `alias`, `define` — all needed for webapp build |
+| wrangler | ^4.69.0 (worker/) | `[assets]` section + `[[routes]]` + `custom_domain = true` all supported in Wrangler v4 |
+
+---
+
+## Integration Points: Exact Files and New Artifacts
+
+| Component | File | Nature of Change |
+|-----------|------|-----------------|
+| Shared PDF parser | `src/shared/pdf-parser.js` (new location) | Move from `src/offscreen/`; remove chrome.runtime.getURL line |
+| Shared position map builder | `src/shared/position-map-builder.js` (new location) | Move from `src/offscreen/`; no code changes |
+| Extension offscreen | `src/offscreen/offscreen.js` | Update import paths; keep `GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(...)` locally |
+| Firefox background | `src/firefox/background.js` | Update import paths for moved shared modules |
+| Token rotation | `worker/src/index.js` + `wrangler secret put` | Remove env.PROXY_TOKEN from extension source; rotate via CLI |
+| Public Worker endpoints | `worker/src/index.js` | Add `/api/patent` + `/api/cache` routes (public, IP rate-limited) |
+| Build script | `scripts/build.js` | Add `buildWebapp()` function + `--webapp-only` CLI arg |
+| Webapp entry | `webapp/src/main.js` (new file) | Sets workerSrc, wires UI → shared matching pipeline |
+| Webapp HTML | `webapp/src/index.html` (new file) | Patent number + passage form, result display |
+| Webapp Workers config | `webapp/wrangler.toml` (new file) | Workers Assets config, cite.tonyrowles.com custom domain |
+| Deploy npm script | root `package.json` | Add `"deploy:webapp": "cd webapp && npx wrangler deploy"` |
 
 ---
 
 ## Sources
 
-- `worker/src/index.js` — direct source read; ES Modules syntax, route dispatch, auth, CORS, env bindings confirmed
-- `worker/wrangler.toml` — direct source read; `PATENT_CACHE` binding, `compatibility_date` confirmed
-- `src/offscreen/offscreen.js:23-24` — direct source read; `WORKER_URL`, `PROXY_TOKEN` constants; existing fetch call patterns
-- `src/manifest.json` + `src/manifest.firefox.json` — direct source read; `host_permissions` for `pct.tonyrowles.com/*` confirmed
-- `src/options/options.js` — direct source read; `chrome.storage.sync` auto-save pattern for options settings
-- `src/background/service-worker.js` — direct source read; `chrome.storage.local` pattern, message dispatch shape
-- `src/firefox/background.js` — direct source read; Worker fetch imports (`fetchAndParsePdf`, `fetchUsptoAndParse`), storage pattern
-- `src/shared/constants.js` — direct source read; `MSG` object structure
-- [Cloudflare Workers Secrets docs](https://developers.cloudflare.com/workers/configuration/secrets/) — `wrangler secret put`; `env.*` access at runtime — HIGH confidence
-- [Cloudflare KV Write docs](https://developers.cloudflare.com/kv/api/write-key-value-pairs/) — `expirationTtl` min 60s; 25 MB value limit — HIGH confidence
-- [Cloudflare KV Bindings docs](https://developers.cloudflare.com/kv/concepts/kv-bindings/) — multiple `[[kv_namespaces]]` block syntax — HIGH confidence
-- [Chrome Storage API docs](https://developer.chrome.com/docs/extensions/reference/api/storage) — `QUOTA_BYTES = 10,485,760` (Chrome 114+, 5 MB pre-114) — HIGH confidence
-- [Chrome Cross-Origin Network Requests docs](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests) — "Cross-origin requests are always treated as such in content scripts, even if the extension has host permissions" — HIGH confidence
-- [Discord Embed Limits](https://discord-webhook.com/en/blog/discord-webhook-embed-limits/) — 6000 total-chars-across-embeds hard limit, per-field limits — MEDIUM confidence
-- [birdie0 Discord Webhooks Rate Limits](https://birdie0.github.io/discord-webhooks-guide/other/rate_limits.html) — 5 requests per 2 seconds per webhook; failed requests count toward limit — MEDIUM confidence
+- `src/offscreen/offscreen.js` — direct read; PROXY_TOKEN location, WORKER_URL, fetch call patterns, PROXY_TOKEN compromised status
+- `src/offscreen/pdf-parser.js` — direct read; GlobalWorkerOptions.workerSrc pattern, chrome.runtime.getURL dependency
+- `src/offscreen/position-map-builder.js` — direct read; 100% pure, zero browser API dependencies
+- `src/shared/matching.js` — direct read; 100% pure, zero browser API dependencies
+- `worker/src/index.js` — direct read; corsHeaders() = `Access-Control-Allow-Origin: *`, auth header validation, IP rate limit pattern for /report, preflight handling
+- `worker/wrangler.toml` — direct read; compatibility_date, KV bindings
+- `scripts/build.js` — direct read; esbuild config patterns, `external: ['../lib/pdf.mjs']`, multi-target pattern
+- `package.json` — direct read; no workspaces, esbuild ^0.27.3, pdfjs-dist ^5.5.207
+- `worker/package.json` — direct read; wrangler ^4.69.0
+- `src/lib/` listing — direct check; pdf.mjs (424 KB), pdf.worker.mjs (1.05 MB) at pdfjs-dist 5.5.207
+- `node_modules/pdfjs-dist/build/` listing — direct check; pdf.mjs, pdf.min.mjs, pdf.worker.mjs, pdf.worker.min.mjs available
+- [Cloudflare Pages Known Issues](https://developers.cloudflare.com/pages/platform/known-issues/) — "Custom domains cannot be added if a Worker is already routed on that domain" — HIGH confidence
+- [Cloudflare Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) — multiple Workers on different subdomains confirmed compatible — HIGH confidence
+- [Cloudflare Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/) — ASSETS binding, `[assets]` TOML config, `not_found_handling` options — HIGH confidence (Context7 + official docs)
+- [Cloudflare Workers Static Assets Binding](https://developers.cloudflare.com/workers/static-assets/binding/) — `run_worker_first`, ASSETS.fetch() pattern — HIGH confidence
+- [Cloudflare Workers Configuration](https://developers.cloudflare.com/workers/wrangler/configuration/) — `[[routes]]` + `custom_domain = true` TOML syntax — HIGH confidence (Context7)
+- [PDF.js GitHub wiki: Setup in website](https://github.com/mozilla/pdf.js/wiki/Setup-pdf.js-in-a-website) — workerSrc must point to pdf.worker.mjs — MEDIUM confidence (content partial)
+- [PDF.js Discussion #19520](https://github.com/mozilla/pdf.js/discussions/19520) — esbuild/Vite workerSrc pattern using import.meta.url or absolute path — MEDIUM confidence
+- [PDF.js Discussion #17622](https://github.com/mozilla/pdf.js/discussions/17622) — ES module import patterns for pdfjs-dist v4+ — MEDIUM confidence
+- [Cloudflare Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/) — `wrangler secret put` rotation pattern — HIGH confidence
 
 ---
 
-*Stack research for: v5.0 Bug Report Feature — Cloudflare Worker /report route, KV durable storage, Discord webhook notification, extension-side transport + retry*
-*Researched: 2026-06-12*
-*Confidence: HIGH overall (all Worker/extension source read directly; external API limits verified from official or well-cited sources)*
+*Stack research for: v6.0 Standalone Citation Webapp — client-side PDF.js, Workers Assets hosting, shared core extraction, PROXY_TOKEN rotation*
+*Researched: 2026-06-16*
+*Confidence: HIGH overall (all critical facts from direct source reads + official Cloudflare docs; PDF.js workerSrc verified from package inspection + wiki + discussion; CORS verified from Worker source)*

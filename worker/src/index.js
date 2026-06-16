@@ -250,6 +250,129 @@ function buildKvRecord(body, fingerprint, timestamp) {
   };
 }
 
+// ─── Security gate helpers (Phase 6 — SEC-03/04/05, WRKR-01/02/03/04) ──────
+
+/**
+ * Allowlisted origins for webapp routes (SEC-03).
+ * Fixed two-item literal — NOT env-configurable (deferred per CONTEXT.md).
+ */
+const ALLOWED_ORIGINS = ['https://cite.tonyrowles.com', 'http://localhost:8788'];
+
+/**
+ * Checks if the request Origin header matches the webapp allowlist.
+ *
+ * @param {Request} request
+ * @returns {string|null} matched origin string, or null if not matched
+ */
+function matchOrigin(request) {
+  const origin = request.headers.get('Origin') || '';
+  return ALLOWED_ORIGINS.includes(origin) ? origin : null;
+}
+
+/**
+ * Resolves the authentication method for a request (SEC-03).
+ * Returns { method: 'bearer' } for valid Bearer token,
+ * { method: 'origin', origin } for allowlisted Origin,
+ * or null if neither matched.
+ *
+ * @param {Request} request
+ * @param {{ PROXY_TOKEN: string }} env
+ * @returns {{ method: 'bearer' } | { method: 'origin', origin: string } | null}
+ */
+function resolveAuth(request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  if (auth === `Bearer ${env.PROXY_TOKEN}`) return { method: 'bearer' };
+  const origin = matchOrigin(request);
+  if (origin) return { method: 'origin', origin };
+  return null;
+}
+
+/**
+ * Returns origin-reflecting CORS headers for webapp routes (Pitfall 5: Vary always present).
+ *
+ * @param {string} origin - the matched/allowlisted origin string
+ * @returns {{ 'Access-Control-Allow-Origin': string, 'Vary': string }}
+ */
+function webappCorsHeaders(origin) {
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Vary': 'Origin',
+  };
+}
+
+/**
+ * Checks and enforces per-IP webapp rate limit (SEC-04).
+ * Max 30 requests per 60-second window per IP.
+ * Mirrors checkIpRateLimit exactly with wrl: prefix and threshold 30.
+ * With testMode=true, the wrl: counter read still happens but increment is suppressed.
+ *
+ * @param {{ BUG_REPORTS: KVNamespace }} env
+ * @param {string} clientIp
+ * @param {boolean} [testMode=false]
+ * @returns {Promise<{allowed: boolean}>}
+ */
+async function checkWebappRateLimit(env, clientIp, testMode = false) {
+  const key = `wrl:${clientIp}`;
+  const countStr = await env.BUG_REPORTS.get(key);
+  const count = countStr ? parseInt(countStr, 10) : 0;
+
+  if (count >= 30) {
+    return { allowed: false };
+  }
+
+  // Increment counter; reset TTL on each request within the window
+  if (!testMode) {
+    await env.BUG_REPORTS.put(key, String(count + 1), { expirationTtl: 60 });
+  }
+  return { allowed: true };
+}
+
+/**
+ * Checks and enforces global daily KV-write guard (SEC-05).
+ * Max 900 writes/day; key wq:YYYYMMDD in PATENT_CACHE, ~48h TTL.
+ * With testMode=true, the counter read still happens but increment is suppressed.
+ * Non-atomic by design — 100-write buffer absorbs bounded concurrent overshoot.
+ *
+ * @param {{ PATENT_CACHE: KVNamespace }} env
+ * @param {boolean} [testMode=false]
+ * @returns {Promise<{allowed: boolean}>}
+ */
+async function checkDailyWriteGuard(env, testMode = false) {
+  const dateKey = `wq:${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  const countStr = await env.PATENT_CACHE.get(dateKey);
+  const count = countStr ? parseInt(countStr, 10) : 0;
+
+  if (count >= 900) {
+    return { allowed: false };
+  }
+
+  if (!testMode) {
+    await env.PATENT_CACHE.put(dateKey, String(count + 1), { expirationTtl: 172800 });
+  }
+  return { allowed: true };
+}
+
+/**
+ * Returns true if the raw patent input is a published application number (WRKR-04).
+ * Must be called on the RAW string BEFORE cleanPatentNumber — kind-code suffix
+ * is stripped by cleanPatentNumber and the check becomes unreliable (Pitfall 2).
+ *
+ * Detects:
+ *   - Kind codes A1, A2, A9 suffix: /[Aa][129]$/
+ *   - 11-digit 20XXXXXXXXX format (US-prefixed or bare): /^20\d{9}/
+ *
+ * True: 20210123456A1, US20210123456A1, 20210123456, US20210123456, 10617174A1
+ * False: 12505414B2, 12505414, US12505414B2
+ *
+ * @param {string} raw - raw patent string before cleaning
+ * @returns {boolean}
+ */
+function isPublishedApplication(raw) {
+  if (/[Aa][129]$/.test(raw)) return true;       // kind codes A1, A2, A9
+  const stripped = raw.replace(/^US/i, '');
+  return /^20\d{9}/.test(stripped);              // 11-digit 20XXXXXXXXX format
+}
+
 /**
  * Checks and enforces IP-keyed rate limit (LIMIT-02).
  * Max 5 requests per 60-second window per IP.

@@ -704,7 +704,7 @@ This is a pure refactoring phase — no new network routes, no new auth surfaces
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED — answers encoded in 07-01/07-02 plans)
 
 1. **CORE-04 PDF fixture in CI**
    - What we know: `tests/e2e/.pdf-cache/US6738932.pdf` is gitignored and present locally

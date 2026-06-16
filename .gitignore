@@ -1,6 +1,9 @@
 .glootie-stop-verified
 worker/node_modules/
 worker/.dev.vars
+# Root-level local token files for `npm run build` — never commit (SEC-02, Phase 6)
+.dev.vars
+.env
 node_modules/
 dist/
 

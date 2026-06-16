@@ -21,10 +21,11 @@ import { WORKER_REPORT_URL } from './constants.js';
 // Module-scope constants (no chrome.* references here)
 // ---------------------------------------------------------------------------
 
-// PROXY_TOKEN is a local const — mirrors offscreen.js:24 and pdf-pipeline.js:23.
+// PROXY_TOKEN is a local const — mirrors offscreen.js and pdf-pipeline.js.
 // NOT imported from constants.js (which is the pure shared module exposed to
 // content scripts; embedding the token there would widen its exposure).
-const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
+// Token injected at build time by esbuild define (SEC-02). Never a literal.
+const PROXY_TOKEN = __PROXY_TOKEN__;
 
 const BACKOFF_MS = [2000, 8000, 30000];   // 2s / 8s / 30s (D-01, QUEUE-02)
 const MAX_ATTEMPTS = 3;                    // After 3 failures → silent drop (D-04, QUEUE-02)

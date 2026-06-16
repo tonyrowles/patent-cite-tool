@@ -4,8 +4,9 @@
 
 **Phases completed:** 5 phases (1-5), 16 plans, 26 tasks
 **Timeline:** 4 days (2026-06-12 → 2026-06-15)
-**Lines of code:** ~2,700 source LOC (`src/` + `worker/src/`, +2704 / -43); 177 files incl. planning across full branch
-**Git range:** 6ed5207 → 6abeff5 (branch `feat/bug-report`)
+**Lines of code:** ~2,700 source LOC (`src/` + `worker/src/`, +2704 / -43)
+**Git range:** 6ed5207 → 6abeff5 (developed on `feat/bug-report`)
+**Shipping state:** Feature code is merged to `origin/main` (squash-merge) and tagged `v5.0` (commit `63f6a76`, 2026-06-14); `src/` + `worker/src/` on `origin/main` are byte-identical to `feat/bug-report`. Only `.planning/` docs (incl. this milestone-close archival) remain unpushed on `feat/bug-report`. NOTE: local `main` is stale (`d8d54c4`, manifest 2.3.0) — `git fetch` to update.
 
 **Delivered:** End users can report citation failures from an in-product affordance; rich auto-captured diagnostic bundles route to a private Cloudflare-backed observability pipeline (`BUG_REPORTS` KV durable + Discord webhook notify) for maintainer triage — the inbound signal channel that v5.1's resumed auto-fix work will ingest. Live UAT-01..06 PROVEN against production `pct.tonyrowles.com` before close.
 

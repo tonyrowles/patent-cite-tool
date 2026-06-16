@@ -461,13 +461,13 @@
 2. **`audit-open` needs format-aware UAT parsing, or close-time triage is manual.** The parser marking valid PASS evidence as `[unknown]` and counting stale cross-milestone quick-tasks made the gate noisier than the actual state. Either teach the parser the UAT-RESULTS format or re-stamp resolved HUMAN-UAT files at phase close so they don't resurface.
 3. **The `milestone.complete` CLI's auto-extraction is unreliable for accomplishments and phase counts when a `999.x` backlog dir lives under `phases/`.** Expect to hand-write the MILESTONES entry and correct STATE frontmatter; the CLI is a scaffold, not the final artifact.
 4. **A non-blocking UAT bug is still a real bug.** Logging the Notes-textarea character drop kept the DoD honest (criteria met) without papering over a shipped defect — but it should be the first v5.1 fix, not lost in the backlog.
-5. **Tag/version namespaces can collide.** The extension's store-release tag `v5.0` (commit `63f6a76` on `main`) is unrelated to the GSD "v5.0 Bug Report Feature" milestone on `feat/bug-report`. Milestone close did NOT create or move a tag. Future milestones should distinguish store-version tags from planning-milestone identifiers explicitly.
+5. **Don't trust a stale local `main` when assessing "is it merged?"** At close I compared against local `main` (`d8d54c4`, still manifest 2.3.0) and wrongly concluded the feature was unmerged. In fact the bug-report code was squash-merged to `origin/main` and tagged `v5.0` (`63f6a76`) before close — `git diff origin/main feat/bug-report -- src/ worker/src/` is empty (byte-identical source). The `git cherry` "141 commits not upstream" was a squash-merge patch-id artifact, NOT missing code. Lesson: verify merge state against `origin/main` (and the actual source diff), not the local branch, before asserting it. The `v5.0` tag doubles as the extension store-release tag — milestone close did NOT create or move it.
 
 ### Cost Observations
 - Model mix: `balanced` profile (Opus orchestrator, sonnet executors/researchers/checkers/verifiers)
 - New npm dependencies: **zero** (sixth consecutive milestone) — built on Web Crypto (`crypto.subtle.digest`), `chrome.storage.local`, background `fetch`, Cloudflare Worker + KV, and `wrangler secret put` for the Discord URL
 - Trust invariants held: `assertTripleGate` body byte-unchanged; v40-auto-fix CI stayed `workflow_dispatch:`-only throughout
-- Notable: work isolated on `feat/bug-report` (144 commits, unmerged) per the established batch-push workflow; v4.3 auto-fix milestone stayed paused and untouched
+- Notable: bug-report feature code is merged to `origin/main` (squash-merge) and tagged `v5.0`; `src/`+`worker/src/` on `origin/main` are byte-identical to `feat/bug-report`. Only `.planning/` docs (incl. milestone-close archival) remain unpushed on `feat/bug-report`. v4.3 auto-fix milestone stayed paused and untouched
 
 ---
 

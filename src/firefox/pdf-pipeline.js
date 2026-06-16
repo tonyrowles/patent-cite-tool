@@ -20,7 +20,8 @@ import { MSG } from '../shared/constants.js';
 
 // Worker configuration — Cloudflare Worker proxy for USPTO ODP and KV cache
 const WORKER_URL = 'https://pct.tonyrowles.com';
-const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
+// Token injected at build time by esbuild define (SEC-02). Never a literal.
+const PROXY_TOKEN = __PROXY_TOKEN__;
 
 // Cache version — bump to invalidate all cached entries.
 // v4 (post-v5.0.0): evicts position maps poisoned by the v5.0.0 column-sequence

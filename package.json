@@ -10,6 +10,7 @@
     "build:chrome": "node scripts/build.js --chrome-only",
     "build:firefox": "node scripts/build.js --firefox-only",
     "build:webapp": "node scripts/build.js --webapp-only",
+    "deploy:webapp": "npm run build:webapp && wrangler deploy -c webapp/wrangler.toml",
     "check-deps-and-pr": "node scripts/check-deps-and-pr.mjs",
     "reports": "node scripts/review-reports.mjs",
     "dev": "node scripts/build.js --watch",

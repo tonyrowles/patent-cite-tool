@@ -121,6 +121,17 @@
   </ul>
   <p>This data is managed entirely by Chrome's infrastructure and is not accessible to the developer. It never leaves Chrome's own sync system.</p>
 
+  <h2>Citation Webapp (cite.tonyrowles.com)</h2>
+  <p>In addition to the browser extension, the same citation lookup is available as a standalone web page at <strong>cite.tonyrowles.com</strong>. The webapp provides the identical deterministic citation function without installing the extension. It introduces <strong>no new personal data collection</strong>:</p>
+  <ul>
+    <li>No account, login, cookies, analytics, or usage tracking — the same as the extension.</li>
+    <li>Patent PDFs are <strong>proxied through the developer's first-party Worker</strong> (pct.tonyrowles.com) via a dedicated <code>/webapp/pdf</code> route. The webapp never fetches patent documents directly from Google's CDN. Only the patent document identifier is included in the request.</li>
+    <li>Parsed patent text position maps are cached in the <strong>same shared first-party Cloudflare KV</strong> used by the extension, keyed only by patent number. No user data is stored — the cache contains only derived patent-document position data.</li>
+    <li>Your citation-format and patent-number-prefix preferences are stored <strong>locally in your browser</strong> (localStorage) and are never transmitted.</li>
+    <li>The webapp authenticates to the Worker using an <strong>Origin header check only</strong> — no token and no <code>Authorization</code> header is sent in any request.</li>
+  </ul>
+  <p>The citation computation (PDF text extraction and passage matching) runs entirely in your browser. As with the extension, no AI or remote inference is involved — the result is a deterministic column:line lookup.</p>
+
   <h2>Data Sharing</h2>
   <p>We do not sell or trade your data. Reports submitted through the voluntary Bug Report Feature are stored on Cloudflare (KV) and a notification containing report fields is delivered via Discord. Cloudflare and Discord act as service providers (processors) for that feature; data is not sold or shared with any other party. Outside the Bug Report Feature, no data is collected that could be shared.</p>
 

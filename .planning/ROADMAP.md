@@ -119,3 +119,25 @@
 | 3. Background Submission Handler + Rate Limit + Retry Queue | 3/3 | Complete   | 2026-06-13 |
 | 4. Report Dialog UI + Citation-UI Wiring | 4/4 | Complete   | 2026-06-13 |
 | 5. Options Page Debug Mode + Popup Fallback + Live UAT | 4/5 | In Progress|  |
+
+## Backlog
+
+### Phase 999.1: Standalone citation webapp on tonyrowles.com (BACKLOG)
+
+**Goal:** [Captured for future planning] A web page where a user enters a patent number + a text passage and gets back the citation (column:line), reusing the extension's deterministic matching core. No LLM — citations are 100% deterministic position lookups.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+**Decisions already made (from 2026-06-15 discussion):**
+- **Same repo, NOT a new repo/project.** Value is reusing `src/shared/matching.js`, `src/offscreen/position-map-builder.js`, `src/offscreen/pdf-parser.js` (all pure, zero `chrome.*`/DOM deps). A separate repo would force extracting/versioning a shared package and risk matching-logic drift.
+- **Scope as a NEW MILESTONE**, and update PROJECT.md's identity from "browser extension" → "patent citation tooling (extension + webapp)".
+- **First phase = extract shared core** into a workspace/package consumed by both surfaces (refactor, no behavior change, guarded by the existing 95-test corpus).
+- Existing Cloudflare Worker at `pct.tonyrowles.com` (USPTO proxy + KV cache) is reusable.
+
+**Open risks / notes:**
+- PDF.js parsing likely runs client-side in the browser (heavier than the Worker's zero-dep proxy).
+- Published applications have no parseable PDF column/line scheme — extension handles via DOM `[0042]` markers, which won't exist server-side. Webapp may skip applications or need a different strategy.
+- ⚠️ Hardcoded `PROXY_TOKEN` in `src/offscreen/offscreen.js` must be treated as compromised and moved server-side / rotated before exposing a public webapp.

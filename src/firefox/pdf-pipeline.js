@@ -14,7 +14,7 @@
  */
 
 import { extractTextFromPdf } from '../offscreen/pdf-parser.js';
-import { buildPositionMap } from '../offscreen/position-map-builder.js';
+import { buildPositionMap } from '../shared/position-map-builder.js';
 import { matchAndCite } from '../shared/matching.js';
 import { MSG } from '../shared/constants.js';
 

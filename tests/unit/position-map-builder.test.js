@@ -12,7 +12,7 @@ import {
   isLikelySpecPage,
   stripCrossBoundaryText,
   buildPositionMap,
-} from '../../src/offscreen/position-map-builder.js';
+} from '../../src/shared/position-map-builder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const ROOT = resolve(__filename, '../../..');

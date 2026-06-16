@@ -8,6 +8,23 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
+## Current Milestone: v6.0 Standalone Citation Webapp
+
+**Goal:** Ship a public web page on `tonyrowles.com` where a user enters a patent number + a text passage and gets back the exact column:line citation — reusing the extension's deterministic matching core (no LLM, 100% deterministic position lookups). Expands the project identity from "browser extension" → "patent citation tooling (extension + webapp)."
+
+**Target features:**
+- Extract the shared deterministic core (`src/shared/matching.js`, `src/offscreen/position-map-builder.js`, `src/offscreen/pdf-parser.js`) into a workspace/package consumed by both the extension and the webapp — refactor only, no behavior change, guarded by the existing golden corpus.
+- Rotate the compromised hardcoded `PROXY_TOKEN` (`src/offscreen/offscreen.js`) and move it server-side — blocking security gate before any public exposure.
+- Core webapp flow: patent number + passage → citation with confidence indicator, parsed client-side via PDF.js.
+- Batch mode: multiple passages for one patent at once.
+- Copy-to-clipboard + the extension's existing citation-format options.
+
+**Key context / constraints:**
+- Same repo (not a new project); reuse the existing `pct.tonyrowles.com` Cloudflare Worker (USPTO proxy + KV cache) as a thin backend.
+- Client-side compute (PDF.js in the browser); Worker stays a thin proxy.
+- Granted US patents only for v1; published applications show a clear "not supported yet" message (no server-side `[XXXX]` paragraph-marker path in v1).
+- "v5.1" remains reserved for the deferred auto-fix resumption + bug-report ingestion work (v4.3 carry-over).
+
 ## Last Shipped: v5.0 Bug Report Feature (Shipped 2026-06-15)
 
 Gave extension users a low-friction in-product affordance to report citation failures, routing rich auto-captured diagnostic bundles to a private Cloudflare-backed observability pipeline (`BUG_REPORTS` KV durable + Discord webhook notify) for maintainer triage — the inbound signal channel that v5.1's resumed auto-fix work will ingest. **Live UAT-01..06 PROVEN against production `pct.tonyrowles.com` before close** (Discord embeds + KV records verified, no IP stored, server-side dedup + cross-browser parity on Chrome/149 + Firefox/151).
@@ -266,4 +283,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-16 after v5.0 Bug Report Feature milestone (5 phases, 16 plans, 26 tasks; 45/45 v1 requirements shipped; live UAT-01..06 PROVEN against production `pct.tonyrowles.com`). v4.3 remains paused at Phase 67 (6/7 shipped) — auto-fix carry-over + bug-report ingestion resume in v5.1 per Pattern B versioning. Next: `/gsd-new-milestone`.*
+*Last updated: 2026-06-16 — started milestone v6.0 Standalone Citation Webapp (client-side PDF.js webapp on `tonyrowles.com` reusing the deterministic matching core; granted patents only for v1; `PROXY_TOKEN` rotation is a blocking security gate). v4.3 auto-fix carry-over + bug-report ingestion remain reserved for v5.1. v5.0 Bug Report Feature shipped 2026-06-15 (45/45 reqs, live UAT-01..06 PROVEN). Next: define v6.0 requirements → roadmap.*

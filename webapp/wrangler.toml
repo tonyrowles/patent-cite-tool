@@ -1,0 +1,7 @@
+name = "patent-cite-webapp"
+compatibility_date = "2026-06-16"
+
+# Workers Assets — no main key (pure static asset serving, no Worker script)
+# Pitfall 7: never use the deprecated sites directive — use [assets] in wrangler v4+
+[assets]
+directory = "../dist/webapp"

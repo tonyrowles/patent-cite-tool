@@ -24,6 +24,7 @@ const args = process.argv.slice(2);
 const watchMode = args.includes('--watch');
 const chromeOnly = args.includes('--chrome-only') || watchMode;
 const firefoxOnly = args.includes('--firefox-only');
+const webappOnly = args.includes('--webapp-only');
 
 // ---------------------------------------------------------------------------
 // Build-time token guard (SEC-02)
@@ -56,7 +57,8 @@ function loadDotEnv() {
 loadDotEnv();
 
 const PROXY_TOKEN = process.env.PROXY_TOKEN;
-if (!PROXY_TOKEN) {
+// SEC-02 / Pitfall 1: webapp build intentionally has no token — bypass guard for --webapp-only
+if (!webappOnly && !PROXY_TOKEN) {
   console.error('ERROR: PROXY_TOKEN environment variable is not set.');
   console.error('Set it in a git-ignored root `.env` (PROXY_TOKEN=...) or export it before building. Build aborted.');
   process.exit(1);
@@ -235,6 +237,40 @@ async function buildFirefox({ sourcemaps = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Webapp build (--webapp-only)
+// No PROXY_TOKEN required — webapp carries no secret (SEC-03 / T-08-01)
+// Cleans only dist/webapp/ — sibling extension builds are untouched (Pitfall 3)
+// ---------------------------------------------------------------------------
+
+async function buildWebapp() {
+  const start = Date.now();
+
+  // Pitfall 3: clean only dist/webapp, not the whole dist/
+  fs.rmSync('dist/webapp', { recursive: true, force: true });
+  fs.mkdirSync('dist/webapp/lib', { recursive: true });
+
+  // Bundle webapp/js/app.js as ESM.
+  // CRITICAL: external path is './lib/pdf.mjs' (sibling of outfile dist/webapp/app.bundle.js),
+  // NOT '../lib/pdf.mjs' (which is the Chrome/Firefox target convention) — Pitfall 2.
+  // No define block — __PROXY_TOKEN__ must NEVER appear in the webapp bundle (T-08-01).
+  await esbuild.build({
+    entryPoints: ['webapp/js/app.js'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    outfile: 'dist/webapp/app.bundle.js',
+    external: ['./lib/pdf.mjs'],
+  });
+
+  // Copy static assets
+  fs.copyFileSync('webapp/index.html', 'dist/webapp/index.html');
+  fs.cpSync('src/lib', 'dist/webapp/lib', { recursive: true });
+
+  const elapsed = Date.now() - start;
+  console.log(`Built webapp in ${elapsed}ms`);
+}
+
+// ---------------------------------------------------------------------------
 // Test-export bundles (ESM bundles of matching logic for each dist/ target)
 // Used by vitest.config.chrome.js and vitest.config.firefox.js via resolve.alias
 // ---------------------------------------------------------------------------
@@ -308,13 +344,17 @@ async function watchChrome() {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // Clean dist before each build (not in watch mode — esbuild manages output)
-  if (!watchMode) {
+  // Clean dist before each build (not in watch mode — esbuild manages output).
+  // Pitfall 3: webapp-only must NOT wipe the whole dist/ (extension builds coexist).
+  if (!watchMode && !webappOnly) {
     fs.rmSync('dist', { recursive: true, force: true });
   }
 
   if (watchMode) {
     await watchChrome();
+  } else if (webappOnly) {
+    // Webapp target: no PROXY_TOKEN, no test exports (those need a token)
+    await buildWebapp();
   } else if (chromeOnly) {
     await buildChrome();
     await buildTestExports({ chrome: true, firefox: false });

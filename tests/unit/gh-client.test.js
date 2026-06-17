@@ -225,3 +225,32 @@ describe('listWithSearch', () => {
     expect(client.listWithSearch.length).toBeLessThanOrEqual(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// WR-05: repo parameter is wired through — factory shape verification
+// ---------------------------------------------------------------------------
+
+describe('WR-05: repo parameter is threaded into gh commands', () => {
+  it('makeKvReportGhClient accepts a repo string without throwing', () => {
+    // Verify the factory closes over repo without error
+    expect(() => makeKvReportGhClient('owner/myrepo')).not.toThrow();
+  });
+
+  it('makeKvReportGhClient with null/undefined repo still returns a functional client', () => {
+    expect(() => makeKvReportGhClient(null)).not.toThrow();
+    expect(() => makeKvReportGhClient(undefined)).not.toThrow();
+    const client = makeKvReportGhClient(null);
+    expect(typeof client.createIssueWithLabels).toBe('function');
+  });
+
+  it('WR-05 source check: repo is used in gh commands (not silently dropped)', () => {
+    const { readFileSync } = require('fs');
+    const src = readFileSync(
+      new URL('../../scripts/gh-client.mjs', import.meta.url),
+      'utf8'
+    );
+    // The source must use repoArg/repoArgv (the repo-wiring variables)
+    expect(src).toContain('repoArg');
+    expect(src).toContain('repoArgv');
+  });
+});

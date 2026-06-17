@@ -53,10 +53,23 @@ export function isWithinCutoff(isoTimestamp, suppressDays, now = Date.now()) {
 /**
  * Create a gh CLI client for KV-report Issue management.
  *
- * @param {string} repo — GitHub repository in "owner/repo" format (passed to gh via env/config)
+ * WR-05: The `repo` parameter is now threaded into every gh command via `--repo <repo>`
+ * so a caller passing a different repo is not silently redirected to the ambient
+ * repository. If `repo` is falsy the parameter is omitted and gh falls back to the
+ * ambient git remote (backward-compatible).
+ *
+ * @param {string|null|undefined} repo — GitHub repository in "owner/repo" format, or null/undefined
+ *   to use gh's ambient repo resolution (git remote / GH_REPO env var).
  * @returns {{ findExistingIssueByKvKey, createIssueWithLabels, isPostFixSuppressed, listWithSearch, addLabel }}
  */
 export function makeKvReportGhClient(repo) {
+  // WR-05: pre-build a --repo flag fragment for shell-string commands (safe: repo comes
+  // from process.env.GITHUB_REPOSITORY which is server-set, not user free-text;
+  // only alphanumeric/- chars expected, but we escape the shell context defensively).
+  const repoArg = repo ? ` --repo '${repo.replaceAll("'", "'\\''")}'` : '';
+  // For execFileSync (shell-free) commands, a separate argv pair.
+  const repoArgv = repo ? ['--repo', repo] : [];
+
   return {
     /**
      * Search issues by query string across open and closed states.
@@ -73,7 +86,7 @@ export function makeKvReportGhClient(repo) {
       try {
         const escaped = query.replaceAll("'", "'\\''");
         const raw = execSync(
-          `gh issue list --search '${escaped}' --state ${state} --json number,title,body,state --limit 30`,
+          `gh issue list${repoArg} --search '${escaped}' --state ${state} --json number,title,body,state --limit 30`,
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
         const parsed = JSON.parse(raw);
@@ -117,7 +130,7 @@ export function makeKvReportGhClient(repo) {
       const labelFlags = labels.flatMap(l => ['--label', l]);
       const out = execFileSync(
         'gh',
-        ['issue', 'create', '--title', title, ...labelFlags, '--body-file', '-'],
+        ['issue', 'create', ...repoArgv, '--title', title, ...labelFlags, '--body-file', '-'],
         { input: body, encoding: 'utf8' }
       );
       const m = out.match(/\/issues\/(\d+)/);
@@ -135,7 +148,7 @@ export function makeKvReportGhClient(repo) {
     addLabel(issueNumber, label) {
       execFileSync(
         'gh',
-        ['issue', 'edit', String(issueNumber), '--add-label', label],
+        ['issue', 'edit', ...repoArgv, String(issueNumber), '--add-label', label],
         { encoding: 'utf8' }
       );
     },
@@ -163,7 +176,7 @@ export function makeKvReportGhClient(repo) {
       // Query 1: merged auto-fix/* PRs referencing patentNumber (T-11-01 — query escaping)
       try {
         const raw = execSync(
-          `gh pr list --state merged --search '${escaped} in:body' ` +
+          `gh pr list${repoArg} --state merged --search '${escaped} in:body' ` +
           `--json number,mergedAt,headRefName,body --limit 20`,
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
@@ -180,7 +193,7 @@ export function makeKvReportGhClient(repo) {
       // Query 2: closed report-fix-candidate Issues referencing patentNumber (T-11-01)
       try {
         const raw = execSync(
-          `gh issue list --label report-fix-candidate --state closed ` +
+          `gh issue list${repoArg} --label report-fix-candidate --state closed ` +
           `--search '${escaped} in:body' --json number,closedAt,body --limit 20`,
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );

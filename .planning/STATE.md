@@ -45,6 +45,16 @@ Last activity: 2026-06-17 — Milestone v6.0 completed and archived
 - SEC-03..05: Origin-header auth on webapp routes; IP rate limits on all webapp-accessible Worker routes; global daily KV-write guard
 - WRKR-04: Worker rejects A1/A2/A9 kind codes with HTTP 400
 
+## Bypass Conventions
+
+**LOAD-BEARING RUNBOOK** (per BYPASS-03 — Pitfall 11 mitigation):
+
+- **DO NOT** use `gh pr merge --admin` on `auto-fix/*` branches. EVER.
+- `--admin` bypasses the `verifier-gate` CI check but still writes `outcome: 'pass'` ledger entries via `auto-fix-promote.mjs`. These entries pollute A/B winner sample math because `assertTripleGate` (verified-label + merged + triage-sourced) does not detect the bypass when the maintainer manually adds `auto-fix:verified` before merging.
+- Sole-maintainer ruleset 17086676 has `@tonyrowles` (`actor_id 254599900`) as permanent bypass actor with `bypass_mode: always` (post-v4.2 reversal — see Ruleset Decision below). The bypass is for **human-authored** changes that warrant scope-decision fast-path or maintenance commits — **not** for auto-fix promotions.
+- Phase 62 `scripts/audit-bypass-merges.mjs` (BYPASS-01) queries `gh api repos/<owner>/<repo>/actions/runs` for `verifier-gate` runs completed AFTER the PR was merged; outputs CSV consumed by Phase 66's `a-b-winner.mjs --admin-bypass` filter to exclude bypass-tainted `outcome:'pass'` entries.
+- Weekly digest gains bypass-count metric (BYPASS-02) so the discipline is observable in the Auto-Fix Pipeline section.
+
 ## Performance Metrics
 
 **By Milestone:**

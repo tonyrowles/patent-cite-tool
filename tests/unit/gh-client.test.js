@@ -183,13 +183,17 @@ describe('makeKvReportGhClient factory', () => {
 
 describe('createIssueWithLabels — escaping shape (T-11-01, T-11-02)', () => {
   it('title with double-quotes is properly escaped in the shell command', () => {
-    // We cannot easily test the execSync call directly without mocking execSync,
-    // so we test the escaping logic inline with the same pattern the code uses.
+    // We test the escaping logic inline with the same pattern the code uses.
+    // The escaping replaces " with \" so it is safe inside --title "..." shell context.
     const title = 'Report for "US11427642B2"';
     const escapedTitle = title.replaceAll('"', '\\"');
+    // The JavaScript string 'Report for \\"US11427642B2\\"' holds: Report for \"US11427642B2\"
+    // The escaped form contains backslash-quote pairs (\" ) not bare quotes:
     expect(escapedTitle).toBe('Report for \\"US11427642B2\\"');
-    // The shell command string would be: --title "Report for \"US11427642B2\""
-    expect(escapedTitle).not.toContain('"');
+    // The raw quote character is replaced; the escaped string uses \" pairs:
+    expect(escapedTitle).toContain('\\"');
+    // The escaped title is different from the original (quotes were transformed):
+    expect(escapedTitle).not.toBe(title);
   });
 
   it('labels with double-quotes are properly escaped', () => {

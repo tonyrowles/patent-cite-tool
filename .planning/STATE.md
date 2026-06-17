@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
 status: planning
-last_updated: "2026-06-17T16:19:20.965Z"
+last_updated: "2026-06-17"
 last_activity: 2026-06-17
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,32 +17,34 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-16)
+See: .planning/PROJECT.md (updated 2026-06-17)
 
-**Core value:** Highlight text on Google Patents, get an accurate citation reference instantly — extended in v6.0 to a standalone web page: enter a patent number + passage, get the exact column:line citation, no LLM.
-**Current focus:** Phase 8 — Webapp Core Build
+**Core value:** Highlight text on Google Patents, get an accurate citation reference instantly. v6.0 extended this to a standalone web page at cite.tonyrowles.com. v6.1 closes the quality loop: real user-reported citation failures become regression-safe fixes under a human merge gate.
+**Current focus:** v6.1 roadmap defined — ready to plan Phase 10
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap defined, phases 10-14)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-17 — Milestone v6.1 started
+Status: Ready to begin Phase 10
+Last activity: 2026-06-17 — v6.1 roadmap created (5 phases, 37 requirements mapped)
 
-## Key Locked Decisions (v6.0)
+```
+Progress: [----------] 0% (0/5 phases complete)
+```
 
-- **Shared core:** plain `src/shared/` + esbuild alias — NOT npm workspaces (avoids symlink complexity with per-target Vitest alias configs)
-- **Deployment:** `cite.tonyrowles.com` via Cloudflare Workers Assets (Cloudflare Pages blocked: cannot share custom domain with an existing routed Worker)
-- **Webapp auth:** Origin-header check only — no `Authorization: Bearer` token in any browser-side webapp code
-- **Published applications:** rejected at BOTH input (kind-code A1/A2/A9 → "not supported") AND Worker level (HTTP 400 before any USPTO fetch)
-- **Zero new npm dependencies** (seventh consecutive milestone; PDF.js, esbuild, and Wrangler are already installed)
-- **Phase 6 is a BLOCKING GATE** — PROXY_TOKEN is already compromised (plaintext in `src/offscreen/offscreen.js:24`); no webapp code can reach production until Phase 6 is complete
+## Key Locked Decisions (v6.1)
 
-## Phase 6 Blockers (must close before any public URL)
-
-- SEC-01..02: Rotate PROXY_TOKEN via `wrangler secret put`; inject from CI secrets in extension build (not committed)
-- SEC-03..05: Origin-header auth on webapp routes; IP rate limits on all webapp-accessible Worker routes; global daily KV-write guard
-- WRKR-04: Worker rejects A1/A2/A9 kind codes with HTTP 400
+- **Fix surface**: `src/shared/` only — `matching.js`, `position-map-builder.js`, `pdf-parser.js`; Worker-route bugs (`tool_not_working`, `pdfParseStatus:"error"`) are classified as `infrastructure` and excluded from LLM fix scope (deferred to v6.2)
+- **Triage is heuristic-only**: No LLM calls during triage; LLM budget reserved exclusively for fix generation; dedup threshold `duplicate_count >= 3` (env-configurable)
+- **`workflow_dispatch:` only**: No cron schedule for triage/ingestion in this milestone; maintainer-triggered only
+- **Per-run cap**: `MAX_FIXES_PER_RUN` default 5 (env-configurable); surplus promoted reports remain queued
+- **Fix-iteration cap**: 3 iterations per report before `auto-fix-stuck` label (no further spend)
+- **Human merge gate is a permanent invariant**: No auto-merge of `src/` fix PRs. Citations go into legal filings. Encoded as a Vitest static-grep test asserting absent auto-merge flags in all workflow YAMLs
+- **Two-commit ledger split inherited from v4.0**: Ledger committed to `main` with `[skip ci]` before `cpr@v8` snapshots the working tree — the ONLY permitted direct push to `main`
+- **`wrangler --remote` is mandatory**: All new `wrangler kv key list/get` calls must include `--remote`; wrangler v4 default reads local miniflare (returns false-empty `[]`)
+- **`REPORT_FIX_SCAFFOLD` is novel**: Phase 12 fix-generation is the highest-risk phase and requires a research-phase during planning (prompt design for KV-report → matching-core diff is new; validate with a sample report; plan 2-3 prompt-iteration cycles)
+- **Phase 10 retirement supersedes `RESUME-V4.3.md`**: The re-enable checklist (un-skip synthetic-trigger contract tests, restore `issues: labeled` trigger, restore `v40-auto-promote` `pull_request:closed` trigger) is voided — those guarded the retired path and are removed, not restored
 
 ## Bypass Conventions
 
@@ -53,6 +55,10 @@ Last activity: 2026-06-17 — Milestone v6.1 started
 - Sole-maintainer ruleset 17086676 has `@tonyrowles` (`actor_id 254599900`) as permanent bypass actor with `bypass_mode: always` (post-v4.2 reversal — see Ruleset Decision below). The bypass is for **human-authored** changes that warrant scope-decision fast-path or maintenance commits — **not** for auto-fix promotions.
 - Phase 62 `scripts/audit-bypass-merges.mjs` (BYPASS-01) queries `gh api repos/<owner>/<repo>/actions/runs` for `verifier-gate` runs completed AFTER the PR was merged; outputs CSV consumed by Phase 66's `a-b-winner.mjs --admin-bypass` filter to exclude bypass-tainted `outcome:'pass'` entries.
 - Weekly digest gains bypass-count metric (BYPASS-02) so the discipline is observable in the Auto-Fix Pipeline section.
+
+**v6.1 extension to human-gate invariant:**
+- No `gh pr merge --auto` or `auto-merge: true` flags in any `v40-*.yml` or new `v61-*.yml` workflow YAML
+- This is enforced as a named Vitest static-grep test (GATE-04) — a drift from this invariant fails CI
 
 ## Performance Metrics
 
@@ -73,45 +79,60 @@ Last activity: 2026-06-17 — Milestone v6.1 started
 | v4.1 Readiness Gate + Push | 9 | 11 | ~2 days |
 | v4.2 Auto-Fix Loop Live | 5 (+60.1 hotfix) | 11 | ~5 days |
 | v5.0 Bug Report Feature | 5 | 16 | ~4 days |
-| v6.0 Standalone Citation Webapp | 4 | TBD | TBD |
+| v6.0 Standalone Citation Webapp | 4 | 9 | ~1 day |
+| v6.1 Auto-Fix from Bug Reports | 5 | TBD | TBD |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
-- 2026-06-16: v6.0 roadmap created (Phases 6-9, 33 requirements: SEC-01..05, WRKR-01..04, CORE-01..04, APP-01..10, FMT-01..02, BATCH-01..03, DEPLOY-01..04, PRIV-01). Phase numbering continues from v5.0 (which used Phases 1-5) → v6.0 uses Phases 6-9 to resume cross-milestone continuity. Forced build order from SUMMARY.md honoured: Phase 6 (security gate + Worker routes) blocks all; Phase 7 (shared core extraction) is the foundation; Phase 8 (webapp build) and Phase 9 (deploy + UAT) are the product delivery phases. Coverage: 33/33 requirements mapped; 0 orphans.
+- 2026-06-17: v6.1 roadmap created (Phases 10-14, 37 requirements across RTR/ING/TRI/PROMO/FIX/GATE/COST/DGST/UAT). Phase numbering continues from v6.0 (Phases 6-9) → v6.1 uses Phases 10-14. Hard dependency chain honoured per all four researcher files and synthesizer: RTR first (Phase 10), then ING+TRI+PROMO triage layer (Phase 11), then FIX+GATE-01..04+COST fix generation (Phase 12), then GATE-05 triple-gate extension (Phase 13), then DGST+UAT hardening (Phase 14). Phase 12 flagged as highest-risk, requiring a research-phase during planning. Coverage: 37/37 v1 requirements mapped; 0 orphans.
 
 ### Decisions
 
-- v6.0-roadmap: Phase numbering continues from v5.0 Phases 1-5 → v6.0 Phases 6-9. No reset.
-- v6.0-roadmap: LOAD-BEARING — Phase 6 (security gate) must fully complete before any webapp code reaches the production Worker. The PROXY_TOKEN is already compromised (plaintext at `src/offscreen/offscreen.js:24`). Phase 6 bundles SEC + WRKR together — rotating the token and adding the new public routes is one Worker deploy.
-- v6.0-roadmap: LOAD-BEARING — `pdf-parser.js`'s `GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(...)` is at module scope (line 14). This throws on import in a plain web page. The `configurePdfWorker(url)` seam is the ONLY non-trivial code change in Phase 7; the other two modules are verbatim moves.
-- v6.0-roadmap: LOAD-BEARING — 75-case golden corpus does NOT exercise the browser-context PDF→position-map pipeline. CORE-04 (full-pipeline browser integration test) is required DoD for Phase 7 — it proves pdf-parser.js works in a plain `<script type="module">` context with PDF.js running in a worker thread.
-- v6.0-roadmap: LOAD-BEARING — published-application numbers must be rejected at TWO points: (1) webapp input stage (kind-code or `20XXXXXXXX` format → show "not supported") and (2) Worker level (HTTP 400 before any USPTO fetch). Producing a wrong column:line citation from a published-application PDF is worse than an error — the result looks plausible but is meaningless.
-- v6.0-roadmap: Workers Assets on `cite.tonyrowles.com` is the ONLY viable Cloudflare static-hosting path. Cloudflare Pages cannot share a custom domain with an existing routed Worker (confirmed known-issue per Cloudflare docs).
-- v6.0-roadmap: `source: "webapp"` provenance field required on all webapp KV cache uploads (WRKR-03). Without it, debugging cross-surface cache poisoning is impossible.
+- v6.1-roadmap: Phase numbering continues from v6.0 Phases 6-9 → v6.1 Phases 10-14. No reset.
+- v6.1-roadmap: LOAD-BEARING — Phase 10 (retirement) must fully complete before any Phase 11 code is written. The old `v40-auto-fix.yml` `issues: labeled` trigger for `triage`-labeled Issues is structurally incompatible with the new `report-fix-candidate` label trigger; having both active simultaneously creates workflow collision risk.
+- v6.1-roadmap: LOAD-BEARING — Phase 11 (triage layer) must be stable before Phase 12 (fix generation) starts. The `v61-report-fix.yml` workflow triggers on Issues created by Phase 11's triage layer; without stable Issue body format and label conventions, the fix workflow has no valid inputs.
+- v6.1-roadmap: LOAD-BEARING — Phase 12 (fix generation) must be proven working on at least one v6.1-sourced fix PR before Phase 13 extends `assertTripleGate`. The auto-promote cycle must not be extended until the end-to-end `auto-fix:verified` label flow is confirmed functional.
+- v6.1-roadmap: LOAD-BEARING — Phase 12 is the highest-risk phase. `REPORT_FIX_SCAFFOLD` prompt design for KV-report → matching-core diff is novel. plan-phase must trigger a research-phase before writing implementation plans. Expect 2-3 prompt-iteration cycles.
+- v6.1-roadmap: ING + TRI + PROMO combined into one phase (Phase 11) — they are tightly coupled (can't triage without reading, can't promote without classifying) and splitting them would create an artificial horizontal layer. 15 requirements is appropriate for a single standard-granularity phase given the coupling.
+- v6.1-roadmap: GATE-01..04 assigned to Phase 12 (not Phase 13) — the regression gate, draft PR, verifier-gate binding, and human-merge invariant are all part of the fix delivery path and are prerequisites for any fix PR to exist. GATE-05 (triple-gate Leg 3) is a post-merge concern that depends on proven fix PRs.
+- v6.1-roadmap: GATE-05 alone in Phase 13 — it is a named architectural invariant change (`assertTripleGate` body + Vitest sha256 pin) that should not be bundled with the experimental Phase 12 work. Its isolation makes the sha256 pin update atomic and auditable.
+- v6.1-roadmap: v4.3 autonomous machinery (inject-defect.mjs, e2e-explore.mjs, v40-auto-fix synthetic trigger, paused Phase 61-67 artifacts) is RETIRED, not resumed. RESUME-V4.3.md is superseded. The inbound signal for v6.1 is exclusively human bug reports from BUG_REPORTS KV.
+
+### Permanent Invariants (do not relax)
+
+| Invariant | Enforcement |
+|-----------|-------------|
+| No auto-merge of `src/` fix PRs | Vitest static-grep (GATE-04) + branch-protection ruleset 17086676 |
+| `assertTripleGate` body byte-stable | Vitest sha256 pin tests in `tests/unit/` |
+| `wrangler kv` always uses `--remote` | Grep assertion in triage layer Vitest tests |
+| `safeAppendLedger` covers all LLM writes | `grep -rn "appendLedgerEntry(LEDGER_PATH" scripts/` count = 1 |
+| User-controlled fields in `<report_data>` envelope (user turn only, never system prompt) | Vitest static-grep on bridge module (FIX-03) |
+| `FORBIDDEN_DELIMITERS` escape on `note`, `selectionText`, `errorLog` before LLM prompt | Vitest static-grep on bridge module |
 
 ### Pending Todos
 
-- v4.3 carry-over (SWEEP-03/04/06 + Phase 68 destructive UAT + final spend tally) — deferred to v6.1 per MEMORY.md entry. Paused-phase artifacts at `.planning/milestones/v4.3-phases-paused/`.
+- v4.3 carry-over items (SWEEP-03/04/06 + Phase 68 destructive UAT + final spend tally) — retired with v4.3 machinery; not carried forward to v6.1. Artifacts at `.planning/milestones/v4.3-phases-paused/`.
 
 ### Blockers/Concerns
 
-- None beyond the Phase 6 blocking gate (documented above and in REQUIREMENTS.md).
+- None. Phase 10 is unblocked — pure archival and deletion work with no external dependencies.
 
 ## Session Continuity
 
-Last session: 2026-06-16
-Stopped at: Roadmap created, REQUIREMENTS.md traceability filled, STATE.md updated. Ready to plan Phase 6.
+Last session: 2026-06-17
+Stopped at: Roadmap created (ROADMAP.md, STATE.md updated; REQUIREMENTS.md traceability filled). Ready to plan Phase 10.
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Run `/gsd:plan-phase 10` to begin Phase 10 planning (Retirement + Scaffolding)
+- Phase 12 will require a research-phase during planning — do not skip it
 
 ## Deferred Items
 
-Items acknowledged and deferred at v6.0 milestone close (2026-06-17):
+Items acknowledged at v6.0 milestone close (2026-06-17) — carried into v6.1 deferred ledger:
 
 | Category | Item | Status |
 |----------|------|--------|
@@ -120,4 +141,4 @@ Items acknowledged and deferred at v6.0 milestone close (2026-06-17):
 | quick_task | 260412-fde-fix-spurious-results-reporting | stale (pre-v6.0) |
 | verification_gap | 08-webapp-core-build (human_needed) | resolved by Phase 9 live UAT |
 
-Non-blocking tech debt (v6.0 audit): pre-existing `weekly-digest-auto-fix` STATE.md `## Bypass Conventions` test (dropped by 0401b31, unrelated to v6.0); 4 deferred code-review info items (WR-02 ordering kept intentionally; IN-02/03/04 test/robustness nice-to-haves).
+Non-blocking tech debt (v6.0 audit): pre-existing `weekly-digest-auto-fix` STATE.md `## Bypass Conventions` test; 4 deferred code-review info items (WR-02, IN-02/03/04).

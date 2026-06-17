@@ -109,54 +109,52 @@
 
 ## Traceability
 
-Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RTR-01 | — | Pending |
-| RTR-02 | — | Pending |
-| RTR-03 | — | Pending |
-| RTR-04 | — | Pending |
-| RTR-05 | — | Pending |
-| ING-01 | — | Pending |
-| ING-02 | — | Pending |
-| ING-03 | — | Pending |
-| ING-04 | — | Pending |
-| TRI-01 | — | Pending |
-| TRI-02 | — | Pending |
-| TRI-03 | — | Pending |
-| TRI-04 | — | Pending |
-| TRI-05 | — | Pending |
-| TRI-06 | — | Pending |
-| TRI-07 | — | Pending |
-| PROMO-01 | — | Pending |
-| PROMO-02 | — | Pending |
-| PROMO-03 | — | Pending |
-| PROMO-04 | — | Pending |
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| FIX-04 | — | Pending |
-| FIX-05 | — | Pending |
-| GATE-01 | — | Pending |
-| GATE-02 | — | Pending |
-| GATE-03 | — | Pending |
-| GATE-04 | — | Pending |
-| GATE-05 | — | Pending |
-| COST-01 | — | Pending |
-| COST-02 | — | Pending |
-| COST-03 | — | Pending |
-| COST-04 | — | Pending |
-| DGST-01 | — | Pending |
-| UAT-01 | — | Pending |
-| UAT-02 | — | Pending |
-| UAT-03 | — | Pending |
+| RTR-01 | Phase 10 | Pending |
+| RTR-02 | Phase 10 | Pending |
+| RTR-03 | Phase 10 | Pending |
+| RTR-04 | Phase 10 | Pending |
+| RTR-05 | Phase 10 | Pending |
+| ING-01 | Phase 11 | Pending |
+| ING-02 | Phase 11 | Pending |
+| ING-03 | Phase 11 | Pending |
+| ING-04 | Phase 11 | Pending |
+| TRI-01 | Phase 11 | Pending |
+| TRI-02 | Phase 11 | Pending |
+| TRI-03 | Phase 11 | Pending |
+| TRI-04 | Phase 11 | Pending |
+| TRI-05 | Phase 11 | Pending |
+| TRI-06 | Phase 11 | Pending |
+| TRI-07 | Phase 11 | Pending |
+| PROMO-01 | Phase 11 | Pending |
+| PROMO-02 | Phase 11 | Pending |
+| PROMO-03 | Phase 11 | Pending |
+| PROMO-04 | Phase 11 | Pending |
+| FIX-01 | Phase 12 | Pending |
+| FIX-02 | Phase 12 | Pending |
+| FIX-03 | Phase 12 | Pending |
+| FIX-04 | Phase 12 | Pending |
+| FIX-05 | Phase 12 | Pending |
+| GATE-01 | Phase 12 | Pending |
+| GATE-02 | Phase 12 | Pending |
+| GATE-03 | Phase 12 | Pending |
+| GATE-04 | Phase 12 | Pending |
+| GATE-05 | Phase 13 | Pending |
+| COST-01 | Phase 12 | Pending |
+| COST-02 | Phase 12 | Pending |
+| COST-03 | Phase 12 | Pending |
+| COST-04 | Phase 12 | Pending |
+| DGST-01 | Phase 14 | Pending |
+| UAT-01 | Phase 14 | Pending |
+| UAT-02 | Phase 14 | Pending |
+| UAT-03 | Phase 14 | Pending |
 
 **Coverage:**
 - v1 requirements: 37 total
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 37 ⚠️
+- Mapped to phases: 37
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-17*
-*Last updated: 2026-06-17 after initial definition (v6.1 milestone)*
+*Last updated: 2026-06-17 — traceability filled after roadmap creation (v6.1 milestone)*

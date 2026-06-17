@@ -35,6 +35,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildIssuePayload } from '../tests/e2e/lib/issue-payload-builder.js';
 import { ERROR_CLASSES } from '../tests/e2e/lib/error-codes.js';
+import { makeKvReportGhClient } from './gh-client.mjs';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -476,6 +477,11 @@ export function processReport(report, { ghClient, runId, repo }) {
 // ---------------------------------------------------------------------------
 
 export function makeRealGhClient(repo, label = NIGHTLY_LABEL) {
+  // Phase 11 D-09: shared gh plumbing (createIssueWithLabels, listOpenWithSearch/listWithSearch,
+  // addLabel) delegated to makeKvReportGhClient. Label-specific methods (createIssue,
+  // listOpenNightlyIssues, commentIssue, filerMetaIssue) remain here; they are nightly-label
+  // specific and not shared with the ingest-reports.mjs path.
+  const kvClient = makeKvReportGhClient(repo);
   return {
     listOpenNightlyIssues() {
       try {
@@ -501,45 +507,22 @@ export function makeRealGhClient(repo, label = NIGHTLY_LABEL) {
       const m = out.match(/\/issues\/(\d+)/);
       return { number: m ? parseInt(m[1], 10) : null };
     },
-    // Phase 35 D-06: multi-label issue create.
+    // Phase 35 D-06: multi-label issue create — delegated to gh-client.mjs (D-09).
     // labels is an ordered array per D-06: [category, 'e2e-nightly', 'triage'].
     // Each label is shell-escaped (T-35-03-04).
     createIssueWithLabels(title, body, labels) {
-      const escapedTitle = title.replaceAll('"', '\\"');
-      const labelArgs = labels
-        .map(l => `--label "${l.replaceAll('"', '\\"')}"`)
-        .join(' ');
-      const out = execSync(
-        `gh issue create --title "${escapedTitle}" ${labelArgs} --body-file -`,
-        { input: body, encoding: 'utf8' }
-      );
-      const m = out.match(/\/issues\/(\d+)/);
-      return { number: m ? parseInt(m[1], 10) : null };
+      return kvClient.createIssueWithLabels(title, body, labels);
     },
-    // Phase 35 D-07: search open issues by query string.
+    // Phase 35 D-07: search open issues by query string — delegated to gh-client.mjs (D-09).
     // Shell-escapes query for single-quoted shell context (T-35-03-03).
     // Returns [] on transient gh failures (defensive).
     listOpenWithSearch(query) {
-      try {
-        const escaped = query.replaceAll("'", "'\\''");
-        const raw = execSync(
-          `gh issue list --search '${escaped}' --state open --json number,title,body,updatedAt --limit 30`,
-          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-        );
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (err) {
-        console.warn('[e2e-report-issue] listOpenWithSearch failed:', err.message);
-        return [];
-      }
+      return kvClient.listWithSearch(query, 'open');
     },
-    // Phase 35 D-12: idempotent label-add for quarantine-append.mjs (Plan 04).
+    // Phase 35 D-12: idempotent label-add — delegated to gh-client.mjs (D-09).
     // gh issue edit no-ops if label is already present.
-    addLabel(issueNumber, label) {
-      execSync(
-        `gh issue edit ${issueNumber} --add-label "${label.replaceAll('"', '\\"')}"`,
-        { encoding: 'utf8' }
-      );
+    addLabel(issueNumber, addedLabel) {
+      return kvClient.addLabel(issueNumber, addedLabel);
     },
     commentIssue(number, body) {
       execSync(`gh issue comment ${number} --body-file -`, {

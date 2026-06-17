@@ -59,8 +59,8 @@ Blocking preconditions — must close before any public URL is announced.
 
 - [x] **DEPLOY-01**: `scripts/build.js` is extended with a `buildWebapp()` step (and `--webapp-only`) producing `dist/webapp/` (`index.html`, the JS bundle, and the vendored `pdf.mjs` + `pdf.worker.mjs`)
 - [x] **DEPLOY-02**: `webapp/wrangler.toml` configures Cloudflare Workers Assets, and a `deploy:webapp` npm script is added
-- [ ] **DEPLOY-03**: The webapp is live and publicly accessible at `cite.tonyrowles.com` via Workers Assets, coexisting with the existing `pct.tonyrowles.com` Worker
-- [ ] **DEPLOY-04**: Live UAT proves: a real granted patent → correct citation with KV cache populated; batch mode with multiple passages; a published-application number → rejection (not a wrong citation); a rate-limit 429 after the threshold; and no `Authorization: Bearer` token in any webapp network request
+- [x] **DEPLOY-03**: The webapp is live and publicly accessible at `cite.tonyrowles.com` via Workers Assets, coexisting with the existing `pct.tonyrowles.com` Worker
+- [x] **DEPLOY-04**: Live UAT proves: a real granted patent → correct citation with KV cache populated; batch mode with multiple passages; a published-application number → rejection (not a wrong citation); a rate-limit 429 after the threshold; and no `Authorization: Bearer` token in any webapp network request
 
 ### Privacy Disclosure
 
@@ -128,8 +128,8 @@ Which phases cover which requirements. **Populated by the roadmapper.**
 | BATCH-03 | Phase 8 | Verified (code; live UAT→Ph9) |
 | DEPLOY-01 | Phase 9 | Verified |
 | DEPLOY-02 | Phase 9 | Verified |
-| DEPLOY-03 | Phase 9 | Human-pending |
-| DEPLOY-04 | Phase 9 | Human-pending |
+| DEPLOY-03 | Phase 9 | Verified |
+| DEPLOY-04 | Phase 9 | Verified |
 | PRIV-01 | Phase 9 | Verified |
 
 **Coverage:**

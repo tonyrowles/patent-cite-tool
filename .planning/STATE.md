@@ -4,8 +4,8 @@ milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
 status: executing
 stopped_at: Phase 11 context gathered
-last_updated: "2026-06-17T19:57:44.419Z"
-last_activity: 2026-06-17 -- Phase 11 planning complete
+last_updated: "2026-06-17T20:01:28.964Z"
+last_activity: 2026-06-17 -- Phase 11 execution started
 progress:
   total_phases: 5
   completed_phases: 1
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-17)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly. v6.0 extended this to a standalone web page at cite.tonyrowles.com. v6.1 closes the quality loop: real user-reported citation failures become regression-safe fixes under a human merge gate.
-**Current focus:** Phase 11 — triage layer
+**Current focus:** Phase 11 — triage-layer
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-17 -- Phase 11 planning complete
+Phase: 11 (triage-layer) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 11
+Last activity: 2026-06-17 -- Phase 11 execution started
 
 ```
 Progress: [██████████] 100%

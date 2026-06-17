@@ -105,8 +105,8 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
   4. A maintainer can manually promote any report (noise, user_error, or ambiguous) via `node scripts/ingest-reports.mjs promote <fp> <ts>` — the same GitHub Issue is created and the triage artifact records `promotion_source: 'manual'`
   5. `tool_not_working` / `pdfParseStatus:"error"` reports are classified as `infrastructure` and do NOT create `report-fix-candidate` issues — the triage log shows them as skipped with the reason
 **Plans**: 3 plans
-  - [ ] 11-01-PLAN.md — Pure heuristic report classifier (named rules + golden/quarantine cross-check) with per-rule Vitest pins (TRI-01..05) [Wave 1]
-  - [ ] 11-02-PLAN.md — Extract shared scripts/gh-client.mjs (kv-key dedup, Issue create, post-fix suppression) + export review-reports.mjs KV I/O (ING-02/03/04, TRI-06, PROMO-01, D-09) [Wave 1]
+  - [x] 11-01-PLAN.md — Pure heuristic report classifier (named rules + golden/quarantine cross-check) with per-rule Vitest pins (TRI-01..05) [Wave 1]
+  - [x] 11-02-PLAN.md — Extract shared scripts/gh-client.mjs (kv-key dedup, Issue create, post-fix suppression) + export review-reports.mjs KV I/O (ING-02/03/04, TRI-06, PROMO-01, D-09) [Wave 1]
   - [ ] 11-03-PLAN.md — ingest-reports.mjs orchestrator (D-05 promote, _review write-back, triage artifact) + workflow_dispatch YAML + static-grep guards (ING-01, TRI-07, PROMO-01..04) [Wave 2]
 
 ### Phase 12: Fix Generation + Regression Gate
@@ -157,7 +157,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 | 8. Webapp Core Build | v6.0 | 3/3 | Complete | 2026-06-16 |
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Complete | 2026-06-17 |
 | 10. Retirement + Scaffolding | v6.1 | 3/3 | Complete    | 2026-06-17 |
-| 11. Triage Layer | v6.1 | 0/3 | Planned | - |
+| 11. Triage Layer | v6.1 | 2/3 | In Progress|  |
 | 12. Fix Generation + Regression Gate | v6.1 | 0/TBD | Not started | - |
 | 13. Triple-Gate Extension | v6.1 | 0/TBD | Not started | - |
 | 14. End-to-End UAT + Digest | v6.1 | 0/TBD | Not started | - |

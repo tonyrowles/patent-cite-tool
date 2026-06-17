@@ -89,6 +89,19 @@ describe('parseArgs', () => {
     expect(a.maxFixes).toBe(3);
   });
 
+  it('WR-03: --max-fixes with non-numeric value throws (prevents NaN disabling COST-02 cap)', () => {
+    expect(() => parseArgs(['--max-fixes', 'not-a-number'])).toThrow(/non-negative integer/);
+  });
+
+  it('WR-03: --max-fixes with negative value throws', () => {
+    expect(() => parseArgs(['--max-fixes', '-1'])).toThrow(/non-negative integer/);
+  });
+
+  it('WR-03: --max-fixes with 0 is allowed (disables auto-promotion explicitly)', () => {
+    const a = parseArgs(['--max-fixes', '0']);
+    expect(a.maxFixes).toBe(0);
+  });
+
   it('--namespace-id sets namespaceId', () => {
     const a = parseArgs(['--namespace-id', 'abc123']);
     expect(a.namespaceId).toBe('abc123');

@@ -103,7 +103,16 @@ export function parseArgs(argv) {
       case '--dry-run': out.dryRun = true; break;
       case '--force': out.force = true; break;
       case '--namespace-id': out.namespaceId = rest.shift(); break;
-      case '--max-fixes': out.maxFixes = Number(rest.shift()); break;
+      case '--max-fixes': {
+        // WR-03: validate to a non-negative integer so NaN can never silently
+        // disable the COST-02 per-run cap (NaN >= n is always false).
+        const n = Number(rest.shift());
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+          throw new Error('--max-fixes must be a non-negative integer');
+        }
+        out.maxFixes = n;
+        break;
+      }
       default:
         if (a.startsWith('-')) throw new Error(`Unknown option: ${a}`);
         out.positionals.push(a);

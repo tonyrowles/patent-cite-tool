@@ -143,6 +143,12 @@ export function buildReportIssueBody(record, {
   inGoldenCorpus,
   inQuarantineCorpus,
 }) {
+  // CR-01: Break the HTML-comment opener in all attacker-controlled free-text fields
+  // so a forged <!-- kv-key: ... --> marker cannot appear in the rendered/raw body.
+  // Code-fence wrapping alone is insufficient — findExistingIssueByKvKey matches
+  // body.includes(marker) against the raw string regardless of Markdown context.
+  const safe = (s) => String(s).replaceAll('<!--', '< !--');
+
   const lines = [
     `## Bug report: ${record.patentNumber} (${record.category})`,
     '',
@@ -151,18 +157,23 @@ export function buildReportIssueBody(record, {
     `| Patent | \`${record.patentNumber}\` |`,
     `| Category | \`${record.category}\` |`,
     `| Confidence tier | \`${record.confidenceTier ?? '(none)'}\` |`,
-    `| Returned citation | \`${record.returnedCitation ?? '(none)'}\` |`,
+    `| Returned citation | \`${record.returnedCitation != null ? safe(record.returnedCitation) : '(none)'}\` |`,
     `| Classification | \`${classification}\` |`,
     '',
     `**Triage rationale:** ${rationale}`,
     '',
-    // D-10/Pitfall 7: selectionText ONLY when present as a key (not null)
-    record.selectionText != null ? `**Selected text:** ${record.selectionText}` : null,
+    // D-10/Pitfall 7: selectionText ONLY when present as a key (not null).
+    // Wrapped in a code fence to prevent Markdown/HTML injection (matching e2e pattern T-29-02-2).
+    record.selectionText != null
+      ? `**Selected text:**\n\n\`\`\`\n${safe(record.selectionText)}\n\`\`\``
+      : null,
     // D-02: golden corpus note — exact string required
     inGoldenCorpus ? '> **Note:** patent in golden corpus — protect the existing golden case' : null,
     inQuarantineCorpus ? '> **Note:** Patent is in the quarantine corpus.' : null,
-    // User note: only when non-empty
-    (record.note && record.note.trim()) ? `**User note:** ${record.note}` : null,
+    // User note: only when non-empty. Fenced to prevent injection (CR-01).
+    (record.note && record.note.trim())
+      ? `**User note:**\n\n\`\`\`\n${safe(record.note)}\n\`\`\``
+      : null,
     '',
     `<!-- kv-key: ${kvKey} -->`,
   ].filter(line => line !== null);

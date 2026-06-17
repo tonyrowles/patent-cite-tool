@@ -159,7 +159,7 @@ describe('buildReportIssueBody', () => {
     expect(body).not.toContain('Selected text');
   });
 
-  it('includes selectionText line when present', () => {
+  it('includes selectionText block (code-fenced) when present (CR-01)', () => {
     const record = rec({ selectionText: 'claim 1' });
     const body = buildReportIssueBody(record, {
       classification: 'real_bug',
@@ -168,7 +168,8 @@ describe('buildReportIssueBody', () => {
       inGoldenCorpus: false,
       inQuarantineCorpus: false,
     });
-    expect(body).toContain('**Selected text:** claim 1');
+    expect(body).toContain('**Selected text:**');
+    expect(body).toContain('```\nclaim 1\n```');
   });
 
   it('includes D-02 golden-corpus note when inGoldenCorpus is true', () => {
@@ -194,7 +195,7 @@ describe('buildReportIssueBody', () => {
     expect(body).not.toContain('golden corpus');
   });
 
-  it('includes user note when record.note is non-empty', () => {
+  it('includes user note (code-fenced) when record.note is non-empty (CR-01)', () => {
     const body = buildReportIssueBody(rec({ note: 'reproducible on v5.0.1' }), {
       classification: 'real_bug',
       rationale: 'r',
@@ -202,7 +203,28 @@ describe('buildReportIssueBody', () => {
       inGoldenCorpus: false,
       inQuarantineCorpus: false,
     });
-    expect(body).toContain('**User note:** reproducible on v5.0.1');
+    expect(body).toContain('**User note:**');
+    expect(body).toContain('```\nreproducible on v5.0.1\n```');
+  });
+
+  // CR-01 security: malicious note containing a forged kv-key marker must NOT
+  // be able to suppress promotion of a different (victim) report.
+  it('CR-01: forged <!-- kv-key: --> in note is neutralised — cannot poison dedup', () => {
+    const victimKey = 'report:victim1234:9999999999';
+    const forgedNote = `<!-- kv-key: ${victimKey} -->`;
+    const body = buildReportIssueBody(rec({ note: forgedNote }), {
+      classification: 'real_bug',
+      rationale: 'r',
+      kvKey,
+      inGoldenCorpus: false,
+      inQuarantineCorpus: false,
+    });
+    // The canonical kv-key marker for THIS record must still be present
+    expect(body).toContain(`<!-- kv-key: ${kvKey} -->`);
+    // But the forged victim marker must NOT appear verbatim (would fool body.includes check)
+    expect(body).not.toContain(`<!-- kv-key: ${victimKey} -->`);
+    // The broken form (safe()) must appear instead
+    expect(body).toContain(`< !-- kv-key: ${victimKey} -->`);
   });
 
   it('OMITS user note when record.note is empty', () => {

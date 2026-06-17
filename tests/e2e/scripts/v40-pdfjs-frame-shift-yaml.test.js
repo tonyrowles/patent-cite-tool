@@ -16,7 +16,7 @@
 //   P3  — `VERIFIER_PDFJS_PATH` env-var name pinned
 //   P4  — `/tmp/old-pdfjs` install location pinned
 //   P5  — OLD pdfjs install pulls `steps.delta.outputs.prev`
-//   P6  — actions/checkout@v4 + actions/setup-node@v4 pinned
+//   P6  — actions/checkout@v5 + actions/setup-node@v5 pinned
 //   P7  — node-version: 22 (literal — no .nvmrc indirection in this workflow)
 //   P8  — `contents: read` permission present
 //   P9  — `contents: write` permission ABSENT (read-only workflow)
@@ -79,9 +79,9 @@ describe('v40-pdfjs-frame-shift.yml contract (Phase 40-04 / DEPS-04)', () => {
     );
   });
 
-  it('P6: actions/checkout@v4 + actions/setup-node@v4 pinned', () => {
-    expect(yaml).toContain('actions/checkout@v4');
-    expect(yaml).toContain('actions/setup-node@v4');
+  it('P6: actions/checkout@v5 + actions/setup-node@v5 pinned', () => {
+    expect(yaml).toContain('actions/checkout@v5');
+    expect(yaml).toContain('actions/setup-node@v5');
   });
 
   it('P7: node-version: 22 (literal — no .nvmrc indirection)', () => {

@@ -84,13 +84,13 @@ jobs:
             echo "Fast-path SUCCESS — non-auto-fix PR (head=${{ github.head_ref }})"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0   # needed for origin/main pin (Pitfall B)
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           node-version: 22
@@ -232,13 +232,13 @@ jobs:
             echo "Fast-path SUCCESS — non-auto-fix PR (head=${{ github.head_ref }})"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0   # required for origin/main verifier-pin
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           node-version: 22
@@ -438,13 +438,13 @@ jobs:
             echo "Fast-path SUCCESS — non-auto-fix PR (head=${{ github.head_ref }})"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           node-version: 22

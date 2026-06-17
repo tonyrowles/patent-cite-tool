@@ -8,22 +8,23 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: Planning next (v6.0 shipped 2026-06-17)
+## Current Milestone: v6.1 Auto-Fix from Bug Reports
 
-**v6.0 goal (achieved):** Ship a public web page on `tonyrowles.com` where a user enters a patent number + a text passage and gets back the exact column:line citation — reusing the extension's deterministic matching core (no LLM, 100% deterministic position lookups). Expanded the project identity from "browser extension" → "patent citation tooling (extension + webapp)." Live at `https://cite.tonyrowles.com`.
+**Goal:** Turn real, human-reported citation failures (the v5.0 `BUG_REPORTS` KV channel) into regression-safe fixes — auto-triage real bugs from noise, analyze them, propose candidate fixes to the matching/normalization core, and prove each fix does not regress other patents before a maintainer merges it. Designed fresh from first principles, grounded entirely in human-reported failures (no autonomous exploration).
 
 **Target features:**
-- Extract the shared deterministic core (`src/shared/matching.js`, `src/offscreen/position-map-builder.js`, `src/offscreen/pdf-parser.js`) into a workspace/package consumed by both the extension and the webapp — refactor only, no behavior change, guarded by the existing golden corpus.
-- Rotate the compromised hardcoded `PROXY_TOKEN` (`src/offscreen/offscreen.js`) and move it server-side — blocking security gate before any public exposure.
-- Core webapp flow: patent number + passage → citation with confidence indicator, parsed client-side via PDF.js.
-- Batch mode: multiple passages for one patent at once.
-- Copy-to-clipboard + the extension's existing citation-format options.
+- **Report intake** — consume reports from the v5.0 `BUG_REPORTS` KV channel as the single source of fix candidates (no synthetic / mutator-injected issues).
+- **Auto-triage** — classify each report (real citation bug vs noise / duplicate / user-error) and auto-promote real ones into analysis, with a **manual-promote escape hatch** for the maintainer to push any report into analysis.
+- **Analysis → proposed fix** — analyze a promoted report and produce a candidate fix targeting the deterministic matching / normalization core.
+- **Regression safety** — every candidate fix must prove zero regression against the golden corpus + quarantine before it can land.
+- **Human merge gate** — the maintainer reviews and approves the proposed-fix PR before merge.
 
 **Key context / constraints:**
-- Same repo (not a new project); reuse the existing `pct.tonyrowles.com` Cloudflare Worker (USPTO proxy + KV cache) as a thin backend.
-- Client-side compute (PDF.js in the browser); Worker stays a thin proxy.
-- Granted US patents only for v1; published applications show a clear "not supported yet" message (no server-side `[XXXX]` paragraph-marker path in v1).
-- "v6.1" is reserved for the deferred auto-fix resumption + bug-report ingestion work (v4.3 carry-over). Renumbered from the originally-reserved "v5.1" after v6.0 shipped, to keep version numbers monotonic (v5.0 → v6.0 → v6.1). Historical v5.0-era artifacts that still say "v5.1" are left as-is — they record the decision as made then.
+- **First-principles rebuild.** The triage → analysis → fix flow is built fresh; only the golden-corpus / quarantine **regression guard** is carried forward from the old auto-fix machinery. Legacy `triage-classifier.js`, `issue-payload-builder.js`, and `PROMPT_SCAFFOLDS` are not assumed and may be replaced.
+- **Autonomous LLM exploration is DEFERRED** to future development — there is no cron "seek out patent errors autonomously" path in v6.1. The inbound signal is exclusively human bug reports.
+- **Retire the autonomous machinery in this milestone** — remove the fixture-mutator synthetic-issue injection, the `e2e:explore` exploration cron, and the `v40-auto-fix` synthetic trigger; archive the paused v4.3 Phases 61–67. This **supersedes** the `RESUME-V4.3.md` checklist (re-enable `v40-auto-promote`, restore the `issues: labeled` trigger, un-skip the 6 synthetic-trigger contract tests) — those guarded the retired path, so they are removed rather than restored.
+- Same repo (not a new project); the v5.0 `BUG_REPORTS` KV namespace + `pct.tonyrowles.com` Worker are the report source.
+- Zero-new-npm-dependency streak (eighth) is a soft goal, not a hard constraint for this milestone.
 
 ## Last Shipped: v6.0 Standalone Citation Webapp (Shipped 2026-06-17)
 
@@ -287,4 +288,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-16 — started milestone v6.0 Standalone Citation Webapp (client-side PDF.js webapp on `tonyrowles.com` reusing the deterministic matching core; granted patents only for v1; `PROXY_TOKEN` rotation is a blocking security gate). v4.3 auto-fix carry-over + bug-report ingestion remain reserved for v6.1. v5.0 Bug Report Feature shipped 2026-06-15 (45/45 reqs, live UAT-01..06 PROVEN). Next: define v6.0 requirements → roadmap.*
+*Last updated: 2026-06-17 — started milestone v6.1 Auto-Fix from Bug Reports. Human-report-driven auto-fix pipeline rebuilt from first principles: v5.0 `BUG_REPORTS` KV intake → auto-triage (+ manual-promote escape hatch) → analysis → regression-safe candidate fix → human merge gate. Autonomous LLM exploration deferred to future; the v4.3 autonomous machinery (fixture-mutator, `e2e:explore` cron, `v40-auto-fix` synthetic trigger, paused Phases 61–67) is retired/archived in this milestone (supersedes RESUME-V4.3.md). Only the golden-corpus / quarantine regression guard is carried forward. v6.0 Standalone Citation Webapp shipped 2026-06-17 (33/33 reqs, live at cite.tonyrowles.com). Next: define v6.1 requirements → roadmap.*

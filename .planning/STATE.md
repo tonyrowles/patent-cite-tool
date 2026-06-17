@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v6.0
-milestone_name: Standalone Citation Webapp
-status: Awaiting next milestone
-stopped_at: Roadmap created, REQUIREMENTS.md traceability filled, STATE.md updated. Ready to plan Phase 6.
-last_updated: "2026-06-17T04:34:18.818Z"
-last_activity: 2026-06-17 — Milestone v6.0 completed and archived
+milestone: v6.1
+milestone_name: Auto-Fix from Bug Reports
+status: planning
+last_updated: "2026-06-17T16:19:20.965Z"
+last_activity: 2026-06-17
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 10
-  percent: 75
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-16)
 
 ## Current Position
 
-Phase: Milestone v6.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-17 — Milestone v6.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-17 — Milestone v6.1 started
 
 ## Key Locked Decisions (v6.0)
 

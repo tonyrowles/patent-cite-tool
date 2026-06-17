@@ -31,7 +31,7 @@ import { tmpdir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKER_DIR = join(HERE, '..', 'worker');
-const REVIEW_STATES = ['open', 'reviewed', 'triaged', 'resolved', 'wontfix'];
+export const REVIEW_STATES = ['open', 'reviewed', 'triaged', 'resolved', 'wontfix'];
 const TTL_90_DAYS = 7776000;
 
 // ───────────────────────── pure helpers (exported for tests) ─────────────────────────
@@ -145,16 +145,16 @@ function parseWranglerJson(out, opener) {
   return JSON.parse(out.slice(i));
 }
 
-function listReportKeys(nsId) {
+export function listReportKeys(nsId) {
   const keys = parseWranglerJson(wrangler(['kv', 'key', 'list', '--remote', `--namespace-id=${nsId}`]), '[');
   return keys.filter((k) => k.name.startsWith('report:'));
 }
-function getRecord(nsId, name) {
+export function getRecord(nsId, name) {
   return parseWranglerJson(wrangler(['kv', 'key', 'get', '--remote', `--namespace-id=${nsId}`, name]), '{');
 }
 
 /** Load every report:* record, decorated with _key/_fp/_ts/_expiration. */
-function loadReports(nsId) {
+export function loadReports(nsId) {
   return listReportKeys(nsId).map((k) => {
     const [, fp, ts] = k.name.split(':');
     const rec = getRecord(nsId, k.name);
@@ -163,7 +163,7 @@ function loadReports(nsId) {
 }
 
 /** Write a review status onto one record, preserving the original TTL/expiration. */
-function writeStatus(nsId, fp, ts, state) {
+export function writeStatus(nsId, fp, ts, state) {
   const key = `report:${fp}:${ts}`;
   const keyMeta = listReportKeys(nsId).find((k) => k.name === key);
   if (!keyMeta) throw new Error(`Record not found: ${key}`);

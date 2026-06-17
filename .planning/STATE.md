@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
-status: executing
-stopped_at: Phase 11 context gathered
-last_updated: "2026-06-17T20:01:28.964Z"
+status: ready_to_plan
+stopped_at: Phase 11 complete (3/3) — ready to discuss Phase 12
+last_updated: 2026-06-17T20:49:21.984Z
 last_activity: 2026-06-17 -- Phase 11 execution started
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 6
   percent: 20
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-17)
 
 **Core value:** Highlight text on Google Patents, get an accurate citation reference instantly. v6.0 extended this to a standalone web page at cite.tonyrowles.com. v6.1 closes the quality loop: real user-reported citation failures become regression-safe fixes under a human merge gate.
-**Current focus:** Phase 11 — triage-layer
+**Current focus:** Phase 12 — fix generation + regression gate
 
 ## Current Position
 
-Phase: 11 (triage-layer) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 11
-Last activity: 2026-06-17 -- Phase 11 execution started
+Phase: 12
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-06-17
 
 ```
 Progress: [██████████] 100%

@@ -24,27 +24,27 @@
 
 ### Ingestion (ING) — read bug reports from KV
 
-- [ ] **ING-01**: A maintainer can run a single command that reads the `BUG_REPORTS` KV namespace (always via `wrangler --remote`) and emits a structured list of pending reports.
-- [ ] **ING-02**: Ingestion reuses the existing `scripts/review-reports.mjs` pure functions (KV read, filter, sort) rather than reimplementing the wrangler shell-out.
-- [ ] **ING-03**: Re-running ingestion is idempotent — a report already promoted (existing candidate Issue / branch) is never re-promoted or duplicated.
-- [ ] **ING-04**: Ingestion writes a `_review.status` marker back to each processed KV record so subsequent runs skip already-handled reports.
+- [x] **ING-01**: A maintainer can run a single command that reads the `BUG_REPORTS` KV namespace (always via `wrangler --remote`) and emits a structured list of pending reports.
+- [x] **ING-02**: Ingestion reuses the existing `scripts/review-reports.mjs` pure functions (KV read, filter, sort) rather than reimplementing the wrangler shell-out.
+- [x] **ING-03**: Re-running ingestion is idempotent — a report already promoted (existing candidate Issue / branch) is never re-promoted or duplicated.
+- [x] **ING-04**: Ingestion writes a `_review.status` marker back to each processed KV record so subsequent runs skip already-handled reports.
 
 ### Triage (TRI) — heuristic-first classification
 
-- [ ] **TRI-01**: Each report is classified into one of {real_bug, noise, duplicate, user_error, infrastructure, ambiguous} using only heuristic rules over KV fields (`category`, `confidenceTier`, `returnedCitation`, `duplicate_count`, `pdfParseStatus`, `errorLog`) — no LLM call.
-- [ ] **TRI-02**: Each heuristic classification rule is named and pinned by a Vitest test that uses real `buildReportPayload()` output shape as input (not fabricated objects).
-- [ ] **TRI-03**: A report is auto-promoted to analysis when it shows a clear real-bug signal: `confidenceTier:"green"` + `category:"inaccurate_citation"`, OR `duplicate_count >= 3` (configurable), OR the patent already exists in the quarantine corpus.
-- [ ] **TRI-04**: Triage cross-checks the patent against the golden + quarantine corpora (pure file reads) before classifying, so known-good and known-broken patents are handled correctly.
-- [ ] **TRI-05**: `tool_not_working` / `pdfParseStatus:"error"` reports are classified as `infrastructure` and excluded from LLM fix analysis (recorded, not promoted to a matching-core fix).
-- [ ] **TRI-06**: Triage skips reports already resolved by a fix merged for the same `patentNumber` within a recent window (post-fix suppression), preventing feedback-loop re-reports from being re-promoted.
-- [ ] **TRI-07**: Triage emits a durable triage-report JSON artifact: one entry per processed report with fingerprint, classification, rationale, and promotion decision (audit trail).
+- [x] **TRI-01**: Each report is classified into one of {real_bug, noise, duplicate, user_error, infrastructure, ambiguous} using only heuristic rules over KV fields (`category`, `confidenceTier`, `returnedCitation`, `duplicate_count`, `pdfParseStatus`, `errorLog`) — no LLM call.
+- [x] **TRI-02**: Each heuristic classification rule is named and pinned by a Vitest test that uses real `buildReportPayload()` output shape as input (not fabricated objects).
+- [x] **TRI-03**: A report is auto-promoted to analysis when it shows a clear real-bug signal: `confidenceTier:"green"` + `category:"inaccurate_citation"`, OR `duplicate_count >= 3` (configurable), OR the patent already exists in the quarantine corpus.
+- [x] **TRI-04**: Triage cross-checks the patent against the golden + quarantine corpora (pure file reads) before classifying, so known-good and known-broken patents are handled correctly.
+- [x] **TRI-05**: `tool_not_working` / `pdfParseStatus:"error"` reports are classified as `infrastructure` and excluded from LLM fix analysis (recorded, not promoted to a matching-core fix).
+- [x] **TRI-06**: Triage skips reports already resolved by a fix merged for the same `patentNumber` within a recent window (post-fix suppression), preventing feedback-loop re-reports from being re-promoted.
+- [x] **TRI-07**: Triage emits a durable triage-report JSON artifact: one entry per processed report with fingerprint, classification, rationale, and promotion decision (audit trail).
 
 ### Promotion (PROMO) — candidate state + manual escape hatch
 
-- [ ] **PROMO-01**: A promoted report becomes a GitHub Issue carrying a `<!-- kv-key: report:{fp}:{ts} -->` pointer and a human-readable summary (not a copy of all KV fields), labeled `report-fix-candidate`.
-- [ ] **PROMO-02**: A maintainer can manually promote ANY report (including noise/ambiguous/user_error) into analysis via a single command (`ingest-reports.mjs promote <fp> <ts>`), bypassing the classifier.
-- [ ] **PROMO-03**: Manual promotion uses the exact same downstream analysis path as auto-promotion and is recorded in the triage artifact with `promotion_source: 'manual'`.
-- [ ] **PROMO-04**: The triage/ingestion entry point is `workflow_dispatch`-only (manual); there is no cron schedule in this milestone.
+- [x] **PROMO-01**: A promoted report becomes a GitHub Issue carrying a `<!-- kv-key: report:{fp}:{ts} -->` pointer and a human-readable summary (not a copy of all KV fields), labeled `report-fix-candidate`.
+- [x] **PROMO-02**: A maintainer can manually promote ANY report (including noise/ambiguous/user_error) into analysis via a single command (`ingest-reports.mjs promote <fp> <ts>`), bypassing the classifier.
+- [x] **PROMO-03**: Manual promotion uses the exact same downstream analysis path as auto-promotion and is recorded in the triage artifact with `promotion_source: 'manual'`.
+- [x] **PROMO-04**: The triage/ingestion entry point is `workflow_dispatch`-only (manual); there is no cron schedule in this milestone.
 
 ### Fix Generation (FIX) — LLM candidate fix
 
@@ -116,21 +116,21 @@
 | RTR-03 | Phase 10 | Complete |
 | RTR-04 | Phase 10 | Complete |
 | RTR-05 | Phase 10 | Complete |
-| ING-01 | Phase 11 | Pending |
-| ING-02 | Phase 11 | Pending |
-| ING-03 | Phase 11 | Pending |
-| ING-04 | Phase 11 | Pending |
-| TRI-01 | Phase 11 | Pending |
-| TRI-02 | Phase 11 | Pending |
-| TRI-03 | Phase 11 | Pending |
-| TRI-04 | Phase 11 | Pending |
-| TRI-05 | Phase 11 | Pending |
-| TRI-06 | Phase 11 | Pending |
-| TRI-07 | Phase 11 | Pending |
-| PROMO-01 | Phase 11 | Pending |
-| PROMO-02 | Phase 11 | Pending |
-| PROMO-03 | Phase 11 | Pending |
-| PROMO-04 | Phase 11 | Pending |
+| ING-01 | Phase 11 | Complete |
+| ING-02 | Phase 11 | Complete |
+| ING-03 | Phase 11 | Complete |
+| ING-04 | Phase 11 | Complete |
+| TRI-01 | Phase 11 | Complete |
+| TRI-02 | Phase 11 | Complete |
+| TRI-03 | Phase 11 | Complete |
+| TRI-04 | Phase 11 | Complete |
+| TRI-05 | Phase 11 | Complete |
+| TRI-06 | Phase 11 | Complete |
+| TRI-07 | Phase 11 | Complete |
+| PROMO-01 | Phase 11 | Complete |
+| PROMO-02 | Phase 11 | Complete |
+| PROMO-03 | Phase 11 | Complete |
+| PROMO-04 | Phase 11 | Complete |
 | FIX-01 | Phase 12 | Pending |
 | FIX-02 | Phase 12 | Pending |
 | FIX-03 | Phase 12 | Pending |

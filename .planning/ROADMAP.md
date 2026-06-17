@@ -157,7 +157,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 | 8. Webapp Core Build | v6.0 | 3/3 | Complete | 2026-06-16 |
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Complete | 2026-06-17 |
 | 10. Retirement + Scaffolding | v6.1 | 3/3 | Complete    | 2026-06-17 |
-| 11. Triage Layer | v6.1 | 3/3 | Complete   | 2026-06-17 |
+| 11. Triage Layer | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 12. Fix Generation + Regression Gate | v6.1 | 0/TBD | Not started | - |
 | 13. Triple-Gate Extension | v6.1 | 0/TBD | Not started | - |
 | 14. End-to-End UAT + Digest | v6.1 | 0/TBD | Not started | - |

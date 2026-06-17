@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
-status: ready_to_plan
-stopped_at: Phase 10 complete (3/3) — ready to discuss Phase 11
-last_updated: 2026-06-17T17:44:50.087Z
+status: planning
+stopped_at: Phase 11 context gathered
+last_updated: "2026-06-17T19:05:24.754Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 5
@@ -128,9 +128,9 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-06-17T17:38:07.945Z
-Stopped at: Phase 10 context gathered
-Resume file: None
+Last session: 2026-06-17T19:05:24.742Z
+Stopped at: Phase 11 context gathered
+Resume file: .planning/phases/11-triage-layer/11-CONTEXT.md
 
 ## Operator Next Steps
 

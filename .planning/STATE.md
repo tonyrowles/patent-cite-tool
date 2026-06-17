@@ -94,7 +94,7 @@ Last activity: 2026-06-17 — Milestone v6.0 completed and archived
 
 ### Pending Todos
 
-- v4.3 carry-over (SWEEP-03/04/06 + Phase 68 destructive UAT + final spend tally) — deferred to v5.1 per MEMORY.md entry. Paused-phase artifacts at `.planning/milestones/v4.3-phases-paused/`.
+- v4.3 carry-over (SWEEP-03/04/06 + Phase 68 destructive UAT + final spend tally) — deferred to v6.1 per MEMORY.md entry. Paused-phase artifacts at `.planning/milestones/v4.3-phases-paused/`.
 
 ### Blockers/Concerns
 

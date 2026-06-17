@@ -155,17 +155,24 @@ export function makeKvReportGhClient(repo) {
      */
     isPostFixSuppressed(patentNumber, suppressDays = POST_FIX_SUPPRESS_DAYS) {
       const escaped = patentNumber.replaceAll("'", "'\\''");
+      // WR-02: exact-match token for body post-filter — the builder renders the patent
+      // number in a backtick cell: `| Patent | \`US11427642\` |`. Checking for this
+      // delimited token prevents US1234 from matching a body that only contains US12345.
+      const exactToken = `\`${patentNumber}\``;
 
       // Query 1: merged auto-fix/* PRs referencing patentNumber (T-11-01 — query escaping)
       try {
         const raw = execSync(
           `gh pr list --state merged --search '${escaped} in:body' ` +
-          `--json number,mergedAt,headRefName --limit 20`,
+          `--json number,mergedAt,headRefName,body --limit 20`,
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
         const prs = JSON.parse(raw);
+        // WR-02: post-filter on exact backtick-delimited token to avoid substring over-match
         const hit = (Array.isArray(prs) ? prs : []).find(
-          pr => pr.headRefName?.startsWith('auto-fix/') && isWithinCutoff(pr.mergedAt, suppressDays)
+          pr => pr.headRefName?.startsWith('auto-fix/')
+            && isWithinCutoff(pr.mergedAt, suppressDays)
+            && typeof pr.body === 'string' && pr.body.includes(exactToken)
         );
         if (hit) return true;
       } catch { /* transient gh failure → not suppressed */ }
@@ -174,11 +181,15 @@ export function makeKvReportGhClient(repo) {
       try {
         const raw = execSync(
           `gh issue list --label report-fix-candidate --state closed ` +
-          `--search '${escaped} in:body' --json number,closedAt --limit 20`,
+          `--search '${escaped} in:body' --json number,closedAt,body --limit 20`,
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
         const issues = JSON.parse(raw);
-        return (Array.isArray(issues) ? issues : []).some(i => isWithinCutoff(i.closedAt, suppressDays));
+        // WR-02: post-filter on exact backtick-delimited token
+        return (Array.isArray(issues) ? issues : []).some(
+          i => isWithinCutoff(i.closedAt, suppressDays)
+            && typeof i.body === 'string' && i.body.includes(exactToken)
+        );
       } catch { return false; }
     },
   };

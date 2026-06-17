@@ -72,7 +72,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 - Human merge gate is a permanent invariant — no auto-merge of `src/` fix PRs, ever
 
 - [x] **Phase 10: Retirement + Scaffolding** - Remove the v4.3 autonomous machinery (fixture-mutator, explore cron, v40-auto-fix synthetic trigger), archive paused Phase 61-67 artifacts, stub REPORT_FIX_SCAFFOLD, confirm test suite green (3 plans) (completed 2026-06-17)
-- [ ] **Phase 11: Triage Layer** - Build `ingest-reports.mjs` (KV polling, heuristic classifier, GitHub Issue creation, `promote` subcommand, `_review.status` write-back, triage artifact, post-fix suppression, corpus cross-check)
+- [x] **Phase 11: Triage Layer** - Build `ingest-reports.mjs` (KV polling, heuristic classifier, GitHub Issue creation, `promote` subcommand, `_review.status` write-back, triage artifact, post-fix suppression, corpus cross-check) (completed 2026-06-17)
 - [ ] **Phase 12: Fix Generation + Regression Gate** - Complete `REPORT_FIX_SCAFFOLD`, build `v61-report-fix.yml` workflow (KV fetch, LLM invocation, diff-guard, two-commit ledger split, draft PR), wire GATE-01..04 and COST-01..04 — HIGHEST RISK: needs research-phase during planning
 - [ ] **Phase 13: Triple-Gate Extension** - Extend `assertTripleGate` Leg 3 to accept `report-fix-candidate`, update `v40-auto-promote.yml`, update Vitest sha256 pin
 - [ ] **Phase 14: End-to-End UAT + Digest** - Live end-to-end pipeline validation, digest `BUG_REPORTS` section, post-milestone golden corpus clean
@@ -107,7 +107,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 **Plans**: 3 plans
   - [x] 11-01-PLAN.md — Pure heuristic report classifier (named rules + golden/quarantine cross-check) with per-rule Vitest pins (TRI-01..05) [Wave 1]
   - [x] 11-02-PLAN.md — Extract shared scripts/gh-client.mjs (kv-key dedup, Issue create, post-fix suppression) + export review-reports.mjs KV I/O (ING-02/03/04, TRI-06, PROMO-01, D-09) [Wave 1]
-  - [ ] 11-03-PLAN.md — ingest-reports.mjs orchestrator (D-05 promote, _review write-back, triage artifact) + workflow_dispatch YAML + static-grep guards (ING-01, TRI-07, PROMO-01..04) [Wave 2]
+  - [x] 11-03-PLAN.md — ingest-reports.mjs orchestrator (D-05 promote, _review write-back, triage artifact) + workflow_dispatch YAML + static-grep guards (ING-01, TRI-07, PROMO-01..04) [Wave 2]
 
 ### Phase 12: Fix Generation + Regression Gate
 **Goal**: A `report-fix-candidate`-labeled Issue triggers a workflow that produces a regression-safe candidate fix as a draft PR — the LLM operates only on the matching core, costs are bounded, and prompt injection from user report fields is structurally blocked
@@ -157,7 +157,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 | 8. Webapp Core Build | v6.0 | 3/3 | Complete | 2026-06-16 |
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Complete | 2026-06-17 |
 | 10. Retirement + Scaffolding | v6.1 | 3/3 | Complete    | 2026-06-17 |
-| 11. Triage Layer | v6.1 | 2/3 | In Progress|  |
+| 11. Triage Layer | v6.1 | 3/3 | Complete   | 2026-06-17 |
 | 12. Fix Generation + Regression Gate | v6.1 | 0/TBD | Not started | - |
 | 13. Triple-Gate Extension | v6.1 | 0/TBD | Not started | - |
 | 14. End-to-End UAT + Digest | v6.1 | 0/TBD | Not started | - |

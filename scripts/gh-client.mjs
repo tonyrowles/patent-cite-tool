@@ -6,14 +6,17 @@
 // import this module. e2e-report-issue.mjs re-exports makeRealGhClient for backward compat.
 //
 // Threat model (T-11-01, T-11-02, T-11-03):
-//   T-11-01: All search query interpolation escapes single-quote shell context via
-//            replaceAll("'", "'\\''") — same pattern as e2e-report-issue.mjs T-35-03-03.
+//   T-11-01 (WR-01): createIssueWithLabels and addLabel use execFileSync (no shell),
+//            so title/label values are passed as argv — no shell metacharacters interpreted.
+//            listWithSearch / isPostFixSuppressed still use execSync with a single-quoted
+//            query string; those paths remain safe because the query is only the server-
+//            validated patentNumber / kv-key (bounded charset).
 //   T-11-02: Issue body passed to gh exclusively via --body-file - stdin ({ input: body }),
 //            NEVER concatenated into the shell command string.
 //   T-11-03: findExistingIssueByKvKey dedup marker is constructed from server-computed
 //            fingerprint+timestamp, not user free-text. Residual risk accepted (see plan).
 
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 
 // ---------------------------------------------------------------------------
 // Env-configurable post-fix suppression window (TRI-06).
@@ -101,8 +104,9 @@ export function makeKvReportGhClient(repo) {
     /**
      * Create a GitHub Issue with multiple labels.
      *
-     * Lifted verbatim from e2e-report-issue.mjs createIssueWithLabels (line 507).
-     * Title and each label are shell-escaped (T-11-01). Body is passed via stdin (T-11-02).
+     * WR-01: Uses execFileSync (shell-free) so title and label values are passed as
+     * argv — backticks, $(), ; and other shell metacharacters are never interpreted.
+     * Body is passed via stdin (T-11-02).
      *
      * @param {string} title
      * @param {string} body — passed via --body-file - stdin, never interpolated into the command
@@ -110,12 +114,10 @@ export function makeKvReportGhClient(repo) {
      * @returns {{ number: number|null }}
      */
     createIssueWithLabels(title, body, labels) {
-      const escapedTitle = title.replaceAll('"', '\\"');
-      const labelArgs = labels
-        .map(l => `--label "${l.replaceAll('"', '\\"')}"`)
-        .join(' ');
-      const out = execSync(
-        `gh issue create --title "${escapedTitle}" ${labelArgs} --body-file -`,
+      const labelFlags = labels.flatMap(l => ['--label', l]);
+      const out = execFileSync(
+        'gh',
+        ['issue', 'create', '--title', title, ...labelFlags, '--body-file', '-'],
         { input: body, encoding: 'utf8' }
       );
       const m = out.match(/\/issues\/(\d+)/);
@@ -125,14 +127,15 @@ export function makeKvReportGhClient(repo) {
     /**
      * Add a label to an existing issue (idempotent — gh issue edit no-ops if already present).
      *
-     * Lifted verbatim from e2e-report-issue.mjs addLabel (line 537).
+     * WR-01: Uses execFileSync (shell-free) so the label value is passed as argv.
      *
      * @param {number} issueNumber
      * @param {string} label
      */
     addLabel(issueNumber, label) {
-      execSync(
-        `gh issue edit ${issueNumber} --add-label "${label.replaceAll('"', '\\"')}"`,
+      execFileSync(
+        'gh',
+        ['issue', 'edit', String(issueNumber), '--add-label', label],
         { encoding: 'utf8' }
       );
     },

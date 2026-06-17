@@ -5,3 +5,13 @@ compatibility_date = "2026-06-16"
 # Pitfall 7: never use the deprecated sites directive — use [assets] in wrangler v4+
 [assets]
 directory = "../dist/webapp"
+
+# Custom domain — the webapp MUST be served from cite.tonyrowles.com because the
+# Worker (pct.tonyrowles.com) Origin allowlist only accepts https://cite.tonyrowles.com
+# (+ localhost:8788). Served from the default *.workers.dev subdomain, every Worker
+# call is rejected (403 → "Could not retrieve patent"). custom_domain = true makes
+# wrangler attach the domain + DNS on deploy. No conflict with the routed pct. Worker —
+# different hostname.
+[[routes]]
+pattern = "cite.tonyrowles.com"
+custom_domain = true

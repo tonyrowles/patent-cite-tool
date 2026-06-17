@@ -708,22 +708,24 @@ const quarantinePatents = new Set(
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All three questions are resolved by the recommendations below; each is carried into the plans as a concrete task decision.
 
 1. **GitHub `--state all` + `--label` dedup reliability**
    - What we know: `listOpenWithSearch()` in `e2e-report-issue.mjs` uses `--state open`. The D-04 dedup requirement searches for issues in any state (an old closed issue from a previous run must also block re-creation).
    - What's unclear: Whether `gh issue list --state all --label report-fix-candidate --search "..."` is more reliable than two separate calls (`--state open` + `--state closed`).
-   - Recommendation: Use two separate calls in the gh-client helper to avoid any gh CLI quirk with `--state all + --label`. Merge and dedup the arrays in memory.
+   - **RESOLVED:** Use two separate calls (`--state open` + `--state closed`) in the gh-client helper to avoid any gh CLI quirk with `--state all + --label`. Merge and dedup the arrays in memory.
 
 2. **`export function` additions to `review-reports.mjs` — test count impact**
    - What we know: `tests/unit/review-reports.test.js` already imports 7 pure functions; no I/O functions are tested there.
    - What's unclear: Whether any test asserts a specific export count or uses `Object.keys(module)` to enumerate exports (a drift guard).
-   - Recommendation: At plan time, grep `review-reports.test.js` for any enumeration assertions. None were found in the code read, so this is likely safe.
+   - **RESOLVED:** No enumeration/export-count assertions exist in `review-reports.test.js` (grepped during research); additive `export` keywords on the four I/O functions are safe and break no existing test.
 
 3. **Artifact path for local CLI runs (gitignore)**
    - What we know: D-11 says local CLI writes to gitignored path + stdout. The `.triage-reports/` directory does not yet exist.
    - What's unclear: Whether `.triage-reports/` should be created by the script or pre-created with a `.gitkeep`.
-   - Recommendation: Have the script create the directory with `fs.mkdirSync('.triage-reports', { recursive: true })` at runtime; add `.triage-reports/` to `.gitignore`.
+   - **RESOLVED:** The script creates the directory at runtime via `fs.mkdirSync('.triage-reports', { recursive: true })`; add `.triage-reports/` to `.gitignore`. No `.gitkeep` needed.
 
 ---
 

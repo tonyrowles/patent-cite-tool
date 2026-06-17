@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
-status: executing
+status: verifying
 stopped_at: Phase 10 context gathered
-last_updated: "2026-06-17T17:32:31.129Z"
+last_updated: "2026-06-17T17:38:07.952Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 20
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-06-17)
 
 Phase: 10 (retirement-scaffolding) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-17
 
 ```
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 ```
 
 ## Key Locked Decisions (v6.1)
@@ -84,6 +84,7 @@ Progress: [███████░░░] 67%
 | v6.0 Standalone Citation Webapp | 4 | 9 | ~1 day |
 | v6.1 Auto-Fix from Bug Reports | 5 | TBD | TBD |
 | Phase 10 P01 | 22min | 2 tasks | 13 files |
+| Phase 10 P03 | 10min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,7 @@ Progress: [███████░░░] 67%
 - v6.1-roadmap: v4.3 autonomous machinery (inject-defect.mjs, e2e-explore.mjs, v40-auto-fix synthetic trigger, paused Phase 61-67 artifacts) is RETIRED, not resumed. RESUME-V4.3.md is superseded. The inbound signal for v6.1 is exclusively human bug reports from BUG_REPORTS KV.
 - [Phase ?]: issues:labeled synthetic trigger cannot fire
 - [Phase 10 / D-12 / RTR-04 / 2026-06-17]: RESUME-V4.3.md re-enable checklist is VOIDED post-retirement. The following triggers and tests are REMOVED (not un-skipped) and must NOT be restored: (1) `issues:labeled` trigger on `v40-auto-fix.yml` — deleted in Phase 10 Plan 01; (2) `v40-auto-promote` `pull_request:closed` trigger — workflow deleted in Phase 10 Plan 01; (3) synthetic-trigger contract tests (`v40-auto-fix-yaml.test.js` A1, `v40-auto-promote-yaml.test.js` A1) — deleted, not merely skipped. The archived checklist now lives at `.planning/milestones/v4.3-phases-paused/RESUME-V4.3.md` with a SUPERSEDED note. The v4.3 autonomous machinery is fully retired; v6.1 uses exclusively human bug reports from the BUG_REPORTS KV channel.
+- [Phase ?]: RTR-05 MET: npm test exits 0, golden corpus 76/76 at 100% close accuracy, test files exactly 90, zero dangling runtime refs, ledger invariant count==1
 
 ### Permanent Invariants (do not relax)
 
@@ -126,7 +128,7 @@ Progress: [███████░░░] 67%
 
 ## Session Continuity
 
-Last session: 2026-06-17T17:32:31.123Z
+Last session: 2026-06-17T17:38:07.945Z
 Stopped at: Phase 10 context gathered
 Resume file: None
 

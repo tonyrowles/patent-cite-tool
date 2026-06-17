@@ -71,7 +71,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 - `MAX_FIXES_PER_RUN` default 5; LLM fix-iteration cap default 3 before `auto-fix-stuck`
 - Human merge gate is a permanent invariant — no auto-merge of `src/` fix PRs, ever
 
-- [ ] **Phase 10: Retirement + Scaffolding** - Remove the v4.3 autonomous machinery (fixture-mutator, explore cron, v40-auto-fix synthetic trigger), archive paused Phase 61-67 artifacts, stub REPORT_FIX_SCAFFOLD, confirm test suite green (3 plans)
+- [x] **Phase 10: Retirement + Scaffolding** - Remove the v4.3 autonomous machinery (fixture-mutator, explore cron, v40-auto-fix synthetic trigger), archive paused Phase 61-67 artifacts, stub REPORT_FIX_SCAFFOLD, confirm test suite green (3 plans) (completed 2026-06-17)
 - [ ] **Phase 11: Triage Layer** - Build `ingest-reports.mjs` (KV polling, heuristic classifier, GitHub Issue creation, `promote` subcommand, `_review.status` write-back, triage artifact, post-fix suppression, corpus cross-check)
 - [ ] **Phase 12: Fix Generation + Regression Gate** - Complete `REPORT_FIX_SCAFFOLD`, build `v61-report-fix.yml` workflow (KV fetch, LLM invocation, diff-guard, two-commit ledger split, draft PR), wire GATE-01..04 and COST-01..04 — HIGHEST RISK: needs research-phase during planning
 - [ ] **Phase 13: Triple-Gate Extension** - Extend `assertTripleGate` Leg 3 to accept `report-fix-candidate`, update `v40-auto-promote.yml`, update Vitest sha256 pin
@@ -92,7 +92,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 **Plans**: 3 plans
   - [x] 10-01-PLAN.md — Hard-delete v40-auto-fix.yml + inject-defect.mjs + e2e-explore.mjs and surgically repair all dependent live tests (RTR-01/02/03)
   - [x] 10-02-PLAN.md — Add bare pure REPORT_FIX_SCAFFOLD stub; archive RESUME-V4.3.md with SUPERSEDED note; record voiding in STATE.md (RTR-04 + scaffold)
-  - [ ] 10-03-PLAN.md — [BLOCKING] RTR-05 full-suite green proof + 75-case golden corpus 100% + dangling-reference sweep (RTR-05)
+  - [x] 10-03-PLAN.md — [BLOCKING] RTR-05 full-suite green proof + 75-case golden corpus 100% + dangling-reference sweep (RTR-05)
 
 ### Phase 11: Triage Layer
 **Goal**: A maintainer can run one command to read, classify, and promote real bug reports from the `BUG_REPORTS` KV channel into candidate GitHub Issues — with every heuristic decision pinned by a Vitest test and the full classifier idempotent on re-run
@@ -153,7 +153,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 | 7. Shared Core Extraction + Corpus Guard | v6.0 | 2/2 | Complete | 2026-06-16 |
 | 8. Webapp Core Build | v6.0 | 3/3 | Complete | 2026-06-16 |
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Complete | 2026-06-17 |
-| 10. Retirement + Scaffolding | v6.1 | 2/3 | In Progress|  |
+| 10. Retirement + Scaffolding | v6.1 | 3/3 | Complete   | 2026-06-17 |
 | 11. Triage Layer | v6.1 | 0/TBD | Not started | - |
 | 12. Fix Generation + Regression Gate | v6.1 | 0/TBD | Not started | - |
 | 13. Triple-Gate Extension | v6.1 | 0/TBD | Not started | - |

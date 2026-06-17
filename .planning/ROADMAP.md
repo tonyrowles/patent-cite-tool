@@ -71,7 +71,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 - `MAX_FIXES_PER_RUN` default 5; LLM fix-iteration cap default 3 before `auto-fix-stuck`
 - Human merge gate is a permanent invariant — no auto-merge of `src/` fix PRs, ever
 
-- [ ] **Phase 10: Retirement + Scaffolding** - Remove the v4.3 autonomous machinery (fixture-mutator, explore cron, v40-auto-fix synthetic trigger), archive paused Phase 61-67 artifacts, stub REPORT_FIX_SCAFFOLD, confirm test suite green
+- [ ] **Phase 10: Retirement + Scaffolding** - Remove the v4.3 autonomous machinery (fixture-mutator, explore cron, v40-auto-fix synthetic trigger), archive paused Phase 61-67 artifacts, stub REPORT_FIX_SCAFFOLD, confirm test suite green (3 plans)
 - [ ] **Phase 11: Triage Layer** - Build `ingest-reports.mjs` (KV polling, heuristic classifier, GitHub Issue creation, `promote` subcommand, `_review.status` write-back, triage artifact, post-fix suppression, corpus cross-check)
 - [ ] **Phase 12: Fix Generation + Regression Gate** - Complete `REPORT_FIX_SCAFFOLD`, build `v61-report-fix.yml` workflow (KV fetch, LLM invocation, diff-guard, two-commit ledger split, draft PR), wire GATE-01..04 and COST-01..04 — HIGHEST RISK: needs research-phase during planning
 - [ ] **Phase 13: Triple-Gate Extension** - Extend `assertTripleGate` Leg 3 to accept `report-fix-candidate`, update `v40-auto-promote.yml`, update Vitest sha256 pin
@@ -89,7 +89,10 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
   3. The paused v4.3 Phase 61-67 artifacts and `RESUME-V4.3.md` are present under `.planning/milestones/` with a clear "superseded" note — they are archived, not deleted, and STATE.md records that the re-enable checklist is voided
   4. `tests/e2e/scripts/inject-defect.mjs` is gone and no npm script references it — running `npm run e2e:explore` either errors helpfully or is absent
   5. A stub `REPORT_FIX_SCAFFOLD` entry exists in `tests/e2e/lib/fix-prompt-builder.js` — subsequent phases can import from a known location without a "file not found" failure
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 10-01-PLAN.md — Hard-delete v40-auto-fix.yml + inject-defect.mjs + e2e-explore.mjs and surgically repair all dependent live tests (RTR-01/02/03)
+  - [ ] 10-02-PLAN.md — Add bare pure REPORT_FIX_SCAFFOLD stub; archive RESUME-V4.3.md with SUPERSEDED note; record voiding in STATE.md (RTR-04 + scaffold)
+  - [ ] 10-03-PLAN.md — [BLOCKING] RTR-05 full-suite green proof + 75-case golden corpus 100% + dangling-reference sweep (RTR-05)
 
 ### Phase 11: Triage Layer
 **Goal**: A maintainer can run one command to read, classify, and promote real bug reports from the `BUG_REPORTS` KV channel into candidate GitHub Issues — with every heuristic decision pinned by a Vitest test and the full classifier idempotent on re-run

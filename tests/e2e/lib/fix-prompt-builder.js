@@ -491,6 +491,36 @@ export const PROMPT_SCAFFOLDS = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
+// REPORT_FIX_SCAFFOLD — v6.1 standalone stub (Phase 10 RTR-04 / D-09 / D-11)
+// ---------------------------------------------------------------------------
+//
+// IMPORTANT: This is a SEPARATE top-level export, NOT a key inside the frozen
+// PROMPT_SCAFFOLDS map above. Adding it to PROMPT_SCAFFOLDS would break the
+// byte-stability sha256 pins AND the "exactly 7 keys" drift guard tests
+// (fix-prompt-builder-byte-stability.test.js + error-class-enumeration-drift.test.js).
+//
+// Phase 12 owns the real prompt body — the fix-generation research-phase will
+// design the KV-report → src/shared matching-core diff prompt (novel; 2-3
+// prompt-iteration cycles expected). This stub gives Phase 12 a known import
+// location without pre-building the envelope/diff-fence/fix-surface contract.
+//
+// D-09: zero new imports — this constant is a bare string literal, no I/O,
+// no subprocesses, no path resolution. The purity guard stays green by
+// construction.
+
+/**
+ * Bare stub for the v6.1 bug-report → fix-candidate prompt scaffold.
+ *
+ * TODO(Phase 12): Replace this with the real KV-report → src/shared matching-core
+ * diff prompt designed during the Phase 12 research-phase. The prompt body,
+ * envelope structure, diff-fence contract, and fix-surface constraint are all
+ * deferred to Phase 12's plan-phase (D-10 — do NOT pre-build them here).
+ *
+ * Import: `import { REPORT_FIX_SCAFFOLD } from 'tests/e2e/lib/fix-prompt-builder.js'`
+ */
+export const REPORT_FIX_SCAFFOLD = 'TODO(Phase 12): REPORT_FIX_SCAFFOLD prompt body — KV-report → src/shared matching-core diff; designed in Phase 12 research-phase';
+
+// ---------------------------------------------------------------------------
 // buildFixPrompt — public entry point
 // ---------------------------------------------------------------------------
 

@@ -197,7 +197,7 @@ describe('quarantine-append CLI — stable_runs label dispatch (G8)', () => {
     // At stable_runs === 3, addLabel is called. The mock-gh receives args as
     // "$@" which bash expands without shell quoting. The label value appears
     // as an unquoted word in the transcript.
-    expect(transcript).toMatch(/issue edit \d+ --add-label quarantine:ready-for-promotion/);
+    expect(transcript).toMatch(/issue edit(?: --repo \S+)? \d+ --add-label quarantine:ready-for-promotion/);
   });
 });
 
@@ -277,7 +277,7 @@ describe('quarantine-append CLI — MUTATOR-04 source-tag suppression (G9)', () 
     // Negative control: real-pipeline source_triage_finding_id at
     // stable_runs===3 must still produce the label-add call.
     expect(transcript).toMatch(
-      /issue edit \d+ --add-label quarantine:ready-for-promotion/,
+      /issue edit(?: --repo \S+)? \d+ --add-label quarantine:ready-for-promotion/,
     );
   });
 
@@ -322,7 +322,7 @@ describe('quarantine-append CLI — MUTATOR-04 source-tag suppression (G9)', () 
     // check this would have been silently suppressed — proving the WR-04
     // tightening is load-bearing.
     expect(transcript).toMatch(
-      /issue edit \d+ --add-label quarantine:ready-for-promotion/,
+      /issue edit(?: --repo \S+)? \d+ --add-label quarantine:ready-for-promotion/,
     );
   });
 });

@@ -91,7 +91,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
   5. A stub `REPORT_FIX_SCAFFOLD` entry exists in `tests/e2e/lib/fix-prompt-builder.js` — subsequent phases can import from a known location without a "file not found" failure
 **Plans**: 3 plans
   - [x] 10-01-PLAN.md — Hard-delete v40-auto-fix.yml + inject-defect.mjs + e2e-explore.mjs and surgically repair all dependent live tests (RTR-01/02/03)
-  - [ ] 10-02-PLAN.md — Add bare pure REPORT_FIX_SCAFFOLD stub; archive RESUME-V4.3.md with SUPERSEDED note; record voiding in STATE.md (RTR-04 + scaffold)
+  - [x] 10-02-PLAN.md — Add bare pure REPORT_FIX_SCAFFOLD stub; archive RESUME-V4.3.md with SUPERSEDED note; record voiding in STATE.md (RTR-04 + scaffold)
   - [ ] 10-03-PLAN.md — [BLOCKING] RTR-05 full-suite green proof + 75-case golden corpus 100% + dangling-reference sweep (RTR-05)
 
 ### Phase 11: Triage Layer
@@ -153,7 +153,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 | 7. Shared Core Extraction + Corpus Guard | v6.0 | 2/2 | Complete | 2026-06-16 |
 | 8. Webapp Core Build | v6.0 | 3/3 | Complete | 2026-06-16 |
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Complete | 2026-06-17 |
-| 10. Retirement + Scaffolding | v6.1 | 1/3 | In Progress|  |
+| 10. Retirement + Scaffolding | v6.1 | 2/3 | In Progress|  |
 | 11. Triage Layer | v6.1 | 0/TBD | Not started | - |
 | 12. Fix Generation + Regression Gate | v6.1 | 0/TBD | Not started | - |
 | 13. Triple-Gate Extension | v6.1 | 0/TBD | Not started | - |

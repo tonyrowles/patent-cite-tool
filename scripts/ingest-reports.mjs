@@ -358,85 +358,106 @@ async function main(argv) {
 
   let autoPromotedCount = 0;
 
-  for (const record of sorted) {
-    const classifyResult = classifyReport(record, {
-      goldenPatents: GOLDEN_PATENTS,
-      quarantinePatents: QUARANTINE_PATENTS,
-    });
+  // WR-04/CR-03: artifact is emitted in finally so the partial audit trail
+  // is always written even when a record throws mid-loop.
+  try {
+    for (const record of sorted) {
+      // WR-06: a single bad record must not abort the whole run — catch per record.
+      try {
+        const classifyResult = classifyReport(record, {
+          goldenPatents: GOLDEN_PATENTS,
+          quarantinePatents: QUARANTINE_PATENTS,
+        });
 
-    const { classification } = classifyResult;
+        const { classification } = classifyResult;
 
-    // T-11-04: only log safe fields
-    console.log(`[ingest] fp=${record.fingerprint?.slice(0, 8)} patent=${record.patentNumber} category=${record.category} classification=${classification}`);
+        // T-11-04: only log safe fields
+        console.log(`[ingest] fp=${record.fingerprint?.slice(0, 8)} patent=${record.patentNumber} category=${record.category} classification=${classification}`);
 
-    if (classification === 'real_bug') {
-      // Check post-fix suppression first (D-07/D-08)
-      const suppressed = ghClient.isPostFixSuppressed(record.patentNumber, POST_FIX_SUPPRESS_DAYS);
+        if (classification === 'real_bug') {
+          // Check post-fix suppression first (D-07/D-08)
+          const suppressed = ghClient.isPostFixSuppressed(record.patentNumber, POST_FIX_SUPPRESS_DAYS);
 
-      if (suppressed) {
-        // Suppressed: no Issue created, write wontfix (D-07)
-        if (!args.dryRun) {
-          writeStatus(nsId, record.fingerprint, String(record.timestamp), 'wontfix');
+          if (suppressed) {
+            // Suppressed: no Issue created, write wontfix (D-07)
+            if (!args.dryRun) {
+              writeStatus(nsId, record.fingerprint, String(record.timestamp), 'wontfix');
+            }
+            artifactEntries.push(buildArtifactEntry(record, classifyResult, {
+              promotionSource: null,
+              promotionDecision: 'skip-suppressed',
+              issueNumber: null,
+              suppressed: true,
+              kvStatusWritten: args.dryRun ? null : 'wontfix',
+            }));
+            continue;
+          }
+
+          // Under the per-run cap? (COST-02)
+          if (autoPromotedCount >= maxFixes) {
+            artifactEntries.push(buildArtifactEntry(record, classifyResult, {
+              promotionSource: null,
+              promotionDecision: 'skip-cap',
+              issueNumber: null,
+              suppressed: false,
+              kvStatusWritten: null,
+            }));
+            continue;
+          }
+
+          // Auto-promote (D-05)
+          const entry = await promoteRecord(nsId, record, classifyResult, 'auto', ghClient, {
+            dryRun: args.dryRun,
+          });
+
+          artifactEntries.push(entry);
+          if (!args.dryRun && entry.promotion_decision !== 'skip-dedup') {
+            autoPromotedCount = autoPromotedCount + 1;
+          }
+
+        } else if (classification === 'noise' || classification === 'user_error' || classification === 'infrastructure') {
+          // Skip (wontfix)
+          if (!args.dryRun) {
+            writeStatus(nsId, record.fingerprint, String(record.timestamp), 'wontfix');
+          }
+          artifactEntries.push(buildArtifactEntry(record, classifyResult, {
+            promotionSource: null,
+            promotionDecision: 'skip-wontfix',
+            issueNumber: null,
+            suppressed: false,
+            kvStatusWritten: args.dryRun ? null : 'wontfix',
+          }));
+
+        } else {
+          // ambiguous / duplicate — leave status, record decision 'skip'
+          artifactEntries.push(buildArtifactEntry(record, classifyResult, {
+            promotionSource: null,
+            promotionDecision: 'skip',
+            issueNumber: null,
+            suppressed: false,
+            kvStatusWritten: null,
+          }));
         }
-        artifactEntries.push(buildArtifactEntry(record, classifyResult, {
-          promotionSource: null,
-          promotionDecision: 'skip-suppressed',
-          issueNumber: null,
-          suppressed: true,
-          kvStatusWritten: args.dryRun ? null : 'wontfix',
-        }));
-        continue;
+      } catch (recordErr) {
+        // WR-06: record the failure entry and continue processing remaining records.
+        const fp = record.fingerprint?.slice(0, 8) ?? '(unknown)';
+        console.error(`[ingest] error processing record fp=${fp}: ${recordErr.message}`);
+        artifactEntries.push({
+          fingerprint: record.fingerprint ?? null,
+          kv_key: (record.fingerprint && record.timestamp)
+            ? `report:${record.fingerprint}:${record.timestamp}` : null,
+          patent_number: record.patentNumber ?? null,
+          category: record.category ?? null,
+          promotion_decision: 'error',
+          error_message: recordErr.message,
+          processed_at: new Date().toISOString(),
+        });
       }
-
-      // Under the per-run cap? (COST-02)
-      if (autoPromotedCount >= maxFixes) {
-        artifactEntries.push(buildArtifactEntry(record, classifyResult, {
-          promotionSource: null,
-          promotionDecision: 'skip-cap',
-          issueNumber: null,
-          suppressed: false,
-          kvStatusWritten: null,
-        }));
-        continue;
-      }
-
-      // Auto-promote (D-05)
-      const entry = await promoteRecord(nsId, record, classifyResult, 'auto', ghClient, {
-        dryRun: args.dryRun,
-      });
-
-      artifactEntries.push(entry);
-      if (!args.dryRun && entry.promotion_decision !== 'skip-dedup') {
-        autoPromotedCount++;
-      }
-
-    } else if (classification === 'noise' || classification === 'user_error' || classification === 'infrastructure') {
-      // Skip (wontfix)
-      if (!args.dryRun) {
-        writeStatus(nsId, record.fingerprint, String(record.timestamp), 'wontfix');
-      }
-      artifactEntries.push(buildArtifactEntry(record, classifyResult, {
-        promotionSource: null,
-        promotionDecision: 'skip-wontfix',
-        issueNumber: null,
-        suppressed: false,
-        kvStatusWritten: args.dryRun ? null : 'wontfix',
-      }));
-
-    } else {
-      // ambiguous / duplicate — leave status, record decision 'skip'
-      artifactEntries.push(buildArtifactEntry(record, classifyResult, {
-        promotionSource: null,
-        promotionDecision: 'skip',
-        issueNumber: null,
-        suppressed: false,
-        kvStatusWritten: null,
-      }));
     }
+  } finally {
+    // WR-04/TRI-07: always emit artifact, even on partial failure.
+    emitArtifact(artifactEntries);
   }
-
-  // Emit artifact (always, even on partial failure paths — TRI-07)
-  emitArtifact(artifactEntries);
 
   // ING-01: print structured JSON of processed reports to stdout
   process.stdout.write(JSON.stringify(artifactEntries, null, 2) + '\n');
@@ -456,14 +477,14 @@ function emitArtifact(entries) {
 }
 
 // ---------------------------------------------------------------------------
-// CLI guard — copy verbatim from review-reports.mjs lines 231-238 (fileURLToPath form)
+// CLI guard — CR-03: main() is async; must be awaited so async failures
+// surface as a non-zero exit code rather than silent unhandled rejections.
+// Use .catch() so the process exits 1 on any async error.
 // ---------------------------------------------------------------------------
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  try {
-    main(process.argv.slice(2));
-  } catch (err) {
+  main(process.argv.slice(2)).catch((err) => {
     console.error(`✖ ${err.message}`);
     process.exit(1);
-  }
+  });
 }

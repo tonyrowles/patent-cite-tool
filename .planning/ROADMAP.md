@@ -65,7 +65,7 @@ Phase 6 is a blocking precondition: the Worker has no rate limiting on proxy/cac
 - [x] **Phase 6: Security Gate + Worker Auth Split** - Rotate compromised PROXY_TOKEN, add rate limiting on all webapp-accessible Worker routes, and add public Origin-auth routes for the webapp (no token in browser JS) (completed 2026-06-16)
 - [x] **Phase 7: Shared Core Extraction + Corpus Guard** - Extract matching.js, position-map-builder.js, pdf-parser.js into src/shared/ with a configurePdfWorker(url) seam; golden corpus passes 100% on both builds (completed 2026-06-16)
 - [x] **Phase 8: Webapp Core Build** - Build the standalone webapp (patent number entry, cache-first pipeline, client-side PDF.js parsing, citation display, batch mode, format toggle, copy-to-clipboard) (3 plans) (completed 2026-06-16)
-- [ ] **Phase 9: Deploy + Live UAT + Privacy** - Deploy dist/webapp/ to cite.tonyrowles.com via Workers Assets; run live end-to-end UAT; update privacy policy
+- [x] **Phase 9: Deploy + Live UAT + Privacy** - Deploy dist/webapp/ to cite.tonyrowles.com via Workers Assets; run live end-to-end UAT; update privacy policy (completed 2026-06-16)
 
 ## Phase Details
 

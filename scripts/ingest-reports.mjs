@@ -306,6 +306,11 @@ async function main(argv) {
   const args = parseArgs(argv);
   if (args.help) { process.stdout.write(HELP); return; }
 
+  // CR-02: Honor DRY_RUN env var (set by workflow's `DRY_RUN: ${{ inputs.dry_run }}`).
+  // The workflow exports this env var but the original script only read args.dryRun (CLI flag).
+  // Merge so either the CLI flag OR the env var activates dry-run mode.
+  args.dryRun = args.dryRun || process.env.DRY_RUN === 'true';
+
   const maxFixes = args.maxFixes ?? MAX_FIXES_PER_RUN;
 
   // Resolve namespace ID

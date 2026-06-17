@@ -450,3 +450,26 @@ describe('TRI-06: post-fix suppression integration', () => {
     expect(entry.suppressed_by_post_fix).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// CR-02: DRY_RUN env var is honored — promoteRecord dry-run path
+// ---------------------------------------------------------------------------
+
+describe('CR-02: DRY_RUN env var activates dry-run mode', () => {
+  it('promoteRecord with dryRun:true creates no Issue and writes no status', async () => {
+    const ghClient = makeMockGhClient({ existingIssue: null, createdNumber: 77 });
+    const writeStatusSpy = vi.fn();
+
+    const entry = await promoteRecord('nsId123', rec(), realBugResult, 'auto', ghClient, {
+      dryRun: true,
+      writeStatusFn: writeStatusSpy,
+    });
+
+    // Dry-run: no side effects
+    expect(ghClient.createIssueWithLabels).not.toHaveBeenCalled();
+    expect(writeStatusSpy).not.toHaveBeenCalled();
+    expect(entry.promotion_decision).toBe('dry-run');
+    expect(entry.kv_status_written).toBeNull();
+    expect(entry.github_issue_number).toBeNull();
+  });
+});

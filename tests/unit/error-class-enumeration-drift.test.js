@@ -26,15 +26,17 @@
 // subset of PROMPT_SCAFFOLDS, or back to ERROR_CLASSES) require visible diff
 // hits on the doc-comment block above so reviewers notice the change. T-65-DG-02.
 //
-// THE 5 CANONICAL ENUMERATION SITES
+// THE 3 CANONICAL ENUMERATION SITES (after Phase 10 retirement)
 // ---------------------------------
 //   1. `tests/e2e/lib/error-codes.js`              — `ERROR_CLASSES` array
-//   2. `.github/workflows/v40-auto-fix.yml`        — precheck `for cls in ...` loop
 //   3. `tests/e2e/lib/fix-prompt-builder.js`       — `PROMPT_SCAFFOLDS` registry
-//   4. `tests/e2e/scripts/inject-defect.mjs`       — `ERROR_CLASSES` Set
 //   5. `tests/e2e/lib/llm-router.js`               — `MODEL_ROUTES` entry OR
 //                                                    `// MODEL_DEFAULT_OK: <CLASS>`
 //                                                    comment
+//
+// Retired sites (Phase 10 RTR-02 / RTR-01):
+//   2. `.github/workflows/v40-auto-fix.yml`        — deleted (RTR-02)
+//   4. `tests/e2e/scripts/inject-defect.mjs`       — deleted (RTR-01)
 //
 // HARNESS_ERROR EXCEPTION
 // -----------------------
@@ -43,8 +45,8 @@
 // Phase 45 design note in tests/e2e/lib/error-codes.js lines 90-96
 // ("HARNESS_ERROR: ... Not a member of ERROR_CLASSES — only the LLM report
 // tallies it."). Site 1 (error-codes.js ERROR_CLASSES) hard-codes this
-// exception with a comment justification; the other 4 sites still require
-// HARNESS_ERROR presence.
+// exception with a comment justification; the remaining live sites (3, 4, 5)
+// still require HARNESS_ERROR presence (site 4 retired in Task 2).
 //
 // FAILURE MESSAGE CONTRACT
 // ------------------------
@@ -88,10 +90,11 @@ const SCAFFOLD_KEYS = Object.keys(PROMPT_SCAFFOLDS);
 // design contract, not asserting against it.
 const HARNESS_ERROR_EXCEPTION = 'HARNESS_ERROR';
 
-// Resolved absolute paths for the 5 canonical enumeration sites.
+// Resolved absolute paths for the 4 remaining canonical enumeration sites.
+// Site 2 (v40-auto-fix.yml) retired in Phase 10 Task 1 (RTR-02).
+// Site 4 (inject-defect.mjs) retired in Phase 10 Task 2 (RTR-01).
 const SITE_PATHS = Object.freeze({
   errorCodes: path.join(REPO_ROOT, 'tests/e2e/lib/error-codes.js'),
-  workflow: path.join(REPO_ROOT, '.github/workflows/v40-auto-fix.yml'),
   fixPromptBuilder: path.join(REPO_ROOT, 'tests/e2e/lib/fix-prompt-builder.js'),
   injectDefect: path.join(REPO_ROOT, 'tests/e2e/scripts/inject-defect.mjs'),
   llmRouter: path.join(REPO_ROOT, 'tests/e2e/lib/llm-router.js'),
@@ -122,41 +125,6 @@ function checkErrorCodesArray(className) {
       `ERROR_CLASS '${className}' is in PROMPT_SCAFFOLDS but missing from ` +
       `site 1 (error-codes.js ERROR_CLASSES): expected literal '${className}' ` +
       `in ${SITE_PATHS.errorCodes}`,
-  };
-}
-
-/**
- * Site 2 — `.github/workflows/v40-auto-fix.yml` precheck `for cls in ...` loop.
- *
- * The workflow line ~91 enumerates every recognized ERROR_CLASS label token.
- * Use a regex that anchors to the `for cls in` clause then word-matches the
- * className token before the trailing `; do`.
- */
-function checkWorkflowPrecheck(className) {
-  let content;
-  try {
-    content = fs.readFileSync(SITE_PATHS.workflow, 'utf8');
-  } catch (err) {
-    return {
-      ok: false,
-      message:
-        `ERROR_CLASS '${className}' is in PROMPT_SCAFFOLDS but missing from ` +
-        `site 2 (v40-auto-fix.yml precheck): failed to read ${SITE_PATHS.workflow} — ${err.message}`,
-    };
-  }
-  // Match the precheck loop line specifically: `for cls in <tokens>; do`.
-  const re = new RegExp(
-    `for\\s+cls\\s+in\\s+[^;]*\\b${className}\\b[^;]*;\\s*do`,
-  );
-  if (re.test(content)) {
-    return { ok: true, message: '' };
-  }
-  return {
-    ok: false,
-    message:
-      `ERROR_CLASS '${className}' is in PROMPT_SCAFFOLDS but missing from ` +
-      `site 2 (v40-auto-fix.yml precheck for-loop): expected literal ` +
-      `'${className}' on the 'for cls in ...; do' line in ${SITE_PATHS.workflow}`,
   };
 }
 
@@ -273,14 +241,6 @@ describe('Phase 65 SCAF-03 — 5-site enumeration drift guard', () => {
   );
 
   it.each(SCAFFOLD_KEYS)(
-    'site 2 (v40-auto-fix.yml precheck): %s present in for-loop',
-    (className) => {
-      const r = checkWorkflowPrecheck(className);
-      expect(r.ok, r.message).toBe(true);
-    },
-  );
-
-  it.each(SCAFFOLD_KEYS)(
     'site 3 (fix-prompt-builder.js PROMPT_SCAFFOLDS): %s is a function thunk',
     (className) => {
       const r = checkPromptScaffolds(className);
@@ -315,8 +275,9 @@ describe('Phase 65 SCAF-03 — 5-site enumeration drift guard', () => {
     expect(r.ok, r.message).toBe(true);
   });
 
-  it("HARNESS_ERROR exception: still required at sites 2-5", () => {
-    expect(checkWorkflowPrecheck(HARNESS_ERROR_EXCEPTION).ok).toBe(true);
+  it("HARNESS_ERROR exception: still required at remaining live sites (3, 4, 5)", () => {
+    // Site 2 (v40-auto-fix.yml) retired in Phase 10 Task 1.
+    // Site 4 (inject-defect.mjs) retired in Phase 10 Task 2.
     expect(checkPromptScaffolds(HARNESS_ERROR_EXCEPTION).ok).toBe(true);
     expect(checkInjectDefectSet(HARNESS_ERROR_EXCEPTION).ok).toBe(true);
     expect(checkLlmRouterCoverage(HARNESS_ERROR_EXCEPTION).ok).toBe(true);
@@ -325,19 +286,20 @@ describe('Phase 65 SCAF-03 — 5-site enumeration drift guard', () => {
   // Helper failure-message shape — synthetic missing-K scenario asserts the
   // actionable error-message substring contract.
   it('helper failure-message shape: contains "is in PROMPT_SCAFFOLDS but missing from"', () => {
-    // None of the helpers will find a nonexistent class at the workflow site.
-    const r = checkWorkflowPrecheck('___NONEXISTENT_CLASS___');
+    // Use site 1 (error-codes.js) as the sample helper — sites 2 and 4 retired in Phase 10.
+    const r = checkErrorCodesArray('___NONEXISTENT_CLASS___');
     expect(r.ok).toBe(false);
     expect(r.message).toMatch(/is in PROMPT_SCAFFOLDS but missing from/);
     // Verify the message names the offending site by number.
-    expect(r.message).toMatch(/site 2/);
+    expect(r.message).toMatch(/site 1/);
   });
 
-  it('helper failure-message shape: all 5 helpers honor the substring contract', () => {
+  it('helper failure-message shape: all remaining (4) helpers honor the substring contract', () => {
+    // Site 2 (v40-auto-fix.yml) retired in Phase 10 Task 1.
+    // Site 4 (inject-defect.mjs) retired in Phase 10 Task 2.
     const synthetic = '___NONEXISTENT_CLASS___';
     const helpers = [
       ['site 1', checkErrorCodesArray],
-      ['site 2', checkWorkflowPrecheck],
       ['site 3', checkPromptScaffolds],
       ['site 4', checkInjectDefectSet],
       ['site 5', checkLlmRouterCoverage],

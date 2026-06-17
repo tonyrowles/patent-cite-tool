@@ -8,7 +8,7 @@
 // silently halting the auto-fix pipeline at runtime.
 //
 // The 5 touchpoints (per .planning/research/ARCHITECTURE.md §4):
-//   TP-01: triage label  — issue-payload-builder.js → v40-auto-fix.yml
+//   TP-01: triage label  — issue-payload-builder.js (producer only; v40-auto-fix.yml consumer retired in Phase 10)
 //   TP-02: fingerprint() → auto-fix.mjs branch namer (fp8)
 //   TP-03: invokeClaudePWithLedger → auto-fix.mjs subscription transport
 //   TP-04: verifyCitation → verify-single-case.mjs CLI shim
@@ -28,6 +28,8 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 describe('Phase 47 CLEANUP-01: 5 v3.1→v4.0 ARCHITECTURE §4 touchpoint contracts', () => {
 
   // ─── TP-01 ───────────────────────────────────────────────────────────
+  // Phase 10 retirement: v40-auto-fix.yml consumer contract removed (RTR-02).
+  // Only the producer (issue-payload-builder.js) assertions are retained.
   describe('TP-01-triage-label-filter', () => {
     it('producer (issue-payload-builder.js) labels array ends with literal "triage"', () => {
       const src = fs.readFileSync(
@@ -36,16 +38,6 @@ describe('Phase 47 CLEANUP-01: 5 v3.1→v4.0 ARCHITECTURE §4 touchpoint contrac
       );
       // Producer contract: labels = [category, 'e2e-nightly', 'triage']
       expect(src).toMatch(/labels\s*=\s*\[[^\]]*['"]triage['"][^\]]*\]/);
-    });
-
-    it('consumer (v40-auto-fix.yml) trigger uses issues.labeled with triage filter', () => {
-      const yaml = fs.readFileSync(
-        path.join(REPO_ROOT, '.github/workflows/v40-auto-fix.yml'),
-        'utf8',
-      );
-      // on.issues.types: [labeled] AND the literal 'triage' appears (label-name filter)
-      expect(yaml).toMatch(/types:\s*\[\s*labeled\s*\]/);
-      expect(yaml).toContain("'triage'");
     });
 
     it('producer keeps the legacy e2e-nightly label alongside triage (no one-sided removal)', () => {

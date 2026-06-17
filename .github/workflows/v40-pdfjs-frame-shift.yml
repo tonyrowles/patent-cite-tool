@@ -215,7 +215,7 @@ jobs:
                 '  newR present: ' + (!!newR),
                 '</frame_shift_evidence>',
                 '',
-                'Auto-Fix path: this issue is wired into the v40-auto-fix workflow via the FRAME_SHIFT_DETECTED label. The auto-fix scaffold lives in tests/e2e/lib/fix-prompt-builder.js (Phase 65 SCAF-02).',
+                'Auto-Fix path: FRAME_SHIFT_DETECTED label triggers the v6.1 fix pipeline. The auto-fix scaffold lives in tests/e2e/lib/fix-prompt-builder.js (Phase 65 SCAF-02).',
                 ''
               ].join('\n');
               fs.writeFileSync('/tmp/frame-shift-evidence.txt', body);
@@ -255,7 +255,7 @@ jobs:
                 perCaseDiff,
                 '</frame_shift_evidence>',
                 '',
-                'Auto-Fix path: this issue is wired into the v40-auto-fix workflow via the FRAME_SHIFT_DETECTED label. The auto-fix scaffold lives in tests/e2e/lib/fix-prompt-builder.js (Phase 65 SCAF-02).',
+                'Auto-Fix path: FRAME_SHIFT_DETECTED label triggers the v6.1 fix pipeline. The auto-fix scaffold lives in tests/e2e/lib/fix-prompt-builder.js (Phase 65 SCAF-02).',
                 ''
               ].join('\n');
               fs.writeFileSync('/tmp/frame-shift-evidence.txt', body);
@@ -271,8 +271,8 @@ jobs:
         # `triage`-labeled GitHub issue with a FRAME_SHIFT_DETECTED label.
         # The body carries the `<frame_shift_evidence>` envelope written by
         # the previous step (PREV/NEW pdfjs versions + diverging case IDs +
-        # per-case normalized JSON diff). The v40-auto-fix workflow then
-        # picks up the FRAME_SHIFT_DETECTED label and routes through
+        # per-case normalized JSON diff). The v6.1 fix pipeline picks up
+        # the FRAME_SHIFT_DETECTED label and routes through
         # tests/e2e/lib/fix-prompt-builder.js PROMPT_SCAFFOLDS.FRAME_SHIFT_DETECTED.
         if: steps.compare.outputs.frame_shift == '1'
         env:

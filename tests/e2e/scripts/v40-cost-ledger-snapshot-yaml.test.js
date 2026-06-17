@@ -264,17 +264,6 @@ describe('Phase 57 invariants', () => {
     expect(matches.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('COMMIT-04 — v40-auto-fix.yml retains EXACTLY ONE `git push origin main` (Pitfall 1)', () => {
-    // The two-commit split in v40-auto-fix.yml is LOAD-BEARING: the direct-to-
-    // main commit lands the ledger entry on main BEFORE the auto-fix PR branch
-    // is created, ensuring the PR diff is clean against FORBIDDEN_PATHS regex 5
-    // (tests/e2e/.llm-spend-ledger.json). Phase 57 explicitly does NOT touch
-    // this file; any future refactor that adds a second `git push origin main`
-    // (or removes the one at ~line 170) collapses Pitfall 1's defense.
-    const out = execSync(
-      "grep -c 'git push origin main' .github/workflows/v40-auto-fix.yml",
-      { encoding: 'utf8', cwd: PROJECT_ROOT },
-    ).trim();
-    expect(out).toBe('1');
-  });
+  // COMMIT-04 removed in Phase 10 (RTR-02): v40-auto-fix.yml deleted entirely.
+  // The LOAD-BEARING two-commit split was only relevant while the workflow existed.
 });

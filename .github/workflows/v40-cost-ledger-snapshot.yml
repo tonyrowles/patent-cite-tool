@@ -86,8 +86,8 @@ jobs:
         # to ledger-snapshots/daily-${SNAPSHOT_DATE} instead of bare
         # `git push` to main, to comply with Phase 50 ruleset 17086676 which
         # blocks direct-to-main pushes for the github-actions[bot] actor.
-        # The main-branch ledger is updated only by v40-auto-fix.yml's
-        # direct-to-main commit (LOAD-BEARING Pitfall 1).
+        # The main-branch ledger direct-to-main commit pattern (Pitfall 1)
+        # is now retired along with v40-auto-fix.yml (Phase 10 RTR-02).
         # Empty-day behavior (ACCEPTED, by-design): the idempotent guard on
         # the line below suppresses `git commit` when the ledger is unchanged,
         # but the final `git push` then runs unconditionally against an

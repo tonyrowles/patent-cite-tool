@@ -8,9 +8,9 @@ A cross-browser extension (Chrome + Firefox) for patent professionals that gener
 
 Highlight text on Google Patents, get an accurate citation reference instantly — no PDF downloading, no manual counting.
 
-## Current Milestone: v6.0 Standalone Citation Webapp
+## Current Milestone: Planning next (v6.0 shipped 2026-06-17)
 
-**Goal:** Ship a public web page on `tonyrowles.com` where a user enters a patent number + a text passage and gets back the exact column:line citation — reusing the extension's deterministic matching core (no LLM, 100% deterministic position lookups). Expands the project identity from "browser extension" → "patent citation tooling (extension + webapp)."
+**v6.0 goal (achieved):** Ship a public web page on `tonyrowles.com` where a user enters a patent number + a text passage and gets back the exact column:line citation — reusing the extension's deterministic matching core (no LLM, 100% deterministic position lookups). Expanded the project identity from "browser extension" → "patent citation tooling (extension + webapp)." Live at `https://cite.tonyrowles.com`.
 
 **Target features:**
 - Extract the shared deterministic core (`src/shared/matching.js`, `src/offscreen/position-map-builder.js`, `src/offscreen/pdf-parser.js`) into a workspace/package consumed by both the extension and the webapp — refactor only, no behavior change, guarded by the existing golden corpus.
@@ -25,7 +25,11 @@ Highlight text on Google Patents, get an accurate citation reference instantly �
 - Granted US patents only for v1; published applications show a clear "not supported yet" message (no server-side `[XXXX]` paragraph-marker path in v1).
 - "v5.1" remains reserved for the deferred auto-fix resumption + bug-report ingestion work (v4.3 carry-over).
 
-## Last Shipped: v5.0 Bug Report Feature (Shipped 2026-06-15)
+## Last Shipped: v6.0 Standalone Citation Webapp (Shipped 2026-06-17)
+
+Shipped a standalone citation webapp live at `https://cite.tonyrowles.com` (Cloudflare Workers Assets) — enter a granted patent number + passage, get the exact column:line citation computed client-side via the shared deterministic core (no LLM, no token in the browser). Rotated the compromised `PROXY_TOKEN` to a build-time esbuild `define` + live secret; split the Worker's global Bearer gate into per-route auth (Origin-authed `/webapp/pdf` + dual-auth `/cache`, rate limits, daily KV-write guard, published-application 400); extracted the three deterministic core modules into `src/shared/` with a `configurePdfWorker(url)` seam (golden corpus byte-identical; CORE-04 browser worker-thread test green); built the single-first webapp (cache-first pipeline, batch mode, confidence chips, format toggle, copy-to-clipboard); and added a "Citation Webapp" privacy-policy section. **Live production UAT PASSED** (real patent → correct citation, KV cache populated, 429 rate-limit, no `Authorization` header). 4 phases (6-9), 9 plans, 33/33 requirements; zero new npm dependencies (seventh consecutive milestone).
+
+### Previously shipped: v5.0 Bug Report Feature (2026-06-15)
 
 Gave extension users a low-friction in-product affordance to report citation failures, routing rich auto-captured diagnostic bundles to a private Cloudflare-backed observability pipeline (`BUG_REPORTS` KV durable + Discord webhook notify) for maintainer triage — the inbound signal channel that v5.1's resumed auto-fix work will ingest. **Live UAT-01..06 PROVEN against production `pct.tonyrowles.com` before close** (Discord embeds + KV records verified, no IP stored, server-side dedup + cross-browser parity on Chrome/149 + Firefox/151).
 

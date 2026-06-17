@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: Standalone Citation Webapp
-status: completed
+status: Awaiting next milestone
 stopped_at: Roadmap created, REQUIREMENTS.md traceability filled, STATE.md updated. Ready to plan Phase 6.
-last_updated: "2026-06-17T04:31:30.554Z"
-last_activity: 2026-06-17 -- Phase 9 marked complete
+last_updated: "2026-06-17T04:34:18.818Z"
+last_activity: 2026-06-17 — Milestone v6.0 completed and archived
 progress:
   total_phases: 4
   completed_phases: 3
@@ -25,12 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-16)
 
 ## Current Position
 
-Phase: 9 — COMPLETE
-Plan: 1 of 3
-Status: Phase 9 complete
-Last activity: 2026-06-17 -- Phase 9 marked complete
-
-Progress: [░░░░░░░░░░] 0%
+Phase: Milestone v6.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-17 — Milestone v6.0 completed and archived
 
 ## Key Locked Decisions (v6.0)
 
@@ -97,3 +95,20 @@ Progress: [░░░░░░░░░░] 0%
 Last session: 2026-06-16
 Stopped at: Roadmap created, REQUIREMENTS.md traceability filled, STATE.md updated. Ready to plan Phase 6.
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
+
+## Deferred Items
+
+Items acknowledged and deferred at v6.0 milestone close (2026-06-17):
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 1-fix-off-by-2-error-in-patent-column-line | stale (pre-v6.0) |
+| quick_task | 2-fix-ci-commit-package-lock-json | stale (pre-v6.0) |
+| quick_task | 260412-fde-fix-spurious-results-reporting | stale (pre-v6.0) |
+| verification_gap | 08-webapp-core-build (human_needed) | resolved by Phase 9 live UAT |
+
+Non-blocking tech debt (v6.0 audit): pre-existing `weekly-digest-auto-fix` STATE.md `## Bypass Conventions` test (dropped by 0401b31, unrelated to v6.0); 4 deferred code-review info items (WR-02 ordering kept intentionally; IN-02/03/04 test/robustness nice-to-haves).

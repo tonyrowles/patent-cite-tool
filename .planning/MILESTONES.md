@@ -1,5 +1,25 @@
 # Milestones
 
+## v6.0 Standalone Citation Webapp (Shipped: 2026-06-17)
+
+**Phases completed:** 4 phases (6-9), 9 plans, ~13 tasks
+**Requirements:** 33/33 verified (SEC, WRKR, CORE, APP, FMT, BATCH, DEPLOY, PRIV)
+**Shipping state:** Webapp live in production at `https://cite.tonyrowles.com` (Cloudflare Workers Assets, `patent-cite-webapp`), coexisting with the routed `pct.tonyrowles.com` API Worker. Worker redeployed with the Phase 6 routes; `PROXY_TOKEN` rotated live. Code on `feat/bug-report`; tag `v6.0` left to the operator (doubles as store release). Local `main` is stale — `git fetch` to judge merged state via `origin/main`.
+
+**Delivered:** A standalone citation webapp — enter a granted patent number + passage, get the exact column:line citation client-side via the shared deterministic core, with no LLM and no token in the browser. Origin-header auth, cache-first lookup, batch mode, format toggle, copy-to-clipboard, and published-application rejection. Live production UAT passed (real patent → correct citation, KV cache populated, 429 rate-limit, no `Authorization` header).
+
+**Key accomplishments:**
+
+1. **Security gate + Worker auth split (Phase 6)** — rotated the compromised `PROXY_TOKEN` (build-time esbuild `__PROXY_TOKEN__` define from CI secret; literal removed from all three source files + live `wrangler secret put`); per-route Worker auth replacing the global Bearer gate (Origin-auth `GET /webapp/pdf`, dual-auth `GET /cache`, `source:"webapp"` provenance on `POST /cache`); per-IP webapp rate limit (30/60s) + global daily KV-write guard (900/day); published-application rejection (A1/A2/A9 + `20XXXXXXXX`) → HTTP 400 before any fetch.
+2. **Shared core extraction (Phase 7)** — relocated `matching.js`, `position-map-builder.js`, `pdf-parser.js` into `src/shared/` consumed by both builds; added the `configurePdfWorker(url)` injectable seam so the modules import in a plain web page without a `chrome` global; golden corpus byte-identical; CORE-04 full-pipeline browser integration test (Playwright worker-thread assertion) green.
+3. **Webapp core build (Phase 8)** — single-first UI reusing the extension aesthetic; cache-first orchestration mirroring the offscreen pipeline without chrome/Bearer; one-fetch-one-parse-N-match batch mode; confidence chips, copy/copy-all, named-stage loading, error/retry, localStorage format/prefix toggles; `--webapp-only` esbuild target → `dist/webapp/`. Zero `Authorization`/`Bearer` and zero direct USPTO/patentimages fetches (grep-guarded).
+4. **Deploy + live UAT + privacy (Phase 9)** — `npm run deploy:webapp` (Workers Assets + `cite.tonyrowles.com` custom domain); hosted privacy policy gains a "Citation Webapp" section; live production UAT passed end-to-end.
+5. **Zero new npm dependencies** — seventh consecutive milestone (PDF.js, esbuild, Wrangler already present).
+
+**Known deferred items at close:** 4 open artifacts acknowledged as out-of-v6.0-scope (3 stale pre-v6.0 quick-tasks; 1 Phase-8 `human_needed` verification resolved by Phase 9 live UAT) — see STATE.md Deferred Items. Non-blocking tech debt (pre-existing `weekly-digest-auto-fix` STATE.md test; 4 deferred code-review info items) in the v6.0 milestone audit.
+
+---
+
 ## v5.0 Bug Report Feature (Shipped: 2026-06-16)
 
 **Phases completed:** 5 phases (1-5), 16 plans, 26 tasks

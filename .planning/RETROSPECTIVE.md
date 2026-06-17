@@ -425,6 +425,52 @@
 
 ---
 
+## Milestone: v5.0 — Bug Report Feature
+
+**Shipped:** 2026-06-15
+**Phases:** 5 (1–5) | **Plans:** 16 | **Tasks:** 26
+**Timeline:** 2026-06-12 → 2026-06-15 (~4 days, 144 commits on `feat/bug-report`)
+
+### What Was Built
+- **Worker route + KV schema + privacy compliance (Phase 1):** `POST /report` Cloudflare Worker route with explicit PAY-01 field allowlist (no `ip`/`clientIp`/`userAgent` stored), `BUG_REPORTS` KV namespace at `report:{fingerprint}:{timestamp}` (90-day TTL), SHA-256 fingerprint dedup over a 15-min window (`duplicate_count`), IP-keyed transient rate limit (`rl:{ip}`, 5/60s), server-side-only Discord webhook; Firefox manifest `data_collection_permissions` + privacy-policy "Bug Report Feature" section + CWS store-listing reconciled (BLOCK-01/02/03 resolved).
+- **Shared constants + pure payload builder (Phase 2):** `src/shared/report-payload-builder.js` pure function (zero `chrome.*`) as the canonical payload schema contract; frozen `REPORT_CATEGORIES` + `MSG.SUBMIT_REPORT` + `WORKER_REPORT_URL`; Vitest-pinned for schema conformance, [Remove selection text] omission, byte-stable fingerprint reproducibility.
+- **Background transport + rate limit + retry queue (Phase 3):** shared `report-transport.js` with disk-first `chrome.storage.local` queue, sliding-window client rate limit (5/10 min), 2s/8s/30s exponential backoff, byte-identical `SUBMIT_REPORT` dispatch across Chrome SW + Firefox background; content scripts never POST cross-origin (XPORT-06 static-grep guard); 29 per-target tests incl. SW-death simulation.
+- **Report dialog UI + citation-UI wiring (Phase 4):** Shadow DOM dialog (4-category picker, note + counter, "What's included" payload preview, sticky [Remove selection text] toggle, focus trap + dismiss paths), Report button auto-surfacing on no-match/yellow/Worker-error with green-hidden invariant (TRIG-04), 20-entry error ring buffer, DOM/PDF diagnostic enrichment.
+- **Options Debug Mode + popup fallback + live UAT (Phase 5):** options `debugMode` toggle (live per-citation read), popup "Report a problem" → options `#report` page-mode dialog (same builder + flow, no Shadow DOM); live UAT-01..06 PROVEN against production `pct.tonyrowles.com`.
+
+### What Worked
+- **Server-first, UI-last build order.** Phases 1→2→3 shipped the entire submission pipeline (Worker → KV → Discord, payload contract, transport layer) testable end-to-end before any UI existed. By the time the Phase 4 Shadow DOM dialog landed, the only new risk was the UI itself — the data path was already proven by unit tests.
+- **A pure payload-builder as the schema contract.** Putting the allowlist in a zero-`chrome.*` function (Phase 2) meant schema conformance, the [Remove selection text] opt-out, and fingerprint reproducibility were all Vitest-pinnable without a browser — and both extension surfaces (content dialog + options page) shared one source of truth.
+- **Live UAT against production closed the DoD honestly.** UAT-01..06 ran real submits on Google Patents against the deployed Worker; KV records + Discord embeds + no-IP asserts + cross-browser parity (Chrome/149 + Firefox/151) gave concrete evidence rather than "tests pass." The `--remote` wrangler-KV gotcha (false-empty local store) was caught and documented during UAT-01.
+- **Compliance gates landed in the same commit as the route (Phase 1).** Manifest `data_collection_permissions`, privacy policy, and webhook-URL hygiene shipped atomically with the Worker route — no window where a reviewable AMO contradiction (route exists, manifest says no collection) could be committed.
+
+### What Was Inefficient
+- **The milestone close ran without a formal `v5.0-MILESTONE-AUDIT.md`.** Close proceeded on the documented live-UAT PASS evidence instead. Defensible here (DoD was concretely proven), but it meant the open-artifact audit's 10 flagged items had to be triaged by hand at close rather than reconciled earlier.
+- **`audit-open` false-positives created close-time noise.** Phase 5's `UAT-RESULTS/RUNBOOK/HANDOFF` were flagged `[unknown]` purely because the query parser can't classify those file formats, and Phase 1's HUMAN-UAT scenarios were resolved by Phase 5 UAT but never re-stamped. The signal (real gaps) was buried under format-classification artifacts.
+- **The `milestone.complete` CLI miscounted phases (6 vs 5)** by sweeping in the `999.1` backlog directory, and its auto-extracted accomplishments were unusable ("One-liner:", file paths, a code-review line). The MILESTONES.md entry and STATE.md frontmatter both needed hand-correction.
+- **A real interactive bug (Notes-textarea character drop) was found at UAT and deferred, not fixed.** It didn't block (note text persisted via paste) but it's a genuine UX defect in the shipped dialog — carried to v5.1.
+
+### Patterns Established
+- **Pure schema-contract module shared across surfaces.** A zero-platform-API builder function as the single source of truth for a wire payload, Vitest-pinned, consumed by every UI surface. Reusable anywhere multiple entry points must emit an identical, compliance-sensitive payload.
+- **Disk-first queue before network attempt** as the MV3 service-worker-termination mitigation: write to `chrome.storage.local` BEFORE `fetch`, remove atomically on 201, retry on next extension load. Survives ~30s SW death; proven by explicit stop/restart unit tests on both targets.
+- **Compliance-in-the-same-commit invariant.** When a capability has a store-review surface (manifest permissions, privacy policy, secret hygiene), the declaration ships in the same commit as the capability — enforced by grep-based success criteria (`discord.com/api/webhooks` → zero hits; no `ip` field in KV).
+- **Production live-UAT runbook with OPERATOR/SCRIPTABLE split.** Pre-fill every scriptable row (build, lint, grep, curl, KV asserts) and leave operator rows for the live browser session; the operator's fingerprints then key the scriptable KV verification. Made a human-in-the-loop UAT mostly machine-verified.
+
+### Key Lessons
+1. **Server-first ordering de-risks UI milestones.** Proving the full data path before the UI exists means UI phases carry only UI risk. Worth replicating for any feature that's "form → transport → durable store → notify."
+2. **`audit-open` needs format-aware UAT parsing, or close-time triage is manual.** The parser marking valid PASS evidence as `[unknown]` and counting stale cross-milestone quick-tasks made the gate noisier than the actual state. Either teach the parser the UAT-RESULTS format or re-stamp resolved HUMAN-UAT files at phase close so they don't resurface.
+3. **The `milestone.complete` CLI's auto-extraction is unreliable for accomplishments and phase counts when a `999.x` backlog dir lives under `phases/`.** Expect to hand-write the MILESTONES entry and correct STATE frontmatter; the CLI is a scaffold, not the final artifact.
+4. **A non-blocking UAT bug is still a real bug.** Logging the Notes-textarea character drop kept the DoD honest (criteria met) without papering over a shipped defect — but it should be the first v5.1 fix, not lost in the backlog.
+5. **Don't trust a stale local `main` when assessing "is it merged?"** At close I compared against local `main` (`d8d54c4`, still manifest 2.3.0) and wrongly concluded the feature was unmerged. In fact the bug-report code was squash-merged to `origin/main` and tagged `v5.0` (`63f6a76`) before close — `git diff origin/main feat/bug-report -- src/ worker/src/` is empty (byte-identical source). The `git cherry` "141 commits not upstream" was a squash-merge patch-id artifact, NOT missing code. Lesson: verify merge state against `origin/main` (and the actual source diff), not the local branch, before asserting it. The `v5.0` tag doubles as the extension store-release tag — milestone close did NOT create or move it.
+
+### Cost Observations
+- Model mix: `balanced` profile (Opus orchestrator, sonnet executors/researchers/checkers/verifiers)
+- New npm dependencies: **zero** (sixth consecutive milestone) — built on Web Crypto (`crypto.subtle.digest`), `chrome.storage.local`, background `fetch`, Cloudflare Worker + KV, and `wrangler secret put` for the Discord URL
+- Trust invariants held: `assertTripleGate` body byte-unchanged; v40-auto-fix CI stayed `workflow_dispatch:`-only throughout
+- Notable: bug-report feature code is merged to `origin/main` (squash-merge) and tagged `v5.0`; `src/`+`worker/src/` on `origin/main` are byte-identical to `feat/bug-report`. Only `.planning/` docs (incl. milestone-close archival) remain unpushed on `feat/bug-report`. v4.3 auto-fix milestone stayed paused and untouched
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution

@@ -1,461 +1,534 @@
 # Domain Pitfalls
 
-**Domain:** v5.0 Bug Report Feature — adding unauthenticated user-feedback submission to a privacy-sensitive cross-browser MV3 extension with an existing Cloudflare Worker/KV backend
-**Researched:** 2026-06-12
-**Confidence:** HIGH for Pitfalls 1–4, 6–8, 10–11 (authoritative source or direct code read); MEDIUM for Pitfall 5 (CWS review patterns, multiple sources agree); MEDIUM for Pitfall 9, 12 (architecture-reasoned from observed patterns)
+**Domain:** v6.0 Standalone Citation Webapp — adding a public client-side PDF.js webapp on tonyrowles.com to an existing cross-browser extension + Cloudflare Worker system, extracting a shared deterministic core
+**Researched:** 2026-06-16
+**Confidence:** HIGH for Pitfalls 1–3, 5–6, 10 (direct code reads + verified architecture); MEDIUM for Pitfalls 4, 7–9 (architecture-reasoned from observed code + PDF.js documentation patterns)
 
-> **Scope note:** This document covers ONLY failure modes specific to adding the v5.0 bug-report feature to the existing extension/Worker/KV architecture. Generic web-app pitfalls are excluded. Each pitfall carries a phase-placement recommendation so load-bearing design decisions land in the earliest possible phase rather than being retrofitted.
+> **Scope note:** Every pitfall here is specific to adding THIS webapp to THIS codebase. Generic web-app advice is excluded. The Worker source, pdf-parser.js, matching.js, position-map-builder.js, offscreen.js, and wrangler.toml were all read directly before writing this document.
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1 (LOAD-BEARING): PII leakage via "diagnostic" payload fields that capture more than developers expect
+### Pitfall 1 (BLOCKING GATE): PROXY_TOKEN is already in the published extension bundle — the webapp must never embed it client-side
 
 **What goes wrong:**
 
-The auto-captured payload collects selection text, URL, browser+OS, viewport/scroll position, XPath, and a settings snapshot. Each field individually looks benign. Together, they form a fingerprint that can identify individual users and expose legally-sensitive content.
+`src/offscreen/offscreen.js` line 24 contains the token as a plain string literal:
 
-The specific vectors for this extension:
+```
+const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
+```
 
-**Selection text** — the user's highlighted text is a patent excerpt. If that excerpt appears in a pending (not yet published) application, filing it in an unencrypted bug report pipeline creates a potential prior-art disclosure vector. More concretely: patent professionals routinely work with confidential claim drafts and attorney work product. If the tool is used on a claims page, the selection text IS the confidential claim language. It should never be transmitted server-side without explicit user acknowledgment.
+This string ships in the Chrome and Firefox extension bundles. Anyone who has downloaded those bundles — from the Chrome Web Store, from Firefox AMO, or from the GitHub Releases artifacts — already has the token. It must be treated as fully compromised regardless of whether it has been visibly abused.
 
-**URL query params** — `patents.google.com/patent/US12345678` is safe. But Google Patents search result URLs (`google.com/search?q=...`) and some navigated patent citation pages embed search terms and session parameters. The PROJECT.md "cosmetic-search query params could leak" note is correct. A naive `window.location.href` capture in the diagnostic bundle captures everything including `tbm=pts&q=...` search terms.
+The webapp scenario makes this catastrophically worse: if the webapp JavaScript embeds the same token (or any replacement token) as a literal string, it is instantly extractable from browser DevTools > Sources, `view-source:`, `curl`, or the Cloudflare Worker's own CORS-exposed response. Unlike the extension bundle which requires deliberate extraction, a plain web page's JavaScript is trivially readable.
 
-**Settings snapshot** — the settings capture includes citation format, trigger mode, prefix configuration. This is low-risk individually but constitutes behavioral profiling when combined with extension version and browser+OS. At scale, it makes user cohorts identifiable.
+The Worker uses this token as the sole authentication mechanism for ALL routes: the USPTO PDF proxy (`GET /?patent=`), the KV position-map cache (`GET /cache`, `POST /cache`), and the bug-report route (`POST /report`). A stolen replacement token gives an attacker:
+- Free unlimited USPTO PDF proxy access (Cloudflare Worker request quota exhaustion)
+- Ability to poison the shared KV position-map cache with corrupt data that causes wrong citations for all extension users
+- Ability to spam the `/report` Discord webhook endpoint
 
-**IP address via Worker request** — the Cloudflare Worker automatically receives `request.headers.get('CF-Connecting-IP')`. This is a real IP address. If it is stored in KV alongside the report, it constitutes PII under GDPR for EU users (European Court of Justice ruling confirmed IP = personal data). The existing Worker presumably does NOT store the caller's IP for the KV patent cache; the bug report KV writes would be the FIRST place IP could be captured server-side.
+**Why it happens:**
 
-**User-agent as fingerprint component** — `navigator.userAgent` + viewport width + scroll position is a classic browser-fingerprint triple. Combined with selection text hash, this is nearly unique per user. The PROJECT.md notes "browser fingerprinting via user-agent + viewport combo" — this is a real risk even if each field seems innocuous.
+The token was designed for an extension context where the bundle is slightly obscured and the user base is trusted professionals. The extension model — where secrets live in the bundle — is a recognized extension-architecture tradeoff that's acceptable for browser extensions. It is categorically NOT acceptable for public web page JavaScript. Teams routinely port extension code to web pages without re-evaluating the trust model, carrying the secret along.
+
+**How to avoid:**
+
+The fix requires two coordinated changes before any webapp code touches the network:
+
+1. **Rotate the token.** Generate a new secret via `openssl rand -hex 32` or similar. Update it in the Cloudflare Worker via `wrangler secret put PROXY_TOKEN`. The Worker already reads it from `env.PROXY_TOKEN` (confirmed in worker/src/index.js line 526) — no Worker code change required. Deploy the Worker with the new secret.
+
+2. **Move the token server-side for webapp requests.** The webapp must NOT send `Authorization: Bearer <token>` from the browser. Instead, the Cloudflare Worker must distinguish webapp requests from extension requests and apply different auth:
+   - **Option A (recommended):** The webapp calls a new Worker route (e.g., `GET /webapp/cache` or `GET /proxy`) with NO auth token. The Worker enforces rate limiting (IP-based, `CF-Connecting-IP`) instead of token auth for the public route, and calls the upstream USPTO API internally with its own API key. The Bearer token gate is retained for extension-only routes.
+   - **Option B:** A separate Cloudflare Worker or Pages Function sits in front of tonyrowles.com and proxies to `pct.tonyrowles.com` with the token injected server-side. The webapp calls `https://tonyrowles.com/api/cite` (or similar) — the token never reaches the browser.
+
+3. **Verify the old token is dead.** After rotation, the extension needs to ship with the new token before the old one is invalidated (or simultaneous rotation with a brief overlap window). The extension currently hardcodes the token; in v6.0 this also needs addressing (move to a build-time injected environment variable or continue hardcoding the new token knowing it's still obscured).
 
 **Warning signs:**
-- The payload preview in the expandable disclosure shows raw `window.location.href` rather than a sanitized version
-- The KV write in the Worker stores `request.headers.get('CF-Connecting-IP')` in the record
-- The settings snapshot object is captured via `JSON.stringify(settings)` without a field allowlist
-- `navigator.userAgent` appears in the diagnostic bundle alongside viewport dimensions
+- Any webapp JS file that contains `Authorization: Bearer` with a literal token string
+- A PR that passes `PROXY_TOKEN` as a build-time variable to a frontend Vite/esbuild config (it will appear in the built bundle)
+- DevTools network inspector showing the webapp sending an `Authorization` header directly to `pct.tonyrowles.com`
+- Worker routes that return data to the webapp without any per-request rate limiting
 
-**Prevention strategy:**
-
-1. **Selection text: show before transmit, never auto-transmit silently.** The expandable payload preview (already in PROJECT.md spec) is load-bearing — users MUST see the selection text before submitting. For a patent attorney audience, "you are about to send this patent text to a server" is not optional disclosure. Do NOT add a "skip preview" option for power users.
-
-2. **URL: strip query params server-side AND client-side.** On the client: `new URL(url).origin + new URL(url).pathname` — strip everything after `?`. On the Worker: validate that the URL is `patents.google.com/patent/US*` before storing. If the URL doesn't match the expected pattern, store the pattern-masked version (`patents.google.com/patent/[redacted]`) and log the anomaly separately.
-
-3. **Settings snapshot: explicit allowlist, not JSON.stringify(settings).** Capture only: `{ triggerMode, citationFormat, prefixEnabled }`. Do NOT capture any field that could contain user-typed content (custom prefix text, etc.).
-
-4. **IP address: do NOT store in KV.** The Worker uses the IP for rate-limiting (a transient decision, never persisted) and NOTHING ELSE. The KV record schema must not include an `ip` or `clientIp` field. This is a design constraint that must be locked in Phase 1.
-
-5. **User-agent + viewport: include ONLY browser family + major version.** `navigator.userAgent` is replaced with a parsed `{ browser: 'Chrome', browserVersion: '124', os: 'macOS' }` object. Exact UA string is discarded. Viewport dimensions should be bucketed to the nearest 100px, not exact.
-
-6. **Selection text for confidential excerpts: offer redaction option.** The expandable preview should have a "[Remove selection text from report]" toggle. Default: included (maintainers need it for debugging). One-tap opt-out: excluded. Store as `{ selectionText: "[redacted by user]" }` in KV when excluded. The user's choice persists for the session, not permanently.
-
-**Phase placement:** Phase 1 (payload schema design). The field allowlist and redaction controls are load-bearing and cannot be retrofitted without changing the KV schema. Lock the exact payload schema in Phase 1 before building any other component.
+**Phase to address:** Phase 1 (BLOCKING — must be complete before any public webapp code can call the Worker). No other work should proceed until token rotation is done and the webapp's access path is auth-redesigned.
 
 ---
 
-### Pitfall 2 (LOAD-BEARING): Discord webhook URL embedded in extension code is public — anyone who downloads the extension can spam your Discord channel
+### Pitfall 2 (BLOCKING GATE): Public Worker exposure without per-request rate limiting creates KV write-quota abuse and USPTO proxy abuse
 
 **What goes wrong:**
 
-The extension source code is publicly visible on the Chrome Web Store and Firefox AMO after submission. Any string literal that looks like `https://discord.com/api/webhooks/<id>/<token>` in the extension bundle can be extracted in under 60 seconds by anyone who downloads the CRX/XPI and runs `strings` on it.
+The existing Worker has exactly one protection on the USPTO proxy and KV cache routes: the Bearer token. Once the webapp goes public without a token (Pitfall 1 mandates this), those routes are reachable by anyone who knows the URL. The current rate limiting (5 req/60s IP-keyed in `checkIpRateLimit`) exists ONLY on the `/report` route — not on `GET /?patent=` (USPTO proxy) or `GET /cache` + `POST /cache` (KV cache).
 
-Once the webhook URL is known:
-- Automated spam scripts can flood your Discord channel with fake reports
-- Competitors or bad actors can DDoS your notification channel, making it useless for triage
-- Discord cannot rotate webhook URLs without destroying all existing integrations — you would have to create a new webhook, update the Worker, and redeploy, losing notification continuity
+Confirmed by reading worker/src/index.js: after the Bearer check passes, route dispatch goes directly to KV or USPTO — no rate limiting anywhere on the proxy or cache paths.
 
-The naive implementation: the extension posts directly to `https://discord.com/api/webhooks/...`. This is the single most common mistake in extension-based notification systems, and it is the explicit design constraint called out in PROJECT.md: "Webhook URL must NEVER be embedded in extension code."
+Cloudflare free-tier hard limits (from previous research, confirmed still applicable):
+- Worker requests: 100,000/day
+- KV reads: 100,000/day
+- KV writes: 1,000/day
+
+The 1,000 KV writes/day limit is the critical constraint. Every time a user parses a patent PDF that isn't already in the KV cache, the webapp will call `POST /cache` to store the position map. With a public user base (even modest traffic of a few hundred users/day), this quota fills within hours, breaking the cache upload for all extension users too.
+
+The USPTO proxy route (`GET /?patent=`) has no quota on the Worker side, but the USPTO API itself may throttle requests without the API key being rate-limited. More critically, 100K Worker requests/day sounds large but can be consumed by a simple crawler that iterates patent numbers.
+
+**Why it happens:**
+
+Teams add a "public webapp reusing the existing Worker" and assume the Worker's Bearer token was the only protection needed. They rotate the token as Pitfall 1 requires, create an unauthenticated public route, and don't realize that rate limiting was NOT on the existing routes.
+
+**How to avoid:**
+
+Before opening any webapp route, add IP-keyed rate limiting on the Worker for all routes the webapp will call. The pattern already exists in `checkIpRateLimit()` — replicate it:
+
+- **USPTO proxy route:** max 10 requests/minute/IP (a user looking up 10 patents per minute is unusually active; 60/hour is more than enough for a legitimate session)
+- **KV cache GET route:** max 60/minute/IP (reads are cheap but should not be unbounded)
+- **KV cache POST route:** max 5/minute/IP (position map uploads are expensive; this is also the critical quota-protect gate). Add a secondary global counter — if total KV writes today exceed 800 (checked from a KV meta key), return 503 to the webapp's upload path to protect the extension's upload quota
+
+Additionally, consider separate KV namespaces: one for extension-only writes, one for webapp-contributed position maps. Cloudflare KV quota is per-account, not per-namespace, so this doesn't solve the quota problem — but it gives visibility into which surface is consuming writes.
 
 **Warning signs:**
-- Any PR that adds a `DISCORD_WEBHOOK_URL` or similar constant to extension source files
-- The submission endpoint in the extension is `https://discord.com/api/webhooks/...` rather than the existing Worker URL
-- A PR that adds `host_permissions` for `discord.com` to the manifest
+- KV writes exhausted before end of day (visible in Cloudflare dashboard analytics)
+- Worker invocations spike after webapp goes public
+- The `/cache` POST route returns 201 for webapp requests with no rate check
 
-**Prevention strategy:**
+**Phase to address:** Phase 1 (same phase as Pitfall 1 — both are blocking security gates before any public exposure).
 
-1. **Architecture: extension → Worker → Discord.** The extension POSTs to `https://pct.tonyrowles.com/report` (the existing Worker domain, already in `host_permissions`). The Worker receives the report, stores it in KV, then calls Discord. The Discord webhook URL lives exclusively in a Cloudflare Worker secret binding.
+---
 
-2. **Worker secret pattern (verified against Cloudflare docs):**
+### Pitfall 3: Shared-core extraction accidentally changes matching behavior by introducing import indirection or module scope changes
+
+**What goes wrong:**
+
+The shared core (`src/shared/matching.js`, `src/offscreen/pdf-parser.js`, `src/offscreen/position-map-builder.js`) currently runs in two contexts with subtle differences:
+
+- **Chrome:** offscreen document (`offscreen.js`) — ES module, runs with `chrome.runtime.getURL()` available, PDF.js worker URL resolved via `chrome.runtime.getURL('lib/pdf.worker.mjs')`
+- **Firefox:** background script — same shared modules, but `chrome.runtime.getURL()` resolves differently
+
+The extraction step creates a third context: the webapp (plain browser page, no `chrome.*` APIs). If the extraction is done naively — copying files into a `packages/core/` directory without changing them — `pdf-parser.js` will crash at the line:
+
+```js
+GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs');
+```
+
+This line is at module scope (top-level, executed on import), not inside a function. In a plain web page, `chrome` is undefined. The import itself throws before any function is called.
+
+The matching functions (`matching.js`) and position map builder (`position-map-builder.js`) are zero-dependency pure functions — they have no `chrome.*` references and extract cleanly. But `pdf-parser.js` has a module-scope side effect that is context-specific. The extraction plan must NOT treat these three files as uniformly portable.
+
+A second, subtler risk: the 75-case golden corpus (`tests/test-cases.js`, `tests/golden/baseline.json`) runs the matching logic through Vitest with fixture-based position maps — it does NOT run the PDF parsing pipeline. If the extraction refactors the way `buildConcat`, `normalizeText`, or `matchAndCite` receive their inputs (e.g., by wrapping them in a class, changing parameter order, or adding default parameters), the existing Vitest tests can still pass while the webapp's code path diverges. The 75-case corpus proves correctness of the matching algorithm given a position map — it does NOT prove that the PDF parsing pipeline produces the same position maps when run in a plain web page context.
+
+**Why it happens:**
+
+Developers see three files that look like pure logic and move them wholesale into a shared package. They run `npm test` and see 206/206 passing and declare the extraction done. The corpus does not exercise the PDF → position map pipeline end-to-end with the exact PDF.js API surface exposed by a plain browser `<script type="module">` context.
+
+**How to avoid:**
+
+1. **Extract in two separate steps:**
+   - Step A: Extract `matching.js` and `position-map-builder.js` (pure, no `chrome.*`) into the shared package. Run the full 75-case corpus on both the extension build AND the shared package. Both must pass identically.
+   - Step B: Create a new `pdf-parser-web.js` (or make the `chrome.runtime.getURL` call conditional) for the webapp context. Do NOT modify `pdf-parser.js` in a way that changes its behavior in the extension context.
+
+2. **The workerSrc line must be injectable, not module-scope.** Refactor `pdf-parser.js` so that `GlobalWorkerOptions.workerSrc` is set inside `extractTextFromPdf()` or via an explicit `configurePdfWorker(url)` initialization call, not at module load time. Both the extension (using `chrome.runtime.getURL(...)`) and the webapp (using a CDN URL or bundled URL) can call this initializer with the appropriate URL.
+
+3. **Add an end-to-end integration test for the webapp path:** parse one real patent PDF fixture through the full pipeline (PDF bytes → `extractTextFromPdf` → `buildPositionMap` → `matchAndCite`) in the webapp context. This test must produce the same position map structure as the extension path. Without this test, the 75-case corpus only proves the matching half.
+
+4. **Vitest alias config pattern (already used):** the existing `per-target vitest alias configs` redirect `src/shared` imports to `dist/` bundles. Use the same pattern for the webapp package: run the corpus against the package's dist output, not its source.
+
+**Warning signs:**
+- The extraction PR modifies `matching.js` in any way (even formatting) without a full 75-case baseline re-run pinned against the ORIGINAL baseline snapshot
+- `pdf-parser.js` retains `chrome.runtime.getURL` at module scope without a conditional guard
+- The webapp parses a test PDF and the position map has a different number of entries than the extension's parse of the same PDF
+- Any PR that changes the function signatures in `matching.js` (parameter names, defaults, order) without corresponding Vitest test updates
+
+**Phase to address:** Phase 1 (core extraction). The extraction is the foundational phase — all other phases build on it. The golden corpus must be pinned and validated on BOTH surfaces before any webapp-specific code is written.
+
+---
+
+### Pitfall 4: PDF.js worker URL configuration fails silently in the webapp, falling back to main-thread parsing
+
+**What goes wrong:**
+
+`pdf-parser.js` sets `GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs')`. In a plain web page, there is no `chrome.runtime.getURL` — the webapp must configure the worker URL differently.
+
+PDF.js v5 (which this project uses, pinned at `pdfjs-dist@5.5.207`) supports four worker initialization modes:
+1. `GlobalWorkerOptions.workerSrc = '<url>'` — loads the worker from a URL
+2. `GlobalWorkerOptions.workerSrc` pointing to a CDN URL (e.g., `unpkg.com/pdfjs-dist@5.5.207/build/pdf.worker.mjs`)
+3. Bundler-injected URL via `new URL('./pdf.worker.mjs', import.meta.url)` in Vite/esbuild
+4. Setting `workerSrc = ''` or omitting it — falls back to fake-worker (main-thread parsing)
+
+Mode 4 (the fallback) silently works but runs the worker on the main thread, blocking the UI during parsing. A 5-30 MB patent PDF takes 2-10 seconds to parse. On the main thread, the page freezes for this duration — no progress indicator, no abort, the browser may show a "page unresponsive" warning.
+
+The silent fallback is the trap: PDF.js does not throw when it falls back to main-thread. The parsing still works. The webapp appears to function correctly in testing. The freeze only surfaces on real 5-30 MB PDFs in a production environment, and only when the worker URL is wrong. Teams test with small PDFs and miss this.
+
+**Why it happens:**
+
+When porting `pdf-parser.js` to the webapp, the developer replaces `chrome.runtime.getURL('lib/pdf.worker.mjs')` with something that looks like it should work (a relative path, a mistyped CDN URL, an incorrect `import.meta.url` construction) and doesn't verify the worker loaded as a separate thread.
+
+**How to avoid:**
+
+1. **Verify the worker loaded as a separate thread** during development: Chrome DevTools > Sources > Threads panel should show a `pdf.worker.mjs` thread when parsing is active. If only the main thread is running, the fallback is in effect.
+
+2. **For the webapp, use the `new URL` pattern with esbuild/a bundler OR an explicit CDN pin:**
+   ```js
+   // esbuild with --bundle treats new URL(..., import.meta.url) as an asset reference
+   GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href;
+   // OR explicit CDN (version-pinned to match the installed package):
+   GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.5.207/build/pdf.worker.mjs';
    ```
-   npx wrangler secret put DISCORD_WEBHOOK_URL
-   ```
-   This stores the value encrypted at rest; it is NOT visible in the dashboard or `wrangler.toml` after creation. The Worker accesses it as `env.DISCORD_WEBHOOK_URL` in its fetch handler. Never write it in `wrangler.toml` plaintext — use the `wrangler secret put` CLI command or the Cloudflare dashboard Secrets UI.
 
-3. **Never add `discord.com` to `host_permissions`.** The manifest adding `https://discord.com/*` would be a dead giveaway to CWS/AMO reviewers that the extension communicates directly with Discord. It is also a security signal that the extension bypasses the Worker intermediary.
+3. **No-zero-dep tension:** this project has a strong zero-new-npm-dependency culture. Using `pdfjs-dist` is not a new dependency (it's already installed). The worker URL configuration is a build/deployment concern, not a library dependency. CDN URL option avoids any bundler change.
 
-4. **If the webhook URL ever leaks:** create a new Discord webhook immediately, update the Worker secret, redeploy. Do NOT try to "keep it secret" after exposure — rotate first.
-
-**Phase placement:** Phase 1 (Worker endpoint + KV schema). The Worker → Discord routing is part of the new `/report` route. Secret binding setup is a deployment step that must happen before any UAT.
-
----
-
-### Pitfall 3 (LOAD-BEARING): Chrome Web Store and Firefox AMO review rejection for user-data collection without required disclosures
-
-**What goes wrong:**
-
-Adding a feature that transmits user-selected text, URLs, and settings to a remote server is a significant privacy-surface change. Both stores have automated and human reviewers who check for undisclosed data collection. The failure modes:
-
-**CWS (Chrome Web Store):**
-- If `host_permissions` changes — the existing manifest already has `https://pct.tonyrowles.com/*`. If the new `/report` endpoint is on the SAME domain, no new `host_permissions` entry is needed. If it moves to a different domain, adding a new `host_permissions` entry mid-extension-lifecycle triggers enhanced review.
-- The CWS program policies (updated May 22, 2025) require: (a) a privacy policy link in the developer dashboard, (b) if data handling is not "closely related to functionality described prominently in the Product's Chrome Web Store page," explicit in-product disclosure and user consent. The patent citation tool's listing does not currently mention bug reporting — the listing text must be updated alongside the feature.
-- The Limited Use policy compliance statement must appear on the extension's homepage or one-click-away page (GitHub Pages privacy policy at `/docs/privacy/`).
-
-**Firefox AMO:**
-- As of November 3, 2025, all new Firefox extensions MUST declare `data_collection_permissions` in `browser_specific_settings.gecko`. The existing manifest.firefox.json already has `data_collection_permissions: { required: ["none"], optional: [] }`. Adding bug-report data transmission REQUIRES updating this to declare the actual data types being collected.
-- The Firefox add-on data classification taxonomy values applicable to the bug-report feature:
-  - `"websiteContent"` — covers the selected patent text (content from a webpage)
-  - `"websiteActivity"` — covers the Google Patents URL
-  - `"technicalAndInteraction"` — covers extension version, browser+OS, settings snapshot, error logs
-- The updated manifest entry should be:
-  ```json
-  "data_collection_permissions": {
-    "required": ["websiteContent", "websiteActivity", "technicalAndInteraction"],
-    "optional": []
-  }
-  ```
-  Note: `"required"` means "transmitted as core functionality" — since the report always includes these data types when submitted, they belong in `required`, not `optional`. Setting them as `optional` when they are always transmitted is a policy violation.
-- AMO's automated scanner (`addons-linter`) will flag `data_collection_permissions: { required: ["none"] }` as inconsistent with a fetch to `pct.tonyrowles.com` that transmits content. This will trigger human review.
-- AMO's `web-ext lint` is run locally by developers and in CI. The existing CI (`FOX-06` — `web-ext lint` zero warnings) must continue to pass after the manifest change.
-
-**Privacy policy update:** The existing GitHub Pages privacy policy (`docs/privacy/index.html`) does NOT mention voluntary bug reporting or diagnostic data transmission. It must be updated to describe: what data the report contains, who receives it (maintainer only), retention period (KV TTL or manual deletion), and how to request deletion (email).
+4. **Add a startup assertion** in the webapp's PDF parsing initialization: if `GlobalWorkerOptions.workerSrc` is empty or undefined after initialization, throw or warn visibly. Do not silently allow main-thread fallback in production.
 
 **Warning signs:**
-- A PR that changes `data_collection_permissions` in manifest.firefox.json from `["none"]` to something else but does NOT update the privacy policy text
-- A PR that adds the report UI without updating the CWS listing description to mention bug reporting
-- The `web-ext lint` CI job starts emitting a warning about undeclared data collection
-- A CWS review rejection email citing "insufficient disclosure of user data handling"
+- Chrome DevTools network tab shows `pdf.worker.mjs` returning a 404 during PDF parsing
+- Chrome DevTools threads panel only shows the main thread during parsing (no worker thread)
+- The UI freezes for several seconds during patent PDF parsing in the webapp
+- `GlobalWorkerOptions.workerSrc` is set to a relative path like `'./pdf.worker.mjs'` in a file where `import.meta.url` is not available
 
-**Prevention strategy:**
-
-1. Update `manifest.firefox.json:browser_specific_settings.gecko.data_collection_permissions` in the same PR that ships the report endpoint.
-2. Update the GitHub Pages privacy policy page (`docs/privacy/index.html`) in the same PR.
-3. Update the CWS listing description to add a sentence about the bug-report feature (can be done via the Developer Dashboard after submission, but should be prepared in advance).
-4. The existing `privacy_policy` URL in the CWS listing already exists from v1.2. Verify it resolves and reflects the updated policy before the PR is submitted to CWS.
-5. No new `host_permissions` are needed IF the report endpoint is on `pct.tonyrowles.com` (already listed). Confirm this with the Worker routing design.
-
-**Phase placement:** Phase 1 (manifest + privacy policy updates). These changes must land in the same commit as the Worker endpoint. A manifest that has `data_collection_permissions: ["none"]` while the Worker route exists is a reviewable contradiction.
+**Phase to address:** Phase 2 (webapp PDF parsing integration). Must be verified with a real 10+ MB patent PDF, not a small test fixture.
 
 ---
 
-### Pitfall 4: Worker URL abuse — rate limiting an unauthenticated public endpoint
+### Pitfall 5: Google Patents PDF URLs are blocked by CORS in a plain web page — the Worker proxy path is mandatory
 
 **What goes wrong:**
 
-The Worker URL (`https://pct.tonyrowles.com/report`) is necessarily public — the extension calls it directly. There is no authentication token. Any bot or script that discovers the URL can flood it.
+In the extension, `fetchPdfWithRetry()` in `offscreen.js` calls `fetch(pdfUrl)` where `pdfUrl` is a Google Patents storage URL like `https://patentimages.storage.googleapis.com/...`. This works because extension offscreen documents and background scripts are not subject to CORS — they make cross-origin requests freely using `host_permissions`.
 
-**Two categories of abuse:**
+In a plain web page on `tonyrowles.com`, the same `fetch(pdfUrl)` call will fail with:
 
-1. **Accidental:** a retry loop in the extension that fails to detect permanent failure and retries indefinitely. At 5 retries × N concurrent users, this can hit the Cloudflare free-tier 100K/day Worker limit quickly.
+```
+Access to fetch at 'https://patentimages.storage.googleapis.com/...' from origin
+'https://tonyrowles.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin'
+header is present on the requested resource.
+```
 
-2. **Intentional:** a bot script calling the endpoint directly to exhaust KV write quota (1,000 writes/day on free tier) or to spam the Discord notification channel.
+Confirmed by checking: Google Patents storage (`patentimages.storage.googleapis.com`) does not send CORS headers permitting third-party origins. The response is opaque. `fetch()` with `mode: 'no-cors'` returns an opaque response whose body cannot be read — the PDF bytes are inaccessible.
 
-The realistic abuse scenario for a niche professional tool: the accidental-retry case is more likely than targeted attack. The tool has a small user base of patent professionals who are unlikely to be adversarially targeted. However, the KV write limit (1,000/day) is the tightest constraint — with dedup, each new fingerprint (patent# + category + selection hash) consumes one KV write. 1,000 writes = 1,000 unique reports per day, which is high for the actual user base but reachable if a bug trigger causes rage-click loops.
+This means the webapp's primary PDF source (the Google Patents link that the extension reads from the DOM) is unavailable. The webapp has no equivalent of the Google Patents DOM context to read the link from — it operates from a standalone page. The webapp flow must go through the Worker proxy exclusively:
+
+**webapp PDF flow:** user enters patent number → webapp calls Worker USPTO proxy (`GET /?patent=US...`) → Worker fetches from USPTO ODP → streams PDF to webapp → webapp parses with PDF.js
+
+There is NO direct Google Patents PDF path for the webapp. The Worker is not optional.
+
+**Why it happens:**
+
+Developers familiar with the extension's unconstrained fetch model assume the same URLs work in a web page. The extension context is uniquely privileged — it's easy to forget that `host_permissions` is what grants that privilege, and web pages don't have the equivalent.
+
+**How to avoid:**
+
+1. **Document and enforce the single path:** the webapp only ever fetches PDFs from the Worker proxy. There is no fallback to direct Google Patents URL fetching. Remove any code that attempts `fetch(googlePatentsPdfUrl)` from the webapp context.
+
+2. **The Worker already supports this path** for granted patents via `fetchEgrantPdf()` in worker/src/index.js. The webapp flow is the same as the extension's USPTO fallback path. The existing Worker code is sufficient — no new Worker routes are needed for PDF fetching (only auth changes from Pitfall 1 apply).
+
+3. **Published applications are out of scope for v1** — this is correctly documented in PROJECT.md. The webapp's published-application limitation is NOT a workaround for CORS — it's a genuine architectural constraint: the extension's published-application citation uses a DOM TreeWalker on `patents.google.com`, which the webapp cannot replicate. Attempting to add published-application support to the webapp without this DOM context is a scope-creep trap (see Pitfall 8).
 
 **Warning signs:**
-- KV write quota exhaustion alert (Cloudflare dashboard)
-- Discord channel flooded with identical or near-identical reports
-- Worker CPU time limit hits (10ms/invocation on free tier) due to high request volume
+- The webapp's fetch code includes a condition that tries `patentimages.storage.googleapis.com` URLs
+- Network tab shows CORS errors for Google Patents storage URLs from the webapp origin
+- The webapp attempts to use `mode: 'no-cors'` for PDF fetching (opaque response — PDF bytes unreadable)
+- Any PR that adds `https://patentimages.storage.googleapis.com/*` to any CORS allow-list on the Worker
 
-**Prevention strategy:**
-
-1. **Client-side rate limit (extension storage, persisted):** ~5 reports per 10 minutes per install, stored in `chrome.storage.local` under a key with ISO timestamp. This is already in the PROJECT.md spec. Critical implementation requirement: the rate limit check must happen BEFORE showing the submit button as active, not just at submit time. If the user is rate-limited, the submit button shows "Try again in X minutes" — do not silently drop the report.
-
-2. **Server-side fingerprint dedup (KV, already planned):** Worker computes `hash(patentNumber + category + sha256(selectionText.slice(0,100)))` and checks for an existing KV key in a 30-minute window before writing. If a duplicate fingerprint exists within the window, return HTTP 200 (to avoid triggering client retry) but do NOT write to KV or notify Discord.
-
-3. **Server-side IP-based rate limit (Worker + KV):** Use `CF-Connecting-IP` header for transient rate-limiting ONLY — never store the IP in the report KV record. Pattern: `ratelimit:${ip}` key in a separate KV namespace (or the same namespace with a `rl:` prefix) with a 1-minute TTL and max-count of 10. If exceeded, return HTTP 429 with `Retry-After: 60`. The extension must handle 429 gracefully (do not retry within the Retry-After window).
-
-4. **For v1: no Cloudflare Turnstile.** As stated in PROJECT.md, adding Turnstile only if abuse surfaces. The above three layers are sufficient for v1. Turnstile requires an additional Cloudflare product binding and adds friction to the submit flow.
-
-5. **CPU time guard:** the Worker's report handler must complete within 10ms of CPU time (free tier limit). The `fetch()` call to Discord is async fire-and-forget — use `ctx.waitUntil(discordFetch)` rather than awaiting it in the main handler, or the CPU budget is consumed by network wait time. KV write is also async; use the same `waitUntil` pattern.
-
-**Phase placement:** Phase 2 (Worker endpoint implementation). Rate limiting is part of the endpoint, not an add-on. The fingerprint dedup is a co-design with the KV schema (Phase 1 payload schema).
+**Phase to address:** Phase 2 (webapp network integration). The PDF fetch path must go through the Worker from the first line of webapp network code.
 
 ---
 
-## Moderate Pitfalls
-
-### Pitfall 5: CWS/AMO review pushback for adding `host_permissions` or changing manifest mid-lifecycle
+### Pitfall 6: Large PDF memory and CPU pressure on the main thread — no offscreen isolation in the webapp
 
 **What goes wrong:**
 
-Adding a new `host_permissions` entry to an already-published extension is a significant permission change that triggers manual review. The existing manifest already includes `https://pct.tonyrowles.com/*` — if the report endpoint is on this domain, NO new `host_permissions` entry is needed, and this pitfall is fully avoided.
+In the Chrome extension, PDF.js runs in an offscreen document — a separate renderer process (technically: a hidden, non-visible document context) that is isolated from the page UI thread. In Firefox, it runs in the background script context. In both cases, the parsing is NOT on the main UI thread; it cannot freeze the user interface.
 
-If the report endpoint is on a DIFFERENT domain (e.g., a dedicated subdomain `https://reports.pct.tonyrowles.com/*`), a new `host_permissions` entry is required. CWS and AMO both treat new `host_permissions` additions as security-sensitive changes requiring justification.
+In the webapp, PDF.js runs in the browser main thread (or a web worker if properly configured — see Pitfall 4). Patent PDFs are 5-30 MB. Parsing a 30 MB patent PDF with PDF.js requires:
+- Reading the ArrayBuffer into memory (30 MB)
+- PDF.js internal parsing structures (roughly 2-3x the PDF size during peak)
+- Text content extraction per page (adding another buffer)
+- Total peak memory: ~100-200 MB for a large patent
 
-**Prevention strategy:** Route the new `/report` endpoint on the EXISTING Worker domain (`pct.tonyrowles.com`) as a new path on the existing Worker. This requires zero manifest changes for the `host_permissions` section. The permission justification for `pct.tonyrowles.com` is already in the store listing ("USPTO proxy and shared patent cache"). Add "bug report submission" to the justification text at update time.
+On mobile or low-memory devices, this triggers GC pressure, jank, or an OOM tab kill. On all devices, if the PDF.js worker is not running in a separate thread (Pitfall 4), the entire UI freezes during parsing.
 
-**Phase placement:** Phase 1 (Worker routing design). Confirm the route is on the existing domain before any manifest changes are drafted.
+Additionally, the current `extractTextFromPdf()` in `pdf-parser.js` does a full sequential page-by-page extraction:
+```js
+for (let i = 1; i <= pdf.numPages; i++) {
+  const page = await pdf.getPage(i);
+  const textContent = await page.getTextContent();
+  ...
+}
+```
 
----
+A 100-page patent runs through 100 sequential async page fetches + text extractions. In the extension's offscreen document, the user doesn't see any UI freeze. In the webapp, even with a worker thread, the long total parse time (5-20 seconds for large patents) needs explicit UX feedback — progress bar, cancel button, or at minimum a spinner. Without this, users will assume the page is broken and reload.
 
-### Pitfall 6: MV3 service-worker termination kills the retry queue in Chrome
+**Why it happens:**
 
-**What goes wrong:**
+The extension architecture naturally solves this via offscreen isolation. When the code is ported to the webapp, the isolation evaporates but the parsing logic is unchanged. Testing with small PDFs (the golden corpus fixtures are test-sized, not 30 MB) misses the production case.
 
-Chrome MV3 service workers are terminated after ~30 seconds of inactivity. Any retry queue held in memory (a `pendingReports` array in the service worker's global scope) is silently dropped when the SW is killed. The user gets no feedback, the report is lost.
+**How to avoid:**
 
-Additionally, the SW can be killed between the moment the user submits the report and the moment the fetch completes if the network call takes longer than 30 seconds (unlikely for a report POST, but plausible on a slow connection).
+1. **Web Worker isolation is mandatory, not optional.** Pitfall 4's prevention (correct `workerSrc`) is a prerequisite. Validate with a real large patent PDF (e.g., US6324676 — the OCR-heavy patent already in the golden corpus) to confirm parsing does not block the UI.
+
+2. **Progress feedback for long parses.** Expose a `onProgress` callback or event from the PDF parsing layer. PDF.js provides `loadingTask.onProgress` for the overall load and per-page callbacks. A simple page counter ("Parsing page 23 of 87...") is sufficient. The alternative — showing a spinner with no progress — causes users to abandon the tab on large patents.
+
+3. **Size gate with user warning.** If the PDF exceeds a threshold (e.g., 25 MB), warn the user before fetching: "This patent's PDF is large (30 MB) and may take 10-20 seconds to parse." A size check from the Worker's HTTP response headers (`Content-Length`) before the ArrayBuffer is read allows an early warning.
+
+4. **Explicit memory cleanup.** The existing `pdf-parser.js` calls `pdf.destroy()` at the end of `extractTextFromPdf()` — this releases PDF.js's internal memory. Ensure this is retained in the webapp path and that the ArrayBuffer itself is not held in module scope after parsing.
 
 **Warning signs:**
-- A PR that stores the pending retry queue in a `let pendingReports = []` in `service-worker.js` without persistence to `chrome.storage.local`
-- Retry logic that only runs when the popup is open (the popup's lifecycle is even shorter than the SW's)
-- The retry loop uses `setTimeout` or `setInterval` without a `keepAlive` mechanism
+- The webapp stalls silently for 10+ seconds on a large patent with no UI feedback
+- Browser memory usage spike to 200+ MB during parsing
+- The tab crashes on mobile devices for large patents
+- `pdf.destroy()` is missing from the webapp's parsing code path
 
-**Prevention strategy:**
-
-1. **Disk-first model:** Any undelivered report is written to `chrome.storage.local` immediately upon the user tapping submit, BEFORE the fetch attempt. Key: `bugReport:pending:${timestamp}`. The fetch is the delivery attempt, not the record creation.
-
-2. **Retry on SW wake:** The service worker's `activate` and `message` event handlers check `chrome.storage.local` for pending reports on startup. This means retry happens whenever the SW restarts (browser start, extension reload, any extension event firing). This is the correct trigger — NOT a polling interval.
-
-3. **Firefox difference:** Firefox MV3 uses a non-persistent event page (background script), not a true service worker. Event pages persist longer than Chrome SWs but can still be terminated. The same disk-first pattern applies. Firefox does NOT have `chrome.storage.session` (added in Chrome 102); use `chrome.storage.local` for the queue on both platforms.
-
-4. **Retry limit:** after 3 failed attempts, mark the report as `bugReport:failed:${timestamp}` and stop retrying. Log a console warning. Do not retry indefinitely — if the Worker is permanently down, an infinite retry loop will fire every time the extension loads.
-
-5. **chrome.storage.local quota:** Chrome: 10MB default (since Chrome 114; was 5MB). Firefox: tied to IndexedDB quota (effectively disk-based, much larger). A bug report payload is ~5-10 KB. Even 100 queued reports = ~1MB, well within quota. Do NOT request `unlimitedStorage` — it is unnecessary and appears suspicious in review.
-
-**Phase placement:** Phase 3 (extension-side submission UI and queue). The disk-first pattern is a design requirement, not an optimization — code the queue this way from the start.
+**Phase to address:** Phase 2 (webapp PDF parsing). Large-PDF testing must be a DoD criterion for this phase.
 
 ---
 
-### Pitfall 7: Discord embed payload overflow from large patent selection text
+### Pitfall 7: Scope-creep — inadvertently re-implementing matching logic in the webapp instead of importing the extracted core
 
 **What goes wrong:**
 
-Discord embeds have hard character limits (verified from official docs):
-- Total embed content across all embeds in one message: **6,000 characters**
-- Individual embed description field: **4,096 characters**
-- Field values: **1,024 characters each**
-- Message content (outside embeds): **2,000 characters**
+The webapp needs to run `matchAndCite()` on the position map produced by PDF parsing. If the shared-core extraction (Pitfall 3) is not completed first, the webapp developer will face a choice: wait for the extraction, or copy `matching.js` into the webapp. The copy path is extremely tempting — it's one file, clearly pure, no dependencies.
 
-A patent selection text can easily be 500-2,000 characters. Combined with patent number, citation result, error log ring buffer, and settings, the 6,000-char total is reachable. Discord silently truncates or rejects messages that exceed limits — the Worker's Discord `fetch()` returns HTTP 400 with an error body, which is easy to miss if error handling is sloppy.
+Once copied, the webapp has its own copy of `matchAndCite()`. Within the same milestone, someone fixes a bug in the extension's `matching.js`. The webapp's copy is not updated. The golden corpus still passes on the extension build. But the webapp silently has stale matching logic, and the divergence is invisible until a specific case fails differently on the two surfaces.
 
-Additionally, free-text notes and patent selection text may contain Discord markdown: `**bold**`, `_italic_`, `[link](url)`, backtick code blocks, and `@everyone` mentions. Unescaped user text in embed `description` fields renders as markdown, which can cause channel formatting abuse and — critically — `@everyone` or role mentions if the selection text contains `@` followed by a role name.
+This is the matching-logic drift failure mode. It's distinct from Pitfall 3 (which is about the extraction process itself) — this is about the ongoing maintenance trap that follows if the extraction is done wrong.
+
+A related variant: the webapp implements its own citation formatting (`"4:5-20"`) rather than calling `formatCitation()` from `matching.js`. The formats diverge when someone adds configurable citation format options in a later milestone. The webapp user gets a different format than the extension user for the same patent passage.
+
+**Why it happens:**
+
+Shared package extraction adds setup overhead (workspace configuration, package.json entries, import path changes). Under time pressure, a copy feels faster. The copy "works" immediately. The divergence is invisible until regression.
+
+**How to avoid:**
+
+1. **The shared package must be a hard prerequisite, not a soft dependency.** Phase ordering must enforce: core extraction phase completes and both the extension AND webapp tests pass against the SAME package before any webapp-specific matching code is written. The roadmap phase gating should make it impossible to skip.
+
+2. **ESLint rule or import guard:** add an ESLint rule to the webapp build that forbids importing from `../../src/shared/matching.js` (the extension source path) — the webapp must import from the shared package only. This prevents accidental direct-path imports that bypass the package boundary.
+
+3. **Canary test:** add a test that runs the same text selection through both the extension's `matchAndCite` (via the Vitest harness) and the webapp's imported `matchAndCite` against the same position map fixture, and asserts identical output. This test fails immediately if the two diverge.
+
+4. **`formatCitation` is part of the shared contract.** Ensure it's exported from the shared package and used by the webapp's citation display code. Do not reimplement it.
 
 **Warning signs:**
-- Worker logs show HTTP 400 responses from Discord's API but the report was stored in KV (silent notification failure)
-- Discord message renders garbled markdown from patent selection text
-- The embed description field shows truncated text without any truncation indicator
+- The webapp imports from a relative path into `src/shared/` instead of from a package path
+- A webapp test fixture's `matchAndCite` output differs from the extension's baseline for the same input
+- The webapp's citation format string differs from the extension's for the same `startEntry`/`endEntry` values
+- Any PR that adds `matching.js` or `formatCitation` as inline functions in webapp-specific files
 
-**Prevention strategy:**
-
-1. **Truncation before dispatch:** Truncate selection text to 800 chars max for the Discord notification. The full selection text is preserved in KV. Add a `[truncated]` suffix when truncated.
-
-2. **Error log ring buffer:** limit to last 5 errors, max 100 chars each in the Discord embed. Full log is in KV.
-
-3. **Sanitize user-provided free-text note:** escape `@` as `\@`, backticks as `\``, asterisks as `\*`. This prevents `@everyone` injection and formatting abuse from a user who types `**important**` in their note field.
-
-4. **Sanitize selection text similarly** — but preserve readability. A simple escaping of `@`, `` ` ``, `_`, and `*` is sufficient. Do NOT HTML-encode (Discord is not HTML).
-
-5. **Test the 400 path explicitly:** in the Worker unit test, mock Discord returning HTTP 400 and assert the Worker still returns HTTP 200 to the extension (the report is in KV; Discord failure is non-fatal) and logs the Discord error. The user must not see a failed submission when Discord is down.
-
-6. **Discord rate limit (5 requests per 2 seconds per webhook):** for v1 user volume, this is not a concern. If more than 5 reports arrive in 2 seconds, the Worker should handle 429 from Discord via `waitUntil` with a brief delay, or simply log the failure and rely on KV as the durable record. Do not implement complex queue logic on the Worker side for v1.
-
-**Phase placement:** Phase 2 (Worker endpoint). The truncation and escaping logic is part of the Worker's Discord dispatch function. Test the 400-response path before declaring the phase done.
+**Phase to address:** Phase 1 (core extraction) and Phase 3 (webapp core integration). Phase 1 creates the shared package; Phase 3 validates that the webapp uses it exclusively.
 
 ---
 
-### Pitfall 8: CORS configuration on the new Worker route blocking the extension fetch
+### Pitfall 8: Published-application scope creep — no PDF column/line scheme means silent wrong citations, not clean errors
 
 **What goes wrong:**
 
-Content scripts in MV3 extensions cannot make cross-origin requests directly — they must message-pass to the service worker/background script, which has `host_permissions` and can perform the fetch. If the report POST is made from the content script directly instead of the service worker, it will fail with a CORS error or a `blocked by CORS policy` error even with the correct `host_permissions` in the manifest.
+The extension handles published applications (US application numbers, typically `20XXXXXXXXX`) via DOM-based citation: the content script's TreeWalker scans the Google Patents page DOM for `[0042]`-style paragraph markers. This path never fetches a PDF. The offscreen/background PDF parsing path is only triggered for granted patents.
 
-This is a known MV3 CORS architecture issue: content scripts run in the page's origin context, not the extension's origin. The page origin (`patents.google.com`) does NOT have permission to fetch `pct.tonyrowles.com` — only the extension background (service worker) does.
+The webapp has no access to the Google Patents DOM. When a user enters a published application number (e.g., `US20210123456A1`), the webapp will:
+1. Call the Worker USPTO proxy with the publication number
+2. The Worker's `fetchEgrantPdf()` looks for `EGRANT.PDF` in the USPTO ODP document list
+3. Published applications do NOT have `EGRANT.PDF` — only issued grants have it
+4. The ODP search succeeds (finding the application record) but `documentBag.find(doc => code === 'EGRANT.PDF' || ...)` returns `undefined`
+5. Worker throws: `"EGRANT.PDF not found in file wrapper for application {appNumber}"`
 
-On the Worker side, if the Worker returns no CORS headers (or the wrong headers), the service worker's fetch will succeed (it uses the extension origin, not the page origin), but a future change that moves the fetch to the content script will silently break.
+This is actually the correct behavior — the Worker errors out. But the risk is that someone "fixes" this by attempting to use the published application PDF (which does exist in ODP under a different document code, e.g., `WIPP.PDF`). Published application PDFs do NOT use the two-column column:line scheme. They use single-column text with paragraph numbers in the margin. Running `buildPositionMap()` on a published application PDF produces either empty results (no two-column pages detected) or garbage column/line numbers that look plausible but are wrong.
+
+The scope-creep trap: the webapp "works" for published applications if you just change the document code lookup in the Worker — but the position map it generates is meaningless for citation purposes, and the match will produce wrong column:line numbers that look like real citations. This is worse than an error.
+
+**Why it happens:**
+
+A user enters a published application number. The webapp returns an error. The developer sees the error and thinks "I should handle this case." They look at the Worker code and see that published application PDFs exist in ODP. They modify the Worker to fetch the application PDF. The PDF.js parsing runs. `buildPositionMap` returns some entries. `matchAndCite` finds a match. The citation looks like `3:47-51`. The developer ships it. The citation is wrong.
+
+**How to avoid:**
+
+1. **Detect application numbers at the input stage** and show a clear, explicit "Not supported" message: "Published applications are not supported in this tool. For paragraph citations, use the browser extension on patents.google.com."
+
+2. **Validate in the Worker too:** if the patent number format matches a publication number pattern (`/^US\d{11}A[12]$/i` or similar), return HTTP 400 with `"Published applications are not supported. Granted patents only."` before any ODP lookup. This is defense-in-depth — if the webapp validation fails, the Worker rejects it.
+
+3. **Do NOT attempt to parse published application PDFs** for column:line citations, even if the PDF exists. The `buildPositionMap()` function's `isTwoColumnPage` + `extractPrintedColumnNumbers` heuristics are tuned for granted-patent PDFs. They will either return empty results or produce plausible-looking but incorrect column/line assignments.
+
+4. **Lock this decision in Phase 2** as a design constraint, not a "nice to have." The v6.0 milestone explicitly scopes to granted patents only. Any PR that modifies the Worker document-code lookup to handle application numbers should be rejected at review.
 
 **Warning signs:**
-- The report submission fetch call is in `content-script.js` instead of `service-worker.js`
-- The Worker's `/report` route does not include `Access-Control-Allow-Origin` headers
-- Error: "Access to fetch at 'https://pct.tonyrowles.com/report' from origin 'https://patents.google.com' has been blocked by CORS policy"
+- A PR that adds `WIPP.PDF` or `APP.PDF` (or similar application PDF document codes) to the Worker's `fetchEgrantPdf()` find conditions
+- The webapp accepts an `A1` or `A2` kind-code number without a "not supported" message
+- A test that passes a published application fixture through `buildPositionMap()` and accepts any non-empty result as correct
 
-**Prevention strategy:**
-
-1. **Architecture: fetch in service worker, not content script.** The content script collects the diagnostic data and sends it to the service worker via `chrome.runtime.sendMessage`. The service worker performs the actual POST. This matches the existing extension architecture for the USPTO fallback fetch (already in service-worker.js).
-
-2. **Worker CORS headers (defense-in-depth):** even though the service worker fetch doesn't technically need CORS headers (it uses the extension origin), add them to the `/report` route for future-proofing:
-   ```
-   Access-Control-Allow-Origin: chrome-extension://[extension-id]
-   ```
-   Or, more pragmatically for a non-sensitive endpoint:
-   ```
-   Access-Control-Allow-Origin: *
-   ```
-   The latter is fine for an unauthenticated report endpoint where there is no session cookie or auth token to protect.
-
-3. **CSP note:** the existing Firefox manifest has `content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'" }`. This CSP applies to extension pages (popup, options), not to the service worker's fetch. No CSP change is required for the report submission fetch.
-
-**Phase placement:** Phase 3 (extension-side submission). The message-passing architecture must be established in the initial implementation. Retrofitting from content-script-fetch to SW-fetch requires touching more files.
+**Phase to address:** Phase 2 (webapp input validation) and Worker guard. Input validation must be in Phase 2; Worker-side guard should be added in Phase 1 alongside the auth redesign.
 
 ---
 
-### Pitfall 9: Trust/phishing — a malicious page triggers the Report flow with fabricated data
+### Pitfall 9: KV cache poisoning from the webapp — webapp-parsed position maps are stored alongside extension-parsed maps with no provenance tracking
 
 **What goes wrong:**
 
-The Report dialog is shown by the content script injected into `patents.google.com`. A malicious page that somehow triggers the citation UI (or a page at a URL the extension runs on) could potentially invoke the report flow programmatically to submit fabricated data to the Worker.
+The existing Worker `POST /cache` route stores position maps submitted by extension users. The existence-check write-protection (`if (existing !== null) return "Already cached"`) means the FIRST writer wins for any given patent+version key.
 
-For this extension, the content scripts only match `https://patents.google.com/patent/US*` — this is a tight match pattern. The attack surface is very narrow: a malicious page would need to be at exactly that URL structure, which means it would have to be hosted on Google's domain (not realistic for an attacker).
+When the webapp goes public, it also calls `POST /cache` after parsing a patent PDF. The webapp runs PDF.js v5.5.207 in a plain browser context; the extension runs the same version in an offscreen document context. In practice, the two should produce identical position maps for the same PDF — but there is a subtle difference: the webapp's PDF.js worker runs in a true Web Worker thread, while the extension's runs in the offscreen document's worker URL context.
 
-However, there is a subtler risk: a page on `patents.google.com` that injects script tags or manipulates DOM events could potentially trigger `chrome.runtime.sendMessage` calls if the content script listens for DOM events without checking the event's origin.
+If there is ANY difference in how PDF.js resolves font data, text extraction ordering, or item boundary splitting between these two contexts (possible in edge cases with complex fonts or Type3 fonts), the first webapp user to parse a patent could store a subtly wrong position map that all subsequent extension users receive from cache, without any indication of the source.
+
+Currently, the KV record format (confirmed in offscreen.js `uploadToCache()`) stores:
+```json
+{ "entries": [...], "meta": {...}, "cachedAt": <ms>, "version": "v3" }
+```
+
+There is no `source` field (webapp vs extension), no client version, no PDF.js version. When a citation goes wrong, there is no way to determine whether the KV-cached position map came from a webapp parse or an extension parse.
+
+**Why it happens:**
+
+The shared Worker was designed for a single client (the extension). Adding a second client (the webapp) to write to the same KV namespace creates an implicit assumption that both clients produce identical output. This is probably true for 99.9% of patents — but the first-writer-wins cache means any divergent case is silently locked in.
+
+**How to avoid:**
+
+1. **Add provenance to the KV cache schema.** When the webapp uploads a position map, include `"source": "webapp"` and `"pdfjsVersion": "5.5.207"`. When the extension uploads, include `"source": "extension-chrome"` or `"source": "extension-firefox"`. This field is informational — it doesn't change cache behavior but enables debugging.
+
+2. **Consider bumping `CACHE_VERSION`** from `v3` to `v4` when the webapp goes live. This ensures fresh parses by both the extension and webapp, avoiding any pre-webapp cache entries being mixed with webapp-contributed entries. The downside: invalidates all existing cached position maps, requiring fresh parses. For a niche tool, this is acceptable.
+
+3. **Run the 75-case golden corpus against webapp-context parsing.** The corpus validates that the position maps produced by the webapp path match the expected citations. If any case fails, the webapp must not upload its position map to the shared KV cache.
 
 **Warning signs:**
-- The report submission `chrome.runtime.sendMessage` handler in the service worker validates no fields from the message payload
-- The submit button in the citation UI can be triggered via `element.click()` from page JavaScript (i.e., the Shadow DOM is not in closed mode, or the click handler is accessible)
-- The report flow accepts the URL from the message payload rather than from `chrome.tabs.query` (maintainer-validated source)
+- A position-map cache entry for a patent that has incorrect citations on the extension but not when parsed fresh
+- KV entries without a `source` field (pre-provenance entries become ambiguous)
+- A newly-public patent starts returning wrong citations for extension users after a webapp user parses it
 
-**Prevention strategy:**
-
-1. **URL from chrome.tabs.query, not from the content script.** The service worker should fetch the tab URL via `chrome.tabs.query({active: true})` rather than trusting the URL value passed in the `sendMessage` payload. The content script should not pass URL as data — the SW already has authoritative access to the tab URL.
-
-2. **Existing Shadow DOM closed mode is sufficient.** The citation UI already uses Shadow DOM closed mode (per the Key Decisions in PROJECT.md). In closed mode, external JS cannot access the shadow root via `element.shadowRoot`. This prevents programmatic button clicks from page JavaScript.
-
-3. **Require a user gesture for submission.** The submit button handler should verify it was invoked by a genuine user interaction (the browser's trusted-event flag). In practice, since the button is inside a closed Shadow DOM, this is already enforced — only real user clicks reach the handler. Document this assumption explicitly.
-
-4. **Service worker message handler validation:** validate that the `sendMessage` origin is the extension itself. Chrome's `chrome.runtime.onMessage` only fires for messages from the same extension, so this is already enforced by the browser. No additional origin check is required. Document this so future developers don't accidentally open a `chrome.runtime.connectExternal` endpoint.
-
-**Phase placement:** Phase 3 (extension-side UI). These are design-time decisions (closed Shadow DOM, URL from chrome.tabs). No special code is needed beyond following the existing extension architecture.
+**Phase to address:** Phase 2 (webapp cache integration) — add `source` field to the upload payload in the same phase that the webapp cache upload is implemented.
 
 ---
 
-### Pitfall 10: Retry loop that never exits if the Worker endpoint returns permanent errors
+### Pitfall 10: The Worker's CORS `Access-Control-Allow-Origin: *` exposes the cache-read endpoint to any origin — OK for the webapp but document the deliberate decision
 
 **What goes wrong:**
 
-The pending-report queue (Pitfall 6) retries on SW wake. If the Worker is permanently misconfigured (e.g., bad route, invalid KV binding, or the Worker domain changes), every report in the queue retries on every extension load indefinitely. If users have submitted 50 reports over several months, the queue grows without bound and each page load fires 50 failed requests.
+The Worker's `corsHeaders()` function returns `{ 'Access-Control-Allow-Origin': '*' }`. This is applied to ALL routes, including `GET /cache` which returns parsed position maps. Combined with removing the Bearer token requirement for webapp requests (Pitfall 1's fix), the KV cache becomes readable by ANY website — not just the webapp.
 
-A related failure: the retry loop retries on HTTP 4xx (client errors — malformed payload, invalid schema) as well as HTTP 5xx (server errors). An HTTP 400 due to a payload schema bug is NOT recoverable by retrying — it will fail forever.
+This is not a critical security issue for this specific data (position maps are not sensitive — they're derived from public patent documents), but it represents an unintentional widening of access that should be deliberate, not accidental. Additionally, if a future route is added that IS sensitive (e.g., bug report contents), applying `Access-Control-Allow-Origin: *` to it would be a security bug.
+
+**Why it happens:**
+
+`corsHeaders()` was written as a one-liner helper applied uniformly to all responses. When the webapp requires CORS access to the cache route, developers confirm that `*` already works and don't audit whether `*` is appropriate for all routes.
+
+**How to avoid:**
+
+1. **Differentiate CORS headers by route sensitivity.** The `GET /cache` and webapp proxy routes: `Access-Control-Allow-Origin: *` is appropriate (public data). The `/report` route: restrict to the extension origin (`chrome-extension://...` or `moz-extension://...`) since the webapp should not call the bug-report route. Future sensitive routes should default to restrictive CORS.
+
+2. **Document the deliberate decision** in a comment in `corsHeaders()` or adjacent to the route dispatch. The decision is correct for public data routes — documenting it prevents future developers from "fixing" it unnecessarily or from accidentally applying it to sensitive routes.
+
+3. **No action needed for v6.0** beyond the documentation — the current `*` behavior is correct for the routes the webapp uses. This pitfall is a flag for the Worker design phase to explicitly acknowledge, not a blocking change.
 
 **Warning signs:**
-- The pending queue in `chrome.storage.local` grows monotonically and never empties
-- Network tab shows repeated POSTs to `pct.tonyrowles.com/report` on every page load
-- The Worker logs show a constant stream of HTTP 400 responses from the same extension install
+- A future PR adds a route with sensitive data and applies `corsHeaders()` without reconsidering the `*` origin
+- The `/report` route (which handles bug reports with potential PII fields) becomes callable from arbitrary origins
 
-**Prevention strategy:**
-
-1. **Distinguish retryable from non-retryable failures:**
-   - HTTP 5xx, network timeout, DNS failure: retryable
-   - HTTP 4xx (except 429): non-retryable — move to `bugReport:failed:${timestamp}` immediately
-   - HTTP 429 (rate limited): retryable after `Retry-After` period
-
-2. **Max retry count = 3.** After 3 failed attempts (retryable or not), mark as failed and stop. Do not expose failed reports to the user — they are for maintainer investigation only (accessible via Debug Mode's "last N reports" view in the future).
-
-3. **TTL on pending reports:** pending reports older than 7 days are dropped silently. A report that has been waiting 7 days is unlikely to be useful for debugging a current failure.
-
-4. **Queue size cap:** maximum 20 pending reports in the queue. If the queue is full (20 items), the oldest pending report is dropped to make room for the new one. This prevents unbounded queue growth from a user who submits many reports without a network connection.
-
-**Phase placement:** Phase 3 (extension-side submission). The retry policy must be implemented alongside the queue, not added later.
+**Phase to address:** Phase 1 (Worker security redesign). Address in the same phase as Pitfall 1 and Pitfall 2 — document the CORS decision per-route during the auth redesign.
 
 ---
 
-## Minor Pitfalls
+## Technical Debt Patterns
 
-### Pitfall 11: Cloudflare free-tier cost ceiling
-
-**What goes wrong:**
-
-The free tier limits are (sourced from `developers.cloudflare.com/workers/platform/pricing` and `developers.cloudflare.com/kv/platform/limits`, verified 2026-06-12):
-
-| Resource | Free Tier Limit | Reset |
-|----------|----------------|-------|
-| Worker requests | 100,000/day | 00:00 UTC |
-| Worker CPU time | 10ms/invocation | per-request |
-| KV reads | 100,000/day | 00:00 UTC |
-| KV writes | 1,000/day | 00:00 UTC |
-| KV deletes | 1,000/day | 00:00 UTC |
-| KV list operations | 1,000/day | 00:00 UTC |
-| KV storage | 1 GB total | — |
-| KV max value size | 25 MiB | — |
-
-**Binding constraint for bug reports: KV writes at 1,000/day.** Each unique report (passing dedup) is one KV write. At 1 write per report, the ceiling is 1,000 unique reports per day before KV write quota is exhausted. For this extension's user base (patent professionals, not a mass-market app), this is extremely unlikely to be hit organically. Intentional abuse could hit it.
-
-The existing Worker already uses KV for the patent position-map cache. The bug-report KV writes share the same daily quota. If the patent cache has heavy write traffic on the same day as a bug-report flood, the quotas compete. Consider using a separate KV namespace for bug reports to isolate quotas (though quotas are per-account, not per-namespace, so this is organizational rather than functional).
-
-**Realistic ceiling:** 1,000 reports/day = never reached by organic usage. The dedup fingerprint (planned) further reduces real writes. The Worker CPU time (10ms/invocation) is the more likely constraint if the fingerprint hash computation or the Discord payload construction is expensive — keep the report handler under 5ms of CPU time.
-
-**Prevention strategy:** Server-side dedup (Pitfall 4) is the primary protection. No paid-tier upgrade is needed for v1.
-
-**Phase placement:** Phase 2 (Worker). Keep the report handler CPU-lean (no synchronous computation, async KV writes via `waitUntil`).
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Copying `matching.js` into webapp instead of extracting a shared package | Faster to start webapp | Matching logic diverges silently across surfaces; 75-case corpus only validates extension | Never — the shared package IS the milestone's core value |
+| Keeping `PROXY_TOKEN` hardcoded in extension after rotating | No extension update needed for v6.0 launch | Next rotation requires another extension release cycle; token will again be in the bundle | Acceptable only if v5.1 adds a rotation mechanism; must be tracked as debt |
+| Skipping provenance (`source` field) in KV cache uploads | Simpler KV schema | Impossible to debug cross-surface cache poisoning | Never — provenance costs 1 field and enables months of future debugging |
+| Using CDN URL for pdf.worker.mjs without version-pinning | Simpler build config | CDN version could drift from installed `pdfjs-dist` version; parsing differences | Never — always pin to exact version matching `pdfjs-dist@5.5.207` |
+| No progress feedback on large PDF parse | Simpler UI | Users abandon the page on 5-30 MB PDFs, assuming it's broken | Never for production; acceptable in Phase 2 dev/testing only |
 
 ---
 
-### Pitfall 12: Architectural debt — adding new patterns that conflict with the existing extension architecture
+## Integration Gotchas
 
-**What goes wrong:**
-
-The existing extension has established patterns:
-- State persistence: `chrome.storage.local` (not a new state store)
-- Cross-origin fetches: service worker background, never content script
-- UI isolation: Shadow DOM closed mode
-- Error logging: existing `console.error` patterns in content script
-- IndexedDB graceful degradation: `idbAvailable` flag, silent fallthrough
-
-The report feature is the FIRST time the extension sends data FROM the user TO the server (all previous Worker calls are the extension REQUESTING data). This inversion creates temptation to add new infrastructure: a separate fetch wrapper, a new logging system, a new analytics-style state store. None of these are necessary.
-
-**Warning signs:**
-- A PR adds a new `lib/report-client.js` abstraction with its own `fetch` wrapper when the existing `fetch` in service-worker.js is sufficient
-- A PR adds a new `state.js` module for managing report queue state when `chrome.storage.local` is the existing state store
-- A PR adds a new error boundary system for the report dialog when the existing `try/catch` pattern is sufficient
-
-**Prevention strategy:**
-
-1. **Reuse chrome.storage.local** for the report queue. Do not add a new IndexedDB table for reports — IDB is used for patent position maps (large structured data). Reports are small JSON objects; `chrome.storage.local` is the right store.
-
-2. **No new fetch wrapper.** The service worker already fetches from `pct.tonyrowles.com` for the USPTO fallback. The report submission is a second endpoint on the same Worker. Use the same `fetch()` call pattern.
-
-3. **No new logging system.** The "recent error log ring buffer" specified in PROJECT.md should capture from `console.error` (or an existing error event handler) — not from a new wrapper that intercepts all console calls.
-
-4. **The report dialog extends the existing Shadow DOM citation UI.** The report button and category picker are new UI elements inside the existing citation-result Shadow DOM component. They do not introduce a new Shadow DOM root, a new iframe, or a new isolated context.
-
-5. **Zero new npm dependencies** (sixth consecutive milestone per PROJECT.md). This constraint rules out form-validation libraries, analytics SDKs, and retry-logic libraries. All are replaceable with ~20 LOC each in the existing style.
-
-**Phase placement:** Phase 3 (extension-side UI). Architecture review in the phase plan should explicitly list which existing patterns the new code follows.
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Worker USPTO proxy from webapp | Sending `Authorization: Bearer <token>` from browser JS | Route through server-side proxy (Cloudflare Pages Function or new Worker route) that injects the token |
+| KV cache writes from webapp | No rate limiting on `POST /cache` | Add IP-keyed rate limit (max 5 uploads/min/IP) before opening the webapp route |
+| Google Patents PDF URL | Fetching `patentimages.storage.googleapis.com` directly from webapp | Always go through Worker proxy — direct fetch is CORS-blocked |
+| PDF.js worker in webapp | Setting `workerSrc` at module scope without testing thread separation | Verify Worker thread in DevTools; use `new URL(..., import.meta.url)` or version-pinned CDN URL |
+| KV cache schema | No `source` field on webapp uploads | Include `"source": "webapp"` in all webapp-contributed cache entries |
 
 ---
 
-## Phase-Specific Warnings
+## Performance Traps
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Phase 1: Payload schema + KV design | Pitfall 1 (PII in fields) + Pitfall 3 (manifest/privacy policy) | Lock field allowlist; update manifest + privacy policy in same commit |
-| Phase 1: Worker routing | Pitfall 5 (new host_permissions) | Route on existing `pct.tonyrowles.com` domain — no manifest change needed |
-| Phase 2: Worker endpoint | Pitfall 2 (webhook URL) + Pitfall 4 (abuse/rate limit) + Pitfall 7 (Discord limits) + Pitfall 11 (cost ceiling) | `wrangler secret put` for Discord URL; server-side rate limit + dedup; truncate payloads; CPU-lean handler |
-| Phase 3: Extension-side submission UI + queue | Pitfall 6 (SW termination) + Pitfall 8 (CORS) + Pitfall 9 (trust) + Pitfall 10 (retry loop) + Pitfall 12 (arch debt) | Disk-first queue; SW-side fetch; closed Shadow DOM + URL from chrome.tabs; retry policy with max count + TTL; no new abstractions |
-| Phase 4 (any): UAT before store submission | Pitfall 3 (AMO scanner) | Run `web-ext lint` locally with updated manifest; verify `data_collection_permissions` is correct before AMO submission |
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| PDF.js main-thread fallback | UI freeze 5-20s on large patents; no error, no warning | Verify worker thread in DevTools; add startup assertion | Always, on every parse — silent from the first line of code |
+| Full 100-page sequential page parse | 10-20s total parse time with no user feedback | Progress callback; page-count aware spinner | Immediately on patents > 50 pages without feedback |
+| PDF ArrayBuffer not released after parse | Memory growth with successive patent parses in one session | Call `pdf.destroy()`; nullify ArrayBuffer reference after parse | After ~5-10 large patent parses in a single session |
+| KV write quota exhaustion | Cache uploads silently fail; position maps re-parsed on every request | Global KV write counter guard in Worker; separate namespaces | At >800 unique patent parses/day from public traffic |
 
 ---
 
-## Design-In vs. Retrofit Flags
+## Security Mistakes
 
-The following pitfalls **must be designed in** — they cannot be retrofitted without changing the KV schema, manifest, or privacy policy after initial deployment:
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Embedding `PROXY_TOKEN` (old or new) in webapp JS | Full Worker access for any attacker; KV poisoning; USPTO quota exhaustion | Server-side proxy pattern; token never in browser JS |
+| No rate limiting on webapp-accessible Worker routes | KV write quota exhaustion in hours; Worker request quota abuse | Per-IP rate limits on all routes before webapp goes public |
+| `Access-Control-Allow-Origin: *` on future sensitive routes | Arbitrary sites can read/write sensitive Worker data | Document per-route CORS decisions; restrict sensitive routes |
+| Caching published-application position maps as if they were granted-patent maps | Wrong column:line citations that look plausible | Detect publication number at input; reject at Worker level |
 
-| Pitfall | Design-in requirement |
-|---------|-----------------------|
-| Pitfall 1 (PII) | Payload field allowlist (determines KV schema shape) |
-| Pitfall 2 (webhook URL) | Worker → Discord routing (determines extension fetch target) |
-| Pitfall 3 (CWS/AMO) | Manifest `data_collection_permissions` update + privacy policy update |
-| Pitfall 6 (SW termination) | Disk-first queue design (`chrome.storage.local` key schema) |
-| Pitfall 10 (retry loop) | Retry policy (max retries, TTL, non-retryable HTTP codes) |
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **PROXY_TOKEN rotation:** token rotated in Cloudflare Worker secrets AND extension updated with new token AND old token confirmed invalid
+- [ ] **Webapp auth path:** confirm via network inspector that NO `Authorization` header appears in webapp requests to the Worker
+- [ ] **PDF.js worker thread:** confirm via DevTools Threads panel that a worker thread appears during patent PDF parsing (not main-thread only)
+- [ ] **75-case corpus on both surfaces:** corpus run against both extension build AND webapp build after core extraction; both must show 100% pass
+- [ ] **Large PDF test:** test with a real 10+ MB patent PDF in the webapp; confirm no UI freeze, confirm parsing completes correctly
+- [ ] **Published application rejection:** test with a `US20210XXXXXAN` number; webapp must show "Not supported" message, NOT a wrong citation
+- [ ] **KV rate limit:** confirm `POST /cache` from the webapp returns 429 after 5+ rapid requests from the same IP
+- [ ] **Position map provenance:** confirm KV entries from webapp include `"source": "webapp"` field
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| PROXY_TOKEN leaked in webapp JS | HIGH | Rotate immediately (`wrangler secret put`); ship extension patch with new token; audit Worker logs for anomalous requests during exposure window |
+| Matching logic drift after copy | HIGH | Run 75-case corpus on both surfaces; identify diverging cases; eliminate the copy; re-extract as shared package |
+| KV write quota exhausted | MEDIUM | Add global write-counter guard to Worker (next deploy); quota resets at 00:00 UTC — no permanent damage |
+| PDF.js main-thread fallback shipped | MEDIUM | Deploy webapp update with correct `workerSrc`; no data migration needed |
+| Published-application wrong citations in production | HIGH | Immediately add input validation to block A1/A2 kind codes; audit KV for any cached position maps from publication PDFs and delete them; ship correction before users file wrong citations in legal documents |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| 1: PROXY_TOKEN exposure | Phase 1 (BLOCKING GATE) | Network inspector confirms no `Authorization: Bearer` in webapp requests; Wrangler confirms new secret deployed |
+| 2: Public Worker without rate limiting | Phase 1 (BLOCKING GATE) | Load test confirms 429 after rate limit threshold; KV write counter guard deployed |
+| 3: Shared-core extraction behavior drift | Phase 1 (core extraction) | 75-case corpus passes identically on extension AND webapp package; baseline snapshot unchanged |
+| 4: PDF.js worker URL misconfiguration | Phase 2 (webapp PDF parsing) | DevTools Threads panel shows worker thread during parse; no UI freeze on 10+ MB PDF |
+| 5: CORS blocking Google Patents URLs | Phase 2 (webapp network) | All PDF fetches route through Worker proxy; no `patentimages.storage.googleapis.com` in network log |
+| 6: Large PDF memory/CPU pressure | Phase 2 (webapp PDF parsing) | Progress UI visible during large-PDF parse; `pdf.destroy()` called; tab stable after 5 parses |
+| 7: Matching logic re-implementation / drift | Phase 1 + Phase 3 | ESLint guard on import paths; canary test compares outputs across surfaces |
+| 8: Published-application scope creep | Phase 2 (input validation) | Entering A1/A2 number shows "Not supported"; Worker returns 400 for publication numbers |
+| 9: KV cache poisoning from webapp | Phase 2 (cache integration) | `source` field present in webapp KV writes; corpus validates webapp-parsed maps |
+| 10: CORS `*` undocumented | Phase 1 (Worker redesign) | Code comment documents per-route CORS intent; `/report` restricted to extension origins |
 
 ---
 
 ## Sources
 
-- `developers.cloudflare.com/kv/platform/limits` — KV free tier limits: 100K reads/day, 1K writes/day, 1K deletes/day, 1K list/day, 1 GB storage, 25 MiB value. Verified 2026-06-12. (HIGH confidence)
-- `developers.cloudflare.com/workers/platform/pricing/` — Worker free tier: 100K requests/day, 10ms CPU/invocation. Verified 2026-06-12. (HIGH confidence)
-- `developers.cloudflare.com/workers/configuration/secrets/` — Secret binding pattern: `wrangler secret put <KEY>`; encrypted at rest, not visible in dashboard after creation. (HIGH confidence)
-- `birdie0.github.io/discord-webhooks-guide/other/rate_limits.html` — Discord webhook rate limit: 5 requests per 2 seconds per webhook. (MEDIUM confidence — community docs, consistent with Discord API docs)
-- `discord-webhook.com/en/blog/discord-webhook-embed-limits/` — Discord embed limits: 6,000 chars total, 4,096 chars description, 1,024 chars field value, 2,000 chars message content. (MEDIUM confidence — cross-checked with Discord Webhooks Guide)
-- `developer.chrome.com/docs/webstore/program-policies/user-data-faq` — CWS: privacy policy required if any data transmitted; Limited Use compliance statement required; in-product consent required if data handling not "closely related to functionality described prominently." Updated May 22, 2025. (HIGH confidence)
-- `blog.mozilla.org/addons/2025/10/23/data-collection-consent-changes-for-new-firefox-extensions/` — Firefox: `data_collection_permissions` required in manifest for all new extensions as of November 3, 2025. (HIGH confidence)
-- `extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/` — Firefox taxonomy values: `"websiteContent"`, `"websiteActivity"`, `"technicalAndInteraction"` applicable to bug-report feature. (MEDIUM confidence — documentation page; taxonomy parsing applied from described categories)
-- `developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/local` — `chrome.storage.local` quota: 5MB Chrome (pre-114), 10MB Chrome 114+, Firefox: IndexedDB-equivalent. (HIGH confidence)
-- WebSearch + chromium-extensions group — MV3 service worker termination ~30s inactivity; disk-first storage pattern required for retry queues. (MEDIUM confidence — multiple consistent sources)
-- WebSearch — Discord markdown injection via `@everyone` in webhook payload; `allowed_mentions` recommended. (MEDIUM confidence — multiple consistent sources including Discord safety docs)
-- Direct code read: `src/manifest.json` — existing `host_permissions: ["https://pct.tonyrowles.com/*"]` confirms no new host permission needed for same-domain report endpoint. (HIGH confidence)
-- Direct code read: `src/manifest.firefox.json` — existing `data_collection_permissions: { required: ["none"] }` confirms manifest update is required when bug-report feature ships. (HIGH confidence)
+- Direct code read: `src/offscreen/offscreen.js` line 24 — PROXY_TOKEN literal string confirmed; all Worker calls use `Authorization: Bearer ${PROXY_TOKEN}`
+- Direct code read: `src/offscreen/pdf-parser.js` line 14 — `GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs')` at module scope; `chrome` would be undefined in a web page
+- Direct code read: `worker/src/index.js` lines 510-678 — Bearer auth applied to all routes; `checkIpRateLimit` only on `/report`; USPTO proxy and cache routes have no IP rate limiting; `corsHeaders()` returns `{ 'Access-Control-Allow-Origin': '*' }` applied uniformly
+- Direct code read: `worker/wrangler.toml` — no Cloudflare Rate Limiting binding; `PATENT_CACHE` and `BUG_REPORTS` KV namespaces confirmed; no `PROXY_TOKEN` or secrets in file (correctly configured via Wrangler secrets)
+- Direct code read: `src/shared/matching.js` — pure functions, zero `chrome.*` references; confirmed portable to web page context
+- Direct code read: `src/offscreen/position-map-builder.js` — pure functions, zero `chrome.*` references; confirmed portable to web page context
+- Direct code read: `src/shared/constants.js` — `WORKER_REPORT_URL` and MSG constants; no `chrome.*` dependencies at module scope
+- Direct code read: `.planning/PROJECT.md` — "Granted US patents only for v1; published applications show a clear 'not supported yet' message"; PROXY_TOKEN compromise acknowledged; "Client-side compute (PDF.js in the browser)"
+- Direct code read: `.planning/ROADMAP.md` backlog item 999.1 — open risks confirmed: "PROXY_TOKEN must be rotated before public exposure"; published-application handling deferred
+- `package.json` grep: `pdfjs-dist@5.5.207` (exact version confirmed); already a dependency, no new library needed for webapp
+- Architecture-reasoned: CORS behavior of `patentimages.storage.googleapis.com` — confirmed by browser CORS model; extension offscreen docs are not subject to CORS restrictions, plain web pages are; extension uses `host_permissions` not CORS
+- Architecture-reasoned: PDF.js `GlobalWorkerOptions.workerSrc = ''` or invalid URL causes silent main-thread fallback — consistent with PDF.js v5 documentation behavior and widely documented in PDF.js GitHub issues
+- Architecture-reasoned: KV free-tier 1,000 writes/day limit from previous research (v5.0 PITFALLS.md); applicable unchanged to v6.0 scenario
 
 ---
 
-*Pitfalls for: v5.0 Bug Report Feature — unauthenticated submission pipeline for cross-browser MV3 extension with Cloudflare Worker/KV backend*
-*Researched: 2026-06-12*
-*Confidence: HIGH on Pitfalls 1–4, 6–8, 10–11 (authoritative sources); MEDIUM on Pitfall 5 (CWS review patterns); MEDIUM on Pitfalls 9, 12 (architecture-reasoned)*
+*Pitfalls for: v6.0 Standalone Citation Webapp — adding a public client-side-PDF.js webapp to an existing cross-browser extension + Cloudflare Worker system*
+*Researched: 2026-06-16*
+*Confidence: HIGH on Pitfalls 1–3, 5–6, 10 (direct code reads); MEDIUM on Pitfalls 4, 7–9 (architecture-reasoned from code + PDF.js patterns)*

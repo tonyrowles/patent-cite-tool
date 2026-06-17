@@ -19,9 +19,9 @@
       ]
     },
     "2026-06": {
-      "invocations": 22,
-      "total_usd": 2.148301,
-      "last_invocation_iso": "2026-06-12T16:00:39.119Z",
+      "invocations": 28,
+      "total_usd": 2.825028,
+      "last_invocation_iso": "2026-06-16T16:00:52.547Z",
       "iterations": [
         {
           "iso": "2026-06-07T04:07:17.208Z",
@@ -262,6 +262,78 @@
           "tokens_out": 548,
           "iteration_n": 3,
           "run_id": "2026-06-12T16-00-03Z",
+          "phase": null,
+          "source": "e2e-explore",
+          "transport": "subscription"
+        },
+        {
+          "iso": "2026-06-15T16:00:03.852Z",
+          "model": "claude-opus-4-8[1m]",
+          "cost_usd": 0.143765,
+          "tokens_in": 25,
+          "tokens_out": 852,
+          "iteration_n": 1,
+          "run_id": "2026-06-15T16-00-03Z",
+          "phase": null,
+          "source": "e2e-explore",
+          "transport": "subscription"
+        },
+        {
+          "iso": "2026-06-15T16:00:29.099Z",
+          "model": "claude-opus-4-8[1m]",
+          "cost_usd": 0.132895,
+          "tokens_in": 25,
+          "tokens_out": 1192,
+          "iteration_n": 2,
+          "run_id": "2026-06-15T16-00-03Z",
+          "phase": null,
+          "source": "e2e-explore",
+          "transport": "subscription"
+        },
+        {
+          "iso": "2026-06-15T16:00:56.213Z",
+          "model": "claude-opus-4-8[1m]",
+          "cost_usd": 0.085484,
+          "tokens_in": 25,
+          "tokens_out": 792,
+          "iteration_n": 3,
+          "run_id": "2026-06-15T16-00-03Z",
+          "phase": null,
+          "source": "e2e-explore",
+          "transport": "subscription"
+        },
+        {
+          "iso": "2026-06-16T16:00:03.753Z",
+          "model": "claude-opus-4-8[1m]",
+          "cost_usd": 0.130645,
+          "tokens_in": 25,
+          "tokens_out": 588,
+          "iteration_n": 1,
+          "run_id": "2026-06-16T16-00-03Z",
+          "phase": null,
+          "source": "e2e-explore",
+          "transport": "subscription"
+        },
+        {
+          "iso": "2026-06-16T16:00:14.320Z",
+          "model": "claude-opus-4-8[1m]",
+          "cost_usd": 0.091029,
+          "tokens_in": 25,
+          "tokens_out": 729,
+          "iteration_n": 2,
+          "run_id": "2026-06-16T16-00-03Z",
+          "phase": null,
+          "source": "e2e-explore",
+          "transport": "subscription"
+        },
+        {
+          "iso": "2026-06-16T16:00:36.600Z",
+          "model": "claude-opus-4-8[1m]",
+          "cost_usd": 0.092909,
+          "tokens_in": 25,
+          "tokens_out": 1047,
+          "iteration_n": 3,
+          "run_id": "2026-06-16T16-00-03Z",
           "phase": null,
           "source": "e2e-explore",
           "transport": "subscription"

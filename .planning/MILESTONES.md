@@ -1,5 +1,49 @@
 # Milestones
 
+## v6.0 Standalone Citation Webapp (Shipped: 2026-06-17)
+
+**Phases completed:** 4 phases (6-9), 9 plans, ~13 tasks
+**Requirements:** 33/33 verified (SEC, WRKR, CORE, APP, FMT, BATCH, DEPLOY, PRIV)
+**Shipping state:** Webapp live in production at `https://cite.tonyrowles.com` (Cloudflare Workers Assets, `patent-cite-webapp`), coexisting with the routed `pct.tonyrowles.com` API Worker. Worker redeployed with the Phase 6 routes; `PROXY_TOKEN` rotated live. Code on `feat/bug-report`; tag `v6.0` left to the operator (doubles as store release). Local `main` is stale — `git fetch` to judge merged state via `origin/main`.
+
+**Delivered:** A standalone citation webapp — enter a granted patent number + passage, get the exact column:line citation client-side via the shared deterministic core, with no LLM and no token in the browser. Origin-header auth, cache-first lookup, batch mode, format toggle, copy-to-clipboard, and published-application rejection. Live production UAT passed (real patent → correct citation, KV cache populated, 429 rate-limit, no `Authorization` header).
+
+**Key accomplishments:**
+
+1. **Security gate + Worker auth split (Phase 6)** — rotated the compromised `PROXY_TOKEN` (build-time esbuild `__PROXY_TOKEN__` define from CI secret; literal removed from all three source files + live `wrangler secret put`); per-route Worker auth replacing the global Bearer gate (Origin-auth `GET /webapp/pdf`, dual-auth `GET /cache`, `source:"webapp"` provenance on `POST /cache`); per-IP webapp rate limit (30/60s) + global daily KV-write guard (900/day); published-application rejection (A1/A2/A9 + `20XXXXXXXX`) → HTTP 400 before any fetch.
+2. **Shared core extraction (Phase 7)** — relocated `matching.js`, `position-map-builder.js`, `pdf-parser.js` into `src/shared/` consumed by both builds; added the `configurePdfWorker(url)` injectable seam so the modules import in a plain web page without a `chrome` global; golden corpus byte-identical; CORE-04 full-pipeline browser integration test (Playwright worker-thread assertion) green.
+3. **Webapp core build (Phase 8)** — single-first UI reusing the extension aesthetic; cache-first orchestration mirroring the offscreen pipeline without chrome/Bearer; one-fetch-one-parse-N-match batch mode; confidence chips, copy/copy-all, named-stage loading, error/retry, localStorage format/prefix toggles; `--webapp-only` esbuild target → `dist/webapp/`. Zero `Authorization`/`Bearer` and zero direct USPTO/patentimages fetches (grep-guarded).
+4. **Deploy + live UAT + privacy (Phase 9)** — `npm run deploy:webapp` (Workers Assets + `cite.tonyrowles.com` custom domain); hosted privacy policy gains a "Citation Webapp" section; live production UAT passed end-to-end.
+5. **Zero new npm dependencies** — seventh consecutive milestone (PDF.js, esbuild, Wrangler already present).
+
+**Known deferred items at close:** 4 open artifacts acknowledged as out-of-v6.0-scope (3 stale pre-v6.0 quick-tasks; 1 Phase-8 `human_needed` verification resolved by Phase 9 live UAT) — see STATE.md Deferred Items. Non-blocking tech debt (pre-existing `weekly-digest-auto-fix` STATE.md test; 4 deferred code-review info items) in the v6.0 milestone audit.
+
+---
+
+## v5.0 Bug Report Feature (Shipped: 2026-06-16)
+
+**Phases completed:** 5 phases (1-5), 16 plans, 26 tasks
+**Timeline:** 4 days (2026-06-12 → 2026-06-15)
+**Lines of code:** ~2,700 source LOC (`src/` + `worker/src/`, +2704 / -43)
+**Git range:** 6ed5207 → 6abeff5 (developed on `feat/bug-report`)
+**Shipping state:** Feature code is merged to `origin/main` (squash-merge) and tagged `v5.0` (commit `63f6a76`, 2026-06-14); `src/` + `worker/src/` on `origin/main` are byte-identical to `feat/bug-report`. Only `.planning/` docs (incl. this milestone-close archival) remain unpushed on `feat/bug-report`. NOTE: local `main` is stale (`d8d54c4`, manifest 2.3.0) — `git fetch` to update.
+
+**Delivered:** End users can report citation failures from an in-product affordance; rich auto-captured diagnostic bundles route to a private Cloudflare-backed observability pipeline (`BUG_REPORTS` KV durable + Discord webhook notify) for maintainer triage — the inbound signal channel that v5.1's resumed auto-fix work will ingest. Live UAT-01..06 PROVEN against production `pct.tonyrowles.com` before close.
+
+**Key accomplishments:**
+
+1. **Worker route + KV schema + privacy compliance (Phase 1)** — `POST /report` Cloudflare Worker route with explicit PAY-01 field allowlist (no `ip`/`clientIp`/`userAgent` stored), `BUG_REPORTS` KV namespace at `report:{fingerprint}:{timestamp}` keys (90-day TTL), SHA-256 fingerprint dedup over a 15-min window (`duplicate_count`), IP-keyed transient rate limit (`rl:{ip}`, 5/60s), server-side-only Discord webhook URL; Firefox manifest `data_collection_permissions` + privacy-policy "Bug Report Feature" section + CWS store-listing reconciled (BLOCK-01/02/03 resolved)
+2. **Shared constants + pure payload builder (Phase 2)** — `src/shared/report-payload-builder.js` pure function (zero `chrome.*`) establishes the canonical payload schema contract; `MSG.SUBMIT_REPORT` / frozen `REPORT_CATEGORIES` / `WORKER_REPORT_URL` constants; Vitest-pinned for schema conformance, [Remove selection text] omission, and fingerprint reproducibility
+3. **Background transport + rate limit + retry queue (Phase 3)** — shared `report-transport.js` with disk-first `chrome.storage.local` queue, sliding-window client rate limit (5/10 min), 2s/8s/30s exponential backoff, byte-identical `SUBMIT_REPORT` dispatch across Chrome SW + Firefox background; content scripts never POST cross-origin (XPORT-06 static-grep guard); 29 new per-target tests incl. SW-death simulation
+4. **Report dialog UI + citation-UI wiring (Phase 4)** — Shadow DOM report dialog (4-category picker, note + counter, "What's included" payload preview, sticky [Remove selection text] toggle, focus trap + dismiss paths), Report button auto-surfacing on no-match/yellow/Worker-error with green-hidden invariant (TRIG-04), 20-entry error ring buffer, DOM/PDF diagnostic enrichment
+5. **Options Debug Mode + popup fallback + live UAT (Phase 5)** — options `debugMode` toggle (live per-citation read, shows Report on green), popup "Report a problem" → options `#report` page-mode dialog (same builder + flow, no Shadow DOM); live UAT-01..06 against production Worker — Discord embeds + KV records verified, no `ip` stored, `web-ext lint` clean, server-side dedup + cross-browser parity (Chrome/149 + Firefox/151) proven
+
+**Requirements:** 45/45 v1 requirements shipped. Zero new npm dependencies (sixth consecutive milestone). `assertTripleGate` body byte-unchanged; v40-auto-fix CI workflow stayed `workflow_dispatch:`-only throughout.
+
+**Known deferred items at close:** 10 items acknowledged as benign/deferred (see STATE.md `## Deferred Items (acknowledged at v5.0 milestone close 2026-06-16)`). Plus one non-blocking follow-up bug: Notes-textarea drops characters during typing (likely a missing `stopPropagation` on a content-script keydown handler) — UAT criteria still met (note text persisted). No formal `v5.0-MILESTONE-AUDIT.md` was run; close proceeded on the documented live-UAT PASS evidence in `05-UAT-RESULTS.md`.
+
+---
+
 ## v4.2 Auto-Fix Loop Live (Shipped: 2026-06-09)
 
 **Phases completed:** 5 phases (56-60), 11 plans, 11 tasks

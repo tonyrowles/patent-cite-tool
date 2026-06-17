@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CORE-04 Pipeline Harness</title>
+</head>
+<body>
+<!--
+  CORE-04 test harness.
+
+  Imports the shared core modules from /src/shared/ (served via page.route()
+  at the synthetic origin http://core04.test/**).
+
+  The pipeline is NOT triggered on page load — the test registers
+  page.on('worker') first, then calls window.__runCore04() via page.evaluate()
+  to start the pipeline. This ensures the WebWorker spawn event is captured
+  (Pitfall 5 from RESEARCH.md).
+
+  window.__core04Result__ is set when the pipeline finishes:
+    { success: boolean, citation: string|null }
+-->
+<script type="module">
+  import { configurePdfWorker, extractTextFromPdf } from '/src/shared/pdf-parser.js';
+  import { buildPositionMap } from '/src/shared/position-map-builder.js';
+  import { matchAndCite } from '/src/shared/matching.js';
+
+  window.__runCore04 = async function () {
+    try {
+      // Must call configurePdfWorker BEFORE any extractTextFromPdf call
+      // so PDF.js spawns its worker (not main-thread fallback). Pitfall 3.
+      configurePdfWorker('/src/lib/pdf.worker.mjs');
+
+      const resp = await fetch('/US6738932.pdf');
+      if (!resp.ok) {
+        window.__core04Result__ = { success: false, citation: null, error: 'fetch failed: ' + resp.status };
+        return;
+      }
+      const buf = await resp.arrayBuffer();
+
+      const pageResults = await extractTextFromPdf(buf);
+      const positionMap = buildPositionMap(pageResults);
+
+      // Verified ground-truth passage (RESEARCH.md, PLAN.md):
+      // patent: US6738932, selectedText below -> citation 1:37 at confidence 0.98
+      const result = matchAndCite(
+        'of information contained in the dumped memory image',
+        positionMap
+      );
+
+      window.__core04Result__ = {
+        success: positionMap.length > 0,
+        citation: result ? result.citation : null,
+      };
+    } catch (err) {
+      window.__core04Result__ = { success: false, citation: null, error: String(err) };
+    }
+  };
+</script>
+</body>
+</html>

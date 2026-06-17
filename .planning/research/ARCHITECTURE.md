@@ -1,625 +1,552 @@
-# Architecture Research: v6.0 Standalone Citation Webapp
+# Architecture Research
 
-**Domain:** Standalone web app integrating with an existing cross-browser MV3 extension — shared deterministic core extraction + public-facing client-side PDF processing
-**Researched:** 2026-06-16
-**Confidence:** HIGH (derived entirely from direct source reading of the production codebase, not inference or search)
-
----
-
-## System Overview: v6.0 Integration Map
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│  EXISTING EXTENSION (Chrome + Firefox)                                 │
-│  ┌─────────────────────────────────────────────────────┐               │
-│  │  src/offscreen/offscreen.js (Chrome)                │               │
-│  │  src/firefox/background.js  (Firefox)               │               │
-│  │    fetchUsptoWithRetry()  → Worker /?patent=        │               │
-│  │    checkCache()           → Worker /cache?patent=   │               │
-│  │    uploadToCache()        → Worker /cache?patent=   │               │
-│  │    extractTextFromPdf()   → @pkg/citation-core      │  [MODIFIED]   │
-│  │    buildPositionMap()     → @pkg/citation-core      │  [MODIFIED]   │
-│  │    matchAndCite()         → @pkg/citation-core      │  [MODIFIED]   │
-│  └─────────────────────────────────────────────────────┘               │
-└────────────────────────────┬───────────────────────────────────────────┘
-                             │ Bearer PROXY_TOKEN (rotated, now server-side)
-                             ↓
-┌────────────────────────────────────────────────────────────────────────┐
-│  CLOUDFLARE WORKER  pct.tonyrowles.com  (worker/src/index.js)          │
-│                                                                        │
-│  Routes:                                                               │
-│    GET  /?patent={n}           → USPTO eGrant PDF proxy                │
-│    GET  /cache?patent={n}&v={v} → KV position-map read (PATENT_CACHE)  │
-│    POST /cache?patent={n}&v={v} → KV position-map write (existence ck) │
-│    POST /report                 → bug report ingestion (BUG_REPORTS KV)│
-│                                                                        │
-│  Auth (CURRENT — MUST CHANGE before v6.0 public launch):              │
-│    Bearer PROXY_TOKEN hardcoded in src/offscreen/offscreen.js          │
-│    Same token guards ALL routes including /report and /cache           │
-│    Token is COMPROMISED (committed to source as plaintext)             │
-│                                                                        │
-│  Auth (v6.0 target — see PROXY_TOKEN Migration section):              │
-│    Extension: rotated token injected from env at build time or CI     │
-│    Webapp:    origin-check + rate limit (no embeddable secret)         │
-└────────────────────────────┬───────────────────────────────────────────┘
-                             │
-          ┌──────────────────┼──────────────────┐
-          ↓                  ↓                  ↓
-   ┌─────────────┐   ┌─────────────┐   ┌────────────────┐
-   │ PATENT_CACHE│   │ BUG_REPORTS │   │ USPTO eGrant   │
-   │ KV namespace│   │ KV namespace│   │ ODP API        │
-   │ pos-maps    │   │ reports     │   │ (PDF source)   │
-   └─────────────┘   └─────────────┘   └────────────────┘
-
-┌────────────────────────────────────────────────────────────────────────┐
-│  NEW: STANDALONE WEBAPP  tonyrowles.com/patent-cite  (v6.0)           │
-│                                                                        │
-│  Client-side browser (no backend):                                     │
-│    Input: patent number + text passage                                 │
-│    Step 1: GET /cache → position map (if cached, skip parsing)         │
-│    Step 2: if miss → GET /?patent= (PDF from Worker/USPTO)             │
-│    Step 3: if miss → fetch Google Patents PDF URL directly             │
-│    Step 4: extractTextFromPdf(arrayBuffer) from @pkg/citation-core    │
-│    Step 5: buildPositionMap(pageResults) from @pkg/citation-core      │
-│    Step 6: POST /cache (fire-and-forget upload)                        │
-│    Step 7: matchAndCite(text, positionMap) from @pkg/citation-core    │
-│    Output: column:line citation + confidence indicator                 │
-│                                                                        │
-│  Batch mode: Steps 7 only (one positionMap, multiple passages)        │
-└────────────────────────────────────────────────────────────────────────┘
-```
+**Domain:** Human-report-driven, LLM-assisted auto-fix pipeline (v6.1)
+**Researched:** 2026-06-17
+**Confidence:** HIGH — all findings sourced directly from production code and committed planning docs
 
 ---
 
-## 1. Shared-Core Extraction: Pure vs Coupled Analysis
-
-This section is derived from direct reading of the three source files.
-
-### `src/offscreen/pdf-parser.js` — Analysis
-
-**The single coupling:** Line 14 is the only browser-API dependency:
-```js
-GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.mjs');
-```
-This sets PDF.js's Web Worker URL using a Chrome extension API.
-
-**Everything else is pure:** `extractTextFromPdf(arrayBuffer)` takes an `ArrayBuffer` and returns structured page data. No DOM access, no `chrome.*` calls, no IndexedDB. The function calls `getDocument()` and `getPage()` from PDF.js — both platform-agnostic.
-
-**The seam:** Extract the `workerSrc` configuration into an **initializer function** that callers provide:
-```js
-// In @pkg/citation-core/pdf-parser.js
-export function configurePdfWorker(workerSrcUrl) {
-  GlobalWorkerOptions.workerSrc = workerSrcUrl;
-}
-export async function extractTextFromPdf(pdfData) { ... } // unchanged
-```
-The extension calls `configurePdfWorker(chrome.runtime.getURL('lib/pdf.worker.mjs'))` at startup. The webapp calls `configurePdfWorker(new URL('./pdf.worker.mjs', import.meta.url).href)` — the PDF.js worker is a static asset served from the webapp origin.
-
-**hasTextLayer():** Pure. Stays in the package as-is.
-
-### `src/offscreen/position-map-builder.js` — Analysis
-
-**Zero coupling.** The entire file — all 786 lines — is pure JavaScript with no `chrome.*`, no DOM, no IndexedDB, no globals. Every export takes plain arrays and numbers, returns plain objects.
-
-Exported functions confirmed pure:
-- `isTwoColumnPage(pageItems, pageWidth)` — pure geometry
-- `findColumnBoundary(pageItems, pageWidth)` — pure geometry
-- `extractPrintedColumnNumbers(items, pageHeight, pageWidth)` — pure text analysis
-- `filterGutterLineNumbers(items, boundary, pageWidth)` — pure filter
-- `stripCrossBoundaryText(items, boundary)` — pure transform
-- `filterHeadersFooters(items, pageHeight)` — pure filter
-- `clusterIntoLines(items, yTolerance)` — pure algorithm
-- `buildLineEntry(lineItems, pageNum, column, lineNumber)` — pure constructor
-- `detectClaimsBoundary(entries)` — pure text search
-- `detectWrapHyphens(entries)` — pure analysis
-- `extractGutterLineGrid(items, boundary, pageWidth)` — pure math
-- `assignLineNumbersByGrid(lines, entries, pageNum, column, grid)` — pure algorithm
-- `assignLineNumbers(lines, entries, pageNum, column)` — pure algorithm
-- `isLikelySpecPage(items, pageHeight)` — pure text analysis
-- `buildPositionMap(pageResults)` — pure orchestrator (entry point)
-
-**Move as-is:** The entire file moves into the shared package without modification.
-
-### `src/shared/matching.js` — Analysis
-
-**Zero coupling.** The entire file is pure JavaScript. Every function takes plain strings or arrays, returns plain objects or primitives.
-
-Exported functions confirmed pure:
-- `normalizeText(text)` — pure string transform
-- `normalizeOcr(text)` — pure string transform
-- `buildConcat(positionMap)` — pure algorithm
-- `findAllOccurrences(haystack, needle)` — pure search
-- `pickBestByContext(positions, matchLen, concat, contextBefore, contextAfter)` — pure scoring
-- `whitespaceStrippedMatch(...)` — pure matching
-- `bookendMatch(...)` — pure matching
-- `resolveMatch(...)` — pure resolver
-- `formatCitation(startEntry, endEntry)` — pure formatter
-- `fuzzySubstringMatch(needle, haystack)` — pure algorithm
-- `levenshtein(a, b)` — pure algorithm
-- `stripGutterNumbers(concat)` — pure transform
-- `gutterTolerantMatch(...)` — pure matching
-- `matchAndCite(selectedText, positionMap, contextBefore, contextAfter)` — pure entry point
-
-**Move as-is:** The entire file moves into the shared package without modification.
-
-### Package Boundary Definition
-
-**Into the shared package (`packages/citation-core/`):**
-- `position-map-builder.js` — verbatim copy
-- `matching.js` — verbatim copy
-- `pdf-parser.js` — with `configurePdfWorker()` seam added
-
-**Stays extension-only (NOT in shared package):**
-- `src/offscreen/offscreen.js` — Chrome extension message listener, IndexedDB, PROXY_TOKEN, `chrome.*` API orchestration. This is the extension adapter layer.
-- `src/firefox/background.js` — Firefox adapter layer; same logic as offscreen but in background context.
-- `src/shared/constants.js` — Extension message types (MSG.*), extension-specific constants. The webapp does not use chrome.runtime messaging.
-- `src/shared/report-payload-builder.js` — Extension-specific diagnostic context, not needed by webapp.
-- `src/shared/report-transport.js` — Extension-specific queue, not needed by webapp.
-
----
-
-## 2. Data Flow: Webapp Citation Path
-
-### Full Pipeline (Cache Miss, No Google Patents PDF)
+## System Overview
 
 ```
-User enters: patent number "US12505414B2" + passage text
-    |
-[Webapp] Step 1: GET https://pct.tonyrowles.com/cache?patent=US12505414B2&v=v3
-                 (no Authorization header — see auth section)
-    |
-    ├── CACHE HIT:  Response { entries: [...], meta: { totalLines, totalColumns, hasClaimsSection } }
-    |               Skip Steps 2-6. Go to Step 7.
-    |
-    └── CACHE MISS: 404 response
-          |
-          [Webapp] Step 2: Try Google Patents PDF URL directly
-                   fetch("https://patents.google.com/patent/US12505414B2/PDF")
-                   (no auth needed — public URL, but subject to Google rate limits)
-          |
-          ├── GOOGLE FETCH SUCCESS:
-          |     arrayBuffer = await response.arrayBuffer()
-          |     Go to Step 4.
-          |
-          └── GOOGLE FETCH FAILURE (CORS block / no link / 4xx):
-                [Webapp] Step 3: GET https://pct.tonyrowles.com/?patent=US12505414B2
-                         (Worker proxies USPTO eGrant API — auth applies here)
-                arrayBuffer = await response.arrayBuffer()
-                |
-                [Webapp] Step 4: import { extractTextFromPdf } from '@pkg/citation-core'
-                         pageResults = await extractTextFromPdf(arrayBuffer)
-                         // throws 'NO_TEXT_LAYER' if scanned PDF
-                |
-                [Webapp] Step 5: import { buildPositionMap } from '@pkg/citation-core'
-                         positionMap = buildPositionMap(pageResults)
-                         // [ { page, column, lineNumber, text, hasWrapHyphen, section, ... } ]
-                |
-                [Webapp] Step 6: POST /cache (fire-and-forget, cache miss upload)
-                         body: { entries: positionMap.map(strip-bbox), meta, cachedAt, version: 'v3' }
-                         // same strip logic as offscreen.js:uploadToCache() — only text,column,lineNumber,
-                         // page,section,hasWrapHyphen cached (no x,y,width,height)
-    |
-[Webapp] Step 7: import { matchAndCite } from '@pkg/citation-core'
-         result = matchAndCite(passage, positionMap, contextBefore='', contextAfter='')
-         // returns { citation: "4:55-5:10", confidence: 1.0, startEntry, endEntry } or null
-    |
-Display: "4:55-5:10" with green/yellow/red indicator
-         Copy-to-clipboard button
-         "No match found" message if null
-```
-
-### Batch Mode (Multiple Passages, One Patent)
-
-Steps 1-6 run once (position map obtained). Step 7 runs N times, one per passage. No additional network calls.
-
-### Cache Key Compatibility
-
-The Worker's KV cache key for position maps is:
-```js
-const key = `${version}:${patentNumber}`;
-// e.g. "v3:12505414"
-```
-
-Where `patentNumber` is the output of `cleanPatentNumber(raw)`:
-```js
-function cleanPatentNumber(raw) {
-  return raw
-    .replace(/^US/i, '')        // strip US prefix
-    .replace(/[A-Z]\d*$/i, ''); // strip kind code (B2, A1, etc.)
-}
-```
-
-And `version` is the `v` query param, defaulting to `'v1'`, currently `'v3'` (from `CACHE_VERSION` const in offscreen.js).
-
-**Cache key the webapp must use:** `v3:12505414` for patent `US12505414B2`. The webapp must apply the same `cleanPatentNumber` normalization before calling the cache endpoint. This normalization logic must be duplicated in the webapp or extracted into the shared package alongside the citation core.
-
-**Cache entry shape (what webapp receives on hit):**
-```json
-{
-  "entries": [
-    { "text": "...", "column": 1, "lineNumber": 5, "page": 3, "section": "description", "hasWrapHyphen": false }
-  ],
-  "meta": {
-    "totalLines": 1240,
-    "totalColumns": 18,
-    "hasClaimsSection": true
-  },
-  "cachedAt": 1718000000000,
-  "version": "v3"
-}
-```
-
-Note: bounding box fields (`x`, `y`, `width`, `height`) are stripped before caching (per the locked design decision in `uploadToCache()`). `matchAndCite()` does not use bbox fields — only `text`, `column`, `lineNumber`, `hasWrapHyphen`, and `section`. Cache hits are fully usable by the webapp.
-
-**Compatibility verdict:** Existing extension-populated cache entries are directly usable by the webapp. The `entries` array structure satisfies `matchAndCite()`'s positionMap contract with no transformation. The webapp and extension share the same cache namespace; popular patents parsed by extension users will cache-hit for webapp users.
-
----
-
-## 3. KV Cache Reuse: Check-Before-Parse
-
-The webapp CAN and SHOULD reuse the Worker's `PATENT_CACHE` KV namespace exactly as the extension does. The GET `/cache` route is already implemented (`worker/src/index.js` lines 561-579). The cache hit means the webapp skips Steps 2-6 entirely — no PDF download, no PDF.js parsing (which can take 3-10 seconds for long patents).
-
-**Current auth requirement:** The GET `/cache` route currently requires `Authorization: Bearer ${PROXY_TOKEN}` — the same as every other route. This must change for the webapp (see PROXY_TOKEN Migration section), because the token cannot be embedded in public webpage JavaScript.
-
-**Proposed split:** The Worker needs two auth tiers:
-- **Tier A (token-gated):** `/?patent=` (expensive — USPTO API call), `POST /cache` (write), `POST /report` (write). These require the rotated `PROXY_TOKEN` held by the extension.
-- **Tier B (public or origin-gated):** `GET /cache` (read-only, no secret exposed, no expensive upstream call). Open to the webapp with origin-header verification or no auth.
-
-Making `GET /cache` public is low risk: it returns cached position maps (no PII, no secrets). The worst case is a scraper reading cached maps, which has no meaningful security impact.
-
----
-
-## 4. PROXY_TOKEN Migration: Auth Model for Public Webapp
-
-### Current State (Must Not Ship)
-
-```js
-// src/offscreen/offscreen.js line 24
-const PROXY_TOKEN = '4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe';
-```
-
-This token is committed to the repository and used in:
-- `fetchUsptoWithRetry()` — `Authorization: Bearer ${PROXY_TOKEN}` (USPTO proxy)
-- `checkCache()` — `Authorization: Bearer ${PROXY_TOKEN}` (cache read)
-- `uploadToCache()` — `Authorization: Bearer ${PROXY_TOKEN}` (cache write)
-
-It guards ALL three routes. The Worker validates it on every non-OPTIONS request (line 526-533 of `worker/src/index.js`).
-
-### The Core Problem
-
-A public webpage cannot hold a secret. Any token embedded in webpage JavaScript is extractable by the user. The webapp needs access to `GET /cache` (read) and `GET /?patent=` (USPTO proxy) but cannot hold the same token as the extension.
-
-### Proposed Auth Model
-
-**Extension token (rotated):**
-- Rotate `PROXY_TOKEN` to a new value, injected at build time from CI secrets (not committed).
-- Extension bundles embed the new token. Extension users are trusted consumers (installed from store, not a public attack surface).
-- Continues to guard `POST /cache`, `POST /report`, `GET /?patent=` (USPTO proxy).
-
-**Webapp — no token, origin-based auth:**
-
-Option A (recommended): **Origin header verification** in the Worker.
-
-```js
-// Worker: separate public routes behind origin check
-const ALLOWED_ORIGINS = ['https://tonyrowles.com', 'https://www.tonyrowles.com'];
-const origin = request.headers.get('Origin') || '';
-
-if (path === '/cache' && request.method === 'GET') {
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    // serve cache read — no PROXY_TOKEN needed
-    return handleCacheRead(request, env);
-  }
-  return new Response('Forbidden', { status: 403 });
-}
-```
-
-Browsers enforce the `Origin` header on cross-origin requests — it cannot be forged from a webpage context. This is not a substitute for server-side secrets but is sufficient for read-only access to non-sensitive cached position maps.
-
-Option B: **Cloudflare Turnstile** (CAPTCHA-like challenge). Adds complexity, hurts UX, overkill for this use case.
-
-Option C: **Per-user API tokens** (login wall). Out of scope for v1 — webapp is public, no accounts.
-
-**For the USPTO proxy (`GET /?patent=`):**
-
-The webapp CANNOT call `GET /?patent=` directly without a token, because the USPTO API key must stay server-side. The proposed flow:
-1. Webapp first tries to fetch the PDF directly from Google Patents (free, public).
-2. If that fails (CORS, missing link, 404), webapp calls a **new public webapp proxy route** on the Worker:
-
-```
-GET /webapp/pdf?patent={n}
-```
-
-This route:
-- Requires `Origin: https://tonyrowles.com` (no token).
-- Rate-limits by IP (using the existing `rl:{ip}` pattern from the bug report handler).
-- Calls `fetchEgrantPdf()` internally (reusing existing logic).
-- Returns the PDF stream.
-
-This keeps the USPTO API key server-side while allowing public webapp access without an embeddable secret.
-
-**Summary of auth model for v6.0:**
-
-| Route | Extension auth | Webapp auth |
-|-------|---------------|-------------|
-| `GET /?patent=` | Bearer PROXY_TOKEN (rotated) | Not used (new `/webapp/pdf` route) |
-| `GET /webapp/pdf?patent=` | N/A — extension uses existing route | Origin header + IP rate limit |
-| `GET /cache?patent=&v=` | Bearer PROXY_TOKEN (rotated) | Origin header (read-only, no secret) |
-| `POST /cache?patent=&v=` | Bearer PROXY_TOKEN (rotated) | Not used (webapp uses fire-and-forget) |
-| `POST /report` | Bearer PROXY_TOKEN (rotated) | Not used in v1 webapp |
-
----
-
-## 5. Recommended Project Structure
-
-```
-patent-cite-tool/
-├── packages/
-│   └── citation-core/          # NEW — shared deterministic parsing + matching
-│       ├── package.json        # name: "@pct/citation-core", type: "module"
-│       ├── index.js            # re-exports: extractTextFromPdf, configurePdfWorker,
-│       │                       #             buildPositionMap, matchAndCite, normalizeText
-│       ├── pdf-parser.js       # MOVED from src/offscreen/pdf-parser.js
-│       │                       #   + configurePdfWorker(workerSrcUrl) seam added
-│       ├── position-map-builder.js  # MOVED from src/offscreen/position-map-builder.js
-│       └── matching.js         # MOVED from src/shared/matching.js
-│
-├── src/                        # EXISTING extension source (modified import paths only)
-│   ├── offscreen/
-│   │   ├── offscreen.js        # MODIFIED: import from @pct/citation-core; PROXY_TOKEN removed
-│   │   ├── offscreen.html
-│   │   └── (pdf-parser.js, position-map-builder.js → moved to packages/)
-│   ├── shared/
-│   │   ├── constants.js        # MODIFIED: PROXY_TOKEN removed, added WEBAPP_ORIGIN
-│   │   ├── matching.js         # DELETED after moving to packages/ (or re-exported)
-│   │   └── ...
-│   └── ...
-│
-├── webapp/                     # NEW — standalone web app
-│   ├── index.html              # Patent number input + passage textarea + citation output
-│   ├── main.js                 # App orchestration: cache check → parse → match → display
-│   ├── worker-client.js        # Worker API calls (cache read, webapp PDF proxy)
-│   ├── pdf-fetch.js            # Google Patents direct fetch → Worker fallback
-│   └── build/                  # esbuild output (bundled for static hosting)
-│
-├── worker/                     # EXISTING Cloudflare Worker (modified)
-│   ├── src/
-│   │   └── index.js            # MODIFIED: new /webapp/pdf route, split auth tiers
-│   └── wrangler.toml           # MODIFIED: PROXY_TOKEN rotated (new secret)
-│
-├── scripts/
-│   └── build.js                # MODIFIED: add webapp esbuild entry point
-└── package.json                # MODIFIED: add workspaces: ["packages/*", "webapp"]
-```
-
-### Structure Rationale
-
-- **`packages/citation-core/`:** Standard npm workspaces pattern. Lets the extension and webapp import identically (`import { matchAndCite } from '@pct/citation-core'`). esbuild resolves workspace packages via `node_modules` symlinks. No publish to npm registry needed.
-- **`webapp/`:** Sibling to `src/` rather than inside it — the webapp is a separate product, not an extension page. Prevents confusion with extension build pipeline.
-- **`worker/` unchanged:** The Worker is already a separate mini-project with its own `package.json`. Modifications are additive.
-
----
-
-## 6. Component Boundaries
-
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| `packages/citation-core/pdf-parser.js` | PDF.js text extraction from ArrayBuffer | PDF.js (external lib), called by extension offscreen + webapp |
-| `packages/citation-core/position-map-builder.js` | Transform page text items → position map | Called by extension offscreen + webapp |
-| `packages/citation-core/matching.js` | 5-tier deterministic text → citation | Called by extension offscreen + webapp |
-| `src/offscreen/offscreen.js` | Chrome extension adapter: IPC, IndexedDB, PROXY_TOKEN, fetch orchestration | `chrome.*` APIs, Worker (Bearer token), citation-core |
-| `src/firefox/background.js` | Firefox extension adapter: same as offscreen.js sans offscreen API | `chrome.*` APIs, Worker (Bearer token), citation-core |
-| `webapp/main.js` | Webapp orchestration: input → output pipeline | worker-client.js, pdf-fetch.js, citation-core |
-| `webapp/worker-client.js` | Worker API client (cache read, webapp PDF proxy) | Worker at pct.tonyrowles.com (origin-auth, no token) |
-| `webapp/pdf-fetch.js` | PDF acquisition: Google Patents direct first, Worker fallback | Google Patents CDN, worker-client.js |
-| `worker/src/index.js` | Cloudflare Worker: auth, routing, USPTO proxy, KV cache, bug reports | USPTO ODP API, PATENT_CACHE KV, BUG_REPORTS KV, Discord |
-
----
-
-## 7. Architectural Patterns
-
-### Pattern 1: Platform Adapter Over Pure Core
-
-**What:** The deterministic core (`pdf-parser.js`, `position-map-builder.js`, `matching.js`) is kept pure — zero browser APIs, zero extension APIs. Platform-specific adapters (extension offscreen, webapp main.js) wrap the core with their environment's fetch/storage/IPC mechanisms.
-
-**When to use:** Any time the same algorithm must run in multiple contexts (extension offscreen, extension background, webpage, Node.js tests). This is why the Vitest test suite already works without mocking PDF.js or chrome.* — `matching.js` was pure from the start.
-
-**Extension adapter pattern (existing, to be preserved):**
-```js
-// src/offscreen/offscreen.js
-import { extractTextFromPdf, buildPositionMap, matchAndCite } from '@pct/citation-core';
-// ... chrome.runtime.onMessage, IndexedDB, PROXY_TOKEN fetch, chrome.runtime.sendMessage
-```
-
-**Webapp adapter pattern (new):**
-```js
-// webapp/main.js
-import { extractTextFromPdf, buildPositionMap, matchAndCite, configurePdfWorker } from '@pct/citation-core';
-configurePdfWorker(new URL('./pdf.worker.mjs', import.meta.url).href);
-// ... fetch, DOM manipulation, no chrome.*, no IndexedDB
-```
-
-### Pattern 2: Cache-First, Parse-on-Miss
-
-**What:** The Worker's KV cache is checked before any PDF download or parsing. On a cache hit, the position map is returned as JSON and the expensive pipeline (PDF download + PDF.js parsing) is skipped entirely.
-
-**Existing extension implementation:** `handleCheckCache()` in `offscreen.js` — check → hit stores to IndexedDB → miss triggers PDF fetch. The webapp replicates this logic directly in `webapp/main.js` without IndexedDB (no cross-session cache needed for the webapp; browser session state is sufficient).
-
-**Cache hit rate benefit:** Patents parsed by extension users populate the shared KV. Popular patents (frequently cited in prosecution) will nearly always be cache hits for webapp users. The webapp benefits from the extension user base's parsing work.
-
-### Pattern 3: Fire-and-Forget KV Upload
-
-**What:** After client-side parsing, the position map is uploaded to the Worker's KV cache asynchronously with no error propagation. Upload failure silently falls through — the user already has their citation.
-
-**Existing pattern:** `uploadToCache()` in `offscreen.js` swallows all errors. Webapp replicates the same pattern. Same bbox-stripped payload shape (`text, column, lineNumber, page, section, hasWrapHyphen` only).
-
----
-
-## 8. New vs Modified Components
-
-### New Files
-
-| File | Context | Purpose |
-|------|---------|---------|
-| `packages/citation-core/package.json` | Build | Workspace package definition |
-| `packages/citation-core/index.js` | Shared | Re-export entry point for the shared package |
-| `packages/citation-core/pdf-parser.js` | Shared | MOVED from `src/offscreen/pdf-parser.js` + `configurePdfWorker()` seam |
-| `packages/citation-core/position-map-builder.js` | Shared | MOVED verbatim from `src/offscreen/position-map-builder.js` |
-| `packages/citation-core/matching.js` | Shared | MOVED verbatim from `src/shared/matching.js` |
-| `webapp/index.html` | Webapp | Main HTML page: inputs + output area |
-| `webapp/main.js` | Webapp | Orchestration: cache check → PDF fetch → parse → match → display |
-| `webapp/worker-client.js` | Webapp | Worker API calls without PROXY_TOKEN |
-| `webapp/pdf-fetch.js` | Webapp | Google Patents direct + Worker fallback PDF acquisition |
-
-### Modified Files
-
-| File | Change |
-|------|--------|
-| `src/offscreen/offscreen.js` | Update imports to `@pct/citation-core`; remove `PROXY_TOKEN` const (injected from build env); remove `pdf-parser.js`/`position-map-builder.js` imports |
-| `src/shared/matching.js` | Either deleted (after moving to packages/) or replaced with re-export: `export * from '@pct/citation-core/matching.js'` |
-| `src/offscreen/pdf-parser.js` | Either deleted or becomes a re-export shim calling `configurePdfWorker(chrome.runtime.getURL(...))` then re-exporting |
-| `src/offscreen/position-map-builder.js` | Either deleted or becomes a re-export shim |
-| `worker/src/index.js` | Add `GET /webapp/pdf` route (origin-auth, no PROXY_TOKEN); split auth: existing routes keep Bearer token, `/cache` GET and `/webapp/pdf` use origin check; rotate PROXY_TOKEN |
-| `worker/wrangler.toml` | PROXY_TOKEN rotated via `wrangler secret put PROXY_TOKEN` (new value, never committed) |
-| `scripts/build.js` | Add webapp esbuild entry point (`webapp/main.js` → `webapp/build/bundle.js`) |
-| `package.json` (root) | Add `"workspaces": ["packages/*", "webapp"]` |
-| `vitest.config.js` (and chrome/firefox variants) | Update alias paths from `src/shared/matching.js` to `@pct/citation-core/matching.js` |
-
----
-
-## 9. Build Order
-
-The security gate (PROXY_TOKEN rotation) MUST complete before the webapp is publicly deployed. All other work can proceed in the order below.
-
-### Gate: PROXY_TOKEN Rotation (Blocking — Do First)
-
-**Why blocking:** The current token is committed to the repo and must not be embedded in any new public-facing artifact. The webapp JavaScript will be publicly readable. The rotation must happen before any webapp code that calls the Worker is shipped.
-
-**What rotation requires:**
-1. Generate a new token value (not committed — stored only in Cloudflare Worker secrets and CI environment secrets).
-2. `wrangler secret put PROXY_TOKEN` → deploy updated Worker (the old token immediately stops working).
-3. Update the extension build pipeline to inject `PROXY_TOKEN` from CI env rather than hardcoding in source.
-4. Add the Worker's origin-auth changes for `/cache` GET and `/webapp/pdf` in the same Worker deploy.
-
-### Phase 1: Shared-Core Extraction (Foundation, Do After Gate)
-
-**What:** Move `pdf-parser.js`, `position-map-builder.js`, `matching.js` into `packages/citation-core/`. Update extension imports. Run full golden corpus (75 cases) to verify zero behavior change.
-
-**Blocking:** Everything else. The webapp imports from `@pct/citation-core` — the package must exist before the webapp can be built.
-
-**Parallelizable within phase:** The three file moves are independent. The `configurePdfWorker()` seam on `pdf-parser.js` is the only non-trivial change.
-
-**Done when:** `npm test` passes identically to pre-extraction. The golden baseline (`tests/golden/baseline.json`) must pass at 100% — this is the correctness guard for the refactor.
-
-### Phase 2: Webapp Core (After Phase 1)
-
-**What:** Build `webapp/` — HTML, `main.js`, `worker-client.js`, `pdf-fetch.js`, esbuild config. This is the new product.
-
-**Parallelizable with:** Phase 3 (Worker changes) can start in parallel because the webapp's Worker client code just calls HTTP endpoints — it doesn't need the Worker to be updated yet for development/testing (can stub).
-
-**Done when:** The webapp loads in a browser, accepts a patent number + passage, fetches a PDF (from Google Patents), parses it with PDF.js, and returns a citation.
-
-### Phase 3: Worker Auth Split (After Gate, Parallel with Phase 2)
-
-**What:** Add `GET /webapp/pdf` route with origin-auth + IP rate limit; make `GET /cache` accept both Bearer token (extension) and origin header (webapp). Deploy to production Worker.
-
-**Critical path:** Must be deployed before the webapp goes to production (webapp needs `/webapp/pdf` and unauth'd cache reads). Can be developed and tested against a staging Worker while Phase 2 is in progress.
-
-**Done when:** Webapp can fetch position maps from cache and fetch PDFs via Worker without any Bearer token.
-
-### Phase 4: Webapp Production Deploy (After Phases 2 + 3)
-
-**What:** Deploy `webapp/build/bundle.js` as a static asset to `tonyrowles.com/patent-cite`. Configure CORS headers on the hosting so the origin-auth in the Worker matches.
-
-**Done when:** End-to-end live test: real patent number → real citation → KV cache populated for subsequent users.
-
-### Dependency Graph
-
-```
-PROXY_TOKEN Gate (must complete before any public deployment)
-    |
-    ├── Phase 1: Shared-core extraction
-    |       |
-    |       └── Phase 2: Webapp core (webapp/*)
-    |                           |
-    ├── Phase 3: Worker auth split ──────────┘
-    |
-    └── Phase 4: Production deploy (requires Phase 2 + Phase 3 complete)
+  INBOUND SIGNAL (sole fix-candidate source)
+  ─────────────────────────────────────────────────────────────────────
+  Extension users
+      │  POST /report (Bearer PROXY_TOKEN)
+      ▼
+  Cloudflare Worker (pct.tonyrowles.com)
+      │  buildKvRecord() allowlist strip  ·  SHA-256 fingerprint  ·  15-min dedup
+      │  IP rate-limit (rl:{ip}, 5/60s)  ·  Discord triage card (best-effort)
+      ▼
+  BUG_REPORTS KV namespace
+  report:{fingerprint}:{timestamp}  (90-day TTL)
+
+  ─────────────────────────────────────────────────────────────────────
+  TRIAGE LAYER (new in v6.1)
+  ─────────────────────────────────────────────────────────────────────
+  scripts/ingest-reports.mjs   ← polls KV via wrangler --remote (like review-reports.mjs)
+      │
+      ├─► Auto-triage classifier
+      │       real citation bug?
+      │         YES → PROMOTE (write promoted:{fp}:{ts} to BUG_REPORTS, or file GitHub Issue)
+      │         NO  → mark status:noise|dupe|user-error in KV _review field
+      │
+      └─► [HUMAN GATE 1] manual-promote escape hatch
+              node scripts/ingest-reports.mjs promote <fp> <ts>
+              (maintainer runs locally; bypasses auto-triage verdict)
+
+  ─────────────────────────────────────────────────────────────────────
+  CANDIDATE STATE (new in v6.1) — lives as GitHub Issue
+  ─────────────────────────────────────────────────────────────────────
+  Promoted reports → GitHub Issue (label: report-fix-candidate)
+      body: fingerprint, KV key, patent number, selection, returned citation,
+            confidence tier, error log, maintainer note
+      State transitions via labels:
+        report-fix-candidate  →  fix-in-progress  →  auto-fix:verified  →  CLOSED
+
+  ─────────────────────────────────────────────────────────────────────
+  ANALYSIS + FIX GENERATION (new in v6.1)
+  ─────────────────────────────────────────────────────────────────────
+  .github/workflows/v61-report-fix.yml
+      Trigger: issues.labeled == 'report-fix-candidate'
+      │
+      ├─ Fetch full KV record via wrangler --remote (has errorLog, xpathNode, etc.)
+      ├─ LLM analysis via invokeAnthropicSdkWithLedger
+      │       system: REPORT_FIX_SCAFFOLD (targets matching.js / position-map-builder.js)
+      │       user: KV record fields wrapped in <report_data> XML tags (prompt-injection defense)
+      ├─ Candidate diff output  (≤ 200 LOC src/ per existing diff-guard)
+      ├─ Ledger write → commit to main [skip ci]  (two-commit-split pattern)
+      └─ peter-evans/create-pull-request@v8  (draft, branch: auto-fix/<issue>-<fp8>)
+
+  ─────────────────────────────────────────────────────────────────────
+  REGRESSION SAFETY GATE (existing, reused)
+  ─────────────────────────────────────────────────────────────────────
+  .github/workflows/v40-verifier-gate.yml  (MODIFIED — scope-gate extended to auto-fix/* from
+                                            both 'triage'-sourced AND 'report-fix-candidate'-sourced issues)
+      Trigger: pull_request opened/synchronize on auto-fix/* branches
+      │
+      ├─ diff-guard (forbidden paths, ≤200 LOC src/, ≤50 LOC tests/, TEST_CASES count)
+      ├─ verifier-gate job: 3× affected-case runs at Tier A/B  (verify-single-case.mjs)
+      │       verifier files pinned to origin/main
+      │       regression: 75-case golden corpus + test-cases-quarantine.js
+      ├─ regression-suite job: full 75-case Playwright suite (parallel)
+      └─ ready-flip: draft → ready-for-review + auto-fix:verified label
+
+  ─────────────────────────────────────────────────────────────────────
+  [HUMAN GATE 2] MERGE GATE
+  ─────────────────────────────────────────────────────────────────────
+  Maintainer reviews ready-for-review PR
+      verifier-gate: PASS + regression: CLEAN → maintainer approves + merges
+      (branch-protection ruleset 17086676 on main: required status check "verifier-gate")
+
+  ─────────────────────────────────────────────────────────────────────
+  POST-MERGE (existing, reused)
+  ─────────────────────────────────────────────────────────────────────
+  .github/workflows/v40-auto-promote.yml  (MODIFIED — triple-gate extended to accept
+                                           'report-fix-candidate' as the triage-source leg)
+      Trigger: pull_request closed + auto-fix:verified label
+      │
+      ├─ assertTripleGate (verified label + merged + report-fix-candidate source)
+      ├─ runPromote → quarantine → golden corpus promotion
+      └─ auto-promote/* PR → [human merges tests/test-cases.js mutation]
 ```
 
 ---
 
-## 10. Anti-Patterns to Avoid
+## Component Responsibilities
 
-### Anti-Pattern 1: Forking the Deterministic Core
-
-**What people do:** Copy `matching.js` into `webapp/matching.js` instead of extracting to a shared package. Fast short-term, catastrophic long-term.
-
-**Why it's wrong:** Any algorithm fix or corpus improvement must be applied in two places. The golden baseline only guards the extension copy. Drift is guaranteed over time — the webapp silently diverges from the extension's behavior.
-
-**Do this instead:** Complete the workspace extraction (Phase 1) first, even if it adds a few days. Shared package means one fix, both callers improved.
-
-### Anti-Pattern 2: Embedding PROXY_TOKEN in Webapp JS
-
-**What people do:** Use the same PROXY_TOKEN in the webapp's worker-client.js for simplicity, since it "already works" for the extension.
-
-**Why it's wrong:** Webpage JavaScript is publicly readable. The token protects the USPTO API key and the KV write quota. An exposed token means anyone can POST arbitrary position maps to PATENT_CACHE, submit unlimited bug reports bypassing rate limits, and exhaust the Cloudflare KV write quota.
-
-**Do this instead:** Split the auth model as described above — origin-check for webapp read-only routes, rotate the token and inject it only into the extension build pipeline.
-
-### Anti-Pattern 3: Storing PDFs in the Browser or KV
-
-**What people do:** Cache the raw PDF ArrayBuffer in sessionStorage or localStorage to avoid re-fetching on batch mode.
-
-**Why it's wrong:** Patent PDFs are 5-30 MB. `localStorage` quota is typically 5-10 MB per origin — one patent can fill it. KV storage of raw PDFs is explicitly out of scope per the project's locked decision. Session memory (in-JS variable) is fine for the duration of a session but should not be persisted.
-
-**Do this instead:** Cache only the position map in memory (JS object) for the duration of the batch session. The position map is 10-100 KB. On page reload, let the KV cache hit handle it.
-
-### Anti-Pattern 4: Making GET /cache Require No Auth At All
-
-**What people do:** Remove the PROXY_TOKEN auth from GET /cache globally (including for extension callers) to simplify the auth model.
-
-**Why it's wrong:** While cache reads are low-risk, removing auth entirely exposes the Worker to being used as a public USPTO patent lookup proxy by scraping the cache GET endpoint at volume, running up Cloudflare KV read costs. The origin-check tiers the auth correctly.
-
-**Do this instead:** GET /cache accepts EITHER a valid Bearer PROXY_TOKEN (extension path) OR a valid `Origin: https://tonyrowles.com` header (webapp path). Both work; neither leaves the endpoint fully open.
-
-### Anti-Pattern 5: Skipping the Corpus Guard on Extraction
-
-**What people do:** Move the three files to the shared package, update imports, and ship — trusting that "it's just a move."
-
-**Why it's wrong:** The `configurePdfWorker()` seam in `pdf-parser.js` is a behavior change. Path resolution changes between extension bundle and webapp bundle can affect the PDF.js worker load. Import aliases in Vitest configs reference `src/shared/matching.js` by path — stale after the move. A silent Vitest alias failure means the tests pass against the old source, not the new package.
-
-**Do this instead:** After extraction, run `npm test` in full (all four test suites: `test:src`, `test:chrome`, `test:firefox`, `test:lint`). Verify 75-case golden baseline passes at 100%. Check the Vitest alias configs (`vitest.config.js`, `vitest.config.chrome.js`, `vitest.config.firefox.js`) are updated to point to the new package paths.
+| Component | Status | Responsibility |
+|-----------|--------|----------------|
+| Cloudflare Worker `POST /report` | EXISTING (unmodified) | Receives extension reports; fingerprints, deduplicates, writes to BUG_REPORTS KV; Discord notify |
+| `BUG_REPORTS` KV namespace | EXISTING (unmodified) | Durable store for `report:{fp}:{ts}` records (90-day TTL); `_review.status` field carries triage state |
+| `scripts/review-reports.mjs` | EXISTING (unmodified) | Maintainer CLI to read/filter/export KV records; writes `_review.status` back |
+| `scripts/ingest-reports.mjs` | NEW | Polls KV for new reports; runs auto-triage classifier; auto-promotes real bugs OR marks noise; exposes `promote` subcommand for manual-promote escape hatch |
+| Auto-triage classifier (inside ingest-reports.mjs) | NEW | Heuristic-first classification: inaccurate_citation + confidence-tier red/yellow + non-empty errorLog → likely real bug; `no_match` with no errorLog → possible user error; dupe detection via duplicate_count |
+| GitHub Issue (report-fix-candidate label) | NEW | Candidate state store: one issue per promoted report; body carries fingerprint, KV key, diagnostic fields; label transitions track pipeline state |
+| `.github/workflows/v61-report-fix.yml` | NEW | Issue-triggered LLM analysis + fix generation; fetches full KV record; calls LLM with REPORT_FIX_SCAFFOLD; produces auto-fix branch + draft PR; two-commit ledger split |
+| `REPORT_FIX_SCAFFOLD` in fix-prompt-builder.js | NEW | Prompt scaffold targeting matching.js / position-map-builder.js; XML-wraps KV diagnostic fields as `<report_data>`; constrained to FORBIDDEN_PATHS diff-guard |
+| `v40-verifier-gate.yml` | MODIFIED | Scope-gate check extended from `triage`-sourced only to also accept `report-fix-candidate`-sourced PRs; all four jobs unchanged |
+| `v40-auto-promote.yml` | MODIFIED | Triple-gate Leg 3 extended: accepts `report-fix-candidate` label on source issue (alongside legacy `triage`) |
+| `tests/e2e/.llm-spend-ledger.json` | EXISTING (unmodified format) | Ledger entries from v61-report-fix.yml get `source: 'report-fix-api'` to distinguish from old `'auto-fix-api'` entries; budget caps enforced as before |
+| Golden corpus (tests/test-cases.js, 75 cases) | EXISTING (unmodified) | Regression guard; verifier-gate runs all 75 cases on every auto-fix/* PR |
+| Quarantine corpus (tests/e2e/test-cases-quarantine.js) | EXISTING (unmodified) | Holds promoted-but-not-yet-golden cases; auto-promote PR mutates test-cases.js when merged |
+| `scripts/review-reports.mjs` promote subcommand | MODIFIED (additive) | Add `promote` as a new subcommand that fires the same GitHub Issue creation that ingest-reports.mjs would produce automatically — the manual-promote escape hatch |
 
 ---
 
-## 11. Integration Points: Exact File/Function Names
+## Data Flow: End-to-End Pipeline
 
-| New Webapp Code | Integrates With | Integration Point |
-|----------------|----------------|-------------------|
-| `webapp/main.js` | `@pct/citation-core` | `import { configurePdfWorker, extractTextFromPdf, buildPositionMap, matchAndCite }` |
-| `webapp/worker-client.js` | `worker/src/index.js` | `GET /cache?patent={n}&v=v3` with `Origin` header; `GET /webapp/pdf?patent={n}` with `Origin` header |
-| `webapp/pdf-fetch.js` | Google Patents CDN | `fetch('https://patents.google.com/patent/US{n}/PDF')` — public, no auth |
-| `worker/src/index.js` | `webapp/worker-client.js` | New route `GET /webapp/pdf` — origin-auth; modified `GET /cache` — accepts origin OR Bearer |
-| Extension `src/offscreen/offscreen.js` | `@pct/citation-core` | Replace: `import { extractTextFromPdf } from './pdf-parser.js'` → `import { extractTextFromPdf } from '@pct/citation-core'` (+ same for buildPositionMap, matchAndCite) |
-| Extension `src/offscreen/offscreen.js` | PROXY_TOKEN | Replace hardcoded const with `process.env.PROXY_TOKEN` (injected by esbuild `define` in build.js) |
-| `packages/citation-core/pdf-parser.js` | `configurePdfWorker()` seam | Called by extension: `configurePdfWorker(chrome.runtime.getURL('lib/pdf.worker.mjs'))` |
-| `packages/citation-core/pdf-parser.js` | `configurePdfWorker()` seam | Called by webapp: `configurePdfWorker(new URL('./pdf.worker.mjs', import.meta.url).href)` |
+### Stage 1: Report Intake (EXISTING, NO CHANGES)
+
+```
+Extension user triggers report dialog
+    → POST /report to pct.tonyrowles.com (Bearer PROXY_TOKEN)
+    → Worker: rate-limit check (rl:{ip}) → fingerprint → dedup check
+    → BUG_REPORTS.put("report:{fp}:{ts}", kvRecord, {expirationTtl: 7776000})
+    → Discord embed (best-effort, ctx.waitUntil)
+    → 201 {ok:true, fingerprint, deduped:false}
+```
+
+KV record shape (20 fields defined by report-schema.md):
+- `category`: inaccurate_citation | no_match | tool_not_working | other
+- `selectionText`, `returnedCitation`, `confidenceTier`
+- `errorLog` (ring buffer, max 20 entries)
+- `xpathNode`, `scrollY`, `viewportWidth`, `viewportHeight`
+- `pdfParseStatus`, `triggerMode`
+- `duplicate_count`, `fingerprint`, `timestamp`
+
+### Stage 2: Triage (NEW)
+
+```
+Scheduled or maintainer-triggered:
+  node scripts/ingest-reports.mjs [--since 7d] [--category inaccurate_citation]
+
+    → wrangler kv key list --remote (prefix: report:)
+    → filter: status == 'open' AND timestamp > last-run watermark
+    → for each report:
+        auto-triage(record) → { verdict: 'promote'|'noise'|'dupe'|'user-error', reason }
+        if verdict == 'promote':
+            create GitHub Issue (label: report-fix-candidate)
+            mark KV record _review.status = 'triaged'
+        else:
+            mark KV record _review.status = verdict
+```
+
+Auto-triage heuristics (cheap, no LLM):
+- `category == 'inaccurate_citation'` AND `confidenceTier IN ['green','yellow']`
+  AND `returnedCitation != null`: high signal for real bug
+- `duplicate_count >= N` (configurable, e.g. 3): real recurrence, promote
+- `pdfParseStatus == 'error'` AND `errorLog.length > 0`: tool failure, check if fixable
+- `category == 'no_match'` AND `errorLog.length == 0`: likely user-error, skip
+- `category == 'other'`: check errorLog; promote if errorLog contains known patterns
+
+Manual-promote escape hatch:
+```
+node scripts/ingest-reports.mjs promote <fp> <ts> [--note "reason"]
+  OR
+node scripts/review-reports.mjs promote <fp> <ts> [--note "reason"]
+```
+Creates the GitHub Issue directly, bypassing the auto-triage verdict.
+
+### Stage 3: Candidate State (GitHub Issue)
+
+One GitHub Issue per promoted report.
+
+Issue body (structured for machine parsing, human readable):
+```
+<!-- fp: {12-hex-fingerprint} -->
+<!-- kv-key: report:{fp}:{ts} -->
+<!-- patent: {patentNumber} -->
+
+**Selection:** {selectionText | "(removed by user)"}
+**Returned citation:** {returnedCitation | "(none)"}
+**Confidence:** {confidenceTier}
+**Category:** {category}
+**PDF parse status:** {pdfParseStatus}
+
+**Error log (last {N}):**
+{errorLog entries}
+
+**Maintainer note:** {note from promote command}
+```
+
+Labels applied at creation: `report-fix-candidate`
+
+State machine via labels:
+```
+report-fix-candidate  (auto-promote or manual-promote creates issue)
+    → fix-in-progress   (v61-report-fix.yml adds when dispatched)
+    → auto-fix:verified (v40-verifier-gate.yml ready-flip adds)
+    → CLOSED            (v40-auto-promote.yml closes after promote PR merged)
+```
+
+### Stage 4: LLM Analysis + Fix Generation (NEW)
+
+Triggered by `issues.labeled` == `report-fix-candidate`.
+
+```
+v61-report-fix.yml:
+  1. Pre-check: issue has report-fix-candidate label + ANTHROPIC_API_KEY present
+  2. Checkout main (full depth)
+  3. Fetch full KV record: wrangler kv key get --remote {kv-key from issue body}
+  4. Run invokeAnthropicSdkWithLedger with REPORT_FIX_SCAFFOLD
+       system: instructions + FORBIDDEN_PATHS + src/shared/ file contents
+       user: <report_data>{KV record JSON}</report_data>
+              + <source_files>{matching.js + position-map-builder.js}</source_files>
+  5. Parse diff from response (DIFF_FENCE_START / DIFF_FENCE_END markers)
+  6. git apply --check → diff-guard → git apply
+  7. Ledger entry: source: 'report-fix-api', fingerprint (12-hex)
+  8. Two-commit split:
+       a. git commit .llm-spend-ledger.json to main [skip ci]
+       b. cpr@v8: branch auto-fix/{issue}-{fp8}, draft PR
+  9. Cross-link PR on source issue + add fix-in-progress label
+```
+
+REPORT_FIX_SCAFFOLD targets only:
+- `src/shared/matching.js`
+- `src/shared/position-map-builder.js`
+- `src/shared/pdf-parser.js` (read-only context; fixes here allowed but rare)
+
+The scaffold does NOT touch:
+- `tests/` (diff-guard LOCKED path)
+- `tests/test-cases.js` (diff-guard LOCKED path)
+- `tests/golden/baseline.json` (diff-guard LOCKED path)
+- `worker/` (diff-guard LOCKED path)
+- `src/shared/report-*.js` (not the matching core)
+- `scripts/` (diff-guard LOCKED path)
+- `.github/` (diff-guard LOCKED path)
+
+### Stage 5: Regression Safety Gate (EXISTING, SCOPE EXTENDED)
+
+`v40-verifier-gate.yml` fires on every `pull_request` to `auto-fix/*` branches.
+
+The scope-gate check at line ~80 currently reads:
+```bash
+if [[ "${{ github.head_ref }}" == auto-fix/* ]]; then
+```
+
+This already matches report-fix-sourced branches (same `auto-fix/` prefix). The only modification needed: the diff-guard scope decision within the workflow filters by branch prefix, not by issue label. So v6.1 auto-fix branches are automatically covered.
+
+Four-job structure (unchanged):
+1. `diff-guard`: FORBIDDEN_PATHS bank + ≤200 LOC src/ + ≤50 LOC tests/ + TEST_CASES count
+2. `verifier-gate`: 3× affected-case runs at Tier A/B (parallelized with job 3)
+3. `regression-suite`: full 75-case Playwright run on PR branch
+4. `ready-flip`: draft → ready + `auto-fix:verified` label (BLOCKER-01 producer)
+
+The `v40-verifier-gate` name is pinned as a required status check on ruleset 17086676. Do not rename.
+
+### Stage 6: Human Merge Gate
+
+```
+Maintainer sees ready-for-review PR
+    ├── verifier-gate:  PASS (auto-fix:verified label present)
+    ├── regression-suite: CLEAN
+    ├── diff visible: only matching.js / position-map-builder.js changed
+    └── maintainer merges (required by branch-protection ruleset 17086676)
+```
+
+Branch protection ruleset 17086676 on `main`:
+- Required status check: `verifier-gate` (job name in v40-verifier-gate.yml)
+- Required status check: `deps-update-gate` (job name in v40-deps-update.yml)
+- No bypass actors except break-glass runbook (§7 in docs/)
+- PROXY_TOKEN and ANTHROPIC_API_KEY as repo secrets
+
+CI cannot merge to main autonomously. All pushes to main via human-approved PR or the specific two-commit-split `[skip ci]` ledger pattern (which only touches `.llm-spend-ledger.json`).
+
+### Stage 7: Post-Merge Auto-Promote (EXISTING, TRIPLE-GATE EXTENDED)
+
+`v40-auto-promote.yml` fires on `pull_request.closed` where PR was merged and carried `auto-fix:verified`.
+
+Triple-gate (Leg 3 modification):
+```
+Leg 1: PR carries 'auto-fix:verified'           (v40-verifier-gate.yml producer)
+Leg 2: pull_request.merged === true             (not close-without-merge)
+Leg 3: source issue carries 'triage'            ← EXTEND to also accept 'report-fix-candidate'
+```
+
+Implementation: the Leg 3 label check in `scripts/auto-fix-promote.mjs`'s `assertTripleGate()` must accept either `triage` or `report-fix-candidate` as the qualifying label on the source issue. The `assertTripleGate` body sha256 pinned by tests; any change here requires the Vitest test update in `tests/unit/`.
+
+Post-merge flow:
+```
+assertTripleGate (extended)
+    → runPromote: quarantine-append → promote from quarantine → test-cases.js mutation
+    → cpr@v8: auto-promote/{issue}-{pr} branch, non-draft PR
+    → maintainer merges auto-promote PR (tests/test-cases.js mutation)
+    → gh issue close source issue
+    → post-merge verifier re-check on origin/main HEAD
+```
+
+---
+
+## Human Gate Placement (Precise)
+
+| Gate | When | Mechanism | Who |
+|------|------|-----------|-----|
+| **GATE 1a** (auto-triage verdict) | After Stage 2 classifier runs | Reports classified as real bugs auto-promote; everything else requires explicit override | Automatic (no human needed for happy path) |
+| **GATE 1b** (manual-promote escape hatch) | Any time after a report exists in KV | `ingest-reports.mjs promote <fp> <ts>` OR `review-reports.mjs promote <fp> <ts>` | Maintainer runs locally |
+| **GATE 2** (merge gate) | After verifier-gate PASS + regression CLEAN | Branch-protection ruleset 17086676; maintainer approves + merges PR | Maintainer in GitHub UI |
+| **GATE 3** (auto-promote PR merge) | After GATE 2 merge triggers auto-promote | Separate auto-promote/* PR for `tests/test-cases.js` mutation; CODEOWNERS on tests/ | Maintainer merges second PR |
+
+Gates 2 and 3 are unchanged from the v4.0 architecture. Only GATE 1 is new.
+
+---
+
+## Candidate State Storage Decision
+
+**Decision: GitHub Issues (not KV-only, not committed files)**
+
+Rationale:
+
+| Option | Verdict | Reason |
+|--------|---------|--------|
+| BUG_REPORTS KV only | REJECT | KV has 90-day TTL; no GitHub notification system; cannot trigger GitHub Actions workflows; no structured label-state machine; wrangler --remote required for every read |
+| Committed JSON file (`promoted-reports.json`) | REJECT | Every promote would need a commit to main, violating the branch-protection ruleset (needs PR); creates commit noise; no native issue/PR cross-linking |
+| GitHub Issues (recommended) | ACCEPT | Workflow triggers work natively on `issues.labeled`; label-based state machine matches existing v4.0 pattern exactly; fingerprint in issue body line 1 is the established convention; issue body carries all diagnostic fields needed for LLM analysis; cross-links to auto-fix PR via issue comments; maintainer triage UI already built around GitHub Issues |
+
+The GitHub Issue is the state-transition hub. The BUG_REPORTS KV record remains the ground-truth diagnostic bundle (full errorLog, xpathNode, etc.) — the issue body carries a pointer (`<!-- kv-key: report:{fp}:{ts} -->`) so the workflow can fetch the complete record at analysis time.
+
+---
+
+## CI Mutates Source Under the Existing Branch-Protection Ruleset
+
+This is the load-bearing constraint inherited from v4.0.
+
+The branch-protection ruleset on `main` (id 17086676) blocks all direct pushes except:
+1. The `[skip ci]` two-commit-split pattern for `tests/e2e/.llm-spend-ledger.json` (the ONLY file)
+2. Human-approved PRs
+
+The v6.1 pipeline does not change this. The auto-fix workflow (`v61-report-fix.yml`) uses the SAME two-commit-split pattern from `v40-auto-fix.yml`:
+
+```
+Step A: git checkout main && git add .llm-spend-ledger.json
+        git commit -m "[skip ci] ledger: report-fix issue-{N}"
+        git push origin main          ← only ledger file, skip-ci marker
+Step B: git checkout auto-fix/{branch}
+        git rebase main
+        → cpr@v8 snapshots ledger-CLEAN working tree
+        → PR diff contains ONLY src/shared/ changes
+```
+
+The diff-guard in `v40-verifier-gate.yml` rejects PRs that touch `tests/e2e/.llm-spend-ledger.json`, which is why the ledger must be committed to main first (the verifier checks `git diff origin/main..HEAD` for LOCKED paths).
+
+The FORBIDDEN_PATHS bank (from `scripts/check-diff-guard.mjs`) locks:
+- `tests/test-cases.js`
+- `tests/golden/baseline.json`
+- `tests/e2e/lib/pdf-verifier.js`
+- `tests/e2e/lib/pdf-fetch.js`
+- `tests/e2e/.llm-spend-ledger.json`
+- `scripts/` directory
+- `.github/` directory
+
+The candidate fix may only touch `src/shared/` — specifically `matching.js`, `position-map-builder.js`, and `pdf-parser.js`. This is enforced by both the diff-guard LOCKED path check AND the REPORT_FIX_SCAFFOLD's explicit instructions.
+
+The `contents: write` permission on `v61-report-fix.yml` is the same requirement as `v40-auto-fix.yml`. The ledger commit to main requires this; cpr@v8 requires it for branch push.
+
+---
+
+## New vs Modified Components
+
+### NEW (build from scratch in v6.1)
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| `scripts/ingest-reports.mjs` | `scripts/` | KV polling, auto-triage, GitHub Issue creation, manual-promote `promote` subcommand |
+| Auto-triage classifier | inside `ingest-reports.mjs` | Heuristic-first; no LLM for triage; cheap, deterministic |
+| `REPORT_FIX_SCAFFOLD` | `tests/e2e/lib/fix-prompt-builder.js` | New scaffold entry targeting matching.js / position-map-builder.js, guided by KV diagnostic bundle |
+| `.github/workflows/v61-report-fix.yml` | `.github/workflows/` | Issue-triggered LLM analysis + fix generation workflow; mirrors v40-auto-fix.yml structure |
+| Vitest tests for new components | `tests/unit/` + `tests/e2e/scripts/` | Schema guards, scaffold tests, YAML contract tests for v61-report-fix.yml |
+
+### MODIFIED (additive changes to existing code)
+
+| Component | Location | What Changes |
+|-----------|----------|-------------|
+| `scripts/auto-fix-promote.mjs` | `scripts/` | `assertTripleGate()` Leg 3 extended to accept `report-fix-candidate` alongside `triage` |
+| `scripts/review-reports.mjs` | `scripts/` | Add `promote` subcommand as manual-promote escape hatch |
+| `.github/workflows/v40-auto-promote.yml` | `.github/workflows/` | `if:` filter: OR-branch for `report-fix-candidate` label |
+| `tests/unit/` gate tests | `tests/unit/` | Update Vitest assertions that pin `assertTripleGate` body sha256 or Leg 3 label whitelist |
+
+### RETIRED (remove in v6.1)
+
+| Component | Location | Action |
+|-----------|----------|--------|
+| `tests/e2e/scripts/inject-defect.mjs` | `tests/e2e/scripts/` | Delete — synthetic mutator retired |
+| `scripts/e2e-explore.mjs` | `scripts/` | Archive — autonomous explore mode deferred |
+| `v40-auto-fix.yml` trigger block | `.github/workflows/` | Keep file but replace trigger; OR: rename to `v61-report-fix.yml` and replace entirely |
+| `v40-auto-promote.yml` `issues:labeled` trigger | `.github/workflows/` | Restore `pull_request: types: [closed]` as primary; dispatch remains for UAT |
+| Paused Phase 61–67 artifacts | `.planning/milestones/v4.3-phases-paused/` | Archive; do not restore |
+| `RESUME-V4.3.md` | `.planning/` | Superseded; archive or delete |
+
+---
+
+## Build Order (respects dependencies)
+
+The pipeline is a strict sequential chain: intake before triage before analysis before regression-gate before PR.
+
+```
+Phase A: Retirement + scaffolding
+  - Archive/delete inject-defect.mjs, e2e-explore.mjs, RESUME-V4.3.md
+  - Archive paused v4.3 phase artifacts
+  - Stub REPORT_FIX_SCAFFOLD in fix-prompt-builder.js (even if not yet wired)
+  Dependencies: none; do first to clear technical debt
+
+Phase B: Triage layer (ingest-reports.mjs)
+  - KV polling + filterReports reuse from review-reports.mjs
+  - Auto-triage classifier (heuristic-first, no LLM)
+  - GitHub Issue creation (candidate state)
+  - `promote` subcommand (manual-promote escape hatch) added to review-reports.mjs
+  - Vitest tests: classifier unit tests + issue-body schema guard
+  Dependencies: Phase A done; needs BUG_REPORTS KV access (wrangler --remote)
+
+Phase C: Fix generation workflow (v61-report-fix.yml)
+  - REPORT_FIX_SCAFFOLD complete (fix-prompt-builder.js)
+  - v61-report-fix.yml: issues.labeled trigger, KV fetch, LLM invoke, PR create
+  - Two-commit ledger split (copy pattern from v40-auto-fix.yml)
+  - Vitest YAML contract tests for v61-report-fix.yml
+  Dependencies: Phase B done (GitHub Issue must exist with correct body format)
+
+Phase D: Triple-gate extension (auto-fix-promote.mjs + v40-auto-promote.yml)
+  - assertTripleGate() Leg 3: accept report-fix-candidate
+  - v40-auto-promote.yml if-filter: OR report-fix-candidate
+  - Restore v40-auto-promote.yml pull_request:closed trigger
+  - Update Vitest sha256 pin tests
+  Dependencies: Phase C done (auto-fix:verified flow must be wired first)
+
+Phase E: Regression-safety validation (UAT)
+  - Live end-to-end UAT: submit report → auto-triage promotes → LLM produces fix →
+    verifier-gate passes → maintainer merges → auto-promote closes issue
+  - Verify no regression on 75-case golden corpus
+  - Verify ledger budget caps enforced
+  Dependencies: Phases A–D done; requires production BUG_REPORTS KV data OR seeded test report
+```
+
+---
+
+## Architectural Patterns
+
+### Pattern 1: KV Record as Ground-Truth Diagnostic Bundle
+
+The BUG_REPORTS KV record is the single source of diagnostic truth. The GitHub Issue carries a pointer (`<!-- kv-key: report:{fp}:{ts} -->`), not a copy of the full record. At LLM analysis time, `v61-report-fix.yml` fetches the KV record via `wrangler kv key get --remote` to get the full errorLog, xpathNode, etc.
+
+Why: The KV record was built by the v5.0 pipeline specifically to capture everything needed for debugging — 20 fields including DOM context, error ring buffer, PDF parse status. Duplicating this into the issue body would be fragile (issue body size limits, edit-drift) and redundant.
+
+### Pattern 2: Two-Commit Ledger Split (INHERITED)
+
+The LLM spend ledger (`tests/e2e/.llm-spend-ledger.json`) is committed directly to `main` with `[skip ci]` before `cpr@v8` snapshots the working tree for the auto-fix PR. This keeps the ledger entry off the diff-guard's FORBIDDEN_PATHS list.
+
+v6.1 inherits this pattern exactly from `v40-auto-fix.yml`. The `source` field on new ledger entries uses `'report-fix-api'` (not `'auto-fix-api'`) to distinguish report-driven invocations from legacy synthetic-trigger invocations.
+
+### Pattern 3: Heuristic-First Auto-Triage (NO LLM for Classification)
+
+The auto-triage classifier in `ingest-reports.mjs` uses zero LLM calls. Classification criteria:
+- `category == 'inaccurate_citation'` — user explicitly said the citation was wrong
+- `confidenceTier IN ['green', 'yellow']` — the tool produced a result (not a no-match)
+- `returnedCitation != null` — the tool produced something to fix
+- `errorLog.length > 0` — additional signal of abnormal execution
+
+This is analogous to the v3.1 heuristic-first triage classifier (`triage-classifier.js`) that resolves 6/8 ERROR_CLASSES without LLM. The philosophy is: spend LLM budget on fix generation (where it's necessary), not on classification (where heuristics suffice).
+
+### Pattern 4: label-Based State Machine on GitHub Issues (INHERITED)
+
+The v4.0 pipeline used GitHub Issue labels as state transitions. v6.1 inherits this:
+- `report-fix-candidate` → issue created, fix not yet generated
+- `fix-in-progress` → v61-report-fix.yml running
+- `auto-fix:verified` → verifier-gate passed, ready for human merge
+- CLOSED → auto-promote cycle complete
+
+Workflows use `issues.labeled` triggers to respond to state transitions, which lets the pipeline be event-driven rather than polling-based after the initial KV ingest step.
+
+### Pattern 5: XML-Tag Prompt-Injection Defense (INHERITED)
+
+The LLM prompt wraps all report-derived content in XML tags:
+- `<report_data>{KV record JSON}</report_data>` — isolates report content from instructions
+- `<source_files>{matching.js content}</source_files>` — isolates read-only source
+
+This follows the v3.1 convention (`<patent_data>` XML tags in triage-classifier.js, `<issue_body_untrusted>` envelope in v40-auto-fix.yml). The fingerprint in the issue body line 1 convention (`<!-- fp: ... -->`) also follows v3.1/v4.0 precedent.
+
+---
+
+## Integration Points
+
+### With Existing Infrastructure
+
+| Integration | How | Constraint |
+|-------------|-----|------------|
+| BUG_REPORTS KV read | `wrangler kv key get --remote` (same as review-reports.mjs) | Requires `wrangler` CLI auth; always pass `--remote` (v4 default is local miniflare) |
+| GitHub Issues | `gh issue create` / `gh issue view` (same as e2e-report-issue.mjs) | GITHUB_TOKEN repo secret; `issues: write` workflow permission |
+| LLM invocation | `invokeAnthropicSdkWithLedger` from tests/e2e/lib/llm-driver.js | ANTHROPIC_API_KEY secret; LEDGER_PATH budget caps enforced; `fix_attempts` cap at 3 |
+| Diff-guard | `node scripts/check-diff-guard.mjs` (pipe from `git diff --name-only`) | FORBIDDEN_PATHS bank unchanged; ≤200 LOC src/ cap applies |
+| Verifier gate | `node scripts/verify-single-case.mjs` (3× per affected case) | Verifier files pinned to origin/main; requires Playwright + Chromium |
+| Regression suite | `npx playwright test --config ...` (75 cases) | Same as v40-verifier-gate.yml regression-suite job |
+| Auto-promote | `scripts/auto-fix-promote.mjs` with extended triple-gate | assertTripleGate body change requires Vitest pin update |
+| Ledger budget | `readLedger() / appendLedgerEntry()` from tests/e2e/lib/llm-ledger.js | Monthly cap shared across all LLM invocations; `source: 'report-fix-api'` distinguishes entries |
+
+### External Boundaries
+
+| Boundary | Protocol | Notes |
+|----------|----------|-------|
+| Cloudflare Worker ↔ Pipeline | wrangler CLI (`--remote` flag required) | Not HTTP; wrangler v4 default reads local miniflare store; `--remote` is mandatory |
+| GitHub Issues ↔ Workflows | `issues.labeled` event + `gh` CLI | Standard GitHub Actions pattern; issue number threaded through all steps |
+| GitHub PR ↔ Verifier Gate | `pull_request` event on `auto-fix/*` | Branch prefix scoping; no change to v40-verifier-gate.yml scope filter needed |
+| LLM ↔ Fix Generator | Anthropic SDK via `invokeAnthropicSdkWithLedger` | Ledger-guarded; ANTHROPIC_API_KEY required; REPORT_FIX_SCAFFOLD is the new prompt |
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Fetching Full KV Record Into Issue Body
+
+Storing the complete 20-field KV record in the GitHub Issue body creates size pressure, edit-drift risk, and privacy exposure (selectionText, errorLog). The correct pattern is pointer-in-issue-body + fetch-at-analysis-time.
+
+### Anti-Pattern 2: LLM Classification in Triage
+
+Running LLM on every incoming report for triage burns budget on noise. The v3.1 heuristic-first classifier showed 6/8 ERROR_CLASSes resolve without LLM. The report schema provides equally strong heuristic signals (category, confidenceTier, errorLog presence). Reserve LLM budget for fix generation.
+
+### Anti-Pattern 3: Bypassing the Diff-Guard in Fix Generation
+
+If the REPORT_FIX_SCAFFOLD permits the LLM to modify `tests/test-cases.js` or the golden baseline, the verifier-gate's trust invariant is broken. The FORBIDDEN_PATHS bank and the explicit scaffold instructions must BOTH prohibit this. Defense in depth: scaffold says "only modify matching core"; diff-guard rejects any violation.
+
+### Anti-Pattern 4: Direct-to-Main Commits for Source Changes
+
+Only `tests/e2e/.llm-spend-ledger.json` may be committed directly to `main` (via the `[skip ci]` two-commit-split pattern). All source changes go through a PR and the verifier-gate required status check. Attempting to push src/ changes directly to main fails the branch-protection ruleset.
+
+### Anti-Pattern 5: Restoring the `issues: labeled` Trigger on v40-auto-fix.yml
+
+The old `v40-auto-fix.yml` triggered on `issues: labeled` == `triage`. v6.1 builds a NEW workflow (`v61-report-fix.yml`) that triggers on `issues: labeled` == `report-fix-candidate`. Restoring the old trigger would re-activate the retired synthetic-issue path. Keep `v40-auto-fix.yml` at `workflow_dispatch:` only or retire the file entirely and replace with v61-report-fix.yml.
 
 ---
 
 ## Sources
 
-- Direct source reading: `src/offscreen/pdf-parser.js`, `src/offscreen/position-map-builder.js`, `src/offscreen/offscreen.js`, `src/shared/matching.js`, `src/shared/constants.js`, `worker/src/index.js`, `worker/wrangler.toml`, `scripts/build.js`, `package.json`, `.planning/PROJECT.md`
-- PROXY_TOKEN: confirmed hardcoded at `src/offscreen/offscreen.js` line 24 — value `4509b9943f831fb140eb0c3a7304f23cc6f72e41b5e5f8c800a42e94f09cadbe`
-- Cache key scheme: confirmed from `worker/src/index.js` line 559 — `\`${version}:${patentNumber}\``
-- Cache entry shape (bbox stripped): confirmed from `offscreen.js` lines 405-406 — only `text, column, lineNumber, page, section, hasWrapHyphen` written
-- Auth model: confirmed from `worker/src/index.js` lines 524-533 — single global Bearer check before route dispatch
-- PDF.js worker coupling: confirmed at `src/offscreen/pdf-parser.js` line 14 — only `chrome.runtime.getURL` call
-- `position-map-builder.js` purity: confirmed — 786 lines, zero `chrome.*`, zero DOM, zero IndexedDB
-- `matching.js` purity: confirmed — 729 lines, zero browser APIs
+- `/home/fatduck/patent-cite-tool/worker/src/index.js` — BUG_REPORTS KV schema, `handleReport`, fingerprint, dedup, rate-limit implementation (HIGH confidence — production code)
+- `/home/fatduck/patent-cite-tool/worker/src/report-schema.md` — 20-field KV record spec, PAY-01 allowlist, PAY-03 exclusions (HIGH confidence — committed specification)
+- `/home/fatduck/patent-cite-tool/scripts/review-reports.mjs` — `filterReports`, `reviewStatus`, `writeStatus` helpers; `wrangler --remote` pattern (HIGH confidence — production tooling)
+- `/home/fatduck/patent-cite-tool/.github/workflows/v40-auto-fix.yml` — two-commit-split pattern, `peter-evans/cpr@v8` usage, ledger commit to main, `[skip ci]` marker (HIGH confidence — production workflow)
+- `/home/fatduck/patent-cite-tool/.github/workflows/v40-verifier-gate.yml` — four-job structure, FORBIDDEN_PATHS, diff-guard, verifier-pin, partial-pass logic, `auto-fix:verified` label producer (HIGH confidence — production workflow)
+- `/home/fatduck/patent-cite-tool/.github/workflows/v40-auto-promote.yml` — triple-gate, `assertTripleGate`, `runPromote`, auto-promote PR pattern (HIGH confidence — production workflow)
+- `/home/fatduck/patent-cite-tool/.planning/PROJECT.md` — v6.1 scope, constraints, BUG_REPORTS channel description, retirement scope (HIGH confidence — authoritative planning doc)
+- `/home/fatduck/patent-cite-tool/.planning/MILESTONES.md` — v3.1 quarantine corpus, v4.0 auto-fix loop, v4.2 fixture-mutator, v5.0 report pipeline delivery evidence (HIGH confidence — milestone history)
 
 ---
 
-*Architecture research for: v6.0 Standalone Citation Webapp — integration into existing Patent Citation Tool*
-*Researched: 2026-06-16*
+*Architecture research for: v6.1 Auto-Fix from Bug Reports pipeline integration*
+*Researched: 2026-06-17*

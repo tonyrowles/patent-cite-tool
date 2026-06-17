@@ -1,452 +1,236 @@
-# Feature Research
+# Feature Research — v6.1 Auto-Fix from Bug Reports
 
-**Domain:** Standalone single-purpose legal-lookup web form (patent citation tool webapp)
-**Researched:** 2026-06-16
-**Confidence:** HIGH (codebase authoritative for matching core, existing formats, confidence thresholds); MEDIUM for web-form UX conventions (general pattern knowledge, no single patent-tool reference)
+**Domain:** Human-report-driven, LLM-assisted auto-fix pipeline (report triage → analysis → candidate fix → regression gate → human merge gate)
+**Researched:** 2026-06-17
+**Confidence:** HIGH (grounded in project's own prior art from v3.1/v4.0 milestones, verified against v5.0 KV schema, and cross-referenced with current industry patterns for AI-assisted triage and auto-fix loops)
 
 ---
 
-## Scope Boundary Confirmation (v1 = v6.0 Milestone)
+## Scope Note
 
-The following decisions are LOCKED from ROADMAP.md backlog entry (Phase 999.1) and
-PROJECT.md (Current Milestone: v6.0). Included here to give the roadmapper a single
-source of truth for what is IN vs OUT.
+This document covers ONLY the new v6.1 human-report-driven pipeline. The v5.0 `BUG_REPORTS` KV channel (intake, schema, fingerprint dedup, Discord notify, rate limiting) is treated as a stable, already-built dependency. The golden corpus + quarantine regression guard carried forward from v4.0/v4.3 is also a stable dependency. The retired autonomous machinery (fixture-mutator, `e2e:explore` cron, `v40-auto-fix` synthetic trigger, Phases 61–67) is explicitly out of scope and should not be referenced as a building block.
 
-| Decision | v1 Status |
-|----------|-----------|
-| Granted US patents only | IN — published apps show "not supported yet" message |
-| Core single-passage citation flow | IN |
-| Batch mode (N passages, one patent, shared parse) | IN |
-| Copy-to-clipboard | IN |
-| Citation format toggle (shorthand vs long form) | IN — first surface to ship this (not yet in extension) |
-| Optional patent number prefix | IN — mirrors extension `includePatentNumber` setting |
-| Client-side PDF.js parsing | IN |
-| Reuse existing Cloudflare Worker (pct.tonyrowles.com) as thin USPTO proxy | IN |
-| Citation history / saved sessions | DEFERRED — out of v1 |
-| User accounts / authentication | DEFERRED — out of v1 |
-| Shareable links | DEFERRED — out of v1 |
-| Published application paragraph citations | DEFERRED — "not supported yet" message only |
-| Non-US patents | OUT OF SCOPE (project-wide) |
-| OCR on patents without text layers | OUT OF SCOPE (project-wide) |
-| File upload (user-supplied PDF) | OUT OF SCOPE for v1 |
-| Multi-patent batch (N patents x M passages) | OUT OF SCOPE for v1 |
+---
+
+## Available Triage Signals in a v5.0 Report
+
+Understanding the signal available from each KV record is prerequisite to designing triage classification. Every `report:{fingerprint}:{timestamp}` entry in `BUG_REPORTS` contains:
+
+| Signal | Field(s) | Triage Use |
+|--------|----------|------------|
+| Report category | `category` | One of 4 frozen values: `inaccurate_citation`, `no_match`, `tool_not_working`, `other`. `inaccurate_citation` + `no_match` are strong indicators of a real citation bug. `tool_not_working` and `other` skew toward user-error / environment issues. |
+| Observed citation | `returnedCitation` | Non-null with a plausible column:line format = extension ran; null or malformed = pipeline didn't complete. |
+| Confidence tier | `confidenceTier` | `"yellow"` or `"red"` = extension's own uncertainty flag is already raised. `"green"` with `inaccurate_citation` = the most interesting case (extension was confident but wrong). |
+| Selection text | `selectionText` | Present (user kept it): enables text-level duplicate detection and LLM analysis. Absent (user removed it): still classifiable via other signals but analysis is weaker. |
+| Patent number + URL | `patentNumber`, `patentUrl` | Enables corpus cross-check against golden + quarantine: if the patent is already in the quarantine with a `stable_runs ≥ 3` entry, this report is a known failure and auto-promote is appropriate. |
+| Fingerprint dedup metadata | `fingerprint` (16 hex), `duplicate_count` | High `duplicate_count` = multiple users hitting the same bug = higher-confidence real issue. Zero-count first submission = isolated incident that may or may not be reproducible. |
+| PDF parse status | `pdfParseStatus` | `"success"` = PDF was parsed cleanly; `"fallback"` = went to USPTO path; `"error"` = parse failed. `"error"` + `no_match` = likely environment/PDF issue, not a matcher bug. |
+| Error log | `errorLog` (ring buffer, ≤20 entries) | Presence of JS exceptions, Worker errors, or fetch failures distinguishes tool-not-working (infrastructure) from citation-accuracy failures. |
+| Browser + OS | `browser`, `os` | Cross-browser inconsistency between multiple reports for the same patent = likely platform-specific, not algorithm. Same bug on both Chrome + Firefox = algorithm-level issue. |
+| Trigger mode | `triggerMode` | `"contextMenu"` vs `"floating"` vs `"auto"` patterns on failing reports can surface trigger-mode-specific bugs. |
+| Viewport/scroll | `xpathNode`, `scrollY`, `viewportWidth`, `viewportHeight` | DOM-level diagnostics for reproducing the exact selection state. |
+| User note | `note` | Free-text, low signal-to-noise but can contain "the citation shows 3:15 but it should be 4:20" — actionable expected vs observed pairs when present. |
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes (Users Expect These)
+### Table Stakes (Maintainer Expects These)
 
-Features a professional-facing free lookup tool must have. Missing any of these makes the
-product feel broken or untrustworthy for use in legal filings.
+Features that a maintainer operating this loop assumes will exist. Without them the pipeline feels broken or untrustworthy.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Patent number input with format flexibility | Users copy patent numbers from many sources in many formats; refusing all but one frustrates them on the first keystroke | LOW | Normalize on input: strip spaces/commas/hyphens, uppercase, accept with or without "US" prefix, with or without kind code. Pure function, no network call. |
-| Input validation with clear error messaging | Legal professionals need to know WHY a number was rejected, not just that it failed | LOW | Three rejection states: unrecognizable format, recognized as published application, recognized as non-US. Each has its own message. |
-| Published application rejection message | v1 scope limit must surface gracefully before any fetch attempt | LOW | Shown after kind-code detection, before network call. "Published applications (US20XXXXXXX) are not yet supported — this tool handles granted patents only." |
-| Passage textarea | Core input for what the user wants cited | LOW | Standard `<textarea>`. No enforced character limit; the matching algorithm handles long passages via bookend matching at >500 chars. Placeholder shows a realistic patent excerpt. |
-| Submit / Cite button with disabled state | Obvious trigger; must not allow double-submit | LOW | Disable during fetch/parse; re-enable after result or error. |
-| Citation result display | The output the user came for | LOW | Display citation string prominently. Default format is `4:15-22` shorthand (same as extension default). |
-| Confidence indicator (green/yellow/red) | Extension trains users to expect this; legal context requires honest confidence communication | LOW | Mirror extension thresholds exactly (from citation-ui.js lines 152-153): >= 0.95 = green (no label); >= 0.80 = yellow ("Approximate match"); < 0.80 = red ("Low confidence — verify manually"). |
-| Copy-to-clipboard | Every citation tool in the legal space provides this; absence is conspicuous | LOW | Navigator Clipboard API with textarea execCommand fallback. Visual "Copied!" confirmation for 1.5s. Mirror citation-ui.js lines 233-262 pattern. |
-| No-match state | User needs feedback when the passage is not found | LOW | Distinct from low-confidence: "No match found — try a shorter or more exact excerpt from the specification." Not a confidence indicator state — no confidence to show. |
-| Network / parse error state | Infrastructure can fail; user must know it is not their input | LOW | "Could not load patent PDF — check your connection and try again." Distinct wording from no-match. |
-| Loading / progress indicator | PDFs are 5-30MB; without a loading state users assume the page is broken and reload | MEDIUM | At minimum two named stages: "Fetching patent PDF..." and "Parsing PDF...". See Loading UX Detail section below. |
+| Feature | Why Expected | Complexity | Dependencies on Existing v5.0 / Corpus |
+|---------|--------------|------------|----------------------------------------|
+| **KV report ingestion** — read `BUG_REPORTS` records via `env.BUG_REPORTS.list()` + `.get()` in a script or Action, sorted by timestamp | Without this, the pipeline has no input. Maintainer cannot manually inspect reports without a CLI. | LOW | v5.0 `BUG_REPORTS` KV namespace with `report:{fp}:{ts}` key format. `wrangler kv key list --remote --binding BUG_REPORTS` already works but is raw JSON. Needs a thin reader script. |
+| **Real-bug vs noise/duplicate/user-error classifier** — heuristic-first, LLM-optional: classify each report into {real_bug, noise, duplicate, user_error, ambiguous} | The v4.0 feature research established heuristic-first as the right pattern (resolves most classes without LLM spend). Maintainer expects reports to arrive pre-classified, not as a raw dump. | MEDIUM | Uses `category`, `confidenceTier`, `pdfParseStatus`, `returnedCitation`, `duplicate_count`, `errorLog` signals from the v5.0 KV record. Cross-checks against golden + quarantine corpus for known-failure match. |
+| **Auto-promotion of real bugs into analysis queue** — reports classified as `real_bug` automatically enter the analysis pipeline without maintainer action | Industry baseline (GitHub's `gh-aw` auto-triage, Dosu, Copilot issue assignment): auto-routing is the baseline; manual-only triage queues get ignored. | LOW | Promotion writes a lightweight analysis-queue entry (a local file, a KV namespace entry, or a GitHub Issue). Depends on classifier output. |
+| **Manual-promote escape hatch** — maintainer can push any report (including `noise`, `ambiguous`, or `user_error`) into the analysis queue via a CLI flag or label | Without this, a smart maintainer who spots a misclassified report has no recourse except modifying the classifier. Required for trust in the auto-classification. | LOW | Minimal new code: a `--force-promote <fingerprint>` flag on the ingestion script, or a GitHub label that overrides the classifier decision. |
+| **LLM analysis → candidate fix proposal** — for each promoted report, an LLM reads the report fields + the relevant source modules and produces a candidate diff targeting the deterministic matching/normalization core | This is the core value of the milestone. Without a fix proposal, the loop has no output. | HIGH | Consumes report fields (esp. `selectionText`, `returnedCitation`, `confidenceTier`, `patentNumber`). Fix surface = `src/shared/matching.js`, `src/offscreen/position-map-builder.js`, `src/offscreen/parser.js`. LLM transport = `@anthropic-ai/sdk` (already installed, EXACT pin). |
+| **Regression gate — golden corpus** — every candidate fix is verified against all 75+ golden cases before the PR is opened; zero regressions required | The golden baseline is the trust anchor for citation accuracy. A fix that breaks other patents cannot land. | LOW (gate wiring) | Depends on existing Vitest golden baseline (`tests/test-cases.js` + `tests/golden/baseline.json`). Running `npm test` is the gate. |
+| **Regression gate — quarantine corpus** — candidate fix also runs against quarantine cases; failures here are expected (these are known broken cases) but regressions in quarantine should not appear as new failures | The quarantine corpus is the "other known broken cases" surface. A fix must not worsen them. | LOW (gate wiring) | Depends on `tests/e2e/test-cases-quarantine.js` carried forward from v3.1/v4.0. The quarantine spec runs non-gating already; v6.1 makes it part of the fix-verification pass. |
+| **Draft PR with fix candidate** — the fix is proposed via a GitHub draft PR on an `auto-fix/<fingerprint-short>` branch; never direct-to-main | Industry universal baseline for agent-generated code touching domain logic. Citations go into legal filings; no auto-merge of matcher changes is ever acceptable. | LOW | Uses existing `gh pr create` or `peter-evans/create-pull-request@v8` (already in the repo's GitHub Actions). Branch naming must be discoverable and idempotent. |
+| **Human merge gate** — the PR requires a maintainer approval click; no auto-merge path for `src/` changes | The v4.0 trust invariant: "Automatic golden promotion blocked — destroys trust invariant." Legal-filing accuracy means a human must sign off on every matcher change. | LOW (policy, not code) | Enforced by the existing GitHub branch-protection ruleset (ruleset 17086676) which already requires status checks before merge. |
+| **Cost-ledger integration** — LLM calls made during analysis + fix generation are recorded in `tests/e2e/.llm-spend-ledger.json` with the existing `invokeAnthropicSdkWithLedger` wrapper; monthly soft/hard caps enforced | v4.0 established spend ledger as table stakes. Any LLM call without ledger accountability is a LEDGER LEAK (known vulnerability from project memory). | LOW | `@anthropic-ai/sdk` is already pinned EXACT. `invokeAnthropicSdkWithLedger` exists in `tests/e2e/lib/llm-driver.js`. Ledger path is `tests/e2e/.llm-spend-ledger.json`. |
+| **Triage report artifact** — the classifier emits a structured JSON report (one entry per processed report: fingerprint, classification, reason, promotion decision) | Without a durable artifact, the maintainer has no audit trail and no way to review classification decisions. Also enables digest/analytics later. | LOW | New artifact; follows the `rerun-report.json` / `triage-report.json` pattern from v3.1. |
 
-### Differentiators (Competitive Advantage)
+### Differentiators (What Makes This Loop Good)
 
-Features that distinguish this from manually counting lines on a printed PDF, which is
-the only real alternative today for users without the extension.
+Features that distinguish a high-quality maintainer experience from a barely-functional one.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Batch mode: N passages, one patent | Patent prosecution often requires citing multiple passages from the same patent; doing them one at a time wastes the PDF parse cost | MEDIUM | Parse PDF once, run matchAndCite N times. Per-row confidence indicator. Copy-all. See Batch Mode UX Detail section. |
-| Copy-all for batch results | Attorneys paste citations into Word or filing documents; one-click copy-all for all batch rows saves repeated manual steps | LOW | Join all citations as one-per-line text block. Appears after at least one result is populated. |
-| Citation format toggle (shorthand vs long form) | Different prosecutors and examiners expect different formats; the extension already plans to offer this choice | LOW | Toggle between `4:15-22` (default) and `Col. 4, ll. 15-22`. Updates both displayed citation and clipboard content. This is a NEW feature in v6.0 — not yet in the extension. |
-| Optional patent number prefix | Some citation styles include the patent number in the citation string | LOW | Checkbox "Include patent number prefix" → `'321 Pat., 4:15-22`. Mirrors extension `includePatentNumber` / `applyPatentPrefix`. |
-| Deterministic, no-LLM positioning statement | Patent attorneys are skeptical of AI tools for filings that go to the USPTO; a clear "no AI inference" statement is a trust signal | LOW | One sentence near the result or in an accessible "How it works" summary: "Citations are deterministic position lookups — no AI, same result every time." |
-| Shared KV cache benefit (implicit) | Returning users and any user who queries a previously-parsed patent get near-instant results from the existing cache | LOW (implicit) | No UI needed; the Worker already implements check-before-fetch. Optionally surface "Loaded from cache" in a subtle status note. |
+| Feature | Value Proposition | Complexity | Dependencies |
+|---------|-------------------|------------|--------------|
+| **Corpus cross-check during triage** — before classifying a report as `real_bug`, check if the patent is already in the golden corpus (known-good → user error?) or quarantine (known-broken → auto-promote immediately) | Catches the case where a report is for a patent the system already knows is broken. Prevents wasted LLM analysis on already-tracked failures. Avoids false `real_bug` classifications for patents where the golden expected-value is itself wrong. | MEDIUM | Requires reading `tests/test-cases.js` (golden) and `tests/e2e/test-cases-quarantine.js` (quarantine) during ingestion. Pure file I/O — no new deps. |
+| **Fingerprint-cluster grouping** — when N≥3 reports share the same fingerprint (same `patentNumber|category|selectionHash`) within the 90-day TTL window, treat as a high-confidence real bug and auto-promote immediately regardless of other classification signals | High `duplicate_count` from the v5.0 dedup mechanism is a strong signal that multiple users are hitting the same bug. Industry pattern: Mozilla's intermittent-failure dashboard uses occurrence count as the primary prioritization signal. | LOW | Reads `duplicate_count` from the KV record. No LLM needed. Promotes into analysis queue directly. |
+| **`inaccurate_citation` + `"green"` confidence tier as highest-priority signal** — the extension was confident (green) but produced a wrong citation; this combination is the highest-value fix target because it means the algorithm is silently wrong, not just uncertain | Most auto-fix systems treat all bugs equally. This project knows from v4.0 that `WRONG_CITATION` with `verifier_strong_agreement` at Tier A/B is the hero case. Green-tier + `inaccurate_citation` = the same class, detectable from the v5.0 payload without any LLM. | LOW | Reads `confidenceTier` + `category` from KV record. Heuristic, no LLM. Maps directly to the `WRONG_CITATION` error class from v3.1/v4.0. |
+| **Structured fix context for LLM** — the analysis prompt includes: `patentNumber`, `returnedCitation` (what the extension produced), `selectionText` (what the user selected), `confidenceTier`, a PDF text extract from the patent (fetched via Worker or from KV cache), and the existing matching-tier waterfall from `src/shared/matching.js` — all wrapped in `<patent_data>` XML tags | Better context = better fixes. v4.0 established that without diagnostic data in the issue body, `--max-turns 1` was insufficient and `error_max_turns` was the failure mode. The v5.0 report already contains most of the needed fields; the gap is the PDF text extract. | MEDIUM | PDF text can be fetched from `PATENT_CACHE` KV (position maps already stored there) or re-fetched via Worker. `<patent_data>` XML wrapping is a v3.1 prompt-injection defense (already established). |
+| **Iteration cap with `auto-fix-stuck` label** — LLM fix-generation is capped at a small number of iterations (3–4 max per report); if the gate still fails after the cap, label the PR `auto-fix-stuck` and surface in the triage digest without burning more budget | Prevents cost runaway on hard cases. v4.0 discovered that `--max-turns 1` was too tight, but unlimited is dangerous. Industry norm: 3–6 max iterations. | LOW | Wires into the existing ledger hard-cap logic. `auto-fix-stuck` is a new GitHub label, low cost. |
+| **Maintainer digest for report volume** — a summary of recent `BUG_REPORTS` volume, classification breakdown, and promotion queue depth, surfaced in the existing Monday weekly digest (or on-demand CLI) | Gives the maintainer visibility into the health of the inbound signal channel. Without this, reports pile up invisibly. Extends the existing v3.1 `DIGEST-01..04` weekly digest. | LOW | Reads from `BUG_REPORTS` KV list (count by category, dedup rate, promotion rate). Wires into `scripts/weekly-digest.mjs`. |
+| **Idempotent ingestion** — re-running the ingestion script never re-promotes an already-promoted report or re-opens a PR for a report that already has one | Without idempotency, nightly cron runs create PR spam. v4.0 had branch-existence idempotency checks on `auto-fix/issue-N` branches. v6.1 applies the same pattern using the fingerprint as the dedup key. | LOW | Track promoted fingerprints in a local state file or via branch-name check (`auto-fix/<fp-short>` branch existence). |
+| **Manual-promote audit trail** — when the maintainer uses the escape hatch to force-promote a report, the triage report artifact records the override with a `promoted_by: 'manual'` marker and a note | Without this, manual overrides are invisible and the classifier's auto/manual split is unknowable. Follows the v4.2 `safeAppendLedger` pattern for audit-able overrides. | LOW | Extend the triage report JSON with a `promotion_source: 'auto' | 'manual'` field. |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+### Anti-Features (Explicitly NOT to Build)
 
-| Anti-Feature | Why Requested | Why Problematic | Alternative |
-|--------------|---------------|-----------------|-------------|
-| Citation history / saved sessions | Users want to retrieve past lookups | Requires localStorage state or server-side auth; creates privacy questions and support burden; not validated as needed for v1 | Explicitly deferred. Copy button is the v1 sharing/saving mechanism. |
-| Shareable links (URL-encoded patent + passage) | Easy to share a citation with a colleague | Long passage text makes URLs ugly and brittle; deep-linking forces a fresh fetch/parse on every load; deferred by explicit locked decision | Defer to v2. For v1 the copy button is the sharing mechanism. |
-| User accounts | Persistent settings, history | Zero value in v1 with no history feature; increases attack surface | Defer indefinitely. The extension has no auth and users do not expect it. |
-| File upload (user-supplied PDF) | Power users want to cite patents not on Google Patents | Requires storage/security design; scope-creep; the tool's value is the USPTO-sourced authoritative PDF | Not in scope. Patent number input remains the only entry point. |
-| Real-time / as-you-type matching | Feels fast and modern | PDF parse takes 2-30s; streaming partial results is misleading for a deterministic tool; increases Worker load for abandoned queries | Single explicit submit with loading indicator. |
-| Published application paragraph citations | Users ask about US20XXXXXXX numbers | No PDF column/line scheme for applications; the extension uses DOM TreeWalker on Google Patents' live page, which does not exist server-side; significant new code path | "Not supported yet" message with link to Google Patents to look up the application there. Defer to v1.x if demand is validated post-launch. |
-| Dark mode | Common feature request | Design cost for a single-purpose tool; increases CSS complexity | Skip for v1. System `prefers-color-scheme` passively if CSS is simple; do not design two full themes. |
-| Multi-patent batch (N patents x M passages) | "Compare across two patents" | Doubles fetch+parse work; scope-creep; the single-patent batch is the right MVP scope | Single-patent batch is v1. Multi-patent batch is v2+. |
-| CAPTCHA | Prevent abuse | Severe friction on a free tool with no sensitive data; the Worker's existing rate-limit pattern is sufficient | Rate-limit at the Worker level if abuse materializes post-launch. |
+Features that appear beneficial but erode the pipeline's correctness, trust, or human control.
 
----
-
-## Input UX Detail: Patent Number Formats
-
-### Accepted Input Formats (all normalize before fetch)
-
-The normalization step is a pure function with no network dependency, allowing real-time
-inline validation as the user types or on form submit.
-
-| User input | Normalized form | Notes |
-|------------|-----------------|-------|
-| `US7654321B2` | `US7654321B2` | Canonical granted patent with kind code |
-| `US7,654,321` | `US7654321` | Comma-separated format common on USPTO printed covers |
-| `US 7,654,321` | `US7654321` | With space |
-| `7654321B2` | `US7654321B2` | No US prefix — add it |
-| `7654321` | `US7654321` | Bare number, no kind code |
-| `us7654321b2` | `US7654321B2` | Lowercase — uppercase |
-| `US 7654321 B2` | `US7654321B2` | Spaces before kind code |
-
-Algorithm: strip spaces and commas, uppercase, add "US" prefix if missing, validate
-remaining chars match `US\d+[A-Z0-9]*`.
-
-### Kind-Code Detection (mirrors patent-info.js exactly)
-
-From `src/content/patent-info.js` lines 36-40:
-- A1, A2, A9 = published application → show rejection message, no fetch
-- Everything else (B1, B2, B1, H1, E1, no kind code) = granted patent → proceed
-
-### Rejection States (shown before any network call)
-
-| Input pattern | Detection | Message shown |
-|---------------|-----------|---------------|
-| `US20210012345A1` (or A2/A9) | A1/A2/A9 kind code | "Published applications (US20XXXXXXX) are not yet supported. This tool handles granted patents only, e.g. US7654321B2." |
-| `EP1234567` / `WO2020123456` | Non-US prefix | "Only US patents are supported." |
-| Unrecognizable (free text, random string) | No patent number pattern | "Enter a US patent number, e.g. US7654321B2." |
-| Valid format, number resolves to 404 from USPTO | Worker returns 404 post-submit | "Patent not found — check the number and try again." (post-submit error, not pre-submit) |
-
-### Implementation Note
-
-The normalization and kind-code detection is a single pure function shareable between
-the webapp and any future extension input field. No `chrome.*` deps. Testable with
-Vitest. The logic is essentially the same as `patent-info.js` refactored for a text
-input rather than a URL path.
-
----
-
-## Result Presentation Detail
-
-### Single Citation Result
-
-```
-Citation
-┌───────────────────────────────────────┐
-│  4:15-22                   [●] [Copy] │
-│  Approximate match (88%)              │
-└───────────────────────────────────────┘
-
-Format:  ○ 4:15-22 (shorthand)
-         ● Col. 4, ll. 15-22 (long form)
-
-[ ] Include patent number prefix
-```
-
-**Confidence dot color rules** (from citation-ui.js lines 152-153):
-- Green dot, no label: confidence >= 0.95
-- Amber/yellow dot + "Approximate match (NN%)": confidence >= 0.80 and < 0.95
-- Red dot + "Low confidence — verify manually": confidence < 0.80
-
-**No-match state:** Replace citation area content with "No match found" in neutral
-styling. No confidence indicator is shown (there is no match to score confidence on).
-Include suggestion: "Try a shorter or more exact excerpt from the specification."
-
-**Network/parse error state:** "Could not load patent PDF. Check your connection and
-try again." Distinct wording from no-match. Include a Retry button.
-
-**Format toggle behavior:** Changing the format toggle updates the citation string
-in-place and updates the clipboard content for the next Copy click. No re-fetch
-or re-match needed — formatCitation is a pure function on the same startEntry/endEntry.
-
-**The format toggle is a new feature for v6.0** — the extension's `formatCitation`
-function in matching.js currently produces only the `4:15-22` shorthand. A second
-code path produces `Col. 4, ll. 15-22`. Both are pure transformations of the same
-column/line integers from startEntry and endEntry.
-
----
-
-## Batch Mode UX Detail
-
-### Entry Layout
-
-Recommended pattern: single patent number input at the top, N passage rows below,
-"Cite All" button, results fill in-place per row.
-
-```
-Patent number: [US7654321B2                    ]
-
-#  | Passage (paste text)               | Citation    | Conf.
-───┼────────────────────────────────────┼─────────────┼──────
-1  | [                                 ]|             |
-2  | [                                 ]|             |
-3  | [                                 ]|             |
-   [+ Add passage]
-
-[Cite All]   [Copy all]
-```
-
-- Patent number input is shared; user enters it once at the top.
-- "Cite All" is disabled until at least one passage row has text.
-- "Copy all" appears only after at least one result has been populated.
-- "Add passage" appends a new empty row. Start with 3 rows visible.
-- Maximum row count for v1: no hard limit in the matching logic, but cap the UI at 20
-  rows to prevent runaway DOM size (users with more passages can do two batches).
-
-### Execution Flow for Batch
-
-```
-[Cite All tap]
-  → Validate patent number
-  → Fetch PDF via Worker (one network call)
-  → Parse PDF → buildPositionMap (one parse, result shared in memory)
-  → For each non-empty passage row:
-       matchAndCite(passage, positionMap) → citation + confidence
-       Fill in Citation + Conf. cells in that row
-  → Enable "Copy all" button
-```
-
-The position-map reuse across all passages is the key performance win. This is already
-how the extension handles a page session. The position map fits in memory (10-100KB
-after stripping bounding boxes, per PROJECT.md Out of Scope list). Do NOT re-parse
-for each passage.
-
-### Per-Row Result
-
-Each row shows:
-- Citation string (filled after Cite All)
-- Confidence dot (green/yellow/red with same thresholds as single-citation)
-- Per-row Copy button (copies just that row's citation)
-
-### Copy-All Behavior
-
-One-citation-per-line default for v1 (simplest for pasting into Word or filing drafts).
-No format choice needed for copy-all — use whatever the format toggle is currently set to.
-Example output (three rows):
-
-```
-4:15-22
-7:3-9
-12:44-50
-```
-
----
-
-## Loading / Progress UX Detail
-
-### The Problem
-
-PDFs are 5-30MB (per PROJECT.md context). On typical broadband: download alone is 1-6s;
-PDF.js parse of a complex patent adds 1-5s more. Total 2-10s is common; large chemical
-patents on slow connections can hit 30s. Without visible progress, users assume the tool
-is broken and reload.
-
-### Required Pattern (Table Stakes)
-
-At minimum, show two named stages:
-
-```
-Stage 1: [spinner] Fetching patent PDF...
-Stage 2: [spinner] Parsing PDF — this may take a few seconds...
-Stage 3: [spinner] Matching passage...   (near-instant; show briefly)
-```
-
-The submit/Cite All button must be disabled for the full duration of all three stages
-to prevent double-submit.
-
-If the Worker can forward a `Content-Length` response header, Stage 1 can show a
-determinate progress bar (bytes received / total). Without it, an indeterminate spinner
-is acceptable and expected.
-
-### Key Rules
-
-- Name the stages — "Fetching PDF" vs "Parsing" — so users understand why it takes time
-  (not a bug or a frozen page).
-- For batch mode, show shared progress once at the patent level, not N times per row:
-  "Parsing US7654321B2 — this may take a few seconds."
-- On KV cache hit, the fetch returns in <1s. Still show the stage labels briefly
-  so the UI does not appear to skip steps. A 300ms minimum display time per stage
-  prevents the appearance of a broken transition.
-- Cancel button is a v2 feature. In v1, the user can reload to abort.
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| **Auto-merge of `src/` fix PRs without human approval** | "If regression gate is green on all 75+ goldens, why not auto-merge?" | Citations go into legal filings. A patch passing 75 goldens may introduce silent off-by-one errors for un-goldenized patents. The v4.0 trust invariant is explicit: auto-merging matcher changes destroys the trust invariant. | Keep all `src/shared/matching.js` and `src/offscreen/` PRs as draft-by-default with mandatory human approval click. The regression gate is necessary but not sufficient. |
+| **Treating `duplicate_count > 0` as noise (not a duplicate of the original = skip)** | "If a report is a duplicate, it's redundant — filter it out." | `duplicate_count` is the occurrence counter for the SAME fingerprint. High `duplicate_count` means many users hit this bug — it is STRONGER evidence of a real issue, not weaker. Filtering duplicates silences the highest-priority reports. | Use `duplicate_count` as a promotion-priority signal: higher count = promote immediately without waiting for LLM classification. |
+| **LLM-as-judge for the regression gate** | "When the verifier disagrees at Tier C, ask an LLM to break the tie." | The existing PDF verifier (`tests/e2e/lib/pdf-verifier.js`) is an independent code path that does not share the extension's bugs. Replacing or supplementing it with an LLM adjudicator re-introduces correlated failure. This anti-pattern was explicitly established in v4.0 as a "phantom-verification grenade." | Tier C disagreements escalate to `human-only-investigation` label; no auto-merge path. |
+| **Autonomous LLM exploration to FIND bugs (not fix them)** | "While we're building the fix pipeline, why not also let the LLM seek out new bugs autonomously?" | This is the v3.1/v4.0 explore mode. It is explicitly DEFERRED to future development. V6.1's signal source is exclusively the v5.0 `BUG_REPORTS` KV channel. Mixing autonomous exploration with human-report-driven triage blurs the signal quality and revives the retired machinery. | Stick to human reports as the sole inbound signal. The `BUG_REPORTS` channel is rich enough (fingerprint, selection text, confidence tier, error log) without autonomous exploration. |
+| **Single LLM call producing both triage classification and fix proposal** | "Token-efficient: one call does both." | Triage classification is a cheap heuristic-first task; fix generation is an expensive, context-heavy task. Coupling them means every report burns fix-generation budget even for noise/user-error reports. It also makes the pipeline opaque (classification decision is entangled with fix direction). | Separate stages: heuristic triage first (cheap, no LLM for most cases), then LLM analysis only for promoted reports. |
+| **Batch auto-fix of entire report queue overnight** | "We have 30 pending reports — run them all at 03:00 UTC." | The v4.0 analysis showed that batch mode creates PR spam, exhausts budget, and buries the human review queue. Per-night cap of 2–3 new fix PRs; FIFO on `duplicate_count` descending (most-reported-first). | Capped per-night dispatch with a configurable `--max-fixes-per-run N` gate. Surface the queue depth in the weekly digest so the maintainer can decide when to raise the cap. |
+| **Storing or displaying `selectionText` in PR body or logs without privacy guard** | "The selection text helps the reviewer understand the bug." | `selectionText` is user-provided content that the user may have opted out of sharing (`includeSelectionText: false`). The v5.0 design explicitly requires respecting this privacy choice end-to-end. If `selectionText` is null in KV, the pipeline must treat it as absent, not attempt to re-fetch from the patent page. | Omit `selectionText` from PR body if null in the KV record. Use the patent PDF text extract as the LLM context instead. |
+| **Promoting reports to analysis without checking if a fix PR already exists for the fingerprint** | "Auto-promote everything real and let CI deduplicate." | Creates multiple concurrent PRs for the same underlying bug when reports share a fingerprint. Confuses the maintainer and wastes LLM budget. | Idempotent promotion: check for an existing `auto-fix/<fp-short>` branch before opening a new PR. Skip if already in progress. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Patent number normalization + kind-code detection
-    └──required by──> Single citation flow (must validate before fetch)
-    └──required by──> Batch mode (same validation at Cite All time)
-    └──required by──> Published app rejection message (fires before any fetch)
+[v5.0 BUG_REPORTS KV channel]
+    └──provides──> [Report ingestion script]
+                       └──feeds──> [Triage classifier]
+                                       ├──auto-promote──> [Analysis queue entry]
+                                       │                      └──triggers──> [LLM analysis + fix proposal]
+                                       │                                          └──produces──> [Candidate diff]
+                                       │                                                             └──gated by──> [Regression gate]
+                                       │                                                                                └──passes──> [Draft PR]
+                                       │                                                                                                 └──requires──> [Human merge gate]
+                                       └──skip (noise/dup/user-error)──> [Triage report artifact]
 
-PDF fetch (via existing Cloudflare Worker at pct.tonyrowles.com)
-    └──required by──> Single citation flow
-    └──required by──> Batch mode (shared, one fetch)
+[Manual-promote escape hatch]
+    └──overrides──> [Triage classifier] ──produces──> [Analysis queue entry]
+                                                           (same path as auto-promote above)
 
-PDF.js parse → buildPositionMap (from src/offscreen/position-map-builder.js)
-    └──required by──> Single citation flow
-    └──required by──> Batch mode (shared across all passage rows)
+[Golden corpus (tests/test-cases.js)]
+    └──cross-checked by──> [Triage classifier] (is this patent known-good?)
+    └──gated by──> [Regression gate] (zero regressions required)
 
-matchAndCite (from src/shared/matching.js)
-    └──required by──> Single citation flow
-    └──required by──> Batch mode (called N times on shared map)
+[Quarantine corpus (tests/e2e/test-cases-quarantine.js)]
+    └──cross-checked by──> [Triage classifier] (is this a known-broken patent? → auto-promote)
+    └──verified by──> [Regression gate] (no new quarantine failures)
 
-Confidence thresholds (green/yellow/red)
-    └──required by──> Single citation result display
-    └──required by──> Batch mode per-row confidence column
+[duplicate_count from KV record]
+    └──signals──> [Triage classifier] (high count = skip LLM, auto-promote immediately)
 
-formatCitation (from src/shared/matching.js) + second code path for long form
-    └──required by──> Single citation result display
-    └──required by──> Citation format toggle
-    └──enhances──> Copy-to-clipboard (copies formatted string)
-    └──enhances──> Batch copy-all (uses same toggle state)
+[confidenceTier="green" + category="inaccurate_citation"]
+    └──signals──> [Triage classifier] (highest-priority WRONG_CITATION class: auto-promote)
 
-applyPatentPrefix logic (from content-script.js applyPatentPrefix)
-    └──enhances──> Single citation display (when prefix checkbox is checked)
-    └──enhances──> Batch copy-all
+[invokeAnthropicSdkWithLedger (existing in llm-driver.js)]
+    └──used by──> [LLM analysis + fix proposal]
+    └──capped by──> [Cost ledger $80/$100 monthly cap]
+
+[Cost ledger (tests/e2e/.llm-spend-ledger.json)]
+    └──gated by──> [LLM analysis step] (hard cap: refuse to start analysis if monthly cap exceeded)
 ```
 
 ### Dependency Notes
 
-- **Shared core extraction is a prerequisite for everything.** The first phase of v6.0
-  (per PROJECT.md and ROADMAP.md) extracts `src/shared/matching.js`,
-  `src/offscreen/position-map-builder.js`, and `src/offscreen/pdf-parser.js` into a
-  workspace package consumed by both the extension and the webapp. All webapp feature
-  work depends on this extraction being done first.
-
-- **PROXY_TOKEN rotation is a blocking security gate** before any public deployment.
-  The hardcoded token in `src/offscreen/offscreen.js` must be rotated and moved
-  server-side before the webapp URL is published, because the webapp exposes the
-  Worker URL publicly. Noted in PROJECT.md and ROADMAP.md.
-
-- **Batch mode requires single-citation flow to work first.** Batch is the same
-  pipeline applied N times. Build and validate single-passage before adding batch row UI.
-
-- **Citation format toggle is stateless.** No storage needed in v1 (resets on page
-  reload). Toggle state lives in a JS variable or `<select>`. Persistent format
-  preference is a v2 feature.
-
-- **Published app rejection message has no dependencies** — it fires purely from
-  kind-code detection on the user's input, before any network call.
+- **Ingestion script requires v5.0 BUG_REPORTS KV:** The `wrangler kv key list --remote` API is the only current access path. The script must run with `wrangler` credentials (same as the deploy workflow already has).
+- **Triage classifier requires golden + quarantine corpus at read-time:** Pure file reads from `tests/test-cases.js` and `tests/e2e/test-cases-quarantine.js`. No network calls.
+- **LLM analysis requires PDF text context:** The patent's position-map / PDF text may be in `PATENT_CACHE` KV already (fetched during user's citation session). If not cached, the analysis step must fetch it via the Worker's `/cache` route or the USPTO fallback — this is the most complex dependency in the pipeline.
+- **Regression gate requires both `npm test` (golden) and the quarantine spec:** Already exists; wiring them as a required gate on the fix PR is the only new work.
+- **Human merge gate is enforced by the existing ruleset:** No new code needed; branch-protection ruleset 17086676 already requires human approval before merge to main.
+- **LLM fix proposal conflicts with auto-merge:** These are incompatible by design. The anti-feature section captures this explicitly.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v1 = v6.0)
+### Launch With (v6.1 core pipeline)
 
-- [x] Shared core extraction (`src/shared/matching.js`, `position-map-builder.js`,
-  `pdf-parser.js` → workspace package) — prerequisite for all other items
-- [x] PROXY_TOKEN rotation to server-side — blocking security gate before public deploy
-- [x] Patent number input with normalization (strip commas/spaces, add US prefix, uppercase)
-- [x] Kind-code detection → "not supported" message for A1/A2/A9 (applications), no fetch
-- [x] PDF fetch via existing Cloudflare Worker — no Worker changes needed for basic proxy
-- [x] Client-side PDF.js parse → position map build
-- [x] Single passage → citation result with green/yellow/red confidence indicator
-- [x] Copy-to-clipboard for single result
-- [x] Citation format toggle (4:15-22 shorthand vs Col. 4, ll. 15-22 long form)
-- [x] Optional patent number prefix checkbox
-- [x] Loading/progress UI with named stage labels (Fetching PDF / Parsing / Matching)
-- [x] No-match state with helpful message
-- [x] Network/parse error state with retry option
-- [x] Batch mode: N passage rows, shared PDF parse, per-row results, copy-all
-- [x] "No account needed, no data stored" disclosure (trust signal for legal professionals)
-- [x] "Deterministic — no AI inference" positioning note
+Minimum viable pipeline to close the human-report → regression-safe fix → human-merge loop.
 
-### Add After Validation (v1.x)
+- [ ] **Report ingestion script** — reads `BUG_REPORTS` KV via `wrangler --remote`, produces a structured JSON list of pending reports. Essential: without this, the pipeline has no input.
+- [ ] **Triage classifier (heuristic-first)** — classifies reports using available KV signals (`category`, `confidenceTier`, `pdfParseStatus`, `returnedCitation`, `duplicate_count`, `errorLog`) and corpus cross-check (golden + quarantine). No LLM needed for most classifications. Essential: determines what gets promoted.
+- [ ] **Auto-promote for clear real-bug signals** — `inaccurate_citation` + `"green"` tier, OR `duplicate_count ≥ 3`, OR patent in quarantine → auto-promote without LLM triage call. Essential: the highest-value reports should never wait for LLM classification budget.
+- [ ] **Manual-promote escape hatch** — `--force-promote <fingerprint>` CLI flag that bypasses classifier and injects a report into the analysis queue. Essential for maintainer trust in the auto-classifier.
+- [ ] **LLM analysis → candidate fix on `src/shared/matching.js` / `src/offscreen/` surface** — the hero case: promoted report feeds an LLM call (via `invokeAnthropicSdkWithLedger`) with report fields + PDF text context + matching-tier waterfall source. Output is a candidate diff. Essential: this is the core new capability.
+- [ ] **Regression gate: golden + quarantine** — every candidate diff is tested against `npm test` (golden) + quarantine spec before PR is opened. PR stays draft until gate is green. Essential for the regression-safety guarantee.
+- [ ] **Draft PR with `auto-fix/<fp-short>` branch** — the candidate fix is proposed via a GitHub draft PR. Never direct-to-main. Essential for human review workflow.
+- [ ] **Cost ledger integration** — all LLM calls go through `invokeAnthropicSdkWithLedger`; refuse to start analysis if monthly hard cap exceeded. Essential given project's established ledger-leak vigilance.
+- [ ] **Triage report artifact** — JSON file recording classification decision + promotion source + rationale for each processed report. Essential for audit trail.
+- [ ] **Retire autonomous machinery** — remove `inject-defect.mjs`, `e2e:explore` cron path, `v40-auto-fix` synthetic trigger, archive Phases 61–67. Essential to clean up the scope confusion with the retired v4.3 approach.
 
-- [ ] Determinate download progress bar if Worker forwards `Content-Length`
-- [ ] "Loaded from cache" status note on fast KV cache hits
-- [ ] Published application paragraph citations — if user demand is validated post-launch
-- [ ] Shareable links — URL-encoded patent + passage (v2 only if passage length is manageable)
-- [ ] Cancel button for long PDF fetches
+### Add After Validation (v6.1.x — post first successful auto-fix PR)
 
-### Future Consideration (v2+)
+Trigger: first successfully merged auto-fix PR that originated from a human bug report.
 
-- [ ] Citation history (localStorage only, no server, no auth) — if repeat-lookup patterns emerge
-- [ ] Multi-patent batch (N patents x M passages)
-- [ ] Patent family cache reuse (continuation patents share specification text)
-- [ ] User accounts — only if citation history requires cross-device sync
+- [ ] **PDF text context fetching** — if patent position-map not in `PATENT_CACHE` KV, fetch via Worker's `/cache` route and extract text for the LLM prompt. Adds richer analysis context.
+- [ ] **Maintainer report digest extension** — add `BUG_REPORTS` volume metrics (report count, classification breakdown, promotion rate) to the existing Monday weekly digest.
+- [ ] **LLM triage for `ambiguous` reports** — only for reports that heuristics cannot classify (e.g., `other` category with a meaningful `note` field). LLM call returns `real_bug | user_error | noise` with reasoning.
+- [ ] **Iteration cap + `auto-fix-stuck` label** — when LLM fix fails the regression gate after N attempts, stop, label `auto-fix-stuck`, surface in digest.
+
+### Future Consideration (v6.2+)
+
+Trigger: stable pipeline with ≥5 successful auto-fix merges and maintainer confidence in the classifier.
+
+- [ ] **Additional fix surfaces** — `worker/src/index.js` (Worker route bugs), `src/offscreen/parser.js` (PDF parsing bugs), reported via `tool_not_working` + `pdfParseStatus: "error"` signal combination.
+- [ ] **Quarantine-append from promoted report** — a promoted report that doesn't have a golden case yet gets added to quarantine so regression detection catches it on future fixes.
+- [ ] **Cross-report fingerprint cluster analysis** — when 3+ reports for different patents share a common `errorLog` pattern or `pdfParseStatus: "fallback"` + `inaccurate_citation`, surface as a potential systemic issue.
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Shared core extraction + PROXY_TOKEN rotation | HIGH (prerequisite / security) | MEDIUM | P1 |
-| Patent number normalization + kind-code validation | HIGH | LOW | P1 |
-| Published app rejection message | HIGH | LOW | P1 |
-| Single citation flow (fetch + parse + match) | HIGH | MEDIUM | P1 |
-| Confidence indicator (green/yellow/red) | HIGH | LOW | P1 |
-| Copy-to-clipboard | HIGH | LOW | P1 |
-| Loading/progress UI with stage labels | HIGH | LOW | P1 |
-| No-match and error states | HIGH | LOW | P1 |
-| Citation format toggle | MEDIUM | LOW | P1 |
-| Patent number prefix option | MEDIUM | LOW | P1 |
-| Batch mode (N passages, shared parse, per-row results) | HIGH | MEDIUM | P1 |
-| Batch copy-all | MEDIUM | LOW | P1 |
-| "Deterministic / no AI" trust signal | MEDIUM | LOW | P1 |
-| Shareable links | LOW | MEDIUM | P3 |
-| Citation history | LOW | MEDIUM | P3 |
-| Published app paragraph citations | LOW | HIGH | P3 |
+| Feature | Maintainer Value | Implementation Cost | Priority |
+|---------|-----------------|---------------------|----------|
+| Report ingestion script | HIGH | LOW | P1 |
+| Heuristic triage classifier + corpus cross-check | HIGH | MEDIUM | P1 |
+| Auto-promote (clear signals: green+inaccurate, dup_count≥3, quarantine match) | HIGH | LOW | P1 |
+| Manual-promote escape hatch | HIGH (trust) | LOW | P1 |
+| LLM analysis → candidate fix (matching core surface) | HIGH | HIGH | P1 |
+| Regression gate (golden + quarantine) | HIGH | LOW (wiring only) | P1 |
+| Draft PR with `auto-fix/<fp-short>` branch | HIGH | LOW | P1 |
+| Cost ledger integration | HIGH (trust + safety) | LOW | P1 |
+| Triage report artifact | MEDIUM (audit trail) | LOW | P1 |
+| Retire autonomous machinery | HIGH (scope hygiene) | MEDIUM | P1 |
+| PDF text context fetching for LLM | MEDIUM | MEDIUM | P2 |
+| Report volume digest extension | MEDIUM | LOW | P2 |
+| LLM triage for ambiguous reports | MEDIUM | MEDIUM | P2 |
+| Iteration cap + stuck label | MEDIUM (cost safety) | LOW | P2 |
+| Quarantine-append from promoted report | LOW | MEDIUM | P3 |
+| Cross-report cluster analysis | LOW | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for launch (v6.0)
-- P2: Should have, add when possible (v6.x)
-- P3: Nice to have, defer to v2+
+- P1: Required for the pipeline to close end-to-end on a real human report
+- P2: Adds quality and maintainer ergonomics after the core loop is proven
+- P3: Sophistication that belongs in a follow-on milestone
 
 ---
 
-## Existing Core Dependency Map (Extension → Webapp)
+## "What Good Looks Like" for the Maintainer
 
-The webapp reuses these three pure modules with zero `chrome.*` or DOM dependencies
-(confirmed in PROJECT.md v6.0 goal section). The extraction into a shared workspace
-package is the first phase of the milestone.
+A maintainer operating this loop on real user reports should experience:
 
-| Module | What it does | Webapp usage |
-|--------|--------------|--------------|
-| `src/shared/matching.js` (`matchAndCite`, `formatCitation`) | Text matching tiers 0-5 + citation string formatting | Direct import in webapp citation handler; `formatCitation` needs a second long-form code path |
-| `src/offscreen/position-map-builder.js` | PDF.js text items → column/line position map | Run client-side in browser (main thread or Web Worker) after PDF fetch |
-| `src/offscreen/pdf-parser.js` | Fetch PDF bytes → PDF.js parse → raw text items | Run client-side; PDF bytes sourced from the existing Worker proxy |
+1. **Zero manual triage required for obvious cases.** A `"green"` confidence report of `"inaccurate_citation"` with `duplicate_count: 5` auto-promotes without a maintainer decision. The maintainer's attention is reserved for `ambiguous` reports and PR review.
 
-### Citation Format Inventory (from codebase)
+2. **An escape hatch that is one command.** When the maintainer spots a misclassified report in the Discord embed, `npm run promote-report -- --fingerprint abc123def456` pushes it into analysis without editing classifier code.
 
-`formatCitation` in `matching.js` lines 382-395 currently produces only the shorthand:
-- Single-line: `4:15`
-- Same-column range: `4:15-22`
-- Cross-column range: `4:55-5:10`
+3. **A PR they can actually review.** The draft PR body shows: the original report fields (patent, selection text if present, returned citation, confidence tier), the candidate diff (ideally ≤30 lines for a single-tier fix), the regression gate results (all 75+ golden cases: PASS, quarantine cases: no new failures), and the cost stamp (`$0.38 / 12,400 tokens`). The reviewer clicks "Approve" or "Request changes" — not "figure out what this PR is trying to fix."
 
-The `displayMode` setting in the extension controls how much info appears in the popup
-(default = citation only; advanced = with confidence detail) — this is NOT the citation
-string format itself.
+4. **No surprises from the regression guard.** If a proposed fix would break even one golden case, the PR stays in draft and the `auto-fix-stuck` label fires. The maintainer is never in a position of merging something that secretly regresses another patent.
 
-The long-form alternative (`Col. 4, ll. 15-22`) is listed as a "Future" requirement in
-PROJECT.md and is not yet implemented anywhere in the extension. **The webapp is the
-first surface to ship the format toggle.** The implementation is a new code path in
-`formatCitation` (or a wrapper) — low complexity since it is a pure transformation of
-the same column/line integers.
-
-The `includePatentNumber` option produces `'321 Pat., ` prefix (last 3 digits of patent
-number + Pat./App.) via `applyPatentPrefix` in content-script.js. This logic is
-webapp-portable as a pure function.
+5. **Visibility into the queue.** The Monday digest includes a line: `Bug Reports: 12 received (7 real, 3 noise, 2 ambiguous) | 4 promoted → 2 PRs open, 1 merged, 1 stuck`. The maintainer knows whether the pipeline is healthy without digging into logs.
 
 ---
 
 ## Sources
 
-- `src/content/citation-ui.js` — confidence thresholds (lines 152-153), popup structure, copy-to-clipboard pattern (HIGH confidence — authoritative codebase)
-- `src/content/patent-info.js` — kind-code detection (A1/A2/A9 = application) (HIGH confidence — authoritative codebase)
-- `src/shared/matching.js` — `formatCitation` function, confidence return values (HIGH confidence — authoritative codebase)
-- `src/content/content-script.js` — `applyPatentPrefix`, `getShortPatentNumber`, patent-type routing (HIGH confidence — authoritative codebase)
-- `src/options/options.html` — existing settings: `displayMode`, `includePatentNumber`, display mode options (HIGH confidence — authoritative codebase)
-- `.planning/PROJECT.md` — v6.0 scope, constraints, out-of-scope items, PROXY_TOKEN warning, PDF size range (5-30MB) (HIGH confidence — project definition)
-- `.planning/ROADMAP.md` — backlog decisions for Phase 999.1, locked decisions from 2026-06-15 discussion (HIGH confidence — project definition)
-- Web form UX conventions for async-heavy single-purpose tools (loading states, batch entry patterns, copy-all) (MEDIUM confidence — general pattern knowledge, not patent-specific)
+- v5.0 `BUG_REPORTS` KV schema — `worker/src/report-schema.md` (project-internal, HIGH confidence)
+- v5.0 `src/shared/report-payload-builder.js` — field allowlist and payload contract (project-internal, HIGH confidence)
+- v4.0 FEATURES.md (`.planning/research-v4.0-archive/FEATURES.md`) — table-stakes, anti-features, verifier gate design, trust invariant (project-internal, HIGH confidence)
+- v3.1 validated requirements (PROJECT.md TRIAGE-01..06, ISSUE-01..04, QUAR-01..05) — heuristic-first classifier design, hybrid triage pattern, fingerprint dedup scheme (project-internal, HIGH confidence)
+- [eesel AI: AI for Bug Report Triage in 2026](https://www.eesel.ai/blog/ai-for-bug-report-triage) — five-stage triage pipeline (capture → classify → deduplicate → prioritize → route), industry baseline for automated triage (MEDIUM confidence)
+- [GitBugs: Bug Reports for Duplicate Detection (arxiv 2504.09651)](https://arxiv.org/abs/2504.09651) — duplicate detection signals, occurrence count as priority signal (MEDIUM confidence)
+- [GitHub Blog: GitHub Models for Open Source Maintainers](https://github.blog/open-source/maintainers/how-github-models-can-help-open-source-maintainers-focus-on-what-matters/) — AI triage as "second pair of eyes"; human-in-the-loop until automation is trusted; spam/needs-review classification scheme (HIGH confidence, official GitHub source)
+- [USENIX: AI in the Pipeline — Reliability Lessons from Adding LLM to CI/CD](https://www.usenix.org/publications/loginonline/ai-pipeline-reliability-lessons-adding-llm-cicd) — cheap deterministic checks first, LLM nightly, paired-comparison gating, auto-rollback (MEDIUM confidence)
+- [dosu.dev: Automating GitHub Issue Triage](https://dosu.dev/blog/automating-github-issue-triage) — maintainer-in-the-loop pattern; suggested responses for human review before posting (MEDIUM confidence)
+- [Self-Healing Software Systems (arxiv 2504.20093)](https://arxiv.org/pdf/2504.20093) — sandboxed test suite validation, branch-and-retry-3x pattern, revert on persistent failure (MEDIUM confidence)
+- [GitHub Blog: Agent Pull Requests review patterns](https://github.blog/ai-and-ml/generative-ai/agent-pull-requests-are-everywhere-heres-how-to-review-them/) — 45.1% of agent PRs require human revision; checkpoint patterns (MEDIUM confidence, established in v4.0 research)
+- SecurityWeek / TheRegister April 2026: Comment-and-Control prompt injection via GitHub issue comments — trigger filtering (issues-event, not comment-event) as injection defense (HIGH confidence, established in v4.0 research)
 
 ---
-
-*Feature research for: standalone patent citation web form (v6.0 milestone)*
-*Researched: 2026-06-16*
+*Feature research for: v6.1 Auto-Fix from Bug Reports — human-report-driven, LLM-assisted auto-fix pipeline*
+*Researched: 2026-06-17*

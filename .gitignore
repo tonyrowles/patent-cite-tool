@@ -34,3 +34,6 @@ patent-cite-firefox.zip
 patent-cite-chrome.zip
 *.xpi
 worker/node_modules
+
+# Phase 11: local triage-report artifacts (gitignored; CI uses upload-artifact — D-11)
+.triage-reports/

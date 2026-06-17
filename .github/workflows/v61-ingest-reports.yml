@@ -1,0 +1,70 @@
+# .github/workflows/v61-ingest-reports.yml
+#
+# Phase 11 Plan 03 (PROMO-04) — workflow_dispatch-only entry point for the
+# v6.1 triage layer. Classifies open BUG_REPORTS KV records, auto-promotes
+# real bugs to report-fix-candidate GitHub Issues, and uploads a per-run
+# triage-report JSON artifact for the audit trail (D-11, TRI-07).
+#
+# PROMO-04: NO schedule, push, or pull_request trigger — maintainer-triggered only.
+# COST-02: max_fixes input default is '5' (REQUIREMENTS.md L12+L68 — per-run cap).
+# D-11: triage-report.json is upload-artifact only — never committed to main.
+
+name: v6.1 Ingest Bug Reports
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no Issues created, no KV writes)'
+        required: false
+        type: boolean
+        default: false
+      max_fixes:
+        description: 'Max auto-promotions per run (default: 5)'
+        required: false
+        type: string
+        default: '5'   # COST-02 / REQUIREMENTS.md L12+L68: per-run cap default is 5, NOT 10
+
+permissions:
+  contents: read
+  issues: write    # LOAD-BEARING: gh issue create 403s without this
+                   # (same note as e2e-weekly-digest.yml line 35)
+
+concurrency:
+  group: v61-ingest-reports
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      MAX_FIXES_PER_RUN: ${{ inputs.max_fixes }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ingest-reports
+        run: node scripts/ingest-reports.mjs
+
+      - name: Upload triage report
+        if: always()    # upload even on partial failure (D-11)
+        uses: actions/upload-artifact@v4
+        with:
+          name: triage-report-${{ github.run_id }}
+          path: .triage-reports/triage-report.json
+          retention-days: 90
+          if-no-files-found: error

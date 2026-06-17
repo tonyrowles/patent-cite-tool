@@ -16,9 +16,9 @@
 
 ### Retirement (RTR) — clear the deferred autonomous machinery first
 
-- [ ] **RTR-01**: The fixture-mutator synthetic-issue injector (`scripts/inject-defect.mjs`) is removed and any npm/CI entry points referencing it are deleted.
-- [ ] **RTR-02**: The `v40-auto-fix.yml` workflow's `issues: labeled` synthetic trigger is removed; the workflow is `workflow_dispatch:`-only (or deleted) so the retired synthetic path cannot fire.
-- [ ] **RTR-03**: The autonomous `e2e:explore` exploration path and its npm script are archived/disabled so no autonomous "seek out bugs" run can be invoked.
+- [x] **RTR-01**: The fixture-mutator synthetic-issue injector (`scripts/inject-defect.mjs`) is removed and any npm/CI entry points referencing it are deleted.
+- [x] **RTR-02**: The `v40-auto-fix.yml` workflow's `issues: labeled` synthetic trigger is removed; the workflow is `workflow_dispatch:`-only (or deleted) so the retired synthetic path cannot fire.
+- [x] **RTR-03**: The autonomous `e2e:explore` exploration path and its npm script are archived/disabled so no autonomous "seek out bugs" run can be invoked.
 - [ ] **RTR-04**: The paused v4.3 Phase 61–67 artifacts and `RESUME-V4.3.md` are archived under `.planning/milestones/`, and STATE.md records that the `RESUME-V4.3.md` re-enable checklist is superseded (the synthetic-trigger contract tests are removed, not un-skipped).
 - [ ] **RTR-05**: After retirement, the full existing test + build suite is green and the 75-case golden corpus passes 100% (proves retirement changed no citation behavior).
 
@@ -111,9 +111,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RTR-01 | Phase 10 | Pending |
-| RTR-02 | Phase 10 | Pending |
-| RTR-03 | Phase 10 | Pending |
+| RTR-01 | Phase 10 | Complete |
+| RTR-02 | Phase 10 | Complete |
+| RTR-03 | Phase 10 | Complete |
 | RTR-04 | Phase 10 | Pending |
 | RTR-05 | Phase 10 | Pending |
 | ING-01 | Phase 11 | Pending |

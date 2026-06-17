@@ -210,10 +210,8 @@ describe('tests/e2e/lib/safe-append-ledger.js — Phase 62 LEDX-01..04', () => {
       path.resolve(REPO_ROOT, 'scripts/auto-fix-promote.mjs'),
       'utf8',
     );
-    const exploreSrc = fs.readFileSync(
-      path.resolve(REPO_ROOT, 'scripts/e2e-explore.mjs'),
-      'utf8',
-    );
+    // scripts/e2e-explore.mjs retired in Phase 10 (RTR-03) — its exploreSrc
+    // assertion removed; promote.mjs + auto-fix.mjs ledger discipline still guarded.
     const autoFixSrc = fs.readFileSync(
       path.resolve(REPO_ROOT, 'scripts/auto-fix.mjs'),
       'utf8',
@@ -231,25 +229,20 @@ describe('tests/e2e/lib/safe-append-ledger.js — Phase 62 LEDX-01..04', () => {
 
     // Both wire sites in promote.mjs use safeAppendLedger(LEDGER_PATH, ...)
     expect(countOccurrences(promoteSrc, 'safeAppendLedger(LEDGER_PATH')).toBeGreaterThanOrEqual(2);
-    // Both wire sites in e2e-explore.mjs use safeAppendLedger(LEDGER_PATH, ...)
-    expect(countOccurrences(exploreSrc, 'safeAppendLedger(LEDGER_PATH')).toBeGreaterThanOrEqual(2);
     // The auto-fix.mjs local wrapper still has its single canonical
     // appendLedgerEntry(LEDGER_PATH, entry) at line 181 — UNCHANGED.
     expect(countOccurrences(autoFixSrc, 'appendLedgerEntry(LEDGER_PATH')).toBe(1);
 
     // Combined invariant: scripts/ total appendLedgerEntry(LEDGER_PATH, ...)
     // calls reduces from 5 (baseline) to 1 (canonical only).
+    // Note: e2e-explore.mjs retired in Phase 10 — only promote + auto-fix counted.
     const totalDirect =
       countOccurrences(promoteSrc, 'appendLedgerEntry(LEDGER_PATH') +
-      countOccurrences(exploreSrc, 'appendLedgerEntry(LEDGER_PATH') +
       countOccurrences(autoFixSrc, 'appendLedgerEntry(LEDGER_PATH');
     expect(totalDirect).toBe(1);
 
-    // And the new helper imports are present in both wire scripts.
+    // And the new helper import is present in the promote wire script.
     expect(promoteSrc).toMatch(
-      /import\s*\{[^}]*safeAppendLedger[^}]*\}\s*from\s*['"]\.\.\/tests\/e2e\/lib\/safe-append-ledger\.js['"]/,
-    );
-    expect(exploreSrc).toMatch(
       /import\s*\{[^}]*safeAppendLedger[^}]*\}\s*from\s*['"]\.\.\/tests\/e2e\/lib\/safe-append-ledger\.js['"]/,
     );
   });

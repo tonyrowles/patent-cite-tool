@@ -45,8 +45,8 @@
 // Phase 45 design note in tests/e2e/lib/error-codes.js lines 90-96
 // ("HARNESS_ERROR: ... Not a member of ERROR_CLASSES — only the LLM report
 // tallies it."). Site 1 (error-codes.js ERROR_CLASSES) hard-codes this
-// exception with a comment justification; the remaining live sites (3, 4, 5)
-// still require HARNESS_ERROR presence (site 4 retired in Task 2).
+// exception with a comment justification; the remaining live sites (3, 5)
+// still require HARNESS_ERROR presence.
 //
 // FAILURE MESSAGE CONTRACT
 // ------------------------
@@ -90,13 +90,12 @@ const SCAFFOLD_KEYS = Object.keys(PROMPT_SCAFFOLDS);
 // design contract, not asserting against it.
 const HARNESS_ERROR_EXCEPTION = 'HARNESS_ERROR';
 
-// Resolved absolute paths for the 4 remaining canonical enumeration sites.
+// Resolved absolute paths for the 3 remaining canonical enumeration sites.
 // Site 2 (v40-auto-fix.yml) retired in Phase 10 Task 1 (RTR-02).
 // Site 4 (inject-defect.mjs) retired in Phase 10 Task 2 (RTR-01).
 const SITE_PATHS = Object.freeze({
   errorCodes: path.join(REPO_ROOT, 'tests/e2e/lib/error-codes.js'),
   fixPromptBuilder: path.join(REPO_ROOT, 'tests/e2e/lib/fix-prompt-builder.js'),
-  injectDefect: path.join(REPO_ROOT, 'tests/e2e/scripts/inject-defect.mjs'),
   llmRouter: path.join(REPO_ROOT, 'tests/e2e/lib/llm-router.js'),
 });
 
@@ -151,38 +150,6 @@ function checkPromptScaffolds(className) {
 }
 
 /**
- * Site 4 — `tests/e2e/scripts/inject-defect.mjs` ERROR_CLASSES Set literal.
- *
- * The mutator allowlist is a `new Set([...])` of single-quoted string
- * literals. Assert the single-quoted form is present.
- */
-function checkInjectDefectSet(className) {
-  let content;
-  try {
-    content = fs.readFileSync(SITE_PATHS.injectDefect, 'utf8');
-  } catch (err) {
-    return {
-      ok: false,
-      message:
-        `ERROR_CLASS '${className}' is in PROMPT_SCAFFOLDS but missing from ` +
-        `site 4 (inject-defect.mjs ERROR_CLASSES Set): failed to read ${SITE_PATHS.injectDefect} — ${err.message}`,
-    };
-  }
-  // Single-quoted string literal as it would appear inside the Set literal.
-  const needle = `'${className}'`;
-  if (content.includes(needle)) {
-    return { ok: true, message: '' };
-  }
-  return {
-    ok: false,
-    message:
-      `ERROR_CLASS '${className}' is in PROMPT_SCAFFOLDS but missing from ` +
-      `site 4 (inject-defect.mjs ERROR_CLASSES Set): expected literal ` +
-      `'${needle}' in ${SITE_PATHS.injectDefect}`,
-  };
-}
-
-/**
  * Site 5 — `tests/e2e/lib/llm-router.js` — EITHER MODEL_ROUTES has an entry
  * OR a `// MODEL_DEFAULT_OK: <CLASS>` comment justifies the sonnet default.
  */
@@ -219,7 +186,7 @@ function checkLlmRouterCoverage(className) {
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe('Phase 65 SCAF-03 — 5-site enumeration drift guard', () => {
+describe('Phase 65 SCAF-03 — enumeration drift guard (3 live sites; 2 retired in Phase 10)', () => {
   it('sanity: PROMPT_SCAFFOLDS has exactly 7 keys', () => {
     // If Plan 65-01 regressed (e.g. someone deleted VERIFIER_DISAGREE or
     // FRAME_SHIFT_DETECTED) this assertion fails before the parameterized
@@ -249,14 +216,6 @@ describe('Phase 65 SCAF-03 — 5-site enumeration drift guard', () => {
   );
 
   it.each(SCAFFOLD_KEYS)(
-    'site 4 (inject-defect.mjs ERROR_CLASSES Set): %s present',
-    (className) => {
-      const r = checkInjectDefectSet(className);
-      expect(r.ok, r.message).toBe(true);
-    },
-  );
-
-  it.each(SCAFFOLD_KEYS)(
     "site 5 (llm-router.js MODEL_ROUTES or // MODEL_DEFAULT_OK comment): %s covered",
     (className) => {
       const r = checkLlmRouterCoverage(className);
@@ -275,11 +234,9 @@ describe('Phase 65 SCAF-03 — 5-site enumeration drift guard', () => {
     expect(r.ok, r.message).toBe(true);
   });
 
-  it("HARNESS_ERROR exception: still required at remaining live sites (3, 4, 5)", () => {
-    // Site 2 (v40-auto-fix.yml) retired in Phase 10 Task 1.
-    // Site 4 (inject-defect.mjs) retired in Phase 10 Task 2.
+  it("HARNESS_ERROR exception: still required at remaining live sites (3, 5)", () => {
+    // Sites 2 (v40-auto-fix.yml) and 4 (inject-defect.mjs) retired in Phase 10.
     expect(checkPromptScaffolds(HARNESS_ERROR_EXCEPTION).ok).toBe(true);
-    expect(checkInjectDefectSet(HARNESS_ERROR_EXCEPTION).ok).toBe(true);
     expect(checkLlmRouterCoverage(HARNESS_ERROR_EXCEPTION).ok).toBe(true);
   });
 
@@ -294,14 +251,12 @@ describe('Phase 65 SCAF-03 — 5-site enumeration drift guard', () => {
     expect(r.message).toMatch(/site 1/);
   });
 
-  it('helper failure-message shape: all remaining (4) helpers honor the substring contract', () => {
-    // Site 2 (v40-auto-fix.yml) retired in Phase 10 Task 1.
-    // Site 4 (inject-defect.mjs) retired in Phase 10 Task 2.
+  it('helper failure-message shape: all remaining (3) helpers honor the substring contract', () => {
+    // Sites 2 (v40-auto-fix.yml) and 4 (inject-defect.mjs) retired in Phase 10.
     const synthetic = '___NONEXISTENT_CLASS___';
     const helpers = [
       ['site 1', checkErrorCodesArray],
       ['site 3', checkPromptScaffolds],
-      ['site 4', checkInjectDefectSet],
       ['site 5', checkLlmRouterCoverage],
     ];
     for (const [label, fn] of helpers) {

@@ -218,12 +218,11 @@ export async function upsertQuarantineEntry(newEntry, opts = {}) {
   // 5. D-12: label-add when threshold reached.
   // Phase 59 Plan 59-01 (MUTATOR-04 / Pitfall 8 LOAD-BEARING): suppress
   // auto-promotion for synthetic UAT-47-b entries. The fixture-mutator
-  // (tests/e2e/scripts/inject-defect.mjs) produces a synthetic triage report
+  // (retired in Phase 10 RTR-01) produced synthetic triage reports
   // whose run_id is the canonical SOURCE_TAG literal 'fixture-mutator-uat-47b'.
-  // The triage layer appends '-iter-<N>' to produce
+  // The triage layer appended '-iter-<N>' to produce
   // source_triage_finding_id values like 'fixture-mutator-uat-47b-iter-1'.
-  // Co-designed in the SAME commit as inject-defect.mjs per
-  // REQUIREMENTS.md MUTATOR-04.
+  // Guard retained for any historical corpus entries already in quarantine.
   //
   // Phase 59 REVIEW-FIX WR-04: anchored-equality regex (NOT startsWith).
   // The pre-REVIEW-FIX `.startsWith('fixture-mutator-uat-47b')` discriminator

@@ -15,7 +15,7 @@ an LLM-driven exploratory mode (local-dev only).
 | Mode          | Trigger                                                | Patent universe                                       | Use when                                                |
 | ------------- | ------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------- |
 | Deterministic | `npm run e2e:smoke` / `e2e:regression` / `e2e:silent`  | 66 live cases from `tests/test-cases.js`              | Nightly CI, pre-commit smoke, regression detection      |
-| Exploratory   | `npm run e2e:explore`                                  | Same 66 cases, LLM picks one + a fresh selection      | Local-dev only, monthly LLM subscription credit         |
+| Exploratory   | `e2e:explore [retired in Phase 10 RTR-03]`                                  | Same 66 cases, LLM picks one + a fresh selection      | Local-dev only, monthly LLM subscription credit         |
 
 The deterministic suite runs in GitHub Actions every night (Phase 29
 cron) and on every push (Phase 26 CI). It exercises the extension
@@ -144,7 +144,7 @@ deterministic 30-case slice).
 
 ## Running exploratory mode locally
 
-`npm run e2e:explore` is a developer tool. It picks a patent + a
+`e2e:explore [retired in Phase 10 RTR-03]` is a developer tool. It picks a patent + a
 selection autonomously by invoking Anthropic's `claude -p` CLI, drives
 the extension, classifies the result, and logs cost + decision into
 `tests/e2e/artifacts/{run-id}/llm-report.json`. It is NOT part of the
@@ -172,10 +172,10 @@ deterministic suite misses.
 ### Usage
 
 ```bash
-npm run e2e:explore                  # 5 iterations (default)
-npm run e2e:explore -- --iterations 1
-npm run e2e:explore -- --iterations 10
-npm run e2e:explore -- --help        # usage
+e2e:explore [retired in Phase 10 RTR-03]                  # 5 iterations (default)
+e2e:explore [retired in Phase 10 RTR-03] -- --iterations 1
+e2e:explore [retired in Phase 10 RTR-03] -- --iterations 10
+e2e:explore [retired in Phase 10 RTR-03] -- --help        # usage
 ```
 
 The double-dash separator (`--`) is npm's standard convention for
@@ -231,7 +231,7 @@ The runner refuses to execute when either `process.env.CI` or
 still trips the guard).
 
 ```bash
-CI=true npm run e2e:explore
+CI=true e2e:explore [retired in Phase 10 RTR-03]
 # [e2e-explore] exploratory mode is local-only — refusing to consume LLM credits in CI.
 # exit 1
 ```
@@ -242,7 +242,7 @@ hours. Exploratory mode is **local-only** by design.
 
 ### Outputs
 
-A single `npm run e2e:explore` run writes two files:
+A single `e2e:explore [retired in Phase 10 RTR-03]` run writes two files:
 
 - `tests/e2e/artifacts/{run-id}/llm-report.json` — per-iteration
   classification, citation, verifier verdict, cost, duration. Schema
@@ -254,7 +254,7 @@ A single `npm run e2e:explore` run writes two files:
 
 ## Uploading an exploratory report to CI
 
-After running `npm run e2e:explore` locally, ship the resulting
+After running `e2e:explore [retired in Phase 10 RTR-03]` locally, ship the resulting
 `llm-report.json` into the nightly CI pipeline without any manual
 GitHub Actions clicks:
 
@@ -466,7 +466,7 @@ Defined at the top of `tests/test-cases.js`:
 
 ## Spend ledger
 
-The spend ledger tracks LLM API cost across `npm run e2e:explore`
+The spend ledger tracks LLM API cost across `e2e:explore [retired in Phase 10 RTR-03]`
 invocations. It enforces the soft warning at $80/month and the hard
 block at $100/month per the v3.0 milestone decision.
 
@@ -512,7 +512,7 @@ by `tests/unit/llm-ledger.test.js` (18 tests).
 | Threshold                       | Behavior                                                                                            |
 | ------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `total_usd >= $80` (this month) | Warning printed to stderr; run continues. Message: `⚠ Monthly spend $X >= $80 — approaching cap`.    |
-| `total_usd >= $100` (this month)| Hard block. `npm run e2e:explore` refuses to invoke `claude -p`; exits with code 4.                  |
+| `total_usd >= $100` (this month)| Hard block. `e2e:explore [retired in Phase 10 RTR-03]` refuses to invoke `claude -p`; exits with code 4.                  |
 
 Both thresholds use `>=` comparison: exactly $80.00 triggers the warning,
 exactly $100.00 triggers the block. The check happens BEFORE every
@@ -538,14 +538,14 @@ To reset the ledger mid-month (e.g. for testing), **delete the file**:
 rm tests/e2e/.llm-spend-ledger.json
 ```
 
-The next `npm run e2e:explore` invocation will recreate it from an
+The next `e2e:explore [retired in Phase 10 RTR-03]` invocation will recreate it from an
 empty state. Tests in `tests/unit/llm-ledger.test.js` exercise this
 "missing file" path (`readLedger()` returns
 `{version: 1, months: {}}` on `ENOENT`).
 
 ### Concurrency note
 
-The ledger is single-process. Do NOT run `npm run e2e:explore` in two
+The ledger is single-process. Do NOT run `e2e:explore [retired in Phase 10 RTR-03]` in two
 terminals simultaneously — the second run's writes will clobber the
 first's increment (read-modify-write is not atomic across processes).
 The hard cap provides a last-resort guard against runaway spend, but
@@ -559,7 +559,7 @@ Per-invocation cost depends heavily on the system-prompt cache state:
   ~31K-token system prompt; ephemeral 1h tier).
 - **Subsequent invocations in same hour:** ~$0.07 (cache hits).
 - **Budget plan:** ~10-15 invocations × ~$0.10 = ~$1.50 per
-  `npm run e2e:explore` run. The $100/month cap supports ~1000
+  `e2e:explore [retired in Phase 10 RTR-03]` run. The $100/month cap supports ~1000
   invocations — far more than any single developer will use.
 
 Use `total_cost_usd` from the `claude -p` response directly — it
@@ -624,7 +624,7 @@ echo "CI=$CI GITHUB_ACTIONS=$GITHUB_ACTIONS"  # both must be empty
 
 Some shells (Docker, devcontainers) set `CI=true` by default. Unset
 both and retry. Note that this is the **only** path by which exit 1 is
-emitted by `npm run e2e:explore`.
+emitted by `e2e:explore [retired in Phase 10 RTR-03]`.
 
 ### Ledger cap reached
 

@@ -21,7 +21,7 @@ tests/e2e/.pdf-cache/
 # Phase 31 — optional spec excerpt cache (gitignored to avoid stale-extract concerns)
 tests/e2e/.spec-cache/
 
-# Local cron log for npm run e2e:explore (gitignored — paths + spend timing)
+# Local cron log (e2e:explore retired in Phase 10 RTR-03; pattern kept for any historical log files)
 .llm-cron.log
 
 # Claude Code local state (worktrees, settings, scheduled-task locks). Never commit:

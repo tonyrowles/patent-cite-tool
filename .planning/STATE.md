@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
-status: planning
-last_updated: "2026-06-17"
-last_activity: 2026-06-17
+status: Ready to begin Phase 10
+stopped_at: Phase 10 context gathered
+last_updated: "2026-06-17T16:56:04.774Z"
+last_activity: 2026-06-17 — v6.1 roadmap created (5 phases, 37 requirements mapped)
 progress:
   total_phases: 5
   completed_phases: 0
@@ -57,6 +58,7 @@ Progress: [----------] 0% (0/5 phases complete)
 - Weekly digest gains bypass-count metric (BYPASS-02) so the discipline is observable in the Auto-Fix Pipeline section.
 
 **v6.1 extension to human-gate invariant:**
+
 - No `gh pr merge --auto` or `auto-merge: true` flags in any `v40-*.yml` or new `v61-*.yml` workflow YAML
 - This is enforced as a named Vitest static-grep test (GATE-04) — a drift from this invariant fails CI
 
@@ -121,9 +123,9 @@ Progress: [----------] 0% (0/5 phases complete)
 
 ## Session Continuity
 
-Last session: 2026-06-17
-Stopped at: Roadmap created (ROADMAP.md, STATE.md updated; REQUIREMENTS.md traceability filled). Ready to plan Phase 10.
-Resume file: None
+Last session: 2026-06-17T16:56:04.763Z
+Stopped at: Phase 10 context gathered
+Resume file: .planning/phases/10-retirement-scaffolding/10-CONTEXT.md
 
 ## Operator Next Steps
 

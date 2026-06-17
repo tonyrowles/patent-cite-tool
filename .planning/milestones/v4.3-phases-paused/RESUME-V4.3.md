@@ -1,4 +1,12 @@
-# Resuming v4.3 (Auto-Fix Loop Closure) — restore checklist
+> **SUPERSEDED by v6.1 (Phase 10, 2026-06-17) — this re-enable checklist is VOIDED.**
+> The synthetic-trigger contract tests referenced by this checklist were **REMOVED** (not
+> un-skipped) in Phase 10 Plan 01. The `issues:labeled` trigger and the
+> `v40-auto-promote` `pull_request:closed` trigger are **NOT to be restored** — the
+> autonomous v4.3 machinery is retired. The inbound signal for v6.1 is exclusively
+> human bug reports from the `BUG_REPORTS` KV channel. This file is archived here for
+> audit history only. Archived path: `.planning/milestones/v4.3-phases-paused/RESUME-V4.3.md`
+
+# Resuming v4.3 (Auto-Fix Loop Closure) — restore checklist [ARCHIVED / VOIDED]
 
 **Status:** v4.3 is PAUSED (since 2026-06-12) to ship the v5.0 Bug Report feature.
 **This file:** the exact, reversible steps to undo the v5.0-era CI quieting when v4.3 resumes as a future milestone. Nothing about the auto-fix *engine* (`scripts/auto-fix.mjs`) was changed — only CI plumbing was made dormant so v5.0's CI could go green. See [[v43-paused-for-bug-report]] memory and `.planning/MILESTONES.md` (v4.2 entry) for the actual v4.3 *work* scope (diagnostic-injection mutator + `--max-turns`/`--allowed-tools=Read` relaxation + forensic-ledger hardening + synthetic-issue cleanup).

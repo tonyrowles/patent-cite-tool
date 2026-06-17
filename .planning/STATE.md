@@ -103,6 +103,7 @@ Progress: [███░░░░░░░] 33%
 - v6.1-roadmap: GATE-05 alone in Phase 13 — it is a named architectural invariant change (`assertTripleGate` body + Vitest sha256 pin) that should not be bundled with the experimental Phase 12 work. Its isolation makes the sha256 pin update atomic and auditable.
 - v6.1-roadmap: v4.3 autonomous machinery (inject-defect.mjs, e2e-explore.mjs, v40-auto-fix synthetic trigger, paused Phase 61-67 artifacts) is RETIRED, not resumed. RESUME-V4.3.md is superseded. The inbound signal for v6.1 is exclusively human bug reports from BUG_REPORTS KV.
 - [Phase ?]: issues:labeled synthetic trigger cannot fire
+- [Phase 10 / D-12 / RTR-04 / 2026-06-17]: RESUME-V4.3.md re-enable checklist is VOIDED post-retirement. The following triggers and tests are REMOVED (not un-skipped) and must NOT be restored: (1) `issues:labeled` trigger on `v40-auto-fix.yml` — deleted in Phase 10 Plan 01; (2) `v40-auto-promote` `pull_request:closed` trigger — workflow deleted in Phase 10 Plan 01; (3) synthetic-trigger contract tests (`v40-auto-fix-yaml.test.js` A1, `v40-auto-promote-yaml.test.js` A1) — deleted, not merely skipped. The archived checklist now lives at `.planning/milestones/v4.3-phases-paused/RESUME-V4.3.md` with a SUPERSEDED note. The v4.3 autonomous machinery is fully retired; v6.1 uses exclusively human bug reports from the BUG_REPORTS KV channel.
 
 ### Permanent Invariants (do not relax)
 

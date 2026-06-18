@@ -177,7 +177,11 @@ Plans:
   3. `npm test` exits 0 at 100% on the 75-case golden corpus after all v6.1 changes — confirming the retirement phase introduced no citation regressions
   4. The Monday 07:00 UTC weekly digest includes a `BUG_REPORTS` section with report volume, classification breakdown, and promotion/PR/merged/stuck counts — a maintainer can see pipeline health without querying KV directly
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 14-01-PLAN.md — DGST-01 BUG_REPORTS digest section (gh-only, degrade-to-n/a) + UAT-03 local checks (golden corpus 100% + ledger-cap)
+- [ ] 14-02-PLAN.md — Consolidated 14-HUMAN-UAT.md operator runbook (UAT-01/02/03 live + 5 folded Phase-12 behaviors)
 
 ## Progress
 

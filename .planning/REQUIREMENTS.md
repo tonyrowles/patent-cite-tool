@@ -60,7 +60,7 @@
 - [x] **GATE-02**: A passing candidate is proposed as a **draft** PR on an `auto-fix/<fp-short>` branch — never a direct push to `main`.
 - [x] **GATE-03**: The existing `verifier-gate` required status check (ruleset 17086676) gates the PR; the job name is unchanged so the required-check binding is preserved.
 - [x] **GATE-04**: Merge of any `src/` fix PR requires a maintainer approval click; no auto-merge flag exists in any workflow YAML (enforced by a static-grep Vitest test) — the human merge gate is a permanent invariant.
-- [ ] **GATE-05**: `assertTripleGate` Leg 3 is extended to accept the `report-fix-candidate` source label alongside the legacy label, and the post-merge auto-promote cycle fires for v6.1-sourced fix PRs; the `assertTripleGate` body change updates its Vitest sha256 pin.
+- [x] **GATE-05**: `assertTripleGate` Leg 3 is extended to accept the `report-fix-candidate` source label alongside the legacy label, and the post-merge auto-promote cycle fires for v6.1-sourced fix PRs; the `assertTripleGate` body change updates its Vitest sha256 pin.
 
 ### Cost & Safety (COST)
 
@@ -140,7 +140,7 @@
 | GATE-02 | Phase 12 | Complete |
 | GATE-03 | Phase 12 | Complete |
 | GATE-04 | Phase 12 | Complete |
-| GATE-05 | Phase 13 | Pending |
+| GATE-05 | Phase 13 | Complete |
 | COST-01 | Phase 12 | Complete |
 | COST-02 | Phase 12 | Complete |
 | COST-03 | Phase 12 | Complete |

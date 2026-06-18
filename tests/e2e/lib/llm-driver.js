@@ -533,6 +533,7 @@ export async function invokeAnthropicSdkWithLedger({
   issueId,
   prNumber,
   forceApi = false,
+  source = 'auto-fix-api',   // COST-01: default preserves legacy behavior; callers pass 'report-fix-api'
 } = {}) {
   const inCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
@@ -614,7 +615,7 @@ export async function invokeAnthropicSdkWithLedger({
       transport: 'sdk',
       issueId,
       prNumber,
-      source: 'auto-fix-api',
+      source,
       error: String(err && err.message ? err.message : err).slice(0, 200),
     });
     return {
@@ -648,7 +649,7 @@ export async function invokeAnthropicSdkWithLedger({
     transport: 'sdk',
     issueId,
     prNumber,
-    source: 'auto-fix-api',
+    source,
   });
 
   // Step 6 — Return

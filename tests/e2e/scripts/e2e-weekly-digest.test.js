@@ -52,6 +52,7 @@ import {
   runDigest,
   renderBugReportsSection,
   fetchBugReportIssues,
+  fetchAutoFixPrs,
 } from '../../../scripts/weekly-digest.mjs';
 
 import { SUMMARY_KEYS } from '../lib/llm-report.js';
@@ -664,16 +665,18 @@ describe('renderBugReportsSection: pure-function locked-order rows', () => {
   it('renders locked-order rows with fixture data and correct counts', () => {
     // Fixture: 2 report-fix-candidate issues, 1 merged verified PR, 1 open PR,
     //          1 stuck issue, 1 overfit PR.
+    // Issues come from `gh api .../issues` → snake_case `created_at` (IN-01).
+    // Dates are now-relative (daysAgo) so the 7-day window (WR-01) counts them.
     const issues = [
       {
         number: 201,
         labels: [{ name: 'report-fix-candidate' }],
-        createdAt: daysAgo(5),
+        created_at: daysAgo(5),
       },
       {
         number: 202,
         labels: [{ name: 'report-fix-candidate' }, { name: 'auto-fix-stuck' }],
-        createdAt: daysAgo(3),
+        created_at: daysAgo(3),
       },
     ];
     const ghPrs = [
@@ -746,7 +749,7 @@ describe('renderBugReportsSection: pure-function locked-order rows', () => {
       {
         number: 203,
         labels: [{ name: 'some-other-label' }, { name: 'report-fix-candidate' }],
-        createdAt: daysAgo(2),
+        created_at: daysAgo(2),
       },
     ];
     const md = renderBugReportsSection({ issues, ghPrs: [], now: PIN_NOW() });
@@ -754,14 +757,52 @@ describe('renderBugReportsSection: pure-function locked-order rows', () => {
     expect(md).toContain('| report_volume (report-fix-candidate) | 1 |');
   });
 
-  it('does NOT echo untrusted Issue/PR titles or bodies (T-14-01 injection guard)', () => {
-    // An issue with a malicious title and PR with injection attempt in body
+  it('WR-01: report_volume/promoted only count report-fix-candidate Issues created within the prior 7 days', () => {
+    // Three report-fix-candidate Issues: two inside the 7-day window, one well
+    // outside it. The renderer must window on created_at relative to `now`.
+    const issues = [
+      { number: 210, labels: [{ name: 'report-fix-candidate' }], created_at: daysAgo(1) },  // in window
+      { number: 211, labels: [{ name: 'report-fix-candidate' }], created_at: daysAgo(6) },  // in window
+      { number: 212, labels: [{ name: 'report-fix-candidate' }], created_at: daysAgo(30) }, // OUT of window
+    ];
+    const md = renderBugReportsSection({ issues, ghPrs: [], now: PIN_NOW() });
+    // Only the 2 in-window issues count — the lifetime total would be 3.
+    expect(md).toContain('| report_volume (report-fix-candidate) | 2 |');
+    expect(md).toContain('| promoted_reports | 2 |');
+  });
+
+  it('IN-02: report_volume excludes entries carrying a pull_request property', () => {
+    // GitHub's GET /issues includes PRs; a PR that somehow carries
+    // report-fix-candidate must NOT be counted as a report.
+    const issues = [
+      { number: 220, labels: [{ name: 'report-fix-candidate' }], created_at: daysAgo(1) },
+      {
+        number: 221,
+        labels: [{ name: 'report-fix-candidate' }],
+        created_at: daysAgo(1),
+        pull_request: { url: 'https://api.github.com/repos/test/test/pulls/221' },
+      },
+    ];
+    const md = renderBugReportsSection({ issues, ghPrs: [], now: PIN_NOW() });
+    // Only the real Issue (220) counts; the PR-shaped entry (221) is excluded.
+    expect(md).toContain('| report_volume (report-fix-candidate) | 1 |');
+  });
+
+  it('structural guard: renderer reads no free-text fields, so untrusted titles/bodies never appear (T-14-01)', () => {
+    // WR-04 (Phase 14): the SAFETY here is structural — renderBugReportsSection
+    // never accesses `.title` or `.body` on issues/PRs; it only reads `.labels`,
+    // `.mergedAt`, `.created_at`, and `.pull_request`. This test documents that
+    // contract by feeding a unique sentinel into EVERY free-text field and
+    // asserting the sentinel never reaches the rendered output. If a future
+    // change starts echoing a free-text field, this test fails.
+    const SENTINEL = 'XSS_SENTINEL_3f9a2b'; // unique, won't appear incidentally
     const issues = [
       {
         number: 204,
         labels: [{ name: 'report-fix-candidate' }],
-        title: '**INJECTION** <script>alert(1)</script>',
-        createdAt: daysAgo(1),
+        title: `**${SENTINEL}** <script>alert(1)</script>`,
+        body: `body ${SENTINEL} <img src=x onerror=alert(1)>`,
+        created_at: daysAgo(1),
       },
     ];
     const ghPrs = [
@@ -771,13 +812,18 @@ describe('renderBugReportsSection: pure-function locked-order rows', () => {
         mergedAt: daysAgo(0),
         createdAt: daysAgo(1),
         state: 'MERGED',
-        body: '<!-- source_issue: 204 --> **INJECTION** ` + "`rm -rf /`" + `',
+        // Well-formed literal (the old fixture concatenated stray backtick
+        // fragments inside a single-quoted string, producing dead noise).
+        title: `pr title ${SENTINEL}`,
+        body: `<!-- source_issue: 204 --> **${SENTINEL}** \`rm -rf /\``,
       },
     ];
     const md = renderBugReportsSection({ issues, ghPrs, now: PIN_NOW() });
-    // Must not contain raw title text
-    expect(md).not.toContain('INJECTION');
+    // No free-text field (title or body, from issue OR PR) reaches the output.
+    expect(md).not.toContain(SENTINEL);
     expect(md).not.toContain('<script>');
+    expect(md).not.toContain('onerror');
+    expect(md).not.toContain('rm -rf');
   });
 });
 
@@ -828,6 +874,7 @@ describe('fetchBugReportIssues: errors-returned-not-thrown contract', () => {
     let callCount = 0;
     const result = fetchBugReportIssues({
       now: PIN_NOW(),
+      repo: 'test/test',
       execFn: () => {
         callCount++;
         if (callCount === 1) return JSON.stringify([{ number: 1, labels: [] }]);
@@ -837,6 +884,51 @@ describe('fetchBugReportIssues: errors-returned-not-thrown contract', () => {
     expect(result.error).toBeNull();
     expect(result.issues).toHaveLength(1);
     expect(result.prs).toHaveLength(1);
+  });
+
+  it('CR-01/WR-02 field-contract guard: PR fetch uses `gh pr list ... mergedAt` (not `gh search prs`) and the issue fetch interpolates `repos/${repo}/issues`', () => {
+    // Capture the exact command strings the helper would run against real `gh`.
+    // This is the regression guard that would have caught CR-01: the prior code
+    // shipped `gh search prs --json ...mergedAt...`, which errors at runtime
+    // ("Unknown JSON field: mergedAt"). It also guards WR-02 (repo interpolation).
+    const commands = [];
+    fetchBugReportIssues({
+      now: PIN_NOW(),
+      repo: 'acme/widgets',
+      execFn: (cmd) => {
+        commands.push(cmd);
+        return '[]';
+      },
+    });
+
+    const issuesCmd = commands[0];
+    const prsCmd = commands[1];
+
+    // WR-02: resolved repo interpolated into the issues command (no placeholder).
+    expect(issuesCmd).toContain('gh api repos/acme/widgets/issues');
+    expect(issuesCmd).not.toContain('{owner}/{repo}');
+
+    // CR-01: PR fetch uses `gh pr list` (which emits mergedAt), with --state all,
+    // and requests the mergedAt field. It must NOT use the broken search command.
+    expect(prsCmd).toContain('gh pr list');
+    expect(prsCmd).toContain('--state all');
+    expect(prsCmd).toContain('mergedAt');
+    expect(prsCmd).not.toContain('gh search prs');
+  });
+
+  it('CR-01 field-contract guard: fetchAutoFixPrs uses `gh pr list ... mergedAt` (not `gh search prs`)', () => {
+    let captured;
+    fetchAutoFixPrs({
+      now: PIN_NOW(),
+      execFn: (cmd) => {
+        captured = cmd;
+        return '[]';
+      },
+    });
+    expect(captured).toContain('gh pr list');
+    expect(captured).toContain('--state all');
+    expect(captured).toContain('mergedAt');
+    expect(captured).not.toContain('gh search prs');
   });
 });
 
@@ -865,7 +957,8 @@ describe('runDigest: BUG_REPORTS section wiring', () => {
       reportsDir: runDir,
       fetchAutoFixPrs: () => ({ prs: [], fetchedAt: PIN_NOW(), error: null }),
       fetchBugReports: () => ({
-        issues: [{ number: 201, labels: [{ name: 'report-fix-candidate' }], createdAt: daysAgo(3) }],
+        // snake_case created_at (gh api shape) within the 7-day window (WR-01/IN-01).
+        issues: [{ number: 201, labels: [{ name: 'report-fix-candidate' }], created_at: daysAgo(3) }],
         prs: [],
         fetchedAt: PIN_NOW(),
         error: null,
@@ -875,6 +968,8 @@ describe('runDigest: BUG_REPORTS section wiring', () => {
     const md = fs.readFileSync(result.reportPath, 'utf8');
     expect(md).toContain('<summary>Bug Reports</summary>');
     expect(md).toContain('report-fix-candidate');
+    // The in-window report-fix-candidate Issue is counted (windowing works).
+    expect(md).toContain('| report_volume (report-fix-candidate) | 1 |');
   });
 
   it('degrade-to-n/a: file still writes and publish called when fetchBugReports returns error', async () => {

@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
-status: ready_to_plan
-stopped_at: Phase 13 complete (1/1) — ready to discuss Phase 14
-last_updated: 2026-06-18T14:38:48.823Z
+status: planning
+stopped_at: Phase 14 context gathered
+last_updated: "2026-06-18T16:03:46.375Z"
 last_activity: 2026-06-18
 progress:
   total_phases: 5
@@ -130,9 +130,9 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-06-18T14:27:08.916Z
-Stopped at: Completed Phase 13 Plan 01 (GATE-05 triple-gate extension)
-Resume file: None
+Last session: 2026-06-18T16:03:46.361Z
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-end-to-end-uat-digest/14-CONTEXT.md
 
 ## Operator Next Steps
 

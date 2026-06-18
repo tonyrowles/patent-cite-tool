@@ -757,21 +757,21 @@ env:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Can `github-actions[bot]` push to `origin/main` under ruleset 17086676?**
-   - What we know: `v40-cost-ledger-snapshot.yml` comments explicitly say this pattern was "retired" (line 88-90). The weekly digest (`e2e-weekly-digest.yml`) does push directly to main — but it may work because it has a different permission model or the ruleset has an Actions exception.
-   - What's unclear: The exact ruleset configuration for `github-actions[bot]` vs the named bypass actor `@tonyrowles`.
-   - Recommendation: Before writing the COST-04 step, test with `e2e-weekly-digest.yml`'s git-push pattern in a scratch branch. If it fails, fall back to the `ledger-snapshots/report-fix-{fp}` branch pattern.
+All three open questions are resolved by the Phase 12 plans. The resolution actually implemented is recorded inline below.
 
-2. **`source` parameter in `invokeAnthropicSdkWithLedger`**
-   - What we know: The function hardcodes `source: 'auto-fix-api'` at two ledger write sites (lines 617, 651 of `llm-driver.js`).
-   - What's unclear: Whether the planner should add the `source` param in Phase 12 (touching `llm-driver.js`) or use a workaround.
-   - Recommendation: Add optional `source` parameter with default `'auto-fix-api'` to `invokeAnthropicSdkWithLedger`. Update the two ledger write sites. The existing unit tests should not break (default matches current behavior). Document the parameter addition in the Phase 12 plan.
+1. **Can `github-actions[bot]` push to `origin/main` under ruleset 17086676?** **(RESOLVED — Plan 12-04, COST-04 deviation)**
+   - What we knew: `v40-cost-ledger-snapshot.yml` comments explicitly say the direct-to-main pattern was "retired" (line 88-90); ruleset 17086676 blocks `github-actions[bot]` direct-to-main pushes.
+   - **RESOLVED:** 12-04 does NOT push the ledger to main. The COST-04 ledger commit is pushed to a `ledger-snapshots/report-fix-<fp-short>` branch fallback (mirroring the established v40-cost-ledger-snapshot.yml S8 pattern that already pins against push-to-main). The COST-04 ordering invariant (ledger-commit step precedes the create-PR step) IS preserved; the "to main" wording is the only deviation. The deviation is gated behind a blocking human checkpoint (12-04 Task 3). 12-04's YAML contract test pins the `ledger-snapshots/report-fix-` target and asserts `git push origin HEAD:main` is absent.
 
-3. **Transport for LLM call: SDK vs subscription**
-   - What we know: SDK is single-turn (no tool calls); subscription is multi-turn (Read/Glob/Grep) but has inverse CI gate.
-   - Recommendation: SDK with source-file content embedded in prompt (Option C). If fix quality is poor, escalate to Phase 14 UAT for evaluation.
+2. **`source` parameter in `invokeAnthropicSdkWithLedger`** **(RESOLVED — Plan 12-01)**
+   - What we knew: The function hardcoded `source: 'auto-fix-api'` at two ledger write sites (lines 617, 651 of `llm-driver.js`); callers could not override it.
+   - **RESOLVED:** 12-01 adds an optional `source` parameter to `invokeAnthropicSdkWithLedger` with a backward-compatible default of `'auto-fix-api'`, threaded to both ledger write sites. The report-fix callers (12-03 dispatcher) pass `source:'report-fix-api'`. Existing unit tests stay green because the default matches prior behavior.
+
+3. **Transport for LLM call: SDK vs subscription** **(RESOLVED — Plan 12-03, Option C)**
+   - What we knew: SDK is single-turn (no tool calls); subscription is multi-turn (Read/Glob/Grep) but has an inverse CI gate (refuses to run in CI).
+   - **RESOLVED:** 12-03 uses Option C — single-turn SDK transport (`invokeAnthropicSdkWithLedger`) with the matching-core source (`src/shared/matching.js` + `position-map-builder.js`, plus `pdf-parser.js` when `pdfParseStatus === 'error'`) embedded verbatim in the user turn under `<matching_core_source>`. This avoids the subscription CI-gate conflict entirely. If fix quality proves poor, evaluation is deferred to Phase 14 UAT.
 
 ---
 

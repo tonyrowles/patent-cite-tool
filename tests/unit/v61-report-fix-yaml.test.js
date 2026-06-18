@@ -261,9 +261,14 @@ describe('v61-report-fix.yml static guards (Plan 12-04)', () => {
   // marker so parseSourceIssue's PREFERRED regex path resolves the source issue
   // for a v6.1 fix PR without any modification to the parser.
   // parseSourceIssue regex (auto-fix-promote.mjs:270): /<!--\s*source_issue:\s*(\d+)\s*-->/
-  it('D-04 (Phase 13): <!-- source_issue: N --> marker present in create-pull-request body (parseSourceIssue PREFERRED path)', () => {
-    expect(yaml).toContain('<!-- source_issue:');
-    expect(yaml).toContain('${{ github.event.issue.number }}');
+  it('D-04 (Phase 13): full <!-- source_issue: ${{ github.event.issue.number }} --> marker present and matches parseSourceIssue PREFERRED regex shape', () => {
+    // Pin the FULL contiguous marker — not two independent substrings. The bare
+    // `${{ github.event.issue.number }}` expression already appears in the
+    // human-readable `**Source Issue:**` line, so asserting it alone proves nothing.
+    expect(yaml).toContain('<!-- source_issue: ${{ github.event.issue.number }} -->');
+    // And prove the template marker has the exact shape parseSourceIssue parses
+    // (auto-fix-promote.mjs:270 — /<!--\s*source_issue:\s*(\d+)\s*-->/ at runtime).
+    expect(yaml).toMatch(/<!--\s*source_issue:\s*\$\{\{ github\.event\.issue\.number \}\}\s*-->/);
   });
 
 });

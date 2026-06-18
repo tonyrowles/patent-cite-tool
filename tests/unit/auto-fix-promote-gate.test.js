@@ -85,12 +85,16 @@ describe('assertTripleGate (Phase 44)', () => {
     })).toThrow(/TRIPLE_GATE_FAILED: merged — pull request not merged/);
   });
 
-  it("T3 — rejects when source-issue lacks 'triage' label", () => {
+  // GATE-05 / Phase 13: De-Morgan rejection boundary. A source issue carrying
+  // NEITHER 'triage' NOR 'report-fix-candidate' must still reject — and the
+  // assertion pins the FULL widened message so a future edit that drops the new
+  // clause (or slips the `&&` to `||`) is caught here, not silently accepted.
+  it("T3 — Phase 13 GATE-05: rejects (full widened message) when source-issue has neither 'triage' nor 'report-fix-candidate'", () => {
     expect(() => assertTripleGate({
       prLabels: ['auto-fix:verified'],
       merged: true,
-      sourceIssueLabels: ['bug'],    // no triage
-    })).toThrow(/TRIPLE_GATE_FAILED: sourceIssueLabels — source issue missing 'triage'/);
+      sourceIssueLabels: ['bug'],    // neither triage nor report-fix-candidate
+    })).toThrow(/TRIPLE_GATE_FAILED: sourceIssueLabels — source issue missing 'triage' or 'report-fix-candidate'/);
   });
 
   it('T4 — happy path: returns void when all three legs satisfied', () => {

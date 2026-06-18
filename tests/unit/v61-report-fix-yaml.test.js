@@ -257,4 +257,13 @@ describe('v61-report-fix.yml static guards (Plan 12-04)', () => {
     expect(yaml).toMatch(/node scripts\/report-fix\.mjs/);
   });
 
+  // D-04 (Phase 13): The create-pull-request body must emit the HTML comment
+  // marker so parseSourceIssue's PREFERRED regex path resolves the source issue
+  // for a v6.1 fix PR without any modification to the parser.
+  // parseSourceIssue regex (auto-fix-promote.mjs:270): /<!--\s*source_issue:\s*(\d+)\s*-->/
+  it('D-04 (Phase 13): <!-- source_issue: N --> marker present in create-pull-request body (parseSourceIssue PREFERRED path)', () => {
+    expect(yaml).toContain('<!-- source_issue:');
+    expect(yaml).toContain('${{ github.event.issue.number }}');
+  });
+
 });

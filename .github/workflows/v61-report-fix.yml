@@ -294,6 +294,7 @@ jobs:
             ## Auto-Fix Report
 
             **Source Issue:** #${{ github.event.issue.number }}
+            <!-- source_issue: ${{ github.event.issue.number }} -->
             **KV Key:** `${{ env.KV_KEY }}`
             **Fingerprint:** `${{ env.FP_SHORT }}`
 

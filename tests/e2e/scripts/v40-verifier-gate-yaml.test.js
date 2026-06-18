@@ -218,3 +218,53 @@ describe('v40-verifier-gate.yml contract (Phase 41-03)', () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// GATE-04 — Cross-workflow no-auto-merge invariant (Phase 12 Plan 04 extension)
+//
+// STATE.md Permanent Invariant: "No auto-merge of src/ fix PRs"
+// Enforcement: Vitest static-grep test — asserts absent auto-merge flags in
+// ALL v4.0 and v6.1 workflow YAMLs.
+//
+// CONTEXT.md GATE-04 mandate: "EXTEND the static-grep test to cover the new
+// v61-report-fix.yml". This block satisfies the milestone-level GATE-04 guard
+// (the permanent cross-workflow invariant), separate from the per-file pins
+// already in tests/unit/v61-report-fix-yaml.test.js.
+//
+// Three forbidden tokens (per STATE.md Permanent Invariants table):
+//   - 'gh pr merge --auto'  (CLI flag variant)
+//   - 'auto-merge: true'    (action input variant)
+//   - '--enable-auto-merge' (additional CLI flag variant)
+// ---------------------------------------------------------------------------
+
+describe('GATE-04 permanent cross-workflow no-auto-merge invariant (Phase 12-04)', () => {
+  const AUTO_MERGE_TOKENS = [
+    'gh pr merge --auto',
+    'auto-merge: true',
+    '--enable-auto-merge',
+  ];
+
+  const WORKFLOWS_UNDER_INVARIANT = [
+    'v61-report-fix.yml',
+  ];
+
+  for (const workflowFile of WORKFLOWS_UNDER_INVARIANT) {
+    describe(`${workflowFile}`, () => {
+      let wfYaml;
+      const wfPath = path.resolve(PROJECT_ROOT, '.github/workflows', workflowFile);
+
+      beforeAll(() => {
+        wfYaml = fs.readFileSync(wfPath, 'utf8');
+      });
+
+      for (const token of AUTO_MERGE_TOKENS) {
+        it(`GATE-04: '${token}' absent from ${workflowFile} (permanent invariant)`, () => {
+          // Per STATE.md: "No auto-merge of src/ fix PRs" — Citations go into
+          // legal filings; human approval is a permanent invariant. Any workflow
+          // that creates or manages fix PRs must not contain these tokens.
+          expect(wfYaml).not.toContain(token);
+        });
+      }
+    });
+  }
+});

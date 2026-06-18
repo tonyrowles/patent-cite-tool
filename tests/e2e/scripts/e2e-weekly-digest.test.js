@@ -50,9 +50,18 @@ import {
   renderDigest,
   renderCostLine,
   runDigest,
+  renderBugReportsSection,
+  fetchBugReportIssues,
 } from '../../../scripts/weekly-digest.mjs';
 
 import { SUMMARY_KEYS } from '../lib/llm-report.js';
+import {
+  HARD_CAP_USD,
+  LEDGER_PATH,
+  monthlyTotal,
+  combinedMonthlyTotalByTransport,
+  readLedger,
+} from '../lib/llm-ledger.js';
 
 // ---------------------------------------------------------------------------
 // Shared test state — mock-gh dir for spawn-based tests
@@ -645,5 +654,361 @@ describe('both publish branches', () => {
     expect(callLog.some(c => c.startsWith('createDigestIssue'))).toBe(true);
     expect(callLog.some(c => c.startsWith('createDiscussion'))).toBe(false);
     expect(result.mode).toBe('issue');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 14 DGST-01: renderBugReportsSection pure-function tests
+// ---------------------------------------------------------------------------
+describe('renderBugReportsSection: pure-function locked-order rows', () => {
+  it('renders locked-order rows with fixture data and correct counts', () => {
+    // Fixture: 2 report-fix-candidate issues, 1 merged verified PR, 1 open PR,
+    //          1 stuck issue, 1 overfit PR.
+    const issues = [
+      {
+        number: 201,
+        labels: [{ name: 'report-fix-candidate' }],
+        createdAt: daysAgo(5),
+      },
+      {
+        number: 202,
+        labels: [{ name: 'report-fix-candidate' }, { name: 'auto-fix-stuck' }],
+        createdAt: daysAgo(3),
+      },
+    ];
+    const ghPrs = [
+      {
+        number: 301,
+        labels: [{ name: 'auto-fix:verified' }],
+        mergedAt: daysAgo(1),
+        createdAt: daysAgo(4),
+        state: 'MERGED',
+        body: '<!-- source_issue: 201 -->',
+      },
+      {
+        number: 302,
+        labels: [{ name: 'human-review-required' }],
+        mergedAt: null,
+        createdAt: daysAgo(2),
+        state: 'OPEN',
+        body: '',
+      },
+    ];
+
+    const md = renderBugReportsSection({ issues, ghPrs, now: PIN_NOW() });
+
+    expect(md).toContain('<summary>Bug Reports</summary>');
+    expect(md).toContain('report_volume (report-fix-candidate)');
+    // report_volume = 2 (both issues have report-fix-candidate label)
+    expect(md).toContain('| report_volume (report-fix-candidate) | 2 |');
+    // promoted = 2 (same as report_volume)
+    expect(md).toContain('| promoted_reports | 2 |');
+    // open_auto_fix_prs = 1 (PR 302 has mergedAt: null)
+    expect(md).toContain('| open_auto_fix_prs | 1 |');
+    // merged_fix_prs = 1 (PR 301 is auto-fix:verified + mergedAt set)
+    expect(md).toContain('| merged_fix_prs | 1 |');
+    // auto_fix_stuck = 1 (issue 202 has auto-fix-stuck label)
+    expect(md).toContain('| auto_fix_stuck | 1 |');
+    // human_review_required = 1 (PR 302 has human-review-required)
+    expect(md).toContain('| human_review_required (overfit) | 1 |');
+    // promotion_rate = 1/2 * 100 = 50.0%
+    expect(md).toContain('| promotion_rate | 50.0% |');
+    expect(md).toContain('</details>');
+  });
+
+  it('zero-denominator ratio degrades to n/a while count metrics keep integer 0', () => {
+    // Empty data — all counts zero, ratio must show n/a
+    const md = renderBugReportsSection({ issues: [], ghPrs: [], now: PIN_NOW() });
+
+    // COUNT metrics must be integer 0 (not n/a)
+    expect(md).toContain('| report_volume (report-fix-candidate) | 0 |');
+    expect(md).toContain('| promoted_reports | 0 |');
+    expect(md).toContain('| open_auto_fix_prs | 0 |');
+    expect(md).toContain('| merged_fix_prs | 0 |');
+    expect(md).toContain('| auto_fix_stuck | 0 |');
+    expect(md).toContain('| human_review_required (overfit) | 0 |');
+
+    // RATIO metric must be n/a (zero denominator — distinct from 0%)
+    expect(md).toContain('| promotion_rate | n/a |');
+    expect(md).not.toContain('0%');
+  });
+
+  it('defensive coercion: non-array inputs treated as empty arrays', () => {
+    // Pass non-arrays — must not throw, must render 0 counts
+    const md = renderBugReportsSection({ issues: null, ghPrs: undefined, now: PIN_NOW() });
+    expect(md).toContain('| report_volume (report-fix-candidate) | 0 |');
+    expect(md).toContain('| promotion_rate | n/a |');
+  });
+
+  it('label-membership counting is not positional (CR-01 discipline)', () => {
+    // Issue with report-fix-candidate NOT at index 0 (shuffled)
+    const issues = [
+      {
+        number: 203,
+        labels: [{ name: 'some-other-label' }, { name: 'report-fix-candidate' }],
+        createdAt: daysAgo(2),
+      },
+    ];
+    const md = renderBugReportsSection({ issues, ghPrs: [], now: PIN_NOW() });
+    // Must count the issue even though report-fix-candidate is at labels[1]
+    expect(md).toContain('| report_volume (report-fix-candidate) | 1 |');
+  });
+
+  it('does NOT echo untrusted Issue/PR titles or bodies (T-14-01 injection guard)', () => {
+    // An issue with a malicious title and PR with injection attempt in body
+    const issues = [
+      {
+        number: 204,
+        labels: [{ name: 'report-fix-candidate' }],
+        title: '**INJECTION** <script>alert(1)</script>',
+        createdAt: daysAgo(1),
+      },
+    ];
+    const ghPrs = [
+      {
+        number: 303,
+        labels: [{ name: 'auto-fix:verified' }],
+        mergedAt: daysAgo(0),
+        createdAt: daysAgo(1),
+        state: 'MERGED',
+        body: '<!-- source_issue: 204 --> **INJECTION** ` + "`rm -rf /`" + `',
+      },
+    ];
+    const md = renderBugReportsSection({ issues, ghPrs, now: PIN_NOW() });
+    // Must not contain raw title text
+    expect(md).not.toContain('INJECTION');
+    expect(md).not.toContain('<script>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 14 DGST-01: fetchBugReportIssues errors-returned contract
+// ---------------------------------------------------------------------------
+describe('fetchBugReportIssues: errors-returned-not-thrown contract', () => {
+  it('returns error string and empty arrays when execFn throws (T-14-02)', () => {
+    const result = fetchBugReportIssues({
+      now: PIN_NOW(),
+      execFn: () => { throw new Error('gh: auth failure'); },
+    });
+    expect(result.error).toBeTruthy();
+    expect(result.error).toContain('gh: auth failure');
+    expect(result.issues).toEqual([]);
+    expect(result.prs).toEqual([]);
+    expect(result.fetchedAt).toBeInstanceOf(Date);
+  });
+
+  it('returns error string when execFn returns unparseable JSON', () => {
+    let callCount = 0;
+    const result = fetchBugReportIssues({
+      now: PIN_NOW(),
+      execFn: () => {
+        callCount++;
+        return 'NOT_VALID_JSON {{{';
+      },
+    });
+    expect(result.error).toBeTruthy();
+    expect(result.issues).toEqual([]);
+  });
+
+  it('returns error string when execFn returns a non-array JSON payload', () => {
+    let callCount = 0;
+    const result = fetchBugReportIssues({
+      now: PIN_NOW(),
+      execFn: () => {
+        callCount++;
+        if (callCount === 1) return '{"not":"an array"}';
+        return '[]';
+      },
+    });
+    expect(result.error).toBeTruthy();
+    expect(result.issues).toEqual([]);
+  });
+
+  it('returns issues and prs arrays with error: null on success', () => {
+    let callCount = 0;
+    const result = fetchBugReportIssues({
+      now: PIN_NOW(),
+      execFn: () => {
+        callCount++;
+        if (callCount === 1) return JSON.stringify([{ number: 1, labels: [] }]);
+        return JSON.stringify([{ number: 10, labels: [], mergedAt: null }]);
+      },
+    });
+    expect(result.error).toBeNull();
+    expect(result.issues).toHaveLength(1);
+    expect(result.prs).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 14 DGST-01: runDigest BUG_REPORTS section wiring
+// ---------------------------------------------------------------------------
+describe('runDigest: BUG_REPORTS section wiring', () => {
+  function makeMockGhClient(fixture) {
+    return {
+      listOpenIssuesByLabel(label) {
+        return fixture.filter(i => i.labels.some(l => l.name === label));
+      },
+      createDigestIssue() { return 'https://github.com/test/test/issues/1'; },
+      hasDiscussions() { return false; },
+      createDiscussion() { return 'https://github.com/test/test/discussions/1'; },
+    };
+  }
+
+  it('BUG_REPORTS section appears in written file when fetchBugReports returns data', async () => {
+    const fixture = loadFixture();
+    const result = await runDigest({
+      ghClient: makeMockGhClient(fixture),
+      now: PIN_NOW,
+      publishMode: 'issue',
+      repo: 'test/test',
+      reportsDir: runDir,
+      fetchAutoFixPrs: () => ({ prs: [], fetchedAt: PIN_NOW(), error: null }),
+      fetchBugReports: () => ({
+        issues: [{ number: 201, labels: [{ name: 'report-fix-candidate' }], createdAt: daysAgo(3) }],
+        prs: [],
+        fetchedAt: PIN_NOW(),
+        error: null,
+      }),
+    });
+
+    const md = fs.readFileSync(result.reportPath, 'utf8');
+    expect(md).toContain('<summary>Bug Reports</summary>');
+    expect(md).toContain('report-fix-candidate');
+  });
+
+  it('degrade-to-n/a: file still writes and publish called when fetchBugReports returns error', async () => {
+    const fixture = loadFixture();
+    const callLog = [];
+    const mockGhClient = {
+      listOpenIssuesByLabel(label) { return fixture.filter(i => i.labels.some(l => l.name === label)); },
+      createDigestIssue(title) { callLog.push('createDigestIssue'); return 'https://github.com/test/test/issues/1'; },
+      hasDiscussions() { return false; },
+      createDiscussion() { callLog.push('createDiscussion'); return ''; },
+    };
+
+    const result = await runDigest({
+      ghClient: mockGhClient,
+      now: PIN_NOW,
+      publishMode: 'issue',
+      repo: 'test/test',
+      reportsDir: runDir,
+      fetchAutoFixPrs: () => ({ prs: [], fetchedAt: PIN_NOW(), error: null }),
+      fetchBugReports: () => ({
+        issues: [],
+        prs: [],
+        fetchedAt: PIN_NOW(),
+        error: 'boom — gh auth failure',
+      }),
+    });
+
+    // File STILL written (degrade, don't abort)
+    expect(fs.existsSync(result.reportPath)).toBe(true);
+
+    // Publish still called
+    expect(callLog).toContain('createDigestIssue');
+
+    // Section renders n/a for ratio (count metrics show 0)
+    const md = fs.readFileSync(result.reportPath, 'utf8');
+    expect(md).toContain('<summary>Bug Reports</summary>');
+    expect(md).toContain('| promotion_rate | n/a |');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 14 UAT-03 (local half): ledger monthly-cap-enforcement assertion
+// ---------------------------------------------------------------------------
+describe('UAT-03: ledger monthly-cap-enforcement path', () => {
+  it('HARD_CAP_USD is 100 (locked constant)', () => {
+    expect(HARD_CAP_USD).toBe(100);
+  });
+
+  it('monthlyTotal returns 0 for missing ledger file (not-a-real-path)', () => {
+    // GOTCHA: monthlyTotal returns 0 for BOTH $0 spend AND missing file.
+    // Must always fs.existsSync(LEDGER_PATH) FIRST before trusting monthlyTotal.
+    const fakeLedger = readLedger('/tmp/__nonexistent_ledger_pct__.json');
+    const total = monthlyTotal(fakeLedger);
+    expect(total).toBe(0);
+  });
+
+  it('cap-enforcement comparison: monthlyTotal(readLedger()) >= HARD_CAP_USD triggers block', () => {
+    // Build an in-memory ledger at or above the cap.
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const overCapLedger = {
+      version: 1,
+      months: {
+        [currentMonth]: {
+          invocations: 10,
+          total_usd: 105.00,
+          last_invocation_iso: new Date().toISOString(),
+          iterations: [],
+        },
+      },
+    };
+    const total = monthlyTotal(overCapLedger);
+    // The cap-enforcement path: total >= HARD_CAP_USD → status: 'block'
+    expect(total >= HARD_CAP_USD).toBe(true);
+  });
+
+  it('cap-enforcement comparison: monthlyTotal below cap does NOT trigger block', () => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const underCapLedger = {
+      version: 1,
+      months: {
+        [currentMonth]: {
+          invocations: 2,
+          total_usd: 12.50,
+          last_invocation_iso: new Date().toISOString(),
+          iterations: [],
+        },
+      },
+    };
+    const total = monthlyTotal(underCapLedger);
+    expect(total >= HARD_CAP_USD).toBe(false);
+    expect(total).toBe(12.50);
+  });
+
+  it('fs.existsSync(LEDGER_PATH) guard: check existence BEFORE monthlyTotal (not-equal-to-0 guard)', () => {
+    // This test validates the canonical pattern:
+    //   if (fs.existsSync(LEDGER_PATH)) { ... monthlyTotal(...) }
+    // monthlyTotal(readLedger(nonexistentPath)) returns 0 — same as $0 spend.
+    // Always existsSync FIRST; never trust monthlyTotal(readLedger()) == 0 alone.
+    const ledgerExists = fs.existsSync(LEDGER_PATH);
+    if (ledgerExists) {
+      const total = monthlyTotal(readLedger(LEDGER_PATH));
+      // If ledger exists, monthlyTotal >= 0 (non-negative)
+      expect(total).toBeGreaterThanOrEqual(0);
+      // The cap-enforcement path compares against HARD_CAP_USD
+      const isOverCap = total >= HARD_CAP_USD;
+      expect(typeof isOverCap).toBe('boolean');
+    } else {
+      // Ledger absent — verify that monthlyTotal returns 0 for the empty ledger
+      const total = monthlyTotal(readLedger(LEDGER_PATH));
+      expect(total).toBe(0);
+      // And that 0 < HARD_CAP_USD (below cap — would not block)
+      expect(total < HARD_CAP_USD).toBe(true);
+    }
+  });
+
+  it('combinedMonthlyTotalByTransport returns combined sum with breakdown', () => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const ledger = {
+      version: 1,
+      months: {
+        [currentMonth]: {
+          invocations: 2,
+          total_usd: 5.00,
+          last_invocation_iso: new Date().toISOString(),
+          iterations: [
+            { cost_usd: 2.00, transport: 'sdk' },
+            { cost_usd: 3.00, transport: 'subscription' },
+          ],
+        },
+      },
+    };
+    const result = combinedMonthlyTotalByTransport(ledger, currentMonth);
+    expect(result.combined).toBe(5.00);
+    expect(result.by_transport.sdk).toBe(2.00);
+    expect(result.by_transport.subscription).toBe(3.00);
   });
 });

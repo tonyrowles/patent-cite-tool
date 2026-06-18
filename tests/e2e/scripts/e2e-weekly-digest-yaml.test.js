@@ -82,4 +82,11 @@ describe('e2e-weekly-digest.yml contract (Phase 37-03)', () => {
     expect(yaml).not.toContain('E2E_LEDGER_PATH_OVERRIDE');
   });
 
+  it('Y7 — no-CF-surface guard (Phase 14 D-01/T-14-03): wrangler and CLOUDFLARE absent', () => {
+    // D-01: the digest cron is GitHub-token-only. Cloudflare/wrangler credentials
+    // must never enter the weekly digest workflow (T-14-03 Information Disclosure).
+    expect(yaml).not.toContain('wrangler');
+    expect(yaml).not.toContain('CLOUDFLARE');
+  });
+
 });

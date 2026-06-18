@@ -75,8 +75,8 @@
 
 ### UAT (UAT)
 
-- [ ] **UAT-01**: A live end-to-end run is proven: a real (or seeded production) `BUG_REPORTS` record is triaged → promoted → LLM produces a fix → regression gate passes → maintainer merges → auto-promote closes the Issue, with ledger entries recorded.
-- [ ] **UAT-02**: The manual-promote escape hatch is exercised live (force-promote a non-auto-promoted report through the full pipeline).
+- [x] **UAT-01**: A live end-to-end run is proven: a real (or seeded production) `BUG_REPORTS` record is triaged → promoted → LLM produces a fix → regression gate passes → maintainer merges → auto-promote closes the Issue, with ledger entries recorded.
+- [x] **UAT-02**: The manual-promote escape hatch is exercised live (force-promote a non-auto-promoted report through the full pipeline).
 - [x] **UAT-03**: Post-milestone, the 75-case golden corpus passes 100% and the monthly ledger cap is confirmed enforced across all new invocations.
 
 ## v2 Requirements (deferred)
@@ -146,8 +146,8 @@
 | COST-03 | Phase 12 | Complete |
 | COST-04 | Phase 12 | Complete |
 | DGST-01 | Phase 14 | Complete |
-| UAT-01 | Phase 14 | Pending |
-| UAT-02 | Phase 14 | Pending |
+| UAT-01 | Phase 14 | Complete |
+| UAT-02 | Phase 14 | Complete |
 | UAT-03 | Phase 14 | Complete |
 
 **Coverage:**

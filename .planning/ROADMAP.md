@@ -76,7 +76,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 - [x] **Phase 10: Retirement + Scaffolding** - Remove the v4.3 autonomous machinery (fixture-mutator, explore cron, v40-auto-fix synthetic trigger), archive paused Phase 61-67 artifacts, stub REPORT_FIX_SCAFFOLD, confirm test suite green (3 plans) (completed 2026-06-17)
 - [x] **Phase 11: Triage Layer** - Build `ingest-reports.mjs` (KV polling, heuristic classifier, GitHub Issue creation, `promote` subcommand, `_review.status` write-back, triage artifact, post-fix suppression, corpus cross-check) (completed 2026-06-17)
 - [x] **Phase 12: Fix Generation + Regression Gate** - Complete `REPORT_FIX_SCAFFOLD`, build `v61-report-fix.yml` workflow (KV fetch, LLM invocation, diff-guard, two-commit ledger split, draft PR), wire GATE-01..04 and COST-01..04 — HIGHEST RISK: needs research-phase during planning (completed 2026-06-18)
-- [ ] **Phase 13: Triple-Gate Extension** - Extend `assertTripleGate` Leg 3 to accept `report-fix-candidate`, update `v40-auto-promote.yml`, update Vitest sha256 pin
+- [x] **Phase 13: Triple-Gate Extension** - Extend `assertTripleGate` Leg 3 to accept `report-fix-candidate`, update `v40-auto-promote.yml`, update Vitest sha256 pin (completed 2026-06-18)
 - [ ] **Phase 14: End-to-End UAT + Digest** - Live end-to-end pipeline validation, digest `BUG_REPORTS` section, post-milestone golden corpus clean
 
 ## Phase Details
@@ -163,7 +163,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 13-01-PLAN.md — Widen assertTripleGate Leg 3 to OR-accept report-fix-candidate (+ PROMOTE-04 pin, T7, same commit); add source_issue marker to v61 PR body (+ YAML-contract assertion, separate commit)
+- [x] 13-01-PLAN.md — Widen assertTripleGate Leg 3 to OR-accept report-fix-candidate (+ PROMOTE-04 pin, T7, same commit); add source_issue marker to v61 PR body (+ YAML-contract assertion, separate commit)
 
 ### Phase 14: End-to-End UAT + Digest
 
@@ -195,7 +195,7 @@ Plans:
 | 10. Retirement + Scaffolding | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 11. Triage Layer | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 12. Fix Generation + Regression Gate | v6.1 | 4/4 | Complete    | 2026-06-18 |
-| 13. Triple-Gate Extension | v6.1 | 0/1 | Not started | - |
+| 13. Triple-Gate Extension | v6.1 | 1/1 | Complete   | 2026-06-18 |
 | 14. End-to-End UAT + Digest | v6.1 | 0/TBD | Not started | - |
 
 ## Backlog

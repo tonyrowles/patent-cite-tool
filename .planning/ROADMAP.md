@@ -200,7 +200,7 @@ Plans:
 | 11. Triage Layer | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 12. Fix Generation + Regression Gate | v6.1 | 4/4 | Complete    | 2026-06-18 |
 | 13. Triple-Gate Extension | v6.1 | 1/1 | Complete    | 2026-06-18 |
-| 14. End-to-End UAT + Digest | v6.1 | 2/2 | Complete   | 2026-06-18 |
+| 14. End-to-End UAT + Digest | v6.1 | 2/2 | Complete    | 2026-06-18 |
 
 ## Backlog
 

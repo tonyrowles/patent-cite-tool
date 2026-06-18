@@ -31,6 +31,7 @@
 // initial RED. Once the module exists (Task 2 GREEN) the assertions take over.
 
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,6 +43,7 @@ import {
   DIFF_FENCE_START,
   DIFF_FENCE_END,
   buildScaffoldSystemPrompt,
+  REPORT_FIX_SCAFFOLD,
 } from '../../tests/e2e/lib/fix-prompt-builder.js';
 
 // __dirname shim for ES modules — needed by the Phase 45 historical-replay
@@ -815,5 +817,55 @@ describe('Phase 67 PITER-01: rewriteHint parameter', () => {
     expect(r.ok).toBe(true);
     // Exactly ONE bare canonical close tag survives (ours).
     expect(r.systemPrompt.match(/(?<!\\)<\/prior_attempt_feedback>/gi)?.length).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 12: REPORT_FIX_SCAFFOLD pins (FIX-02, FIX-03, GATE-04)
+// ---------------------------------------------------------------------------
+
+describe('Phase 12 REPORT_FIX_SCAFFOLD', () => {
+  it('is exported as a string (not a thunk, not in PROMPT_SCAFFOLDS)', () => {
+    expect(typeof REPORT_FIX_SCAFFOLD).toBe('string');
+    expect(typeof PROMPT_SCAFFOLDS.REPORT_FIX_SCAFFOLD).toBe('undefined'); // NOT a map key
+  });
+
+  it('PROMPT_SCAFFOLDS still has EXACTLY 7 keys (REPORT_FIX_SCAFFOLD is NOT added)', () => {
+    expect(Object.keys(PROMPT_SCAFFOLDS).length).toBe(7);
+  });
+
+  it('FIX-02: contains all 10 FORBIDDEN_PATHS substrings', () => {
+    const FORBIDDEN_PATH_LITERALS = [
+      'tests/test-cases.js', 'tests/golden/baseline.json',
+      'tests/e2e/test-cases-quarantine.js', '.github/workflows/v40-',
+      'tests/e2e/.llm-spend-ledger.json', '.github/CODEOWNERS',
+      'tests/e2e/.rerun-ring-buffer.json', 'tests/e2e/.flake-suppression.json',
+      'tests/e2e/lib/fix-prompt-builder.js', 'tests/e2e/lib/llm-router.js',
+    ];
+    for (const p of FORBIDDEN_PATH_LITERALS) {
+      expect(REPORT_FIX_SCAFFOLD).toContain(p);
+    }
+  });
+
+  it('FIX-03: user-controlled field names (note, selectionText, errorLog) NOT in system prompt', () => {
+    // These must appear ONLY in the user turn (buildReportUserTurn), not the system prompt
+    expect(REPORT_FIX_SCAFFOLD).not.toContain('note:');
+    expect(REPORT_FIX_SCAFFOLD).not.toContain('selectionText:');
+    expect(REPORT_FIX_SCAFFOLD).not.toContain('errorLog:');
+  });
+
+  it('contains <report_data> envelope literal (NOT <issue_body_untrusted>)', () => {
+    expect(REPORT_FIX_SCAFFOLD).toContain('<report_data>');
+    expect(REPORT_FIX_SCAFFOLD).not.toContain('<issue_body_untrusted>');
+  });
+
+  it('contains DIFF_FENCE_START and DIFF_FENCE_END', () => {
+    expect(REPORT_FIX_SCAFFOLD).toContain('===DIFF_START===');
+    expect(REPORT_FIX_SCAFFOLD).toContain('===DIFF_END===');
+  });
+
+  it('sha256 byte-stable (locks scaffold body against future drift)', () => {
+    const sha256hex = (str) => createHash('sha256').update(str, 'utf8').digest('hex');
+    expect(sha256hex(REPORT_FIX_SCAFFOLD)).toBe('bae9738eb48f8a1c5b9567f9eca77eaebe0037846007bc4be10b49e82290e327');
   });
 });

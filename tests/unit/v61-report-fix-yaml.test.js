@@ -103,9 +103,11 @@ describe('v61-report-fix.yml static guards (Plan 12-04)', () => {
   });
 
   it('COST-04: ledger commit step appears BEFORE create-pull-request step (ordering invariant)', () => {
-    // Mirror of v40-cost-ledger-snapshot-yaml.test.js S14 pattern
-    const idxLedger = yaml.search(/git\s+commit.*\[skip ci\]/);
-    const idxCPR = yaml.search(/create-pull-request@v8/);
+    // Mirror of v40-cost-ledger-snapshot-yaml.test.js S14 pattern.
+    // Search for the step's uses: directive (not comment mentions of the action name)
+    // and the ledger git commit line. The ledger commit must precede the CPR uses: line.
+    const idxLedger = yaml.search(/git diff --cached --quiet \|\| git commit/);
+    const idxCPR = yaml.search(/^\s+uses:\s+peter-evans\/create-pull-request@v8/m);
     expect(idxLedger).toBeGreaterThan(-1);
     expect(idxCPR).toBeGreaterThan(-1);
     expect(idxLedger).toBeLessThan(idxCPR);

@@ -781,6 +781,70 @@ export function fetchAutoFixPrs({ now, execFn } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// fetchBugReportIssues — Phase 14 DGST-01 bug-reports fetch helper.
+//
+// Mirrors fetchAutoFixPrs EXACTLY for the injected-deps + errors-RETURNED
+// contract (D-05 / D-16):
+//   - execFn is an injectable seam (production omits it; Vitest passes a fake).
+//   - Errors are RETURNED in { error: string }, never thrown.
+//   - NEVER writes to process.stderr (that is runDigest's responsibility).
+//
+// Data fetched (D-03 metric set, gh-only — no wrangler/Cloudflare):
+//   issues: report-fix-candidate Issues (state=all, open+closed, per D-03)
+//   prs:    auto-fix/* PRs (labeled auto-fix:verified OR auto-fix:partial-verified)
+//           sourced via the same gh search PRs command shape as fetchAutoFixPrs.
+//
+// @param {{ now?: Date, execFn?: (cmd: string, opts: object) => string }} opts
+// @returns {{ issues: Array<object>, prs: Array<object>, fetchedAt: Date, error: string|null }}
+// ---------------------------------------------------------------------------
+export function fetchBugReportIssues({ now, execFn } = {}) {
+  const fetchedAt = now instanceof Date ? now : new Date(now ?? Date.now());
+  const runner = execFn ?? ((c, o) => execSync(c, o));
+
+  // (1) Fetch report-fix-candidate Issues — state=all (open+closed) per D-03
+  const issuesCmd =
+    'gh api repos/{owner}/{repo}/issues --method GET ' +
+    '-f labels=report-fix-candidate -f state=all --paginate';
+  let rawIssues;
+  try {
+    rawIssues = runner(issuesCmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (err) {
+    return { issues: [], prs: [], fetchedAt, error: String(err?.message ?? err) };
+  }
+  let parsedIssues;
+  try {
+    parsedIssues = JSON.parse(rawIssues);
+  } catch (err) {
+    return { issues: [], prs: [], fetchedAt, error: String(err?.message ?? err) };
+  }
+  if (!Array.isArray(parsedIssues)) {
+    return { issues: [], prs: [], fetchedAt, error: 'gh api issues returned non-array payload' };
+  }
+
+  // (2) Fetch auto-fix PRs (same command as fetchAutoFixPrs — reuse the proven command)
+  const prsCmd =
+    'gh search prs --label auto-fix:verified --label auto-fix:partial-verified ' +
+    '--json number,state,mergedAt,createdAt,labels,body --limit 100';
+  let rawPrs;
+  try {
+    rawPrs = runner(prsCmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (err) {
+    return { issues: parsedIssues, prs: [], fetchedAt, error: String(err?.message ?? err) };
+  }
+  let parsedPrs;
+  try {
+    parsedPrs = JSON.parse(rawPrs);
+  } catch (err) {
+    return { issues: parsedIssues, prs: [], fetchedAt, error: String(err?.message ?? err) };
+  }
+  if (!Array.isArray(parsedPrs)) {
+    return { issues: parsedIssues, prs: [], fetchedAt, error: 'gh search prs returned non-array payload' };
+  }
+
+  return { issues: parsedIssues, prs: parsedPrs, fetchedAt, error: null };
+}
+
+// ---------------------------------------------------------------------------
 // isMain guard (WR-02, copied from run-triage-pipeline.mjs:220-230)
 // ---------------------------------------------------------------------------
 const isMain =

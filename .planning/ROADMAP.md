@@ -119,7 +119,12 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
   3. A diff that contains the reported `patentNumber` as a string literal in `src/` is flagged for mandatory human review and the PR body notes the specificity concern — no silent overfitting reaches the merge gate
   4. All LLM calls route through `safeAppendLedger` with `source:'report-fix-api'`; a per-run cap of 5 analysis calls is enforced; a report that exhausts 3 fix-iteration attempts gets the `auto-fix-stuck` label and no further spend — the monthly ledger cap remains untriggered for a single typical run
   5. No `auto-merge` flag exists in `v61-report-fix.yml` or any `v40-*.yml` — a Vitest static-grep test enforces this as a named permanent invariant
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 12-01-PLAN.md — Extract shared diff primitives (fix-primitives.js) + add source param to invokeAnthropicSdkWithLedger (D-02, COST-01)
+- [ ] 12-02-PLAN.md — REPORT_FIX_SCAFFOLD prompt body + Vitest content/byte-stability pins (FIX-02, FIX-03)
+- [ ] 12-03-PLAN.md — scripts/report-fix.mjs dispatcher: <report_data> envelope, FIX-04 overfit soft-flag, D-05 hard-abort, D-06 idempotency (FIX-01/03/04/05, COST-01/03)
+- [ ] 12-04-PLAN.md — v61-report-fix.yml workflow + YAML-contract test; COST-04 ledger-branch deviation (ruleset 17086676), GATE-01..04
 **Research flag**: NEEDS RESEARCH-PHASE during planning — the `REPORT_FIX_SCAFFOLD` prompt design for the KV-report → matching-core diff is novel; validate with a sample report before writing the workflow YAML; plan 2-3 prompt-iteration cycles; the interaction between `--max-turns 5 --tools Read,Glob,Grep` and the new scaffold is the highest uncertainty in the milestone
 
 ### Phase 13: Triple-Gate Extension

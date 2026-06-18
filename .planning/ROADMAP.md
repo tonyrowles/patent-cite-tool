@@ -160,7 +160,10 @@ Plans:
   2. The `assertTripleGate` body change and its Vitest sha256 pin are updated atomically in the same commit — the pin test passes on `main` after the change and there is no window where the gate is unenforced
   3. The existing `triage`-sourced auto-promote path continues to work (no regression from the Leg 3 extension) — the gate accepts either label, not only the new one
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 13-01-PLAN.md — Widen assertTripleGate Leg 3 to OR-accept report-fix-candidate (+ PROMOTE-04 pin, T7, same commit); add source_issue marker to v61 PR body (+ YAML-contract assertion, separate commit)
 
 ### Phase 14: End-to-End UAT + Digest
 
@@ -192,7 +195,7 @@ Plans:
 | 10. Retirement + Scaffolding | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 11. Triage Layer | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 12. Fix Generation + Regression Gate | v6.1 | 4/4 | Complete    | 2026-06-18 |
-| 13. Triple-Gate Extension | v6.1 | 0/TBD | Not started | - |
+| 13. Triple-Gate Extension | v6.1 | 0/1 | Not started | - |
 | 14. End-to-End UAT + Digest | v6.1 | 0/TBD | Not started | - |
 
 ## Backlog

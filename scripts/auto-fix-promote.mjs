@@ -122,9 +122,9 @@ export function assertTripleGate({ prLabels, merged, sourceIssueLabels } = {}) {
   if (merged !== true) {
     throw new Error('TRIPLE_GATE_FAILED: merged — pull request not merged');
   }
-  // Leg 3 — source-issue carries triage (Phase 34 triage-classifier verdict).
-  if (!Array.isArray(sourceIssueLabels) || !sourceIssueLabels.includes('triage')) {
-    throw new Error("TRIPLE_GATE_FAILED: sourceIssueLabels — source issue missing 'triage'");
+  // Leg 3 — source-issue carries triage or report-fix-candidate.
+  if (!Array.isArray(sourceIssueLabels) || (!sourceIssueLabels.includes('triage') && !sourceIssueLabels.includes('report-fix-candidate'))) {
+    throw new Error("TRIPLE_GATE_FAILED: sourceIssueLabels — source issue missing 'triage' or 'report-fix-candidate'");
   }
 }
 

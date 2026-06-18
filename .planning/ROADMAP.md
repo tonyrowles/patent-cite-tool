@@ -75,7 +75,7 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 
 - [x] **Phase 10: Retirement + Scaffolding** - Remove the v4.3 autonomous machinery (fixture-mutator, explore cron, v40-auto-fix synthetic trigger), archive paused Phase 61-67 artifacts, stub REPORT_FIX_SCAFFOLD, confirm test suite green (3 plans) (completed 2026-06-17)
 - [x] **Phase 11: Triage Layer** - Build `ingest-reports.mjs` (KV polling, heuristic classifier, GitHub Issue creation, `promote` subcommand, `_review.status` write-back, triage artifact, post-fix suppression, corpus cross-check) (completed 2026-06-17)
-- [ ] **Phase 12: Fix Generation + Regression Gate** - Complete `REPORT_FIX_SCAFFOLD`, build `v61-report-fix.yml` workflow (KV fetch, LLM invocation, diff-guard, two-commit ledger split, draft PR), wire GATE-01..04 and COST-01..04 — HIGHEST RISK: needs research-phase during planning
+- [x] **Phase 12: Fix Generation + Regression Gate** - Complete `REPORT_FIX_SCAFFOLD`, build `v61-report-fix.yml` workflow (KV fetch, LLM invocation, diff-guard, two-commit ledger split, draft PR), wire GATE-01..04 and COST-01..04 — HIGHEST RISK: needs research-phase during planning (completed 2026-06-18)
 - [ ] **Phase 13: Triple-Gate Extension** - Extend `assertTripleGate` Leg 3 to accept `report-fix-candidate`, update `v40-auto-promote.yml`, update Vitest sha256 pin
 - [ ] **Phase 14: End-to-End UAT + Digest** - Live end-to-end pipeline validation, digest `BUG_REPORTS` section, post-milestone golden corpus clean
 
@@ -136,16 +136,16 @@ Phase 10 (Retirement) → Phase 11 (Triage Layer)
 Plans:
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — Extract shared diff primitives (fix-primitives.js) + add source param to invokeAnthropicSdkWithLedger (D-02, COST-01)
-- [ ] 12-02-PLAN.md — REPORT_FIX_SCAFFOLD prompt body + Vitest content/byte-stability pins (FIX-02, FIX-03)
+- [x] 12-01-PLAN.md — Extract shared diff primitives (fix-primitives.js) + add source param to invokeAnthropicSdkWithLedger (D-02, COST-01)
+- [x] 12-02-PLAN.md — REPORT_FIX_SCAFFOLD prompt body + Vitest content/byte-stability pins (FIX-02, FIX-03)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 12-03-PLAN.md — scripts/report-fix.mjs dispatcher: <report_data> envelope, FIX-04 overfit soft-flag, D-05 hard-abort, D-06 idempotency (FIX-01/03/04/05, COST-01/03)
+- [x] 12-03-PLAN.md — scripts/report-fix.mjs dispatcher: <report_data> envelope, FIX-04 overfit soft-flag, D-05 hard-abort, D-06 idempotency (FIX-01/03/04/05, COST-01/03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 12-04-PLAN.md — v61-report-fix.yml workflow + YAML-contract test; COST-04 ledger-branch deviation (ruleset 17086676), GATE-01..04
+- [x] 12-04-PLAN.md — v61-report-fix.yml workflow + YAML-contract test; COST-04 ledger-branch deviation (ruleset 17086676), GATE-01..04
 
 **Research flag**: NEEDS RESEARCH-PHASE during planning — the `REPORT_FIX_SCAFFOLD` prompt design for the KV-report → matching-core diff is novel; validate with a sample report before writing the workflow YAML; plan 2-3 prompt-iteration cycles; the interaction between `--max-turns 5 --tools Read,Glob,Grep` and the new scaffold is the highest uncertainty in the milestone
 
@@ -191,7 +191,7 @@ Plans:
 | 9. Deploy + Live UAT + Privacy | v6.0 | 0/TBD | Complete | 2026-06-17 |
 | 10. Retirement + Scaffolding | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 11. Triage Layer | v6.1 | 3/3 | Complete    | 2026-06-17 |
-| 12. Fix Generation + Regression Gate | v6.1 | 0/TBD | Not started | - |
+| 12. Fix Generation + Regression Gate | v6.1 | 4/4 | Complete    | 2026-06-18 |
 | 13. Triple-Gate Extension | v6.1 | 0/TBD | Not started | - |
 | 14. End-to-End UAT + Digest | v6.1 | 0/TBD | Not started | - |
 

@@ -48,26 +48,26 @@
 
 ### Fix Generation (FIX) — LLM candidate fix
 
-- [ ] **FIX-01**: A `report-fix-candidate`-labeled Issue triggers a workflow that fetches the full KV record (via `wrangler --remote`) and invokes the LLM (`invokeAnthropicSdkWithLedger`) to produce a candidate diff.
-- [ ] **FIX-02**: The fix prompt is built by a new `REPORT_FIX_SCAFFOLD` that targets only the `src/shared/` matching core and enumerates FORBIDDEN_PATHS (tests, golden baseline, verifier, scripts, workflows) that the diff may not touch.
-- [ ] **FIX-03**: All user-controlled report fields (`note`, `selectionText`, `errorLog`) are escaped (`FORBIDDEN_DELIMITERS`) and wrapped in an `<report_data>`/untrusted XML envelope in the user turn — never in the system prompt — as a prompt-injection defense, pinned by a static-grep Vitest test.
-- [ ] **FIX-04**: The candidate diff is rejected (flagged for mandatory human review) if it contains the reported `patentNumber` as a string literal in `src/` (overfit / hardcoded-result guard).
-- [ ] **FIX-05**: If `selectionText` is absent in the KV record (user opted out), it is omitted from the prompt and PR body — never re-fetched from the patent page.
+- [x] **FIX-01**: A `report-fix-candidate`-labeled Issue triggers a workflow that fetches the full KV record (via `wrangler --remote`) and invokes the LLM (`invokeAnthropicSdkWithLedger`) to produce a candidate diff.
+- [x] **FIX-02**: The fix prompt is built by a new `REPORT_FIX_SCAFFOLD` that targets only the `src/shared/` matching core and enumerates FORBIDDEN_PATHS (tests, golden baseline, verifier, scripts, workflows) that the diff may not touch.
+- [x] **FIX-03**: All user-controlled report fields (`note`, `selectionText`, `errorLog`) are escaped (`FORBIDDEN_DELIMITERS`) and wrapped in an `<report_data>`/untrusted XML envelope in the user turn — never in the system prompt — as a prompt-injection defense, pinned by a static-grep Vitest test.
+- [x] **FIX-04**: The candidate diff is rejected (flagged for mandatory human review) if it contains the reported `patentNumber` as a string literal in `src/` (overfit / hardcoded-result guard).
+- [x] **FIX-05**: If `selectionText` is absent in the KV record (user opted out), it is omitted from the prompt and PR body — never re-fetched from the patent page.
 
 ### Regression Gate & Merge (GATE)
 
-- [ ] **GATE-01**: Every candidate diff runs the golden-corpus suite (`npm test`) and the quarantine spec before any PR is opened; zero golden regressions and no new quarantine failures are required.
-- [ ] **GATE-02**: A passing candidate is proposed as a **draft** PR on an `auto-fix/<fp-short>` branch — never a direct push to `main`.
-- [ ] **GATE-03**: The existing `verifier-gate` required status check (ruleset 17086676) gates the PR; the job name is unchanged so the required-check binding is preserved.
-- [ ] **GATE-04**: Merge of any `src/` fix PR requires a maintainer approval click; no auto-merge flag exists in any workflow YAML (enforced by a static-grep Vitest test) — the human merge gate is a permanent invariant.
+- [x] **GATE-01**: Every candidate diff runs the golden-corpus suite (`npm test`) and the quarantine spec before any PR is opened; zero golden regressions and no new quarantine failures are required.
+- [x] **GATE-02**: A passing candidate is proposed as a **draft** PR on an `auto-fix/<fp-short>` branch — never a direct push to `main`.
+- [x] **GATE-03**: The existing `verifier-gate` required status check (ruleset 17086676) gates the PR; the job name is unchanged so the required-check binding is preserved.
+- [x] **GATE-04**: Merge of any `src/` fix PR requires a maintainer approval click; no auto-merge flag exists in any workflow YAML (enforced by a static-grep Vitest test) — the human merge gate is a permanent invariant.
 - [ ] **GATE-05**: `assertTripleGate` Leg 3 is extended to accept the `report-fix-candidate` source label alongside the legacy label, and the post-merge auto-promote cycle fires for v6.1-sourced fix PRs; the `assertTripleGate` body change updates its Vitest sha256 pin.
 
 ### Cost & Safety (COST)
 
-- [ ] **COST-01**: All LLM calls route through the ledger guard (`safeAppendLedger`) with the existing monthly soft/hard caps enforced before each call; new entries carry `source:'report-triage'` / `source:'report-fix-api'`.
-- [ ] **COST-02**: A per-run analysis cap (`MAX_FIXES_PER_RUN`, default 5) bounds how many reports are LLM-analyzed in one pipeline execution; surplus promoted reports remain queued.
-- [ ] **COST-03**: LLM fix generation is capped at 3 iterations per report; on exhaustion the PR/Issue is labeled `auto-fix-stuck` and surfaced (no further spend).
-- [ ] **COST-04**: A YAML-contract Vitest test pins that the workflow commits the ledger to `main` (`[skip ci]`) in a step that precedes the create-PR step (two-commit-split invariant preserved).
+- [x] **COST-01**: All LLM calls route through the ledger guard (`safeAppendLedger`) with the existing monthly soft/hard caps enforced before each call; new entries carry `source:'report-triage'` / `source:'report-fix-api'`.
+- [x] **COST-02**: A per-run analysis cap (`MAX_FIXES_PER_RUN`, default 5) bounds how many reports are LLM-analyzed in one pipeline execution; surplus promoted reports remain queued.
+- [x] **COST-03**: LLM fix generation is capped at 3 iterations per report; on exhaustion the PR/Issue is labeled `auto-fix-stuck` and surfaced (no further spend).
+- [x] **COST-04**: A YAML-contract Vitest test pins that the workflow commits the ledger to `main` (`[skip ci]`) in a step that precedes the create-PR step (two-commit-split invariant preserved).
 
 ### Digest (DGST)
 
@@ -131,20 +131,20 @@
 | PROMO-02 | Phase 11 | Complete |
 | PROMO-03 | Phase 11 | Complete |
 | PROMO-04 | Phase 11 | Complete |
-| FIX-01 | Phase 12 | Pending |
-| FIX-02 | Phase 12 | Pending |
-| FIX-03 | Phase 12 | Pending |
-| FIX-04 | Phase 12 | Pending |
-| FIX-05 | Phase 12 | Pending |
-| GATE-01 | Phase 12 | Pending |
-| GATE-02 | Phase 12 | Pending |
-| GATE-03 | Phase 12 | Pending |
-| GATE-04 | Phase 12 | Pending |
+| FIX-01 | Phase 12 | Complete |
+| FIX-02 | Phase 12 | Complete |
+| FIX-03 | Phase 12 | Complete |
+| FIX-04 | Phase 12 | Complete |
+| FIX-05 | Phase 12 | Complete |
+| GATE-01 | Phase 12 | Complete |
+| GATE-02 | Phase 12 | Complete |
+| GATE-03 | Phase 12 | Complete |
+| GATE-04 | Phase 12 | Complete |
 | GATE-05 | Phase 13 | Pending |
-| COST-01 | Phase 12 | Pending |
-| COST-02 | Phase 12 | Pending |
-| COST-03 | Phase 12 | Pending |
-| COST-04 | Phase 12 | Pending |
+| COST-01 | Phase 12 | Complete |
+| COST-02 | Phase 12 | Complete |
+| COST-03 | Phase 12 | Complete |
+| COST-04 | Phase 12 | Complete |
 | DGST-01 | Phase 14 | Pending |
 | UAT-01 | Phase 14 | Pending |
 | UAT-02 | Phase 14 | Pending |

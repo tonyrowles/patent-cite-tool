@@ -180,7 +180,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md — DGST-01 BUG_REPORTS digest section (gh-only, degrade-to-n/a) + UAT-03 local checks (golden corpus 100% + ledger-cap)
+- [x] 14-01-PLAN.md — DGST-01 BUG_REPORTS digest section (gh-only, degrade-to-n/a) + UAT-03 local checks (golden corpus 100% + ledger-cap)
 - [ ] 14-02-PLAN.md — Consolidated 14-HUMAN-UAT.md operator runbook (UAT-01/02/03 live + 5 folded Phase-12 behaviors)
 
 ## Progress
@@ -200,7 +200,7 @@ Plans:
 | 11. Triage Layer | v6.1 | 3/3 | Complete    | 2026-06-17 |
 | 12. Fix Generation + Regression Gate | v6.1 | 4/4 | Complete    | 2026-06-18 |
 | 13. Triple-Gate Extension | v6.1 | 1/1 | Complete    | 2026-06-18 |
-| 14. End-to-End UAT + Digest | v6.1 | 0/TBD | Not started | - |
+| 14. End-to-End UAT + Digest | v6.1 | 1/2 | In Progress|  |
 
 ## Backlog
 

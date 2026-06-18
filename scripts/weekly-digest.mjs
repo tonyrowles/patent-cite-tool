@@ -503,7 +503,9 @@ export async function runDigest(opts = {}) {
   // (6.6) Phase 14 DGST-01 — append BUG_REPORTS section AFTER renderDigest
   // and the auto-fix section (so the ≤50-line budget at line 290 is preserved).
   // Errors RETURNED (D-05): on error emit ONE stderr warning and degrade to n/a rows.
-  const bugReportsResult = fetchBugReportsImpl({ now: nowDate });
+  // WR-02 (Phase 14): thread the resolved `repo` so fetchBugReportIssues can
+  // interpolate `repos/${repo}/issues` instead of relying on a placeholder.
+  const bugReportsResult = fetchBugReportsImpl({ now: nowDate, repo });
   if (bugReportsResult.error !== null) {
     process.stderr.write(
       `weekly-digest: bug-reports section degraded — ${bugReportsResult.error}\n`,
@@ -759,7 +761,14 @@ export function loadLatestBypassCount(reportsDir = 'reports/bypass-audits') {
 }
 
 /**
- * Fetch auto-fix PRs via a single read-only `gh search prs` invocation.
+ * Fetch auto-fix PRs via a single read-only `gh pr list` invocation.
+ *
+ * CR-01 (Phase 14): the `gh search` PR API's `--json` does NOT emit `mergedAt`
+ * ("Unknown JSON field: mergedAt"), which silently broke every `mergedAt`-based
+ * merge metric in the renderers. `gh pr list --state all` DOES emit `mergedAt`, so the
+ * mergedAt-based merge detection stays correct and UNCHANGED. `--state all` is
+ * required because `gh pr list` defaults to `--state open` (which would drop
+ * merged PRs entirely).
  *
  * Per D-15: errors are RETURNED (never thrown). On non-zero exit, JSON.parse
  * throw, missing `gh`, or non-array payload → returns `{prs: [], fetchedAt, error}`.
@@ -776,7 +785,7 @@ export function loadLatestBypassCount(reportsDir = 'reports/bypass-audits') {
 export function fetchAutoFixPrs({ now, execFn } = {}) {
   const fetchedAt = now instanceof Date ? now : new Date(now ?? Date.now());
   const cmd =
-    'gh search prs --label auto-fix:verified --label auto-fix:partial-verified ' +
+    'gh pr list --state all --label auto-fix:verified --label auto-fix:partial-verified ' +
     '--json number,state,mergedAt,createdAt,labels,body --limit 100';
   const runner = execFn ?? ((c, o) => execSync(c, o));
   let raw;
@@ -792,7 +801,7 @@ export function fetchAutoFixPrs({ now, execFn } = {}) {
     return { prs: [], fetchedAt, error: String(err?.message ?? err) };
   }
   if (!Array.isArray(parsed)) {
-    return { prs: [], fetchedAt, error: 'gh search prs returned non-array payload' };
+    return { prs: [], fetchedAt, error: 'gh pr list returned non-array payload' };
   }
   return { prs: parsed, fetchedAt, error: null };
 }
@@ -818,14 +827,27 @@ export function renderBugReportsSection({ issues, ghPrs, now }) {
   const prs = Array.isArray(ghPrs) ? ghPrs : [];
   const nowDate = now instanceof Date ? now : new Date(now);
 
-  // (1) report_volume — count of report-fix-candidate Issues (open+closed, D-03)
+  // (1) report_volume — count of report-fix-candidate Issues created within the
+  //     prior 7 days (open+closed, D-03), mirroring aggregate()'s quarantine
+  //     window. WR-01 (Phase 14): the prior code applied NO window despite the
+  //     "window" wording; this now honors the 7-day "Weekly" contract.
+  //     IN-01 (Phase 14): key on `created_at` (snake_case) because the issue
+  //     stream comes from `gh api .../issues`, which emits snake_case. (Note the
+  //     PR stream from `gh pr list` emits `createdAt` camelCase — two field names
+  //     coexist in this module, one per source.)
+  //     IN-02 (Phase 14): GitHub's GET /issues returns PRs too; exclude any entry
+  //     carrying a `pull_request` property so PRs are never counted as reports.
   //     COUNT metric — keeps integer 0 when empty.
+  const reportWindowStart = new Date(nowDate.getTime() - 7 * 24 * 60 * 60 * 1000);
   const reportVolume = issueList.filter((i) => {
+    if (i?.pull_request) return false;
     const names = (i?.labels ?? []).map((l) => l?.name).filter(Boolean);
-    return names.includes('report-fix-candidate');
+    if (!names.includes('report-fix-candidate')) return false;
+    const createdAt = new Date(i?.created_at);
+    return createdAt >= reportWindowStart && createdAt <= nowDate;
   }).length;
 
-  // (2) promoted — count of report-fix-candidate Issues (open+closed window)
+  // (2) promoted — count of report-fix-candidate Issues (open+closed, in window)
   //     i.e., the same report-fix-candidate Issues are the promoted funnel (D-02).
   //     COUNT metric.
   const promoted = reportVolume;
@@ -899,18 +921,22 @@ export function renderBugReportsSection({ issues, ghPrs, now }) {
 // Data fetched (D-03 metric set, gh-only — no wrangler/Cloudflare):
 //   issues: report-fix-candidate Issues (state=all, open+closed, per D-03)
 //   prs:    auto-fix/* PRs (labeled auto-fix:verified OR auto-fix:partial-verified)
-//           sourced via the same gh search PRs command shape as fetchAutoFixPrs.
+//           sourced via the same gh pr list command shape as fetchAutoFixPrs.
 //
-// @param {{ now?: Date, execFn?: (cmd: string, opts: object) => string }} opts
+// WR-02 (Phase 14): `repo` is threaded in and interpolated into the issues
+// command, mirroring makeRealGhClient (`gh api repos/${repo}/issues`), instead
+// of relying on a `{owner}/{repo}` placeholder + gh's local-remote resolution.
+//
+// @param {{ now?: Date, execFn?: (cmd: string, opts: object) => string, repo?: string }} opts
 // @returns {{ issues: Array<object>, prs: Array<object>, fetchedAt: Date, error: string|null }}
 // ---------------------------------------------------------------------------
-export function fetchBugReportIssues({ now, execFn } = {}) {
+export function fetchBugReportIssues({ now, execFn, repo } = {}) {
   const fetchedAt = now instanceof Date ? now : new Date(now ?? Date.now());
   const runner = execFn ?? ((c, o) => execSync(c, o));
 
   // (1) Fetch report-fix-candidate Issues — state=all (open+closed) per D-03
   const issuesCmd =
-    'gh api repos/{owner}/{repo}/issues --method GET ' +
+    `gh api repos/${repo}/issues --method GET ` +
     '-f labels=report-fix-candidate -f state=all --paginate';
   let rawIssues;
   try {
@@ -928,9 +954,11 @@ export function fetchBugReportIssues({ now, execFn } = {}) {
     return { issues: [], prs: [], fetchedAt, error: 'gh api issues returned non-array payload' };
   }
 
-  // (2) Fetch auto-fix PRs (same command as fetchAutoFixPrs — reuse the proven command)
+  // (2) Fetch auto-fix PRs (same command as fetchAutoFixPrs — reuse the proven command).
+  //     CR-01 (Phase 14): use `gh pr list --state all` (emits mergedAt), NOT
+  //     the `gh search` PR API (which has no mergedAt field).
   const prsCmd =
-    'gh search prs --label auto-fix:verified --label auto-fix:partial-verified ' +
+    'gh pr list --state all --label auto-fix:verified --label auto-fix:partial-verified ' +
     '--json number,state,mergedAt,createdAt,labels,body --limit 100';
   let rawPrs;
   try {
@@ -945,7 +973,7 @@ export function fetchBugReportIssues({ now, execFn } = {}) {
     return { issues: parsedIssues, prs: [], fetchedAt, error: String(err?.message ?? err) };
   }
   if (!Array.isArray(parsedPrs)) {
-    return { issues: parsedIssues, prs: [], fetchedAt, error: 'gh search prs returned non-array payload' };
+    return { issues: parsedIssues, prs: [], fetchedAt, error: 'gh pr list returned non-array payload' };
   }
 
   return { issues: parsedIssues, prs: parsedPrs, fetchedAt, error: null };

@@ -418,7 +418,8 @@ function makeRealGhClient(repo) {
  *   repo?: string,
  *   ledgerPath?: string,
  *   reportsDir?: string,
- *   fetchAutoFixPrs?: (opts: object) => { prs: Array, fetchedAt: Date, error: string|null }
+ *   fetchAutoFixPrs?: (opts: object) => { prs: Array, fetchedAt: Date, error: string|null },
+ *   fetchBugReports?: (opts: object) => { issues: Array, prs: Array, fetchedAt: Date, error: string|null }
  * }} opts
  */
 export async function runDigest(opts = {}) {
@@ -432,6 +433,7 @@ export async function runDigest(opts = {}) {
   // Vitest passes a fake; production callers omit it (defaults to the real
   // child_process.execSync-backed fetchAutoFixPrs exported below).
   const fetchAutoFixPrsImpl = opts.fetchAutoFixPrs ?? fetchAutoFixPrs;
+  const fetchBugReportsImpl = opts.fetchBugReports ?? fetchBugReportIssues;
 
   // (1) Read both label sets unconditionally (never short-circuit — Pitfall 3 / D-03)
   const nightlyIssues = ghClient.listOpenIssuesByLabel('e2e-nightly');
@@ -497,7 +499,22 @@ export async function runDigest(opts = {}) {
     now: nowDate,
     bypass_count: bypassCountForSection,
   });
-  const finalMd = md + '\n\n' + autoFixSection;
+
+  // (6.6) Phase 14 DGST-01 — append BUG_REPORTS section AFTER renderDigest
+  // and the auto-fix section (so the ≤50-line budget at line 290 is preserved).
+  // Errors RETURNED (D-05): on error emit ONE stderr warning and degrade to n/a rows.
+  const bugReportsResult = fetchBugReportsImpl({ now: nowDate });
+  if (bugReportsResult.error !== null) {
+    process.stderr.write(
+      `weekly-digest: bug-reports section degraded — ${bugReportsResult.error}\n`,
+    );
+  }
+  const bugReportsSection = renderBugReportsSection({
+    issues: bugReportsResult.issues,
+    ghPrs: bugReportsResult.prs,
+    now: nowDate,
+  });
+  const finalMd = md + '\n\n' + autoFixSection + '\n\n' + bugReportsSection;
 
   // (7) Write report file (idempotent overwrite, D-11)
   fs.mkdirSync(reportsDir, { recursive: true });
@@ -778,6 +795,96 @@ export function fetchAutoFixPrs({ now, execFn } = {}) {
     return { prs: [], fetchedAt, error: 'gh search prs returned non-array payload' };
   }
   return { prs: parsed, fetchedAt, error: null };
+}
+
+// ---------------------------------------------------------------------------
+// renderBugReportsSection — Phase 14 DGST-01 pure-function renderer.
+//
+// Mirrors renderAutoFixPipelineSection EXACTLY (D-04): same array/Date coercion,
+// label-membership count idiom (CR-01 — never positional), merge-state guard,
+// NaN/Infinity degrade-to-'n/a' on ratios, integer-0 on count metrics, and the
+// <details><summary> fixed-order line-array assembly.
+//
+// PURE: zero I/O — no execSync, fs, or fetch. All data is supplied by the caller.
+// COUNT metrics keep integer 0 (not n/a) when the result is zero.
+// RATIO metrics collapse to the literal string 'n/a' on zero/empty denominator.
+// Row labels reflect the PROMOTED funnel (D-02); no "Total reports received".
+//
+// @param {{ issues: Array<object>, ghPrs: Array<object>, now: Date }} opts
+// @returns {string} markdown string opening with `<details>...` and closing `</details>`
+// ---------------------------------------------------------------------------
+export function renderBugReportsSection({ issues, ghPrs, now }) {
+  const issueList = Array.isArray(issues) ? issues : [];
+  const prs = Array.isArray(ghPrs) ? ghPrs : [];
+  const nowDate = now instanceof Date ? now : new Date(now);
+
+  // (1) report_volume — count of report-fix-candidate Issues (open+closed, D-03)
+  //     COUNT metric — keeps integer 0 when empty.
+  const reportVolume = issueList.filter((i) => {
+    const names = (i?.labels ?? []).map((l) => l?.name).filter(Boolean);
+    return names.includes('report-fix-candidate');
+  }).length;
+
+  // (2) promoted — count of report-fix-candidate Issues (open+closed window)
+  //     i.e., the same report-fix-candidate Issues are the promoted funnel (D-02).
+  //     COUNT metric.
+  const promoted = reportVolume;
+
+  // (3) open_prs — count of auto-fix/* PRs not yet merged (state !== 'MERGED' and
+  //     mergedAt is null/undefined). COUNT metric.
+  const openPrs = prs.filter((p) => {
+    return p?.mergedAt === null || p?.mergedAt === undefined;
+  }).length;
+
+  // (4) merged_fix_prs — count of PRs labeled auto-fix:verified OR
+  //     auto-fix:partial-verified AND mergedAt is set. COUNT metric.
+  const mergedFixPrs = prs.filter((p) => {
+    const names = (p?.labels ?? []).map((l) => l?.name).filter(Boolean);
+    return (names.includes('auto-fix:verified') || names.includes('auto-fix:partial-verified'))
+      && p?.mergedAt !== null && p?.mergedAt !== undefined;
+  }).length;
+
+  // (5) auto_fix_stuck — count of Issues labeled auto-fix-stuck. COUNT metric.
+  const stuckIssues = issueList.filter((i) => {
+    const names = (i?.labels ?? []).map((l) => l?.name).filter(Boolean);
+    return names.includes('auto-fix-stuck');
+  }).length;
+
+  // (6) overfit_prs — count of PRs labeled human-review-required. COUNT metric.
+  const overfitPrs = prs.filter((p) => {
+    const names = (p?.labels ?? []).map((l) => l?.name).filter(Boolean);
+    return names.includes('human-review-required');
+  }).length;
+
+  // (7) promotion_rate — mergedFixPrs / promoted (RATIO metric; n/a on zero denominator).
+  let promotionRate;
+  if (promoted === 0) {
+    promotionRate = 'n/a';
+  } else {
+    const pct = (mergedFixPrs / promoted) * 100;
+    promotionRate = Number.isFinite(pct) ? `${pct.toFixed(1)}%` : 'n/a';
+  }
+
+  // Assemble markdown (D-04 / D-11 structure — fixed-order line array)
+  const lines = [];
+  lines.push('<details>');
+  lines.push('<summary>Bug Reports</summary>');
+  lines.push('');
+  lines.push(`_fetched ${nowDate.toISOString()}_`);
+  lines.push('');
+  lines.push('| Metric | Value |');
+  lines.push('| --- | --- |');
+  lines.push(`| report_volume (report-fix-candidate) | ${reportVolume} |`);
+  lines.push(`| promoted_reports | ${promoted} |`);
+  lines.push(`| open_auto_fix_prs | ${openPrs} |`);
+  lines.push(`| merged_fix_prs | ${mergedFixPrs} |`);
+  lines.push(`| auto_fix_stuck | ${stuckIssues} |`);
+  lines.push(`| human_review_required (overfit) | ${overfitPrs} |`);
+  lines.push(`| promotion_rate | ${promotionRate} |`);
+  lines.push('');
+  lines.push('</details>');
+
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------

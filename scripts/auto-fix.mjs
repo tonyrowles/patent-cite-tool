@@ -70,6 +70,10 @@ import {
   DIFF_FENCE_END,
 } from '../tests/e2e/lib/fix-prompt-builder.js';
 import {
+  parseFencedDiff,
+  changedPathsFromDiff,
+} from '../tests/e2e/lib/fix-primitives.js';
+import {
   invokeAnthropicSdkWithLedger,
   invokeClaudePWithLedger,
 } from '../tests/e2e/lib/llm-driver.js';
@@ -362,59 +366,15 @@ export function extractErrorClass(labels) {
   return matches[0];
 }
 
-/**
- * Extract EXACTLY ONE unified diff between the fixed fence markers. Returns
- * {ok:true, diff} on a single match; {ok:false, reason} for 0 or 2+ matches
- * or non-string input. The caller writes a ledger entry with
- * errorReason:`malformed-diff:${reason}` and exits 1.
- */
-export function parseFencedDiff(llmText) {
-  if (typeof llmText !== 'string') return { ok: false, reason: 'non-string-llm-text' };
-  const startRe = new RegExp(escapeRe(DIFF_FENCE_START), 'g');
-  const endRe = new RegExp(escapeRe(DIFF_FENCE_END), 'g');
-  const startMatches = llmText.match(startRe) || [];
-  const endMatches = llmText.match(endRe) || [];
-  if (startMatches.length === 0 || endMatches.length === 0) {
-    return { ok: false, reason: 'no-fences' };
-  }
-  if (startMatches.length !== endMatches.length) {
-    return { ok: false, reason: 'unbalanced-fences' };
-  }
-  if (startMatches.length > 1) {
-    return { ok: false, reason: 'multiple-diff-blocks' };
-  }
-  const re = new RegExp(`${escapeRe(DIFF_FENCE_START)}\\s*\\n([\\s\\S]*?)\\n?${escapeRe(DIFF_FENCE_END)}`, 'm');
-  const m = llmText.match(re);
-  if (!m) return { ok: false, reason: 'fence-regex-mismatch' };
-  return { ok: true, diff: m[1] };
-}
+// ---------------------------------------------------------------------------
+// parseFencedDiff + changedPathsFromDiff (D-02)
+// ---------------------------------------------------------------------------
+//
+// These functions are now defined in tests/e2e/lib/fix-primitives.js (the
+// single source of truth per D-02). Re-exported here so any existing callers
+// that import from auto-fix.mjs continue to work without modification.
 
-function escapeRe(s) {
-  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Parse `+++ b/<path>` headers from a unified diff. New files use `+++ b/<path>`;
- * deleted files use `+++ /dev/null` (skipped). Returns deduped path list in
- * source-order.
- */
-export function changedPathsFromDiff(diff) {
-  if (typeof diff !== 'string') return [];
-  const paths = [];
-  const seen = new Set();
-  for (const line of diff.split(/\r?\n/)) {
-    if (!line.startsWith('+++ ')) continue;
-    const rest = line.slice(4).trim();
-    if (rest === '/dev/null') continue;
-    // Strip leading "b/" (git unified diff convention).
-    const p = rest.startsWith('b/') ? rest.slice(2) : rest;
-    if (!seen.has(p)) {
-      seen.add(p);
-      paths.push(p);
-    }
-  }
-  return paths;
-}
+export { parseFencedDiff, changedPathsFromDiff };
 
 // ---------------------------------------------------------------------------
 // dispatchFlakeState — Phase 45-03 Plan 03 Task 2 (FLAKE-02)

@@ -976,3 +976,68 @@ describe('Phase 39 CLEANUP-04 regression: invokeClaudePWithLedger CI gate UNCHAN
     expect(appendSpy).toHaveBeenCalledTimes(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 12 Plan 01 Task 2 — invokeAnthropicSdkWithLedger optional source param
+//   COST-01: source param defaults to 'auto-fix-api' (legacy unchanged);
+//   report-fix callers pass source:'report-fix-api' to record correct source.
+//   T-12-01: both ledger write sites (error + success branches) use the param.
+// ---------------------------------------------------------------------------
+
+describe('Phase 12 COST-01: invokeAnthropicSdkWithLedger source param', () => {
+  let appendSpy;
+
+  beforeEach(() => {
+    sdkCreateMock.mockReset();
+    vi.stubEnv('CI', 'true');
+    vi.spyOn(ledgerNs, 'readLedger').mockReturnValue({ version: 1, months: {} });
+    appendSpy = vi.spyOn(ledgerNs, 'appendLedgerEntry').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('Test 41: default (no source arg) → ledger entry has source:auto-fix-api (legacy unchanged)', async () => {
+    mockSdkResponse(makeSdkSuccessResponse());
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '12',
+    });
+    expect(result.ok).toBe(true);
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const [, entry] = appendSpy.mock.calls[0];
+    expect(entry.source).toBe('auto-fix-api');
+  });
+
+  it('Test 42: source:report-fix-api passed → success-branch ledger entry has source:report-fix-api', async () => {
+    mockSdkResponse(makeSdkSuccessResponse());
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '12',
+      source: 'report-fix-api',
+    });
+    expect(result.ok).toBe(true);
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const [, entry] = appendSpy.mock.calls[0];
+    expect(entry.source).toBe('report-fix-api');
+  });
+
+  it('Test 43: source:report-fix-api passed → error-branch ledger entry has source:report-fix-api', async () => {
+    mockSdkError(new Error('timeout-test'));
+    const result = await drv.invokeAnthropicSdkWithLedger({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      phase: '12',
+      source: 'report-fix-api',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errorReason).toBe('sdk_error');
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const [, entry] = appendSpy.mock.calls[0];
+    expect(entry.source).toBe('report-fix-api');
+  });
+});

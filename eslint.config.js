@@ -222,6 +222,50 @@ export default [
   },
 
   // ---------------------------------------------------------------------------
+  // Phase 12 (T-12-02) — fix-primitives purity rule (PROMPT-04 pattern).
+  // ---------------------------------------------------------------------------
+  //
+  // Restricts `tests/e2e/lib/fix-primitives.js` from importing node:fs,
+  // node:child_process, node:path, @anthropic-ai/sdk — same 4 restrictions
+  // as fix-prompt-builder.js (D-04 purity invariant). fix-primitives is a
+  // shared pure computation module; if it could read files or spawn
+  // subprocesses, the D-02 single-source-of-truth invariant would collapse.
+  //
+  // Must be BEFORE the catch-all block below; the catch-all adds fix-primitives
+  // to its ignores: list so these per-file rules are not clobbered (same
+  // Pitfall 1 / Pitfall 3 pattern as fix-prompt-builder.js — commit 345cdcb).
+  {
+    files: ['tests/e2e/lib/fix-primitives.js'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          {
+            name: 'node:fs',
+            message:
+              'fix-primitives must be pure — no I/O. (T-12-02 / D-04)',
+          },
+          {
+            name: 'node:child_process',
+            message:
+              'fix-primitives must be pure — no subprocesses. (T-12-02 / D-04)',
+          },
+          {
+            name: 'node:path',
+            message:
+              'fix-primitives must be pure — no path computation. (T-12-02 / D-04)',
+          },
+          {
+            name: '@anthropic-ai/sdk',
+            message:
+              'Import via invokeAnthropicSdkWithLedger from tests/e2e/lib/llm-driver.js. ' +
+              'Direct @anthropic-ai/sdk imports forbidden — Phase 39 LEDGER-03 single-entry-point rule.',
+          },
+        ],
+      }],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // Phase 39 (LEDGER-03 + CLEANUP-04 partial) — SDK single-entry-point rule.
   // ---------------------------------------------------------------------------
   //
@@ -264,6 +308,10 @@ export default [
       // node:fs/node:child_process/node:path rules (Pitfall 1 / Pitfall 3
       // — commit 345cdcb regression guard).
       'tests/e2e/lib/fix-prompt-builder.js',
+      // Phase 12 T-12-02: fix-primitives has its own per-file block ABOVE
+      // that INLINES the @anthropic-ai/sdk restriction. Same Pitfall 1 /
+      // Pitfall 3 protection as fix-prompt-builder.js.
+      'tests/e2e/lib/fix-primitives.js',
     ],
     rules: {
       'no-restricted-imports': ['error', {

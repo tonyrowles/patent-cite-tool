@@ -12,7 +12,11 @@ findings:
   warning: 4
   info: 2
   total: 7
-status: issues_found
+status: resolved
+resolved: 2026-06-18T00:00:00Z
+resolution_commits:
+  - 0f14722
+  - ea4da7d
 ---
 
 # Phase 14: Code Review Report
@@ -20,7 +24,28 @@ status: issues_found
 **Reviewed:** 2026-06-18
 **Depth:** standard
 **Files Reviewed:** 3
-**Status:** issues_found
+**Status:** resolved (fixes applied in 0f14722 + ea4da7d)
+
+## Resolution (2026-06-18)
+
+All findings fixed under the operator-chosen "shared root cause" scope:
+- **CR-01** — both `fetchAutoFixPrs` and `fetchBugReportIssues` switched from the
+  invalid `gh search prs --json mergedAt` to `gh pr list --state all --json …mergedAt…`
+  (`gh pr list` emits `mergedAt`; `gh search prs` does not). Renderer merge-detection
+  unchanged. A field-contract test now asserts `gh pr list`/`--state all`/`mergedAt`
+  present and `gh search prs` absent. `grep "gh search prs"` → 0.
+- **WR-01/IN-01** — `report_volume`/`promoted` now windowed to `created_at` within 7
+  days of `now` (keyed snake_case, as `gh api` emits); windowing test added.
+- **WR-02** — `repo` threaded into `fetchBugReportIssues`; `repos/${repo}/issues`
+  interpolated; `runDigest` passes the resolved repo.
+- **IN-02** — Issue-only counts now skip entries carrying a `pull_request` property.
+- **WR-04** — injection test rewritten as a real structural assertion; malformed
+  line-774 fixture repaired.
+- **WR-03** (duplicate gh fetch) — intentionally left as-is (out of the chosen scope;
+  quality-only, not correctness).
+
+Verified: `gh pr list --json mergedAt` exits 0; `npx vitest run` on both digest files
+→ 53 passed; `npm test` → exit 0, golden corpus 100%.
 
 ## Summary
 

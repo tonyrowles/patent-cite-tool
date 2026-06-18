@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
-status: ready_to_plan
-stopped_at: Phase 11 complete (3/3) — ready to discuss Phase 12
-last_updated: 2026-06-17T20:49:21.984Z
-last_activity: 2026-06-17 -- Phase 11 execution started
+status: planning
+stopped_at: Phase 12 context gathered
+last_updated: "2026-06-18T02:51:51.490Z"
+last_activity: 2026-06-17
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
   completed_plans: 6
-  percent: 20
+  percent: 40
 ---
 
 # Project State
@@ -128,9 +128,9 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-06-17T19:05:24.742Z
-Stopped at: Phase 11 context gathered
-Resume file: .planning/phases/11-triage-layer/11-CONTEXT.md
+Last session: 2026-06-18T02:51:51.479Z
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-fix-generation-regression-gate/12-CONTEXT.md
 
 ## Operator Next Steps
 

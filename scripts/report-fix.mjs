@@ -494,7 +494,10 @@ export async function runReportFix({
 
   // D-05: git apply --check (CWE-94: execFileSync arg-array)
   try {
-    execFileSync('git', ['apply', '--check'], {
+    // --recount: recompute hunk line-counts from content. LLM-generated diffs
+    // very commonly have correct context but wrong @@ -x,y +a,b @@ counts;
+    // --recount makes the check tolerant of that without weakening context match.
+    execFileSync('git', ['apply', '--check', '--recount'], {
       input: parsed.diff,
       stdio: ['pipe', 'pipe', 'pipe'],
       encoding: 'utf8',
@@ -519,7 +522,7 @@ export async function runReportFix({
       errorReason: 'apply-check-failed',
       issueId: issueNumber ? String(issueNumber) : undefined,
     });
-    return { ok: false, hardAbort: true, reason: 'apply-check-failed', stderrSnip };
+    return { ok: false, hardAbort: true, reason: 'apply-check-failed', stderrSnip, diff: parsed.diff };
   }
 
   // FIX-04 / D-03: overfit soft-flag — scan for patentNumber literal in src/ added lines

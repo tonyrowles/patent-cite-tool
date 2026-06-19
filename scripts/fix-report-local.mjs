@@ -39,7 +39,7 @@
 
 import { parseArgs } from 'node:util';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -134,7 +134,11 @@ async function main() {
     const result = await runReportFix({ kvRecord, fpShort, issueNumber, repo, reTrigger, transport, timeoutMs });
 
     if (!result.ok) {
-      console.error(`[fix-report] dispatcher: ${JSON.stringify({ reason: result.reason, skipped: result.skipped })}`);
+      console.error(`[fix-report] dispatcher: reason=${result.reason}${result.stderrSnip ? ` | git apply: ${result.stderrSnip}` : ''}`);
+      if (result.diff) {
+        const dbg = `/tmp/report-fix-${fpShort}-iter${iter}.diff`;
+        try { writeFileSync(dbg, result.diff); console.error(`[fix-report] failing diff saved to ${dbg}`); } catch { /* ignore */ }
+      }
       if (result.skipped) process.exit(0);
       if (iter >= maxIter) { markStuck(repo, issueNumber); fail(`hard-abort after ${maxIter} iterations: ${result.reason}`); }
       reTrigger = true;
@@ -142,7 +146,7 @@ async function main() {
     }
 
     // Apply the validated diff to the working tree (the CI job never did this).
-    try { sh('git', ['apply'], { input: result.diff, stdio: ['pipe', 'pipe', 'pipe'] }); }
+    try { sh('git', ['apply', '--recount'], { input: result.diff, stdio: ['pipe', 'pipe', 'pipe'] }); }
     catch (e) { console.error(`[fix-report] git apply failed: ${e.message}`); if (iter >= maxIter) { markStuck(repo, issueNumber); fail('apply failed at last iteration'); } reTrigger = true; continue; }
 
     // Regression gate (golden corpus). On failure, revert and re-trigger.

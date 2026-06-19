@@ -473,6 +473,12 @@ export async function runReportFix({
     return { ok: false, hardAbort: true, reason: errorReason };
   }
 
+  // Normalize: LLM fenced diffs almost always omit the final newline, which makes
+  // `git apply` report "corrupt patch" at the last hunk line (the diff hits EOF
+  // mid-hunk). Append one. Flows to git apply --check, scanForOverfit, and the
+  // diff returned to the wrapper's real apply.
+  if (!parsed.diff.endsWith('\n')) parsed.diff += '\n';
+
   const changedPaths = changedPathsFromDiff(parsed.diff);
   const guardResult = checkDiffGuard(changedPaths);
   if (!guardResult.ok) {

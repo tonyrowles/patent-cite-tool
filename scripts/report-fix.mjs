@@ -306,6 +306,14 @@ export function resolveTransport(explicit) {
   return inCi ? 'sdk' : 'subscription';
 }
 
+// Subscription (`claude -p`) timeout for the report-fix call. The shared
+// invokeClaudeP default (LLM_TIMEOUT_MS = 60s) was tuned for small triage
+// prompts; report-fix embeds the full matching-core source and runs up to 5
+// tool-use turns, so it needs much more headroom. Tunable via env.
+export const REPORT_FIX_SUBSCRIPTION_TIMEOUT_MS = parseInt(
+  process.env.REPORT_FIX_TIMEOUT_MS ?? '300000', 10,
+);
+
 // ---------------------------------------------------------------------------
 // runReportFix — main orchestration entry point (D-01)
 // ---------------------------------------------------------------------------
@@ -341,6 +349,7 @@ export async function runReportFix({
   reTrigger = false,
   maxFixes,
   transport,
+  timeoutMs,
 }) {
   const ghClient = makeKvReportGhClient(repo);
   // Transport selection: subscription (local Claude Code, no API key) vs sdk (CI
@@ -391,6 +400,7 @@ export async function runReportFix({
     ? await invokeClaudePWithLedger({
         systemPrompt: REPORT_FIX_SCAFFOLD,
         userPrompt,
+        timeoutMs: timeoutMs ?? REPORT_FIX_SUBSCRIPTION_TIMEOUT_MS,
         phase: 'phase-12',
         source: 'report-fix-api',
       })
@@ -541,6 +551,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       'output-file': { type: 'string' },
       'transport': { type: 'string' },        // 'sdk' | 'subscription' (default: env-resolved)
       'subscription': { type: 'boolean', default: false },  // shorthand for --transport subscription
+      'timeout-ms': { type: 'string' },        // subscription claude -p timeout (default 300s / env REPORT_FIX_TIMEOUT_MS)
     },
     strict: false,
   });
@@ -580,6 +591,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     reTrigger: values['re-trigger'] || false,
     maxFixes,
     transport,
+    timeoutMs: values['timeout-ms'] ? parseInt(values['timeout-ms'], 10) : undefined,
   });
 
   if (values['output-file']) {

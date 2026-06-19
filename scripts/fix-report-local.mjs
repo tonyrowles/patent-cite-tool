@@ -71,6 +71,7 @@ async function main() {
       'gate-cmd': { type: 'string', default: 'npx vitest run' },
       'push': { type: 'boolean', default: false },
       'transport': { type: 'string' },
+      'timeout-ms': { type: 'string' },
     },
     strict: false,
   });
@@ -125,11 +126,12 @@ async function main() {
 
   // 4. Regression-driven loop (subscription LLM -> apply -> gate)
   const [gateBin, ...gateArgs] = values['gate-cmd'].split(/\s+/);
+  const timeoutMs = values['timeout-ms'] ? parseInt(values['timeout-ms'], 10) : undefined;
   let reTrigger = values['re-trigger'];
   let success = null;
   for (let iter = 1; iter <= maxIter; iter += 1) {
     console.error(`\n[fix-report] === iteration ${iter}/${maxIter} (transport=${transport}) ===`);
-    const result = await runReportFix({ kvRecord, fpShort, issueNumber, repo, reTrigger, transport });
+    const result = await runReportFix({ kvRecord, fpShort, issueNumber, repo, reTrigger, transport, timeoutMs });
 
     if (!result.ok) {
       console.error(`[fix-report] dispatcher: ${JSON.stringify({ reason: result.reason, skipped: result.skipped })}`);

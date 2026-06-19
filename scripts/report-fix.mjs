@@ -401,7 +401,12 @@ export async function runReportFix({
         systemPrompt: REPORT_FIX_SCAFFOLD,
         userPrompt,
         timeoutMs: timeoutMs ?? REPORT_FIX_SUBSCRIPTION_TIMEOUT_MS,
-        maxTurns: 1,  // single-shot diff (source already embedded) — no agentic tool wandering
+        // Single-shot diff: source is already embedded, so give claude NO tools
+        // (tools:'' → never burns a turn on a tool call → no error_max_turns) and
+        // enough budget to emit the whole diff without mid-output truncation.
+        maxTurns: 2,
+        tools: '',
+        maxBudgetUsd: process.env.REPORT_FIX_MAX_BUDGET_USD ?? '3.00',
         phase: 'phase-12',
         source: 'report-fix-api',
       })

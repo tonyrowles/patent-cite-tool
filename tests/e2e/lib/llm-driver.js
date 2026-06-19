@@ -101,22 +101,28 @@ const PATENT_ID_RE = /^[A-Z]{2}\d+[A-Z]?\d*$/;
  * @param {{ systemPrompt: string, userPrompt: string, timeoutMs?: number }} opts
  * @returns {Promise<{ timedOut: boolean, stdout: string, stderr: string, code: number|null }>}
  */
-export async function invokeClaudeP({ systemPrompt, userPrompt, timeoutMs = LLM_TIMEOUT_MS, maxTurns = 5 } = {}) {
+export async function invokeClaudeP({
+  systemPrompt, userPrompt, timeoutMs = LLM_TIMEOUT_MS,
+  maxTurns = 5, tools = 'Read,Glob,Grep', maxBudgetUsd = '0.50',
+} = {}) {
   return new Promise((resolve) => {
     // Phase 61 TURNS-01/02: --tools RESTRICTS palette (NOT --allowedTools permission-grant);
     // --max-budget-usd verified against `claude --help` v2.1.169. See header comment above.
-    // maxTurns is caller-tunable: triage classifiers want the agentic default (5);
-    // single-shot diff generation (report-fix, source already embedded) passes 1 so
-    // claude emits the diff in one turn instead of wandering across tool-use turns.
+    // Caller-tunable for single-shot diff generation (report-fix, source already
+    // embedded): tools='' restricts to NO tools so claude emits the diff directly
+    // (never burns its turn on a tool call → no error_max_turns), and a higher
+    // maxBudgetUsd avoids truncating the diff mid-output on large prompts.
     const args = [
       '-p',
       '--output-format', 'json',
       '--max-turns', String(maxTurns),
-      '--tools', 'Read,Glob,Grep',
-      '--max-budget-usd', '0.50',
+    ];
+    if (tools !== null && tools !== undefined) args.push('--tools', String(tools));
+    args.push(
+      '--max-budget-usd', String(maxBudgetUsd),
       '--system-prompt', systemPrompt,
       userPrompt,
-    ];
+    );
     // Threat T-31-4 mitigation: blank ANTHROPIC_API_KEY even if developer set it.
     const env = { ...process.env, ANTHROPIC_API_KEY: '' };
 
@@ -404,6 +410,8 @@ export async function invokeClaudePWithLedger({
   phase,
   source,
   maxTurns,
+  tools,
+  maxBudgetUsd,
 } = {}) {
   // Step 1 — CI gate (defense-in-depth: subscription-local invariant TRIAGE-04).
   // Returns immediately, no subprocess spawn, no ledger entry written.
@@ -430,7 +438,7 @@ export async function invokeClaudePWithLedger({
   }
 
   // Step 3 — Invoke the subprocess.
-  const claudeResult = await invokeClaudeP({ systemPrompt, userPrompt, timeoutMs, maxTurns });
+  const claudeResult = await invokeClaudeP({ systemPrompt, userPrompt, timeoutMs, maxTurns, tools, maxBudgetUsd });
   const parsed = parseClaudeResponse(claudeResult);
 
   // Step 4 — Extract cost and model. Pitfall 6: trust pre-computed total_cost_usd.

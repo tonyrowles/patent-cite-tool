@@ -77,13 +77,15 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Scope gate (report-fix-candidate label only)
         id: scope
+        env:
+          LABEL_NAME: ${{ github.event.label.name }}
         run: |
-          if [[ "${{ github.event.label.name }}" == "report-fix-candidate" ]]; then
+          if [[ "$LABEL_NAME" == "report-fix-candidate" ]]; then
             echo "active=true" >> "$GITHUB_OUTPUT"
             echo "Scope: active — processing report-fix-candidate label"
           else
             echo "active=false" >> "$GITHUB_OUTPUT"
-            echo "Scope: fast-path SUCCESS — label '${{ github.event.label.name }}' is not report-fix-candidate"
+            echo "Scope: fast-path SUCCESS — label '$LABEL_NAME' is not report-fix-candidate"
           fi
 
       - name: Exit early if not in scope
@@ -113,8 +115,9 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Extract KV key and fingerprint from Issue body
         id: extract
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
-          ISSUE_BODY="${{ github.event.issue.body }}"
           KV_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- kv-key: )[^>]+(?= -->)' || true)
           if [[ -z "$KV_KEY" ]]; then
             echo "ERROR: No kv-key comment found in Issue body"

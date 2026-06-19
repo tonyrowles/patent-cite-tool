@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { makeKvReportGhClient } from './gh-client.mjs';
 import { parseFencedDiff, changedPathsFromDiff } from '../tests/e2e/lib/fix-primitives.js';
 import { REPORT_FIX_SCAFFOLD } from '../tests/e2e/lib/fix-prompt-builder.js';
-import { invokeAnthropicSdkWithLedger } from '../tests/e2e/lib/llm-driver.js';
+import { invokeAnthropicSdkWithLedger, invokeClaudePWithLedger } from '../tests/e2e/lib/llm-driver.js';
 import { LEDGER_PATH } from '../tests/e2e/lib/llm-ledger.js';
 import { safeAppendLedger } from '../tests/e2e/lib/safe-append-ledger.js';
 import { checkDiffGuard } from './check-diff-guard.mjs';
@@ -287,6 +287,26 @@ export function findExistingPr(fpShort, repo) {
 }
 
 // ---------------------------------------------------------------------------
+// resolveTransport — subscription (local Claude Code) vs sdk (CI Anthropic API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the LLM transport. Explicit 'sdk' | 'subscription' wins; otherwise
+ * pick by environment to honor the inverse-CI invariant in llm-driver.js
+ * (invokeClaudePWithLedger refuses in CI; invokeAnthropicSdkWithLedger refuses
+ * outside CI). Default outside CI is the subscription transport — no API key /
+ * no per-token billing, runs through the Claude Code Max subscription (`claude -p`).
+ *
+ * @param {string} [explicit] — 'sdk' | 'subscription' | undefined
+ * @returns {'sdk'|'subscription'}
+ */
+export function resolveTransport(explicit) {
+  if (explicit === 'sdk' || explicit === 'subscription') return explicit;
+  const inCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  return inCi ? 'sdk' : 'subscription';
+}
+
+// ---------------------------------------------------------------------------
 // runReportFix — main orchestration entry point (D-01)
 // ---------------------------------------------------------------------------
 
@@ -320,8 +340,13 @@ export async function runReportFix({
   repo,
   reTrigger = false,
   maxFixes,
+  transport,
 }) {
   const ghClient = makeKvReportGhClient(repo);
+  // Transport selection: subscription (local Claude Code, no API key) vs sdk (CI
+  // Anthropic API). Threaded into every ledger entry so COST caps/audit unify
+  // across both via combinedMonthlyTotalByTransport.
+  const resolvedTransport = resolveTransport(transport);
 
   // COST-02: validate maxFixes (caller should validate, but defensive check)
   if (maxFixes !== undefined && maxFixes !== null) {
@@ -339,7 +364,7 @@ export async function runReportFix({
         tokens_in: 0,
         tokens_out: 0,
         phase: 'phase-12',
-        transport: 'sdk',
+        transport: resolvedTransport,
         source: 'report-fix-api',
         errorReason: 'skipped-pr-exists',
         issueId: issueNumber ? String(issueNumber) : undefined,
@@ -358,21 +383,34 @@ export async function runReportFix({
   // Build the user turn (FIX-01 / FIX-03 / FIX-05)
   const userPrompt = buildReportUserTurn(kvRecord, matchingCoreSources);
 
-  // Single LLM attempt (COST-03: the 3-iteration loop is in the workflow, not here)
-  const llmResult = await invokeAnthropicSdkWithLedger({
-    systemPrompt: REPORT_FIX_SCAFFOLD,
-    userPrompt,
-    model: 'claude-sonnet-4-6',
-    maxTokens: 8192,
-    phase: 'phase-12',
-    issueId: issueNumber ? String(issueNumber) : undefined,
-    source: 'report-fix-api',
-  });
+  // Single LLM attempt (COST-03: the 3-iteration loop lives in the workflow/local
+  // wrapper, not here). Subscription transport → local Claude Code (`claude -p`,
+  // no API key); sdk transport → Anthropic API (CI only). Both return a
+  // compatible { ok, llmText, modelId, costUsd } shape on success.
+  const llmResult = resolvedTransport === 'subscription'
+    ? await invokeClaudePWithLedger({
+        systemPrompt: REPORT_FIX_SCAFFOLD,
+        userPrompt,
+        phase: 'phase-12',
+        source: 'report-fix-api',
+      })
+    : await invokeAnthropicSdkWithLedger({
+        systemPrompt: REPORT_FIX_SCAFFOLD,
+        userPrompt,
+        model: 'claude-sonnet-4-6',
+        maxTokens: 8192,
+        phase: 'phase-12',
+        issueId: issueNumber ? String(issueNumber) : undefined,
+        source: 'report-fix-api',
+      });
 
   if (!llmResult.ok) {
-    // SDK error or cap block — report as hard-abort (no iteration consumed by outer loop
-    // for cap blocks; for SDK errors this is also a hard abort)
-    const errorReason = llmResult.capBlocked ? 'cap-blocked' : (llmResult.errorReason || 'sdk-error');
+    // LLM error, cap block, or ci-gate (subscription refused in CI) — hard-abort.
+    const errorReason = llmResult.capBlocked
+      ? 'cap-blocked'
+      : llmResult.ciGate
+        ? 'ci-gate-subscription-blocked'
+        : (llmResult.errorReason || `${resolvedTransport}-error`);
     if (issueNumber) {
       try {
         ghClient.addLabel(Number(issueNumber), 'auto-fix-stuck');
@@ -385,7 +423,7 @@ export async function runReportFix({
       tokens_in: 0,
       tokens_out: 0,
       phase: 'phase-12',
-      transport: 'sdk',
+      transport: resolvedTransport,
       source: 'report-fix-api',
       errorReason,
       issueId: issueNumber ? String(issueNumber) : undefined,
@@ -411,7 +449,7 @@ export async function runReportFix({
       tokens_in: 0,
       tokens_out: 0,
       phase: 'phase-12',
-      transport: 'sdk',
+      transport: resolvedTransport,
       source: 'report-fix-api',
       errorReason,
       issueId: issueNumber ? String(issueNumber) : undefined,
@@ -435,7 +473,7 @@ export async function runReportFix({
       tokens_in: 0,
       tokens_out: 0,
       phase: 'phase-12',
-      transport: 'sdk',
+      transport: resolvedTransport,
       source: 'report-fix-api',
       errorReason,
       issueId: issueNumber ? String(issueNumber) : undefined,
@@ -465,7 +503,7 @@ export async function runReportFix({
       tokens_in: 0,
       tokens_out: 0,
       phase: 'phase-12',
-      transport: 'sdk',
+      transport: resolvedTransport,
       source: 'report-fix-api',
       errorReason: 'apply-check-failed',
       issueId: issueNumber ? String(issueNumber) : undefined,
@@ -501,6 +539,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       'repo': { type: 'string' },
       're-trigger': { type: 'boolean', default: false },
       'output-file': { type: 'string' },
+      'transport': { type: 'string' },        // 'sdk' | 'subscription' (default: env-resolved)
+      'subscription': { type: 'boolean', default: false },  // shorthand for --transport subscription
     },
     strict: false,
   });
@@ -527,6 +567,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
 
+  const transport = resolveTransport(
+    values['subscription'] ? 'subscription' : values['transport'],
+  );
+  console.error(`[report-fix] transport=${transport}`);
+
   const result = await runReportFix({
     kvRecord,
     fpShort: values['fp-short'] || 'unknown',
@@ -534,6 +579,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     repo: values['repo'] || null,
     reTrigger: values['re-trigger'] || false,
     maxFixes,
+    transport,
   });
 
   if (values['output-file']) {

@@ -401,6 +401,7 @@ export async function runReportFix({
         systemPrompt: REPORT_FIX_SCAFFOLD,
         userPrompt,
         timeoutMs: timeoutMs ?? REPORT_FIX_SUBSCRIPTION_TIMEOUT_MS,
+        maxTurns: 1,  // single-shot diff (source already embedded) — no agentic tool wandering
         phase: 'phase-12',
         source: 'report-fix-api',
       })

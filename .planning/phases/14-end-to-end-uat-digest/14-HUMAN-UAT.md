@@ -3,12 +3,42 @@ status: partial
 phase: 14-end-to-end-uat-digest
 source: [14-VERIFICATION.md]
 started: 2026-06-18T00:00:00Z
-updated: 2026-06-18T00:00:00Z
+updated: 2026-06-20T00:00:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing]
+[awaiting human testing — see Live UAT Evidence below for what is already proven]
+
+## Live UAT Evidence (2026-06-20)
+
+The live chain was exercised against production. **Deviation from the authored
+runbook:** LLM fix generation now runs LOCALLY via the Claude Code subscription
+(`npm run fix-report`, ADR-001), not the CI Anthropic-API path — so the in-CI LLM
+steps of tests 1/6 are satisfied by the local equivalent.
+
+- **Test 7 / UAT-02 — manual promote → PASS (escape hatch + gate-reject arm).**
+  `ingest-reports.mjs promote 7fd5697e…` force-promoted an `ambiguous` report →
+  Issue #32 (`report-fix-candidate`) → local subscription fix → the candidate diff
+  REGRESSED pinned `normalizeOcr` tests → the regression gate **rejected and
+  reverted** it → 3-iteration exhaustion → `auto-fix-stuck`. Proves PROMO-02 and
+  the gate's reject path (also satisfies Test 3).
+- **Test 6 / UAT-01 — auto-promote → green fix → merge → PASS (gate-accept arm).**
+  Seeded green-confidence `inaccurate_citation` report (`POST /report`, fp
+  `fc9752b2`) → triage `real_bug` (RULE_REAL_BUG_GREEN) → auto-promoted → Issue #33
+  → local subscription fix (additive U+FB05/FB06 st-ligature rule in
+  `normalizeText`) → `git apply` → full suite **1789 passed, golden corpus 0
+  mismatch** → draft PR #34 (`auto-fix/fc9752b2`, `<!-- source_issue: 33 -->`,
+  overfit=false) → **human-merged to `main`** (GATE-04). Both gate arms now
+  demonstrated live.
+- **Test 1 — label → draft PR flow → PASS** (via the local path above).
+
+**Remaining tails (not yet exercised):** auto-promote closing Issue #33
+(`v40-auto-promote.yml` is currently disabled — `gh workflow enable` then dispatch,
+or close #33 manually); UAT-03 live cap across real Actions (Test 8); overfit
+soft-flag (Test 2); D-06 live idempotency (Test 4); a green verifier-gate binding
+(Test 5 — the gate's PROXY_TOKEN build wiring was fixed this session so future
+auto-fix PRs gate cleanly; #34 merged via owner-bypass past the then-red gate).
 
 ## Tests
 

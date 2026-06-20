@@ -1,43 +1,21 @@
 # .github/workflows/v61-report-fix.yml
 #
-# Phase 12 Plan 04 (FIX-01, GATE-01..04, COST-01..04) — issues:labeled-triggered
-# workflow that converts a promoted BUG_REPORTS KV record into a draft fix PR.
+# Phase 14 (ADR-001) — NOTIFY-ONLY. The LLM fix generation that Phase 12 ran here
+# via the Anthropic API has moved LOCAL, to the Claude Code subscription transport
+# (`npm run fix-report -- <issue#>`, see scripts/fix-report-local.mjs + ADR-001).
+# CI cannot run the subscription transport (invokeClaudePWithLedger refuses when
+# CI/GITHUB_ACTIONS is set, and hosted runners can't reach the operator's Claude
+# Code auth), so this workflow no longer fetches KV, calls an LLM, runs the
+# regression loop, or opens a PR. It only acknowledges the promoted Issue and
+# points the operator at the local command.
 #
-# FIX-01: trigger is issues:labeled gated on report-fix-candidate; KV fetch via
-#          wrangler kv get --remote from worker/ directory.
-# GATE-01: in-workflow golden corpus + quarantine spec regression run drives the
-#          3-iteration re-prompt loop (D-04).
-# GATE-02: passing candidate opens a DRAFT PR on auto-fix/<fp-short> via
-#          peter-evans/create-pull-request@v8; fix branch is never pushed to main.
-# GATE-03: v40-verifier-gate.yml is reused as-is — NOT renamed, no new gate.
-#          The auto-fix/<fp-short> branch prefix makes the required-status fire.
-# GATE-04: human merge is a permanent invariant (no automated merging of any kind).
-#          The workflow must not contain any automated PR merge mechanism.
-# COST-01: all LLM calls routed through ledger-guarded dispatcher with
-#          source:'report-fix-api' traceability.
-# COST-02: MAX_FIXES_PER_RUN caps iterations (env-configurable, default 5).
-# COST-03: iteration loop hard-capped at 3 before auto-fix-stuck label.
-# COST-04: ledger commit step precedes the create-pull-request step (two-commit-split
-#          ordering invariant). DEVIATION from literal COST-04 wording: ledger is
-#          pushed to ledger-snapshots/report-fix-${FP_SHORT} rather than main,
-#          because ruleset 17086676 blocks github-actions[bot] direct-to-main pushes
-#          (consistent with v40-cost-ledger-snapshot.yml established pattern).
-#          HUMAN CONFIRMED: "Accept ledger-branch" (Task 3 checkpoint gate).
-# FIX-04/D-03: after a clean dispatcher exit, if overfit=true was emitted, the
-#          workflow applies human-review-required to the draft PR and does NOT
-#          self-apply the verified label (the soft-flag closes at the workflow layer).
-#          The verified label is granted exclusively by v40-verifier-gate.yml.
+# What is UNCHANGED downstream:
+#   - The resulting auto-fix/<fp> draft PR (created locally) is still gated by
+#     v40-verifier-gate.yml via the branch prefix.
+#   - GATE-04 human-merge invariant: no automated merging of any kind here.
 #
-# Comment-paraphrase discipline (inherited from Phase 40-03 / 41-03):
-#   - "automated merging of any kind" paraphrases the forbidden auto-merge tokens
-#   - "automated PR merge mechanism" paraphrases --enable-automated-merging
-#   - "main-branch direct push" paraphrases the git push to default branch pattern
-#
-# Permissions minimized per Pitfall 1 step 7:
-#   contents:write        — ledger branch push + checkout operations
-#   pull-requests:write   — draft PR creation + --add-label
-#   issues:write          — auto-fix-stuck label on source Issue
-#   repository-projects:read — gh pr edit --add-label dep per cli/cli #6274
+# Security: untrusted Issue fields (label.name) are passed via env:, never
+# interpolated into a run: script (prevents shell injection — CWE-94).
 
 name: v6.1 Report Fix
 
@@ -46,35 +24,21 @@ on:
     types: [labeled]
 
 permissions:
-  contents: write
-  pull-requests: write
   issues: write
-  repository-projects: read
 
 concurrency:
   group: v61-report-fix-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
-  report-fix:
+  notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY: ${{ github.repository }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      MAX_FIXES_PER_RUN: ${{ vars.MAX_FIXES_PER_RUN || '5' }}
-      # KV namespace for BUG_REPORTS store (wrangler.toml binding: BUG_REPORTS)
-      KV_NAMESPACE_ID: cefe2733c0074fe2a28a49ff536de105
-      # source traceability for COST-01 ledger routing
-      REPORT_FIX_SOURCE: report-fix-api
-
     steps:
-      # -----------------------------------------------------------------------
-      # Step 1: Scope gate — exit early for any label other than report-fix-candidate
-      # -----------------------------------------------------------------------
+      # Scope gate — only act on the report-fix-candidate label.
       - name: Scope gate (report-fix-candidate label only)
         id: scope
         env:
@@ -82,270 +46,21 @@ jobs:
         run: |
           if [[ "$LABEL_NAME" == "report-fix-candidate" ]]; then
             echo "active=true" >> "$GITHUB_OUTPUT"
-            echo "Scope: active — processing report-fix-candidate label"
           else
             echo "active=false" >> "$GITHUB_OUTPUT"
-            echo "Scope: fast-path SUCCESS — label '$LABEL_NAME' is not report-fix-candidate"
+            echo "Scope: label '$LABEL_NAME' is not report-fix-candidate — no-op."
           fi
 
       - name: Exit early if not in scope
         if: steps.scope.outputs.active != 'true'
-        run: |
-          echo "Not report-fix-candidate — exiting cleanly."
-          exit 0
+        run: exit 0
 
-      # -----------------------------------------------------------------------
-      # Step 2: Checkout + node setup
-      # -----------------------------------------------------------------------
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      # -----------------------------------------------------------------------
-      # Step 3: Extract KV key from Issue body and derive FP_SHORT
-      # Issue body format: <!-- kv-key: report:{fp}:{ts} -->
-      # -----------------------------------------------------------------------
-      - name: Extract KV key and fingerprint from Issue body
-        id: extract
+      # Acknowledge the promoted report and point the operator at the local
+      # subscription-transport command. No LLM, no KV, no PR creation in CI.
+      - name: Comment — run report-fix locally (subscription transport)
+        if: steps.scope.outputs.active == 'true'
         env:
-          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          KV_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- kv-key: )[^>]+(?= -->)' || true)
-          if [[ -z "$KV_KEY" ]]; then
-            echo "ERROR: No kv-key comment found in Issue body"
-            gh issue edit "${{ github.event.issue.number }}" \
-              --add-label "auto-fix-stuck" \
-              --repo "$GITHUB_REPOSITORY" || true
-            exit 1
-          fi
-          # Extract fp-short from key: report:{fp}:{ts} → fp (first 8 chars of fp)
-          FP_FULL=$(echo "$KV_KEY" | sed 's/^report://;s/:[0-9]*$//')
-          FP_SHORT="${FP_FULL:0:8}"
-          echo "KV_KEY=$KV_KEY" >> "$GITHUB_ENV"
-          echo "FP_SHORT=$FP_SHORT" >> "$GITHUB_ENV"
-          echo "kv_key=$KV_KEY" >> "$GITHUB_OUTPUT"
-          echo "fp_short=$FP_SHORT" >> "$GITHUB_OUTPUT"
-          echo "Extracted KV key: $KV_KEY (FP_SHORT: $FP_SHORT)"
-
-      # -----------------------------------------------------------------------
-      # Step 4: D-06 idempotency — skip if auto-fix/<fp-short> PR already exists
-      # -----------------------------------------------------------------------
-      - name: D-06 idempotency check (skip if PR already open for this fingerprint)
-        id: idempotency
-        run: |
-          EXISTING=$(gh pr list \
-            --head "auto-fix/${{ env.FP_SHORT }}" \
-            --state open \
-            --json number \
-            --jq length \
-            --repo "$GITHUB_REPOSITORY" || echo "0")
-          if [[ "$EXISTING" -gt "0" && "${{ github.event.action }}" != "re-trigger" ]]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "PR already exists for auto-fix/${{ env.FP_SHORT }} — skipping (D-06 idempotency)"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Exit early if PR already exists (D-06)
-        if: steps.idempotency.outputs.skip == 'true'
-        run: |
-          echo "D-06: idempotency guard fired — no duplicate PR created"
-          exit 0
-
-      # -----------------------------------------------------------------------
-      # Step 5: Fetch KV record via wrangler --remote (FIX-01 / Pitfall 3)
-      # MANDATORY: run from worker/ directory so wrangler finds wrangler.toml
-      # MANDATORY: --remote flag to read PRODUCTION KV, not local miniflare
-      # -----------------------------------------------------------------------
-      - name: Fetch KV record from BUG_REPORTS store
-        working-directory: worker
-        run: |
-          echo "Fetching KV record: ${{ env.KV_KEY }}"
-          wrangler kv get "${{ env.KV_KEY }}" --namespace-id "${{ env.KV_NAMESPACE_ID }}" --remote > /tmp/kv-record.json
-          echo "KV record fetched ($(wc -c < /tmp/kv-record.json) bytes)"
-
-      # -----------------------------------------------------------------------
-      # Step 6: COST-03 / D-04 — 3-iteration regression-driven loop
-      # Each iteration: invoke dispatcher → run golden+quarantine regression →
-      # break on clean pass, re-prompt on regression, auto-fix-stuck after 3.
-      # -----------------------------------------------------------------------
-      - name: Run report-fix dispatcher (3-iteration loop — GATE-01/D-04/COST-03)
-        id: fix_loop
-        run: |
-          MAX_ITER=3
-          ITER=0
-          OVERFIT_FLAG=false
-          RE_TRIGGER_FLAG=""
-
-          while [[ $ITER -lt $MAX_ITER ]]; do
-            ITER=$((ITER + 1))
-            echo "=== Iteration $ITER of $MAX_ITER ==="
-
-            # Invoke dispatcher: source:'report-fix-api' (COST-01 traceability)
-            DISPATCH_OUTPUT=$(node scripts/report-fix.mjs \
-              --kv-record-file /tmp/kv-record.json \
-              --fp-short "${{ env.FP_SHORT }}" \
-              --issue-number "${{ github.event.issue.number }}" \
-              --repo "$GITHUB_REPOSITORY" \
-              $RE_TRIGGER_FLAG \
-              --output-file /tmp/report-fix-result.json 2>&1) || DISPATCH_EXIT=$?
-
-            if [[ "${DISPATCH_EXIT:-0}" -ne 0 ]]; then
-              echo "Dispatcher failed (exit ${DISPATCH_EXIT:-0}) on iteration $ITER:"
-              echo "$DISPATCH_OUTPUT"
-              if [[ $ITER -ge $MAX_ITER ]]; then
-                echo "Hard abort after $MAX_ITER iterations — applying auto-fix-stuck"
-                gh issue edit "${{ github.event.issue.number }}" \
-                  --add-label "auto-fix-stuck" \
-                  --repo "$GITHUB_REPOSITORY" || true
-                exit 1
-              fi
-              RE_TRIGGER_FLAG="--re-trigger"
-              continue
-            fi
-
-            # Read overfit signal from dispatcher output (GITHUB_OUTPUT written by dispatcher)
-            if [[ -f /tmp/report-fix-result.json ]]; then
-              OVERFIT_FLAG=$(node -e "
-                const r = JSON.parse(require('fs').readFileSync('/tmp/report-fix-result.json','utf8'));
-                process.stdout.write(r.overfitFlag ? 'true' : 'false');
-              " 2>/dev/null || echo "false")
-            fi
-            echo "overfit_flag=$OVERFIT_FLAG" >> "$GITHUB_OUTPUT"
-
-            echo "Dispatcher succeeded on iteration $ITER (overfit=$OVERFIT_FLAG)"
-
-            # GATE-01 / D-04: run golden corpus regression
-            echo "Running golden corpus test..."
-            if ! npm test -- --run tests/golden 2>&1; then
-              echo "Golden corpus regression on iteration $ITER"
-              if [[ $ITER -ge $MAX_ITER ]]; then
-                echo "Regression persists after $MAX_ITER iterations — applying auto-fix-stuck"
-                gh issue edit "${{ github.event.issue.number }}" \
-                  --add-label "auto-fix-stuck" \
-                  --repo "$GITHUB_REPOSITORY" || true
-                exit 1
-              fi
-              RE_TRIGGER_FLAG="--re-trigger"
-              continue
-            fi
-
-            # GATE-01 / D-04: run quarantine spec regression
-            echo "Running quarantine spec..."
-            if ! npx playwright test tests/e2e/specs/quarantine.spec.js 2>&1; then
-              echo "Quarantine spec regression on iteration $ITER"
-              if [[ $ITER -ge $MAX_ITER ]]; then
-                echo "Quarantine regression persists after $MAX_ITER iterations — applying auto-fix-stuck"
-                gh issue edit "${{ github.event.issue.number }}" \
-                  --add-label "auto-fix-stuck" \
-                  --repo "$GITHUB_REPOSITORY" || true
-                exit 1
-              fi
-              RE_TRIGGER_FLAG="--re-trigger"
-              continue
-            fi
-
-            echo "Iteration $ITER PASSED — clean golden + quarantine regression"
-            break
-          done
-
-          echo "Fix loop complete — overfit=$OVERFIT_FLAG"
-
-      # -----------------------------------------------------------------------
-      # Step 7: COST-04 two-commit ledger split — ORDERING IS LOAD-BEARING
-      # This step MUST appear before the create-pull-request step.
-      # DEVIATION: pushes to ledger-snapshots/report-fix-${FP_SHORT} (NOT main)
-      # because ruleset 17086676 blocks github-actions[bot] direct-to-main pushes.
-      # Human confirmed "Accept ledger-branch" at Task 3 checkpoint.
-      # Mirrors established pattern from v40-cost-ledger-snapshot.yml.
-      # -----------------------------------------------------------------------
-      - name: Commit ledger entry [skip ci] (COST-04 — ledger before CPR)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/e2e/.llm-spend-ledger.json
-          git diff --cached --quiet || git commit -m "[skip ci] ledger: report-fix ${{ env.FP_SHORT }}"
-          git push origin HEAD:ledger-snapshots/report-fix-${{ env.FP_SHORT }}
-          # Reset ledger from working tree before CPR snapshots — prevents
-          # the ledger file from entering the fix branch diff
-          # (would trigger the forbidden-path guard in v40-verifier-gate.yml)
-          git checkout -- tests/e2e/.llm-spend-ledger.json
-
-      # -----------------------------------------------------------------------
-      # Step 8: Create draft PR on auto-fix/<fp-short> (GATE-02)
-      # The auto-fix/ branch prefix makes v40-verifier-gate.yml fire automatically (GATE-03).
-      # draft:true — human approval is required before merge (GATE-04 permanent invariant).
-      # -----------------------------------------------------------------------
-      - name: Create draft PR on auto-fix/${{ env.FP_SHORT }} (GATE-02)
-        id: cpr
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: auto-fix/${{ env.FP_SHORT }}
-          base: main
-          draft: true
-          title: "auto-fix: report ${{ env.FP_SHORT }} — citation regression"
-          body: |
-            ## Auto-Fix Report
-
-            **Source Issue:** #${{ github.event.issue.number }}
-            <!-- source_issue: ${{ github.event.issue.number }} -->
-            **KV Key:** `${{ env.KV_KEY }}`
-            **Fingerprint:** `${{ env.FP_SHORT }}`
-
-            This PR was generated by `v61-report-fix.yml` from a human bug report
-            promoted to `report-fix-candidate` by the Phase 11 triage layer.
-
-            Ledger entry committed to `ledger-snapshots/report-fix-${{ env.FP_SHORT }}`
-            (COST-04 — spend is auditable; source: `report-fix-api`).
-
-            ---
-            *Review required before merge (GATE-04 human-merge invariant).*
-          commit-message: "fix: auto-fix citation regression for report ${{ env.FP_SHORT }}"
-
-      # -----------------------------------------------------------------------
-      # Step 9: FIX-04 / D-03 — consume overfit signal from dispatcher
-      # If overfit=true: apply human-review-required label to draft PR and
-      # append overfit note to PR body. Do NOT self-apply the verified label
-      # (that is the verifier-gate's grant — GATE-04 soft-flag rule).
-      # -----------------------------------------------------------------------
-      - name: Apply human-review-required if overfit detected (FIX-04/D-03)
-        if: steps.fix_loop.outputs.overfit_flag == 'true' && steps.cpr.outputs.pull-request-number != ''
-        run: |
-          PR_NUMBER="${{ steps.cpr.outputs.pull-request-number }}"
-          echo "Overfit signal detected — applying human-review-required label to PR #$PR_NUMBER"
-          # Idempotent label create (pattern from e2e-nightly.yml)
-          gh label create "human-review-required" \
-            --color "E4E669" \
-            --description "Fix contains pattern that may overfit to a specific patent number" \
-            --force \
-            --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
-          gh pr edit "$PR_NUMBER" \
-            --add-label "human-review-required" \
-            --repo "$GITHUB_REPOSITORY"
-          gh pr comment "$PR_NUMBER" \
-            --body "**Overfit warning (FIX-04/D-03):** The dispatcher detected that the candidate diff references a specific patent number literal in src/ added lines. Human review is required before this can be considered for merge. The verified label will not be granted by the automated gate until the overfit concern is resolved." \
-            --repo "$GITHUB_REPOSITORY"
-          echo "human-review-required applied to PR #$PR_NUMBER"
-
-      - name: Report fix complete
-        run: |
-          PR_NUM="${{ steps.cpr.outputs.pull-request-number }}"
-          OVERFIT="${{ steps.fix_loop.outputs.overfit_flag }}"
-          echo "=== v61-report-fix complete ==="
-          echo "PR: #$PR_NUM (auto-fix/${{ env.FP_SHORT }})"
-          echo "Overfit: $OVERFIT"
-          echo "Ledger: ledger-snapshots/report-fix-${{ env.FP_SHORT }}"
-          if [[ "$OVERFIT" == "true" ]]; then
-            echo "Status: draft PR created with human-review-required (overfit soft-flag)"
-          else
-            echo "Status: draft PR created — v40-verifier-gate.yml will run automatically"
-          fi
+          BODY="🛠️ Promoted for auto-fix. Fix generation runs **locally** via the Claude Code subscription (no Anthropic API in CI — see ADR-001). On an authenticated operator machine, run: \`npm run fix-report -- $ISSUE_NUMBER --push\`. That creates an \`auto-fix/<fp>\` draft PR gated by \`v40-verifier-gate.yml\`; human merge is required (GATE-04)."
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$BODY" || true

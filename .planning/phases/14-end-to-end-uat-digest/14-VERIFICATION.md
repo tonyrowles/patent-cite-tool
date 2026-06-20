@@ -26,6 +26,26 @@ human_verification:
 **Status:** human_needed
 **Re-verification:** No — initial verification
 
+## Live UAT Resolution (2026-06-20)
+
+The two `human_needed` items (UAT-01, UAT-02) were exercised live against
+production; their core mechanics now PASS. The LLM fix runs locally via the Claude
+Code subscription (ADR-001), not the CI Anthropic API.
+
+- **UAT-02 (manual promote) — PASS.** `ingest-reports.mjs promote 7fd5697e…` →
+  Issue #32 → local subscription fix → regression gate **rejected + reverted** a
+  corpus-regressing diff → `auto-fix-stuck`. Escape hatch + gate-reject arm proven.
+- **UAT-01 (auto promote → merge) — PASS (core).** Green seed (fp `fc9752b2`) →
+  triage `real_bug` → Issue #33 → local subscription fix (additive st-ligature,
+  U+FB05/FB06) → full suite 1789 passed, golden 0 mismatch → draft PR #34 →
+  human-merged to `main`. Gate-accept arm proven; both arms now demonstrated.
+
+**Remaining tails (do not block the digest deliverable):** auto-promote closing
+Issue #33 (`v40-auto-promote.yml` disabled — enable+dispatch or close manually);
+UAT-03 live cap across real Actions; a green verifier-gate binding (the gate's
+PROXY_TOKEN build wiring was fixed this session; #34 merged via owner-bypass).
+See `14-HUMAN-UAT.md` › Live UAT Evidence for refs.
+
 ## Goal Achievement
 
 ### Observable Truths

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v6.1
 milestone_name: Auto-Fix from Bug Reports
-status: milestone_complete
-stopped_at: Milestone complete (Phase 14 was final phase)
-last_updated: 2026-06-18T17:16:52.480Z
-last_activity: 2026-06-18
+status: Awaiting next milestone
+stopped_at: Phase 14 context gathered
+last_updated: "2026-06-20T20:27:33.476Z"
+last_activity: 2026-06-20 — Milestone v6.1 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -25,14 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-17)
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-06-18
-
-```
-Progress: [██████████] 100%
-```
+Phase: Milestone v6.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-20 — Milestone v6.1 completed and archived
 
 ## Key Locked Decisions (v6.1)
 
@@ -138,8 +134,7 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run `/gsd:plan-phase 10` to begin Phase 10 planning (Retirement + Scaffolding)
-- Phase 12 will require a research-phase during planning — do not skip it
+- Start the next milestone with /gsd-new-milestone
 
 ## Deferred Items
 
@@ -153,3 +148,17 @@ Items acknowledged at v6.0 milestone close (2026-06-17) — carried into v6.1 de
 | verification_gap | 08-webapp-core-build (human_needed) | resolved by Phase 9 live UAT |
 
 Non-blocking tech debt (v6.0 audit): pre-existing `weekly-digest-auto-fix` STATE.md `## Bypass Conventions` test; 4 deferred code-review info items (WR-02, IN-02/03/04).
+
+Items acknowledged at v6.1 milestone close (2026-06-20):
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 1-fix-off-by-2-error-in-patent-column-line | stale orphan (Mar 2026, has SUMMARY — complete; audit can't parse status) |
+| quick_task | 2-fix-ci-commit-package-lock-json | stale orphan (Mar 2026, complete) |
+| quick_task | 260412-fde-fix-spurious-results-reporting | stale orphan (Apr 2026, complete) |
+| uat_gap | 01 / 04 / 05 (v5.0 phases) | stale prior-milestone debt — not a v6.1 blocker |
+| verification_gap | 01 / 04 (v5.0 phases) | stale prior-milestone debt |
+| uat_gap + verification_gap | 12 (Fix Generation) | 5 deferred live-CI behaviors folded into 14-HUMAN-UAT.md; consciously deferred (D-09) |
+| uat_gap + verification_gap | 14 (End-to-End UAT) | live pipeline PROVEN end-to-end this session (UAT-01 auto #33→PR #34→merge; UAT-02 manual #32→gate-reject; both gate arms). Remaining tails: auto-promote issue-close, UAT-03 live cap — non-blocking. See 14-HUMAN-UAT.md Live UAT Evidence |
+
+v6.1 live-validation note: the report-fix LLM runs locally via Claude Code subscription (ADR-001); CI `v61-report-fix.yml` is notify-only. The st-ligature fix (#33→PR #34) is merged to `main` but not yet deployed to the extension/webapp/worker (build+deploy is a separate release decision).

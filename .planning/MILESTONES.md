@@ -1,5 +1,25 @@
 # Milestones
 
+## v6.1 Auto-Fix from Bug Reports (Shipped: 2026-06-20)
+
+**Phases completed:** 5 phases (10-14), 13 plans, 16 tasks
+
+**Delivered:** Turned real human-reported citation failures (the v5.0 `BUG_REPORTS` KV channel) into regression-safe fixes to the deterministic matching core, under a permanent human-merge gate. Rebuilt from first principles after retiring the v4.3 autonomous machinery — inbound signal is exclusively human bug reports.
+
+**Key accomplishments:**
+
+- **Phase 10 — Retirement + Scaffolding:** Hard-deleted the v4.3 autonomous machinery (`v40-auto-fix.yml`, `inject-defect.mjs` fixture-mutator, `e2e:explore` cron, synthetic-issue trigger), surgically repaired 7 dependent live tests, and stood up the `REPORT_FIX_SCAFFOLD` stub. Supersedes `RESUME-V4.3.md`.
+- **Phase 11 — Triage Layer:** `ingest-reports.mjs` (`workflow_dispatch`-only) reads `BUG_REPORTS` KV (`wrangler --remote`), classifies via `report-classifier.mjs` (8 heuristic rules), and auto/manual-promotes real bugs to `report-fix-candidate` Issues via shared `gh-client.mjs` with KV-key dedup + 30-day post-fix suppression (ING/TRI/PROMO — 15 reqs).
+- **Phase 12 — Fix Generation + Regression Gate:** A labeled Issue drives `v61-report-fix.yml` → `report-fix.mjs` → `REPORT_FIX_SCAFFOLD` LLM call inside a 3-iteration golden+quarantine loop → draft PR on `auto-fix/<fp>`, gated by `v40-verifier-gate.yml`, no auto-merge anywhere; prompt-injection structurally blocked; ledger-capped (FIX/GATE/COST — 13 reqs).
+- **Phase 13 — Triple-Gate Extension:** `assertTripleGate` Leg 3 widened to OR-accept `report-fix-candidate` (atomic with its byte-pin) + `<!-- source_issue -->` marker so the unchanged `parseSourceIssue` resolves v6.1 issues (GATE-05); trust invariants preserved.
+- **Phase 14 — End-to-End UAT + Digest:** Weekly digest gains a gh-only `BUG_REPORTS` section (degrade-to-`n/a`); UAT-03 asserts the $100 monthly ledger hard-cap. Live UAT proved the full pipeline end-to-end — both regression-gate arms (a regressing fix rejected+reverted; an additive st-ligature fix passed → PR merged to `main`).
+
+**Post-milestone evolution (this close):** report-fix LLM moved to the local Claude Code subscription transport (`npm run fix-report`, ADR-001 — no API billing); `v61-report-fix.yml` is now notify-only. v6.1 merged to `main` 2026-06-20.
+
+**Known deferred items at close:** 14 open artifacts acknowledged (see STATE.md Deferred Items) — v6.1 UAT tails (auto-promote issue-close, UAT-03 live cap) + stale v5.0 gaps + 3 completed quick-task orphans. None block shipping.
+
+---
+
 ## v6.0 Standalone Citation Webapp (Shipped: 2026-06-17)
 
 **Phases completed:** 4 phases (6-9), 9 plans, ~13 tasks

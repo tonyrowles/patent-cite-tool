@@ -512,3 +512,35 @@
 5. **ROADMAP.md plan checkboxes fall out of sync.** Observed in v1.1, v1.2, and v2.0 — 4th consecutive milestone. Needs automation or removal.
 6. **E2E browser testing is essential for extension development.** Integration bugs invisible to code review in all milestones.
 7. **Phased architecture evolution beats big-bang rewrites.** v2.0's extract → build → port → validate sequence kept each phase independently verifiable.
+
+---
+
+## Milestone: v6.1 — Auto-Fix from Bug Reports
+
+**Shipped:** 2026-06-20
+**Phases:** 5 (10-14) | **Plans:** 13
+
+### What Was Built
+Human bug reports (v5.0 `BUG_REPORTS` KV) → heuristic triage → `report-fix-candidate` Issue → LLM diff against the `src/shared/` matching core → 3-iteration golden+quarantine regression loop → draft PR gated by `v40-verifier-gate.yml` → human merge → triple-gate auto-promote. Plus a gh-only `BUG_REPORTS` weekly-digest section. The v4.3 autonomous machinery (fixture-mutator, explore cron, synthetic trigger) was retired first (Phase 10).
+
+### What Worked
+- **Retire-before-rebuild (Phase 10 first).** Deleting the conflicting autonomous machinery before writing new code avoided trigger/label collisions — the load-bearing sequencing call held.
+- **Live UAT surfaced the real gaps.** Everything that actually blocked the pipeline (missing GitHub labels, workflows not on `main`, a shell-injection in `v61-report-fix.yml`, a verifier-gate that never passed `PROXY_TOKEN`) was invisible to unit tests and only appeared when driving a real report end-to-end.
+- **The regression gate did its job, both ways.** A regressing fix was rejected+reverted; an additive fix passed and merged — the thesis demonstrated live, not asserted.
+
+### What Was Inefficient
+- **Iterating `claude -p` flags blind.** Five failed local runs to converge on the right single-shot config (no tools, $3 budget, 300s, `--recount` + trailing-newline). A 30-second `claude --version` + tiny-prompt smoke test up front would have isolated "flags/auth vs prompt-too-big" immediately.
+- **CI secret/label/merge prerequisites weren't in the runbook.** The live UAT rediscovered each deployment prerequisite one red run at a time.
+
+### Patterns Established
+- **Dual LLM transport by environment.** Subscription (local) vs SDK (CI), mutually exclusive by `CI`/`GITHUB_ACTIONS`, unified through one ledger + cap. v6.1 moved report-fix to the subscription side (ADR-001).
+- **LLM-diff hygiene.** Fenced diffs need `git apply --recount` (wrong `@@` counts) AND a force-appended trailing newline (corrupt-patch at EOF); single-shot generation wants no tools.
+
+### Key Lessons
+1. **A live end-to-end run is worth more than any number of green unit suites** for a multi-system pipeline — it's the only thing that exercises labels, secrets, branch state, and triggers together.
+2. **Smoke-test an external subprocess before tuning timeouts** — run-to-run variability (timeout / error_max_turns / apply-fail) signals wrong invocation, not slowness.
+3. **Front-load deployment prerequisites into the runbook**, or they get rediscovered as CI failures.
+
+### Cost Observations
+- Model mix: plan/execute via Opus + Sonnet executors; report-fix LLM now on the Claude Code subscription (no API billing).
+- Notable: the live-UAT debugging loop dominated wall-clock, not the build.

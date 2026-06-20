@@ -17,6 +17,8 @@ export function normalizeText(text) {
     .replace(/\uFB00/g, 'ff')
     .replace(/\uFB03/g, 'ffi')
     .replace(/\uFB04/g, 'ffl')
+    .replace(/\uFB05/g, 'st')
+    .replace(/\uFB06/g, 'st')
     .replace(/\s+/g, ' ')
     .trim();
 }

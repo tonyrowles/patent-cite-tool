@@ -1,8 +1,8 @@
 # v4.0 LLM Spend Ledger Dashboard
 
-**Generated:** 2026-05-31T16:03:31.594Z
+**Generated:** 2026-06-16T16:00:36.600Z
 **Source:** tests/e2e/.llm-spend-ledger.json
-**Month:** 2026-06  |  **Total:** $0.00  |  **Warn @ $80.00**  |  **Hard cap @ $100.00**  |  Status: ok
+**Month:** 2026-07  |  **Total:** $0.00  |  **Warn @ $80.00**  |  **Hard cap @ $100.00**  |  Status: ok
 
 ## By Transport (current month)
 
@@ -22,4 +22,6 @@
 
 | Phase | Spend (USD) | Per-Phase Cap | Status |
 | ----- | ----------- | ------------- | ------ |
+| 46-fix-issue | $0.49 | $10.00 | ok |
 | 39-bootstrap | $0.00 | $10.00 | ok |
+| 42-auto-fix | $0.00 | $10.00 | ok |

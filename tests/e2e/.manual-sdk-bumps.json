@@ -1,4 +1,13 @@
 {
   "version": 1,
-  "notes": []
+  "notes": [
+    {
+      "iso": "2026-09-07T14:39:43.737Z",
+      "pkg": "@anthropic-ai/sdk",
+      "current": "0.100.1",
+      "latest": "0.124.0",
+      "action": "manual-review-required",
+      "reason": "package is on NEVER_AUTO_BUMP list — manual security review required before bump"
+    }
+  ]
 }

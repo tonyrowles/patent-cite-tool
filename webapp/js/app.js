@@ -1,10 +1,11 @@
+import { CACHE_VERSION, validateCachePayload } from '../../src/shared/cache-schema.js';
 /**
  * app.js — Orchestration pipeline and UI state machine for the Patent Citation Webapp.
  *
  * Responsibilities:
  *   - Passage-row add / remove management
  *   - Submit handler: normalize → published-app guard → cache-first pipeline
- *   - Cache-first pipeline: GET /cache → on hit skip parse; on miss fetch+parse+upload
+ *   - Cache-first pipeline: GET /cache → on hit skip parse; on miss fetch+parse
  *   - matchAndCite × N passages (one positionMap, no re-parse — BATCH-01)
  *   - Result rendering: citation text, confidence chips, per-row copy, copy-all (≥2)
  *   - No-match and error states with retry (APP-07)
@@ -42,7 +43,7 @@ configurePdfWorker('/lib/pdf.worker.mjs');
 // ---------------------------------------------------------------------------
 
 const WORKER_URL = 'https://pct.tonyrowles.com';
-const CACHE_VERSION = 'v5';
+
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -382,12 +383,18 @@ function renderError(kind) {
  * @returns {Promise<{entries: Array, meta: object}|null>}
  */
 async function checkCache(patentId) {
-  const res = await fetch(
-    `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${CACHE_VERSION}`
-    // NO auth header — Origin header sent automatically by browser (SEC-03)
-  );
-  if (!res.ok) return null; // 404 = miss; other errors treated as miss
-  return await res.json(); // { entries, meta, ... }
+  try {
+    const res = await fetch(
+      `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${CACHE_VERSION}`,
+      { signal: AbortSignal.timeout(3000) }
+      // Browser Origin header only; no operator credential in the webapp.
+    );
+    if (!res.ok) return null;
+    const cached = await res.json();
+    return validateCachePayload(cached) ? cached : null;
+  } catch {
+    return null; // Cache outages and corrupt records fall through to local parsing.
+  }
 }
 
 /**
@@ -407,37 +414,6 @@ async function fetchPdf(patentId) {
   return await res.arrayBuffer();
 }
 
-/**
- * Upload a position map to the Worker KV cache. Fire-and-forget — never throws into UX.
- *
- * @param {string} patentId    - Normalized patent ID
- * @param {Array}  positionMap - Built by buildPositionMap(pageResults)
- */
-async function uploadToCache(patentId, positionMap) {
-  const entries = positionMap.map(({ text, column, lineNumber, page, section, hasWrapHyphen }) => ({
-    text, column, lineNumber, page, section, hasWrapHyphen,
-  }));
-  const meta = {
-    totalLines: positionMap.length,
-    totalColumns: positionMap.length > 0 ? positionMap[positionMap.length - 1].column : 0,
-    hasClaimsSection: positionMap.some(e => e.section === 'claims'),
-  };
-  const payload = { entries, meta, cachedAt: Date.now(), version: CACHE_VERSION };
-
-  try {
-    await fetch(
-      `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${CACHE_VERSION}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // NO auth header — Origin only (SEC-03)
-        body: JSON.stringify(payload),
-      }
-    );
-  } catch (_) {
-    // Fire-and-forget: never surface cache-upload failures to UX
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Core orchestration pipeline (APP-03..08, BATCH-01)
@@ -449,7 +425,7 @@ async function uploadToCache(patentId, positionMap) {
  * Stage order:
  *   1. GET /cache  (loading-cache)
  *   2. On miss: GET /webapp/pdf (loading-fetch) → extractTextFromPdf (loading-parse)
- *      → buildPositionMap → POST /cache (fire-and-forget)
+ *      → buildPositionMap
  *   3. matchAndCite × N passages on same positionMap (loading-match)  [BATCH-01]
  *   4. renderResults (success) or renderError (network / parse failure)
  *
@@ -493,8 +469,7 @@ async function runCitation(normalizedId, passages) {
 
       positionMap = buildPositionMap(pageResults);
 
-      // Fire-and-forget cache upload (APP-05)
-      uploadToCache(normalizedId, positionMap);
+
     }
   } catch (_outerErr) {
     // Unexpected error in cache-check or surrounding logic — treat as network error

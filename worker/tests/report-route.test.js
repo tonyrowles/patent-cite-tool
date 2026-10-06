@@ -21,7 +21,7 @@
 
 import { env } from 'cloudflare:workers';
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import worker from '../src/index.js';
 
 const TEST_TOKEN = 'test-token'; // must match miniflare.bindings.PROXY_TOKEN
@@ -428,16 +428,16 @@ describe('POST /report', () => {
 
   describe('Discord best-effort (D-04)', () => {
     it('returns 201 even when Discord webhook URL is unreachable', async () => {
-      // The test webhook URL 'https://discord.example.com/test-webhook' will not respond
-      // but the route must still return 201 because Discord runs in ctx.waitUntil()
+      vi.mocked(fetch).mockRejectedValueOnce(new Error('Simulated Discord outage'));
       const ctx = createExecutionContext();
       const response = await worker.fetch(
         makeReportRequest(makeBody(PATENT_DISCORD), IP_DISCORD),
-        env, ctx
+        { ...env, DISCORD_WEBHOOK_URL: 'https://discord-outage.example.com/webhook' }, ctx
       );
       // Status is available immediately without waiting for Discord
       expect(response.status).toBe(201);
-      await waitOnExecutionContext(ctx).catch(() => {}); // Discord fetch may throw — that's OK
+      await waitOnExecutionContext(ctx); // The Worker swallows notification failures.
+      expect(fetch).toHaveBeenCalledWith('https://discord-outage.example.com/webhook', expect.objectContaining({ method: 'POST' }));
     });
   });
 

@@ -242,7 +242,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "U.S. patent application Ser. No. 1 1/266,792 titled",
     "hasWrapHyphen": false,
     "x": 87.36000201485712,
@@ -266,7 +266,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "U.S. patent application Ser. No. 1 1/266,877 titled “HARD",
     "hasWrapHyphen": false,
     "x": 87.36000201485712,
@@ -302,7 +302,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "U.S. patent application Ser. No. 11/266,890 titled",
     "hasWrapHyphen": false,
     "x": 87.59999652714288,
@@ -314,7 +314,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "“ENCRYPTED DEBUG INTERFACE. ",
     "hasWrapHyphen": false,
     "x": 78.4800029291429,
@@ -326,7 +326,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "BACKGROUND",
     "hasWrapHyphen": false,
     "x": 155.0400003512381,
@@ -338,7 +338,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "In some applications, a manufacturer or designer of elec",
     "hasWrapHyphen": false,
     "x": 87.84000338228567,
@@ -350,7 +350,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "tronics equipment wishes to prevent third parties from reverse",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -362,7 +362,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "engineering Such equipment (at for example, the unit or sys",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -374,7 +374,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "tem level, board level, or component level). One approach to",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -386,7 +386,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "doing this is to include a mechanical lock that is designed to",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -398,7 +398,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "prevent a case (or other enclosure) from being opened (or to",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -410,7 +410,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "otherwise prevent the contents of the case from being physi",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -422,7 +422,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "cally accessed) when locked. Such a mechanical lock does",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -434,7 +434,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "not, however, prevent access to those interfaces that arephysi",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -446,7 +446,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "cally accessible from outside of the case or other enclosure",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -458,7 +458,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "(for example, a debug interface Such as an interface Support",
     "hasWrapHyphen": false,
     "x": 78.72000208685712,
@@ -470,7 +470,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "ing the Institute for Electrical and Electronics Engineers",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -482,7 +482,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "(IEEE) 1149.1 Standard (also referred to here as a “JTAG”",
     "hasWrapHyphen": false,
     "x": 78.72000208685712,
@@ -494,7 +494,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "interface)).",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -506,7 +506,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "Some reverse-engineering techniques access electronics",
     "hasWrapHyphen": false,
     "x": 87.84000338228567,
@@ -518,7 +518,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "enclosed within a mechanically locked case by communicat",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -530,7 +530,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "ing with Such electronics using externally accessible inter",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -542,7 +542,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "faces. For example, a debug interface is typically designed to",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -554,7 +554,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "provide a mechanism by which an external device is able to",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -566,7 +566,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "inspect and change the State of various items of electronics",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -578,7 +578,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "contained within Such a mechanically locked case (for",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -590,7 +590,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "example, by inspecting and/or changing the state ofregisters,",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -602,7 +602,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "memory, or I/O interfaces). Thus, Such a debug interface can",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -614,7 +614,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "be exploited in some cases to reverse engineering such equip",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -626,7 +626,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "ment.",
     "hasWrapHyphen": false,
     "x": 79.19999933999999,
@@ -638,7 +638,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "SUMMARY",
     "hasWrapHyphen": false,
     "x": 163.6799973615238,
@@ -650,7 +650,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "In one embodiment, a system comprises debug function",
     "hasWrapHyphen": false,
     "x": 87.84000338228567,
@@ -662,7 +662,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "ality, a debug interface communicatively coupled to the",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -674,7 +674,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "debug functionality, and a hardware key interface. Commu",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -686,7 +686,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "nication with the debug functionality over the debug interface",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -698,7 +698,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "is not permitted ifan authorized hardware key is not commu",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -710,7 +710,7 @@
   {
     "page": 15,
     "column": 1,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "nicatively coupled to the hardware key interface.",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -1310,7 +1310,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "FIG. 2 is a high-level block diagram ofone embodiment of",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -1322,7 +1322,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "a hardware key.",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -1334,7 +1334,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "FIG.3A is a block diagram ofone example ofa linear shift",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -1346,7 +1346,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "register.",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -1358,7 +1358,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "FIG. 3B is a variation of FIG. 3A demonstrating the use of",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -1370,7 +1370,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "a control register to modify the polynomial defined by the",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -1382,7 +1382,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "linear shift register.",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -1394,7 +1394,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "FIG. 4 is a high-level flow diagram ofone embodiment of",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -1406,7 +1406,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "a method performed by the hardware key of FIG. 2.",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -1418,7 +1418,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "FIG. 5 is a high-level flow diagram ofone embodiment of",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -1430,7 +1430,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "a method performed by the system of FIG. 1.",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -1442,7 +1442,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "FIG. 6 is a flow diagram ofone embodiment ofa method of",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -1454,7 +1454,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "providing access to a debug interface.",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -1466,7 +1466,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "FIG. 7A and FIG. 7B are high-level block diagrams illus",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -1478,7 +1478,7 @@
   {
     "page": 15,
     "column": 2,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "trating approaches to encrypting and decrypting communica",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -8450,7 +8450,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "Permitting an external debugging device 112 to interact",
     "hasWrapHyphen": false,
     "x": 87.84000338228567,
@@ -8462,7 +8462,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "with the debug functionality 114 of the system 100 only if an",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -8474,7 +8474,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "authorized hardware key 130 that permits access to the debug so",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8486,7 +8486,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "interface 110 is communicatively coupled to the hardware",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8498,7 +8498,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "key interface 132 provides protection against unauthorized",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8510,7 +8510,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "access to the debug interface 110 (for example, in the form of",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8522,7 +8522,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "unauthorized reverse-engineering ofthe system 100). This is",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -8534,7 +8534,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "desirable in Some applications since the debug interface 110 ss",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8546,7 +8546,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "typically provides a mechanism to view and/or change the",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -8558,7 +8558,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "state of one or more ofthe components ofthe system 100.",
     "hasWrapHyphen": false,
     "x": 78.72000208685712,
@@ -8570,7 +8570,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "Another way to protect the debug interface 110 (for",
     "hasWrapHyphen": false,
     "x": 87.59999652714288,
@@ -8582,7 +8582,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "example, from reverse engineering) is to encrypt or scramble",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8594,7 +8594,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "communications that occur over the debug interface 110. 60",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8606,7 +8606,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "FIG. 7A is a high-level block diagram illustrating one",
     "hasWrapHyphen": false,
     "x": 78.72000208685712,
@@ -8618,7 +8618,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "approach to encrypting and decrypting communications that",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8630,7 +8630,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "occur over a debug interface 110. In the example shown in",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8642,7 +8642,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "FIG. 7A, the debug interface 110 comprises a serial interface",
     "hasWrapHyphen": false,
     "x": 78.72000208685712,
@@ -8654,7 +8654,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "having a transmit data (TD) line, a receive data (RD) line, a 65",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -8666,7 +8666,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "ready-to-send (RTS) line and a clear-to-send (CTS) line. For",
     "hasWrapHyphen": false,
     "x": 78.47999523171431,
@@ -8678,7 +8678,7 @@
   {
     "page": 20,
     "column": 11,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "the system 100, the TD and CTS lines are inputs and the RD",
     "hasWrapHyphen": false,
     "x": 78.24000071942855,
@@ -12206,7 +12206,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "Ifthere is a match, the external debugging device 112 is an",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -12218,7 +12218,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "authorized device (block 922) and the processing described",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12230,7 +12230,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "here in connection with blocks 924 through936 is performed.",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -12242,7 +12242,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "If the external debugging device 112 is authorized, the",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -12254,7 +12254,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "debug security functionality 116 synchronizes the real-time",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12266,7 +12266,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "clock 1008 (shown in FIG. 10) using the timestamp received",
     "hasWrapHyphen": false,
     "x": 312.24000701532043,
@@ -12278,7 +12278,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "from the external debugging device 112 (block 924) and",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12290,7 +12290,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "configures its linear feedback shift register 1006 using the",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12302,7 +12302,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "polynomial received from the external debugging device 112",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12314,7 +12314,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "(block 926). For example, the debug security functionality",
     "hasWrapHyphen": false,
     "x": 312.4800015102856,
@@ -12326,7 +12326,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "116 configures the linear feedback shift register 1006 to have",
     "hasWrapHyphen": false,
     "x": 312.71999602257137,
@@ -12338,7 +12338,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "the length specified in the polynomial, to use the taps speci",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -12350,7 +12350,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "fied in the polynomial, and the seed value specified in the",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12362,7 +12362,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "polynomial. Then, the debug security functionality 116 indi",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12374,7 +12374,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "cates to the external debugging device 112 that it is ready to",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12386,7 +12386,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "communicate (for example, by sending a “ready' message on",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12398,7 +12398,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "the debug interface 110) (block 928). Then, the debug secu",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -12410,7 +12410,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "rity functionality 116 starts outputting the key bit stream from",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12422,7 +12422,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "the linear feedback shift register 1006 on each clock pulse",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -12434,7 +12434,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "(block 930). The debug security functionality 116 uses the",
     "hasWrapHyphen": false,
     "x": 312.4800015102856,
@@ -12446,7 +12446,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "key stream generated by the linear feedback shift register",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12458,7 +12458,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "1006 to encrypt and decrypt communications that occur over",
     "hasWrapHyphen": false,
     "x": 312.71999602257137,
@@ -12470,7 +12470,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "the debug interface 110.",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -12482,7 +12482,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "In the particular embodiment shown in FIG.9, the polyno",
     "hasWrapHyphen": false,
     "x": 321.3599959505714,
@@ -12494,7 +12494,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "mial that is used by the linear feedback shift registers 1002",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12506,7 +12506,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "and 1006 is changed at periodic intervals. When the current",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12518,7 +12518,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "periodic interval has elapsed since the polynomial was last",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12530,7 +12530,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "changed (checked in block932), the debug security function",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12542,7 +12542,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "ality 116 receives a new polynomial from the external debug",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12554,7 +12554,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "ging device 112 via the debug interface 110 (block 934). In",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12566,7 +12566,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "one implementation of Such an embodiment, the new poly",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12578,7 +12578,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "nomial is transmitted to the debugging security functionality",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12590,7 +12590,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "116 using the same encryption techniques that are used to",
     "hasWrapHyphen": false,
     "x": 312.4800015102856,
@@ -12602,7 +12602,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "transmit regular data over the debug interface 110. In other",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -12614,7 +12614,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "implementations, the transmission ofthe new polynomial is",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12626,7 +12626,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "encrypted in other ways or not encrypted.",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12638,7 +12638,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "After receiving the new polynomial, the debug security",
     "hasWrapHyphen": false,
     "x": 321.12000143828567,
@@ -12650,7 +12650,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "functionality 116 then re-configures the linear feedback shift",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,
@@ -12662,7 +12662,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "1006 using the new polynomial (block 936) and indicates to",
     "hasWrapHyphen": false,
     "x": 312.71999602257137,
@@ -12674,7 +12674,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "the external debugging device 112 that it is ready to commu",
     "hasWrapHyphen": false,
     "x": 312.0000001428571,
@@ -12686,7 +12686,7 @@
   {
     "page": 22,
     "column": 16,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "nicate overthe debug interface 110 using the bit stream output",
     "hasWrapHyphen": false,
     "x": 312.2399946551429,

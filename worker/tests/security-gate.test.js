@@ -5,7 +5,7 @@
 // Tests cover:
 //   WRKR-01: GET /webapp/pdf — Origin-authenticated PDF proxy
 //   WRKR-02: GET /cache — dual-auth (Bearer OR Origin)
-//   WRKR-03: POST /cache — webapp uploads tagged source:"webapp"
+//   Shared cache: operator-only signed writes, validation, repair, deletion, and expiry.
 //   WRKR-04: isPublishedApplication guard — HTTP 400 before any fetch
 //   SEC-03: webapp Origin auth; no Bearer required for webapp routes
 //   SEC-04: webapp rate limit (30/60s, wrl: prefix) → 429 on exceed
@@ -18,6 +18,7 @@ import { env } from 'cloudflare:workers';
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import worker from '../src/index.js';
+import { buildCachePayload, MAX_CACHE_BYTES } from '../../src/shared/cache-schema.js';
 
 const TEST_TOKEN = 'test-token'; // must match miniflare.bindings.PROXY_TOKEN
 const ALLOWED_ORIGIN = 'https://cite.tonyrowles.com';
@@ -60,6 +61,16 @@ function makeUnauthRequest(path, { ip = '10.3.0.1', method = 'GET' } = {}) {
   });
 }
 
+const VALID_MAP = buildCachePayload([{ text: 'verified patent text', column: 1, lineNumber: 1,
+  page: 2, section: 'description', hasWrapHyphen: false }]);
+function makeWriterRequest(patent, { method = 'POST', body = VALID_MAP, testMode = false, token = 'test-cache-writer' } = {}) {
+  return new Request(`https://worker.example.com/cache?patent=${patent}&v=v6`, {
+    method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+      ...(testMode ? { 'X-PCT-Test-Mode': 'true' } : {}) },
+    ...(method === 'DELETE' ? {} : { body: JSON.stringify(body) }),
+  });
+}
+
 // ─── Unique IPs and patent numbers per describe block ─────────────────────
 
 // isPublishedApplication guard (WRKR-04)
@@ -82,7 +93,7 @@ const PATENT_CACHE_BEARER = '12505100';
 const PATENT_CACHE_ORIGIN = '12505101';
 const PATENT_CACHE_UNAUTH = '12505102';
 
-// POST /cache webapp provenance (WRKR-03)
+// Cache mutation integrity
 const IP_POST_ORIGIN = '10.13.0.1';
 const IP_POST_BEARER = '10.13.0.2';
 const PATENT_POST_ORIGIN = '12505200';
@@ -106,7 +117,7 @@ describe('WRKR-04: isPublishedApplication guard — HTTP 400 before auth/rate-li
   it('GET /cache with published-application kind-code A1 → 400', async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_PUBAPP_A1}&v=v4`, { ip: IP_PUBAPP }),
+      makeOriginRequest(`/cache?patent=${PATENT_PUBAPP_A1}&v=v6`, { ip: IP_PUBAPP }),
       env, ctx
     );
     await waitOnExecutionContext(ctx);
@@ -128,7 +139,7 @@ describe('WRKR-04: isPublishedApplication guard — HTTP 400 before auth/rate-li
   it('GET /cache with 11-digit 20XXXXXXXXX bare number → 400', async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_PUBAPP_20_BARE}&v=v4`, { ip: IP_PUBAPP }),
+      makeOriginRequest(`/cache?patent=${PATENT_PUBAPP_20_BARE}&v=v6`, { ip: IP_PUBAPP }),
       env, ctx
     );
     await waitOnExecutionContext(ctx);
@@ -138,7 +149,7 @@ describe('WRKR-04: isPublishedApplication guard — HTTP 400 before auth/rate-li
   it('GET /cache with US-prefixed published-application → 400', async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_PUBAPP_US20}&v=v4`, { ip: IP_PUBAPP }),
+      makeOriginRequest(`/cache?patent=${PATENT_PUBAPP_US20}&v=v6`, { ip: IP_PUBAPP }),
       env, ctx
     );
     await waitOnExecutionContext(ctx);
@@ -148,7 +159,7 @@ describe('WRKR-04: isPublishedApplication guard — HTTP 400 before auth/rate-li
   it('GET /cache with normal patent number → NOT 400 (auth check may still produce 403)', async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_NORMAL}&v=v4`, { ip: IP_PUBAPP }),
+      makeOriginRequest(`/cache?patent=${PATENT_NORMAL}&v=v6`, { ip: IP_PUBAPP }),
       env, ctx
     );
     await waitOnExecutionContext(ctx);
@@ -209,7 +220,7 @@ describe('WRKR-02: GET /cache — dual auth (Bearer OR Origin)', () => {
   it('GET /cache with valid Bearer (extension) → 404 not-found (not auth error, wildcard CORS)', async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeBearerRequest(`/cache?patent=${PATENT_CACHE_BEARER}&v=v4`, { ip: IP_CACHE_BEARER }),
+      makeBearerRequest(`/cache?patent=${PATENT_CACHE_BEARER}&v=v6`, { ip: IP_CACHE_BEARER }),
       env, ctx
     );
     await waitOnExecutionContext(ctx);
@@ -221,7 +232,7 @@ describe('WRKR-02: GET /cache — dual auth (Bearer OR Origin)', () => {
   it('GET /cache with valid Origin (webapp) → 404 with webappCorsHeaders (reflected origin + Vary)', async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_CACHE_ORIGIN}&v=v4`, { ip: IP_CACHE_ORIGIN, testMode: true }),
+      makeOriginRequest(`/cache?patent=${PATENT_CACHE_ORIGIN}&v=v6`, { ip: IP_CACHE_ORIGIN, testMode: true }),
       env, ctx
     );
     await waitOnExecutionContext(ctx);
@@ -233,7 +244,7 @@ describe('WRKR-02: GET /cache — dual auth (Bearer OR Origin)', () => {
   it('GET /cache with no auth → 401 or 403', async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeUnauthRequest(`/cache?patent=${PATENT_CACHE_UNAUTH}&v=v4`),
+      makeUnauthRequest(`/cache?patent=${PATENT_CACHE_UNAUTH}&v=v6`),
       env, ctx
     );
     await waitOnExecutionContext(ctx);
@@ -241,43 +252,83 @@ describe('WRKR-02: GET /cache — dual auth (Bearer OR Origin)', () => {
   });
 });
 
-describe('WRKR-03: POST /cache — webapp provenance tagging', () => {
-  it('POST /cache via Origin → stored payload contains source:"webapp"', async () => {
-    const ctx = createExecutionContext();
-    const postResponse = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_POST_ORIGIN}&v=v4`, {
-        ip: IP_POST_ORIGIN,
-        method: 'POST',
-        body: { entries: [], meta: {} },
-      }),
-      env, ctx
-    );
-    await waitOnExecutionContext(ctx);
-    expect(postResponse.status).toBe(201);
-
-    // Verify the KV record has source:"webapp"
-    const stored = await env.PATENT_CACHE.get(`v4:${PATENT_POST_ORIGIN}`, { type: 'json' });
-    expect(stored).not.toBeNull();
-    expect(stored.source).toBe('webapp');
+describe('Shared cache integrity', () => {
+  it.each(['POST', 'PUT', 'DELETE'])('rejects Origin-only %s writes, even with an allowed Origin', async method => {
+    const response = await worker.fetch(makeOriginRequest(`/cache?patent=${PATENT_POST_ORIGIN}&v=v6`, {
+      method, body: VALID_MAP,
+    }), env, createExecutionContext());
+    expect(response.status).toBe(403);
+    expect(await env.PATENT_CACHE.get(`v6:${PATENT_POST_ORIGIN}`)).toBeNull();
+  });
+  it('rejects the public extension token for writes', async () => {
+    const response = await worker.fetch(makeBearerRequest(`/cache?patent=${PATENT_POST_BEARER}&v=v6`, {
+      method: 'POST', body: VALID_MAP,
+    }), env, createExecutionContext());
+    expect(response.status).toBe(403);
+  });
+  it('fails closed when the writer secret is absent or reused as the extension token', async () => {
+    for (const CACHE_WRITE_TOKEN of [undefined, 'test-token']) {
+      const response = await worker.fetch(makeWriterRequest('12505202', { token: 'test-token' }),
+        { ...env, CACHE_WRITE_TOKEN }, createExecutionContext());
+      expect(response.status).toBe(403);
+    }
+  });
+  it.each([null, [], {}, { ...VALID_MAP, entries: [] },
+    { ...VALID_MAP, entries: [{ ...VALID_MAP.entries[0], lineNumber: 999 }] },
+    { ...VALID_MAP, meta: { ...VALID_MAP.meta, totalLines: 100 } },
+    { ...VALID_MAP, version: 'v5' }])('rejects malformed payload %j without storing it', async body => {
+    const response = await worker.fetch(makeWriterRequest('12505203', { body }), env, createExecutionContext());
+    expect(response.status).toBe(400);
+    expect(await env.PATENT_CACHE.get('v6:12505203')).toBeNull();
+  });
+  it('bounds the actual streamed body even without Content-Length', async () => {
+    const request = new Request('https://worker.example.com/cache?patent=12505204&v=v6', {
+      method: 'POST', headers: { Authorization: 'Bearer test-cache-writer' },
+      body: new ReadableStream({ start(controller) {
+        controller.enqueue(new Uint8Array(MAX_CACHE_BYTES + 1)); controller.close();
+      } }),
+    });
+    const response = await worker.fetch(request, env, createExecutionContext());
+    expect(response.status).toBe(413);
+    expect(await env.PATENT_CACHE.get('v6:12505204')).toBeNull();
+  });
+  it('creates a trusted map, refuses accidental overwrite, replaces and deletes explicitly', async () => {
+    const patent = '12505205';
+    expect((await worker.fetch(makeWriterRequest(patent), env, createExecutionContext())).status).toBe(201);
+    let cached = await env.PATENT_CACHE.get(`v6:${patent}`, { type: 'json' });
+    expect(cached.source).toBe('operator');
+    const listed = await env.PATENT_CACHE.list({ prefix: `v6:${patent}` });
+    expect(listed.keys[0].expiration).toBeGreaterThan(Math.floor(Date.now() / 1000));
+    expect((await worker.fetch(makeWriterRequest(patent), env, createExecutionContext())).status).toBe(409);
+    const repaired = { ...VALID_MAP, entries: [{ ...VALID_MAP.entries[0], text: 'repaired text' }] };
+    expect((await worker.fetch(makeWriterRequest(patent, { method: 'PUT', body: repaired }), env, createExecutionContext())).status).toBe(200);
+    const read = await worker.fetch(makeOriginRequest(`/cache?patent=${patent}&v=v6`), env, createExecutionContext());
+    expect(read.status).toBe(200);
+    expect((await read.json()).entries[0].text).toBe('repaired text');
+    expect((await worker.fetch(makeWriterRequest(patent, { method: 'DELETE' }), env, createExecutionContext())).status).toBe(200);
+    expect(await env.PATENT_CACHE.get(`v6:${patent}`)).toBeNull();
+  });
+  it('rejects unsigned, modified, and transplanted cache records', async () => {
+    const patent = '12505207';
+    expect((await worker.fetch(makeWriterRequest(patent), env, createExecutionContext())).status).toBe(201);
+    const record = await env.PATENT_CACHE.get(`v6:${patent}`, { type: 'json' });
+    expect(record.signature).toMatch(/^[a-f0-9]{64}$/);
+    await env.PATENT_CACHE.put('v6:12505208', JSON.stringify(record));
+    expect((await worker.fetch(makeOriginRequest('/cache?patent=12505208&v=v6'), env, createExecutionContext())).status).toBe(404);
+    const forged = { ...record, entries: [{ ...record.entries[0], lineNumber: 99 }] };
+    await env.PATENT_CACHE.put(`v6:${patent}`, JSON.stringify(forged));
+    expect((await worker.fetch(makeOriginRequest(`/cache?patent=${patent}&v=v6`), env, createExecutionContext())).status).toBe(404);
+    const { signature, ...unsigned } = record;
+    await env.PATENT_CACHE.put(`v6:${patent}`, JSON.stringify(unsigned));
+    expect((await worker.fetch(makeOriginRequest(`/cache?patent=${patent}&v=v6`), env, createExecutionContext())).status).toBe(404);
   });
 
-  it('POST /cache via Bearer → stored payload does NOT have source field', async () => {
-    const ctx = createExecutionContext();
-    const postResponse = await worker.fetch(
-      makeBearerRequest(`/cache?patent=${PATENT_POST_BEARER}&v=v4`, {
-        ip: IP_POST_BEARER,
-        method: 'POST',
-        body: { entries: [], meta: {} },
-      }),
-      env, ctx
-    );
-    await waitOnExecutionContext(ctx);
-    expect(postResponse.status).toBe(201);
-
-    // Verify the KV record does NOT have source field (extension uploads are untagged)
-    const stored = await env.PATENT_CACHE.get(`v4:${PATENT_POST_BEARER}`, { type: 'json' });
-    expect(stored).not.toBeNull();
-    expect(stored.source).toBeUndefined();
+  it('does not serve malformed or pre-v6 records', async () => {
+    await env.PATENT_CACHE.put('v6:12505206', JSON.stringify({ entries: [{ text: 'fake' }] }));
+    const corrupt = await worker.fetch(makeOriginRequest('/cache?patent=12505206&v=v6'), env, createExecutionContext());
+    expect(corrupt.status).toBe(404);
+    const legacy = await worker.fetch(makeOriginRequest('/cache?patent=12505206&v=v5'), env, createExecutionContext());
+    expect(legacy.status).toBe(400);
   });
 });
 
@@ -289,7 +340,7 @@ describe('SEC-04: Webapp rate limit — 30/60s on GET /webapp/pdf and GET /cache
     for (let i = 0; i < 30; i++) {
       const ctx = createExecutionContext();
       const response = await worker.fetch(
-        makeOriginRequest(`/cache?patent=${PATENT_RATELIMIT}&v=v4`, {
+        makeOriginRequest(`/cache?patent=${PATENT_RATELIMIT}&v=v6`, {
           ip: IP_RATELIMIT_WEBAPP,
           // Do NOT use testMode here — we need the wrl: counter to actually increment
         }),
@@ -303,7 +354,7 @@ describe('SEC-04: Webapp rate limit — 30/60s on GET /webapp/pdf and GET /cache
     // 31st request — should be rate limited regardless of testMode
     const ctx = createExecutionContext();
     const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_RATELIMIT}&v=v4`, {
+      makeOriginRequest(`/cache?patent=${PATENT_RATELIMIT}&v=v6`, {
         ip: IP_RATELIMIT_WEBAPP,
       }),
       env, ctx
@@ -316,51 +367,21 @@ describe('SEC-04: Webapp rate limit — 30/60s on GET /webapp/pdf and GET /cache
   });
 });
 
-describe('SEC-05: Daily write guard — 900/day on POST /cache', () => {
-  it('POST /cache with testMode:true → 201 and wq: counter NOT incremented', async () => {
-    const dateKey = `wq:${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
-    // Record the counter BEFORE the testMode request (may already be non-null from prior tests)
-    const counterBefore = await env.PATENT_CACHE.get(dateKey);
-    const countBefore = counterBefore ? parseInt(counterBefore, 10) : 0;
-
-    const ctx = createExecutionContext();
-    const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_WRITEGUARD}&v=v4`, {
-        ip: IP_WRITEGUARD,
-        method: 'POST',
-        body: { entries: [], meta: {} },
-        testMode: true,
-      }),
-      env, ctx
-    );
-    await waitOnExecutionContext(ctx);
+describe('Daily operator write guard', () => {
+  it('test mode returns 201 without incrementing the write counter', async () => {
+    const key = `wq:${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+    const before = await env.PATENT_CACHE.get(key);
+    const response = await worker.fetch(makeWriterRequest(PATENT_WRITEGUARD, { testMode: true }), env, createExecutionContext());
     expect(response.status).toBe(201);
-
-    // wq: counter should NOT have changed since testMode suppresses the increment
-    const counterAfter = await env.PATENT_CACHE.get(dateKey);
-    const countAfter = counterAfter ? parseInt(counterAfter, 10) : 0;
-    expect(countAfter).toBe(countBefore);
+    expect(await env.PATENT_CACHE.get(key)).toBe(before);
   });
-
-  it('POST /cache at write-guard threshold → 503 Service Unavailable', async () => {
-    // Directly inject the wq: counter at 900 to simulate exhaustion
-    const dateKey = `wq:${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
-    await env.PATENT_CACHE.put(dateKey, '900', { expirationTtl: 172800 });
-
-    // Now try to POST /cache (without testMode so it checks the guard)
-    const ctx = createExecutionContext();
-    const response = await worker.fetch(
-      makeOriginRequest(`/cache?patent=${PATENT_WRITEGUARD}&v=v4`, {
-        ip: IP_WRITEGUARD,
-        method: 'POST',
-        body: { entries: [], meta: {} },
-      }),
-      env, ctx
-    );
-    await waitOnExecutionContext(ctx);
+  it('rejects writes at the daily threshold', async () => {
+    const key = `wq:${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+    await env.PATENT_CACHE.put(key, '900', { expirationTtl: 172800 });
+    const response = await worker.fetch(makeWriterRequest(PATENT_WRITEGUARD), env, createExecutionContext());
     expect(response.status).toBe(503);
-    // 503 on origin path must include webappCorsHeaders
-    expect(response.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN);
+    expect(await env.PATENT_CACHE.get(`v6:${PATENT_WRITEGUARD}`)).toBeNull();
+    await env.PATENT_CACHE.delete(key);
   });
 });
 

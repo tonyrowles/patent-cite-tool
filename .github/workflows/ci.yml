@@ -67,6 +67,9 @@ jobs:
       - name: Test — worker (Vitest)
         run: cd worker && npm test
 
+      - name: Build standalone webapp
+        run: npm run build:webapp
+
       - name: Package Chrome extension
         if: success()
         run: cd dist/chrome && zip -r ../../patent-cite-chrome.zip .

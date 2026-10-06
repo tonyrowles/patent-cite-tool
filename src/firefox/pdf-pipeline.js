@@ -1,3 +1,4 @@
+import { CACHE_VERSION, validateCachePayload } from '../shared/cache-schema.js';
 /**
  * PDF pipeline for the Firefox extension.
  *
@@ -25,13 +26,7 @@ const WORKER_URL = 'https://pct.tonyrowles.com';
 // Token injected at build time by esbuild define (SEC-02). Never a literal.
 const PROXY_TOKEN = __PROXY_TOKEN__;
 
-// Cache version — bump to invalidate all cached entries.
-// v5: evicts maps built during the v5.0.x fix window — both the v5.0.0
-// column-sequence regression AND the cross-column merged-line dropout
-// (stripCrossBoundaryText) that dropped right-column lines. POST /cache is
-// write-once, so any map cached under an older version must be abandoned by
-// bumping here. See position-map-builder.js.
-const CACHE_VERSION = 'v5';
+
 
 // ---------------------------------------------------------------------------
 // IndexedDB degradation state (FOX-05)
@@ -58,10 +53,12 @@ const positionMapCache = new Map();
  */
 function openDb() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('patent-cite-tool', 1);
+    const request = indexedDB.open('patent-cite-tool', 2);
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
+      // Discard maps persisted before operator-only cache writes and the parser fixes.
+      if (event.oldVersion < 2 && db.objectStoreNames.contains('pdfs')) db.deleteObjectStore('pdfs');
       if (!db.objectStoreNames.contains('pdfs')) {
         db.createObjectStore('pdfs', { keyPath: 'patentId' });
       }
@@ -205,7 +202,8 @@ async function checkCache(patentId) {
     clearTimeout(timeoutId);
 
     if (!response.ok) return null; // 404 = cache miss
-    return await response.json();
+    const cached = await response.json();
+    return validateCachePayload(cached) ? cached : null;
   } catch (err) {
     clearTimeout(timeoutId);
     // AbortError (timeout) or network error — fall through silently
@@ -396,57 +394,6 @@ export async function lookupPosition(selectedText, patentId, contextBefore = '',
   }
 }
 
-/**
- * Upload the position map for a parsed patent to the Cloudflare KV cache.
- * Fire-and-forget — errors are swallowed to never impact the user experience.
- *
- * Strips bounding box fields (x, y, width, height) from each entry.
- * Only caches: text, column, lineNumber, page, section, hasWrapHyphen.
- *
- * Absorbs uploadToCache() from offscreen.js.
- *
- * @param {string} patentId
- */
-export async function uploadToCache(patentId) {
-  try {
-    const entry = await readPositionMap(patentId);
-
-    if (!entry?.positionMap || !entry?.positionMapMeta) {
-      console.warn('[Firefox] No positionMap to upload for', patentId);
-      return;
-    }
-
-    // Strip bounding box fields — only cache text, column, lineNumber, page, section, hasWrapHyphen
-    const entries = entry.positionMap.map(({ text, column, lineNumber, page, section, hasWrapHyphen }) => ({
-      text, column, lineNumber, page, section, hasWrapHyphen,
-    }));
-
-    const payload = {
-      entries,
-      meta: {
-        totalLines: entry.positionMapMeta.totalLines,
-        totalColumns: entry.positionMapMeta.totalColumns,
-        hasClaimsSection: entry.positionMapMeta.hasClaimsSection,
-      },
-      cachedAt: Date.now(),
-      version: CACHE_VERSION,
-    };
-
-    const url = `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${CACHE_VERSION}`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${PROXY_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    console.log(`[Firefox] Cache upload for ${patentId}: ${resp.status} ${resp.statusText}`);
-  } catch (err) {
-    // Silently ignore — cache upload failure must never affect the user
-    console.warn('[Firefox] Cache upload failed:', err.message);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Internal helpers (not exported)

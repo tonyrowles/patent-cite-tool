@@ -11,7 +11,7 @@ Highlight text in a patent specification → get a formatted citation like `Col.
 - **Four trigger modes** — floating button, automatic, right-click context menu, or silent Ctrl+C
 - **Silent clipboard mode** — Ctrl+C on highlighted text appends the citation to your clipboard with toast feedback
 - **Three-state toolbar icon** — gray (not a patent page), amber (patent detected, parsing), blue (ready to cite)
-- **Server-side cache** — parsed position maps are cached via Cloudflare KV so repeat lookups are instant
+- **Server-side cache** — operator-prepared position maps in Cloudflare KV speed up supported lookups; cache misses are parsed locally
 - **USPTO fallback** — if Google's PDF CDN is unavailable, falls back to USPTO eGrant API via Cloudflare Worker proxy
 - **Options page** — configurable trigger mode, display mode, and optional patent number prefix
 
@@ -98,7 +98,7 @@ npm run accuracy-report -- --compare   # Compare against pre-fix baseline
 
 Weekly digests publish an `e2e-digest` issue and retain Markdown reports and bypass audits as Actions artifacts for 90 days. They do not push directly to protected `main`.
 
-Dependency scans retain review reports. They create draft PRs only when the Actions pull-request policy can be confirmed as enabled; otherwise the artifact is available for manual review. Build steps in nightly and dependency-gate workflows use the repository's `PROXY_TOKEN` secret.
+Dependency scans retain review reports. They create draft PRs only when the Actions pull-request policy can be confirmed as enabled; otherwise the artifact is available for manual review. Nightly builds use the repository's `PROXY_TOKEN` secret. The required dependency gate runs blocking smoke and rotating regression tests on every PR with a placeholder token, so PR code never receives the production secret; Google PDF download and local parsing are exercised, while authenticated USPTO fallback requires a separate trusted run.
 
 A disabled workflow stays disabled until the maintainer intentionally enables it. In particular, `deps-update-gate` is a required check, so the dependency workflow must be enabled before merging PRs. The retired v4.3 autonomous machinery must not be restored. v6.1 report fixes run locally through `npm run fix-report -- <issue-number>`; CI only supplies verification and notification.
 
@@ -106,7 +106,7 @@ Firefox validation calls Mozilla's `addons-linter` directly, with the same PDF.j
 
 ### Cloudflare Worker
 
-The `worker/` directory contains a Cloudflare Worker that proxies USPTO eGrant API requests and manages a shared KV cache. See `worker/wrangler.toml` for configuration.
+The `worker/` directory contains a Cloudflare Worker that proxies USPTO eGrant API requests and manages a shared KV cache. Browser clients read trusted maps; they cannot write shared records. Operators populate, replace, or delete maps using a separate `CACHE_WRITE_TOKEN` secret that must differ from `PROXY_TOKEN` and must never be included in browser builds. Maps expire after 30 days. See [cache operations](docs/cache-operations.md) for setup, repair commands, and rollout order, and `worker/wrangler.toml` for configuration.
 
 ## Permissions
 
@@ -123,7 +123,7 @@ The `worker/` directory contains a Cloudflare Worker that proxies USPTO eGrant A
 
 ## Privacy
 
-No personal data is collected. The only stored data is three preference settings in `chrome.storage.sync`. Patent position maps are cached on first-party Cloudflare KV infrastructure — no third-party analytics or tracking.
+Normal citation use collects no personal information and uses no analytics or tracking. Three preferences are synced through browser storage, and patent position maps contain only public document data. If you submit a voluntary bug report, diagnostic fields and any optional selection text or note are stored in Cloudflare KV for 90 days and a notification is sent to a maintainer Discord channel. Pending reports and retry metadata are also stored locally until delivery or expiry.
 
 Full privacy policy: [tonyrowles.github.io/patent-cite-tool/privacy](https://tonyrowles.github.io/patent-cite-tool/privacy)
 

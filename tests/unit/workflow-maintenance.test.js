@@ -6,13 +6,15 @@ function workflow(name) {
 }
 
 describe('maintenance workflow safeguards', () => {
-  it('supplies authentication to every nightly and dependency extension build', () => {
+  it('supplies production authentication only to nightly builds and a placeholder to PR builds', () => {
     for (const name of ['e2e-nightly', 'v40-deps-update']) {
       const steps = workflow(name).split(/\n      - /);
       const builds = steps.filter(step => /run: npm run (build:chrome|e2e:quarantine)/.test(step));
       expect(builds.length).toBeGreaterThan(0);
       for (const step of builds) {
-        expect(step).toContain('PROXY_TOKEN: ${{ secrets.PROXY_TOKEN }}');
+        expect(step).toContain(name === 'v40-deps-update'
+          ? 'PROXY_TOKEN: test-proxy-token'
+          : 'PROXY_TOKEN: ${{ secrets.PROXY_TOKEN }}');
         expect(step.match(/\n        env:/g)).toHaveLength(1);
       }
     }

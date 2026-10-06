@@ -302,7 +302,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 30,
+    "lineNumber": 29,
     "text": "The present invention relates to programmable devices",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -314,7 +314,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 31,
+    "lineNumber": 30,
     "text": "such as field programmable gate arrays (FPGAs). More",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -326,7 +326,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 32,
+    "lineNumber": 31,
     "text": "Specifically, the present invention relates to methods for",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -338,7 +338,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 33,
+    "lineNumber": 32,
     "text": "programming and enabling licensed macroS in an FPGA.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -350,7 +350,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 35,
+    "lineNumber": 34,
     "text": "BACKGROUND OF THE INVENTION",
     "hasWrapHyphen": false,
     "x": 93.60000001142855,
@@ -362,7 +362,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 37,
+    "lineNumber": 36,
     "text": "Due to advancing Semiconductor processing technology,",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -374,7 +374,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 38,
+    "lineNumber": 37,
     "text": "integrated circuits have greatly increased in functionality",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -386,7 +386,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 39,
+    "lineNumber": 38,
     "text": "and complexity. For example, programmable devices Such",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -398,7 +398,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 40,
+    "lineNumber": 39,
     "text": "as field programmable gate arrays (FPGAS) and program",
     "hasWrapHyphen": false,
     "x": 59.99999762706768,
@@ -410,7 +410,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 41,
+    "lineNumber": 40,
     "text": "mable logic devices (PLDS), can incorporate ever",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -422,7 +422,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 42,
+    "lineNumber": 41,
     "text": "increasing numbers of functional blockS and more flexible",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -434,7 +434,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 43,
+    "lineNumber": 42,
     "text": "interconnect Structures to provide greater functionality and",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -446,7 +446,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 44,
+    "lineNumber": 43,
     "text": "flexibility.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -458,7 +458,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 45,
+    "lineNumber": 44,
     "text": "FIG. 1 is a simplified Schematic diagram of a conventional",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -470,7 +470,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 46,
+    "lineNumber": 45,
     "text": "FPGA 110. FPGA 110 includes user logic circuits such as",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -482,7 +482,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 47,
+    "lineNumber": 46,
     "text": "input/output blocks (IOBs), configurable logic blocks",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -494,7 +494,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 48,
+    "lineNumber": 47,
     "text": "(CLBs), and programmable interconnect 130, which con",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -506,7 +506,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 49,
+    "lineNumber": 48,
     "text": "tains programmable switch matrices (PSMs). Each IOB and",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -518,7 +518,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 50,
+    "lineNumber": 49,
     "text": "CLB can be configured through configuration port 120 to",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -530,7 +530,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 51,
+    "lineNumber": 50,
     "text": "perform a variety of functions. Programmable interconnect",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -542,7 +542,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 52,
+    "lineNumber": 51,
     "text": "130 can be configured to provide electrical connections",
     "hasWrapHyphen": false,
     "x": 60.240004983714236,
@@ -554,7 +554,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 53,
+    "lineNumber": 52,
     "text": "between the various CLBs and IOBs by configuring the",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -566,7 +566,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 54,
+    "lineNumber": 53,
     "text": "PSMs and other programmable interconnection points",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -578,7 +578,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 55,
+    "lineNumber": 54,
     "text": "(PIPS, not shown) through configuration port 120. Typically,",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -590,7 +590,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 56,
+    "lineNumber": 55,
     "text": "the IOBS can be configured to drive output signals or to",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -602,7 +602,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 57,
+    "lineNumber": 56,
     "text": "receive input signals from various pins (not shown) of FPGA",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -614,7 +614,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 58,
+    "lineNumber": 57,
     "text": "110.",
     "hasWrapHyphen": false,
     "x": 60,
@@ -626,7 +626,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 59,
+    "lineNumber": 58,
     "text": "FPGA 110 also includes dedicated internal logic. Dedi",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -638,7 +638,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 60,
+    "lineNumber": 59,
     "text": "cated internal logic performs Specific functions and can only",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -650,7 +650,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 61,
+    "lineNumber": 60,
     "text": "be minimally configured by a user. For example, configu",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -662,7 +662,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 62,
+    "lineNumber": 61,
     "text": "ration port 120 is one example of dedicated internal logic.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -674,7 +674,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 63,
+    "lineNumber": 62,
     "text": "Other examples may include dedicated clock nets (not",
     "hasWrapHyphen": false,
     "x": 59.99999762706768,
@@ -686,7 +686,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 64,
+    "lineNumber": 63,
     "text": "shown), power distribution grids (not shown), and boundary",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -698,7 +698,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 65,
+    "lineNumber": 64,
     "text": "scan logic (i.e. IEEE Boundary Scan Standard 1149.1, not",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -710,7 +710,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 66,
+    "lineNumber": 65,
     "text": "shown).",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -722,7 +722,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 67,
+    "lineNumber": 66,
     "text": "FPGA 110 is illustrated with 16 CLBs, 16 IOBs, and 9",
     "hasWrapHyphen": false,
     "x": 69.12000335273952,
@@ -734,7 +734,7 @@
   {
     "page": 11,
     "column": 1,
-    "lineNumber": 68,
+    "lineNumber": 67,
     "text": "PSMs for clarity only. Actual FPGAs may contain thousands",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -1634,7 +1634,7 @@
   {
     "page": 12,
     "column": 3,
-    "lineNumber": 10,
+    "lineNumber": 9,
     "text": "The present invention uses on-chip keys, i.e., keys pro",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -1694,7 +1694,7 @@
   {
     "page": 12,
     "column": 3,
-    "lineNumber": 15,
+    "lineNumber": 14,
     "text": "a locked macro. A corresponding key is placed within the",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -1706,7 +1706,7 @@
   {
     "page": 12,
     "column": 3,
-    "lineNumber": 16,
+    "lineNumber": 15,
     "text": "FPGA in a write-only memory or a write and read once",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -1718,7 +1718,7 @@
   {
     "page": 12,
     "column": 3,
-    "lineNumber": 17,
+    "lineNumber": 16,
     "text": "memory. (A read-once memory is a memory that can be read",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -1730,7 +1730,7 @@
   {
     "page": 12,
     "column": 3,
-    "lineNumber": 18,
+    "lineNumber": 17,
     "text": "back only once, e.g., for manufacturing test purposes.)",
     "hasWrapHyphen": false,
     "x": 59.519999001022555,
@@ -1742,7 +1742,7 @@
   {
     "page": 12,
     "column": 3,
-    "lineNumber": 19,
+    "lineNumber": 18,
     "text": "During configuration of the FPGA, a decoder detects the",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -2582,7 +2582,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 24,
+    "lineNumber": 23,
     "text": "FPGA.",
     "hasWrapHyphen": false,
     "x": 294.0000008666666,
@@ -2702,7 +2702,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "FIG. 6 illustrates a method of programming an FPGA in",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -2714,7 +2714,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "accordance with another embodiment of the present inven",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -2738,7 +2738,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "FIG. 7 illustrates a method of programming an FPGA in",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -2750,7 +2750,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "accordance with another embodiment of the present inven",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -2762,7 +2762,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "tion.",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -2774,7 +2774,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "FIG. 8 illustrates a method of programming an FPGA in",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -2786,7 +2786,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "accordance with another embodiment of the present inven",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -2798,7 +2798,7 @@
   {
     "page": 12,
     "column": 4,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "tion.",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -5126,7 +5126,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "Thus, end user 630 has the desired locked macros for his",
     "hasWrapHyphen": false,
     "x": 59.76000532729416,
@@ -5138,7 +5138,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "design file and a properly keyed FPGA (i.e., keyed FPGA",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -5150,7 +5150,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "745) to receive the design file. Thus, end user 630 can create",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -5162,7 +5162,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "a programmed FPGA 735, which implements locked macro",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5198,7 +5198,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "FIG. 8 illustrates a method in accordance with other",
     "hasWrapHyphen": false,
     "x": 69.12,
@@ -5210,7 +5210,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "embodiments of the present invention to safely distribute",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5222,7 +5222,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "and use locked macroS for multiple macro vendors. AS",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5234,7 +5234,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "illustrated in FIG. 8, end user 630 obtains FPGA 615 from",
     "hasWrapHyphen": false,
     "x": 59.76000532729416,
@@ -5246,7 +5246,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "FPGA maker 610. End user 630 also obtains locked macro",
     "hasWrapHyphen": false,
     "x": 60,
@@ -5258,7 +5258,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "725 from macro vendor 720 and locked macro 625 from",
     "hasWrapHyphen": false,
     "x": 59.76,
@@ -5270,7 +5270,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "macro vendor 620. End user 630 uses a key programming",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5282,7 +5282,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "tool 830 to pre-program the appropriate keys into FPGA",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5294,7 +5294,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "615.",
     "hasWrapHyphen": false,
     "x": 60.239999999999995,
@@ -5306,7 +5306,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "In one embodiment, key programming tool contacts the",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -5318,7 +5318,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "appropriate macro Vendor to obtain the desired key over a",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5330,7 +5330,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "Secure medium. For example, in FIG. 8, key programming",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5342,7 +5342,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "tool 830 contacts macro vendor 620 to obtain key 624 over",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5354,7 +5354,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "Secure medium 626 and contacts macro vendor 720 to obtain",
     "hasWrapHyphen": false,
     "x": 59.76,
@@ -5366,7 +5366,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "key 724 over secure medium 726. The secure medium could",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5378,7 +5378,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "be, for example, a telephone line to the macro Vendors using",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5390,7 +5390,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "modems, or an encrypted channel of a public network Such",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5402,7 +5402,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "as the internet.",
     "hasWrapHyphen": false,
     "x": 60,
@@ -5414,7 +5414,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "In another embodiment, encrypted versions of keys 624",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -5426,7 +5426,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "and 724 are distributed directly to end user 630. However,",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5438,7 +5438,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "only key programming tool 830 can decrypt and pre",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5450,7 +5450,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "program FPGA 615 with keys 624 and 724. Key program",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5462,7 +5462,7 @@
   {
     "page": 14,
     "column": 7,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "ming tool 830 is configured to contact macro vendor 620 to",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5774,7 +5774,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "only of the principles of this invention and are not intended",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5786,7 +5786,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "to limit the Scope of the invention to the particular embodi",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5798,7 +5798,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "ments described. For example, in View of this disclosure,",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5810,7 +5810,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "those skilled in the art can define other decoders, locked",
     "hasWrapHyphen": false,
     "x": 293.5200053327395,
@@ -5834,7 +5834,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "ration devices, FPGAs, CLBs, IOBS, PSMs, configuration",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5858,7 +5858,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "alternative features to create a method, circuit, or System",
     "hasWrapHyphen": false,
     "x": 293.76000387966025,
@@ -5870,7 +5870,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "according to the principles of this invention. Thus, the",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -5882,7 +5882,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "invention is limited only by the following claims.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5918,7 +5918,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "array (FPGA), the method comprising:",
     "hasWrapHyphen": false,
     "x": 293.7599929681804,
@@ -5930,7 +5930,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "pre-programming a first key into a key table of Said",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -5942,7 +5942,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "FPGA;",
     "hasWrapHyphen": false,
     "x": 311.7599939124156,
@@ -5954,7 +5954,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "processing configuration data in Said FPGA to detect a",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -5966,7 +5966,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "first locked macro; and",
     "hasWrapHyphen": false,
     "x": 311.51999794870585,
@@ -5978,7 +5978,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "unlocking Said first locked macro using Said first key",
     "hasWrapHyphen": false,
     "x": 302.1600029677142,
@@ -5990,7 +5990,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "pre-programmed into Said key table.",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -6002,7 +6002,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "2. The method of claim 1, further comprising:",
     "hasWrapHyphen": false,
     "x": 302.1600029677142,
@@ -6014,7 +6014,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "pre-programming a Second key into a key table of Said",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -6026,7 +6026,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "FPGA;",
     "hasWrapHyphen": false,
     "x": 311.7599939124156,
@@ -6038,7 +6038,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "processing configuration data in Said FPGA to detect a",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -6050,7 +6050,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 49,
+    "lineNumber": 51,
     "text": "Second locked macro; and",
     "hasWrapHyphen": false,
     "x": 311.51999794870585,
@@ -6062,7 +6062,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 50,
+    "lineNumber": 52,
     "text": "unlocking Said Second locked macro using Said Second",
     "hasWrapHyphen": false,
     "x": 302.1600029677142,
@@ -6074,7 +6074,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 51,
+    "lineNumber": 53,
     "text": "key pre-programmed into Said key table.",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -6086,7 +6086,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 52,
+    "lineNumber": 54,
     "text": "3. The method of claim 1, wherein the step of unlocking",
     "hasWrapHyphen": false,
     "x": 302.1600029677142,
@@ -6098,7 +6098,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 53,
+    "lineNumber": 55,
     "text": "Said first locked macro comprises the Step of decrypting Said",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6110,7 +6110,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 54,
+    "lineNumber": 56,
     "text": "first locked macro using Said first key.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6122,7 +6122,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 55,
+    "lineNumber": 57,
     "text": "4. The method ofclaim 1, wherein said first key comprises",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -6134,7 +6134,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 56,
+    "lineNumber": 58,
     "text": "a header Section and a key Section.",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -6146,7 +6146,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 57,
+    "lineNumber": 59,
     "text": "5. The method of claim 4, wherein the step of pre",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -6158,7 +6158,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 58,
+    "lineNumber": 60,
     "text": "programming a first key comprises:",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6170,7 +6170,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 59,
+    "lineNumber": 61,
     "text": "Storing Said header Section of Said first key in a visible",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -6182,7 +6182,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 60,
+    "lineNumber": 62,
     "text": "header Section of Said key table; and",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -6194,7 +6194,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 61,
+    "lineNumber": 63,
     "text": "Storing Said key Section of Said first key in an invisible key",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -6206,7 +6206,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 62,
+    "lineNumber": 64,
     "text": "Section of Said key table.",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -6218,7 +6218,7 @@
   {
     "page": 14,
     "column": 8,
-    "lineNumber": 64,
+    "lineNumber": 66,
     "text": "k k k k k",
     "hasWrapHyphen": false,
     "x": 373.67999731805037,

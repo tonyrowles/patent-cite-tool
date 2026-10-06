@@ -20,7 +20,6 @@ import {
   fetchAndParsePdf,
   fetchUsptoAndParse,
   lookupPosition,
-  uploadToCache,
 } from './pdf-pipeline.js';
 import { submitReport, drainQueueOnce } from '../shared/report-transport.js';
 import { installErrorBuffer } from '../content/report-dialog.js';
@@ -370,8 +369,6 @@ async function fetchAndProcessPdf(patentId, patentType, pdfUrl, tabId, usptoAtte
 
   if (result.success) {
     await handleParseSuccess(patentId, result.lineCount, result.columnCount, tabId);
-    // Fire-and-forget cache upload
-    uploadToCache(patentId).catch(() => { /* fire-and-forget */ });
     return;
   }
 
@@ -384,7 +381,6 @@ async function fetchAndProcessPdf(patentId, patentType, pdfUrl, tabId, usptoAtte
       const usptoResult = await fetchUsptoAndParse(patentId);
       if (usptoResult.success) {
         await handleParseSuccess(patentId, usptoResult.lineCount, usptoResult.columnCount, tabId);
-        uploadToCache(patentId).catch(() => { /* fire-and-forget */ });
       } else {
         await handleParseFailure(patentId, patentType, usptoResult.error, tabId, true);
       }
@@ -410,7 +406,6 @@ async function fetchAndProcessPdf(patentId, patentType, pdfUrl, tabId, usptoAtte
     const usptoResult = await fetchUsptoAndParse(patentId);
     if (usptoResult.success) {
       await handleParseSuccess(patentId, usptoResult.lineCount, usptoResult.columnCount, tabId);
-      uploadToCache(patentId).catch(() => { /* fire-and-forget */ });
     } else {
       await handleParseFailure(patentId, patentType, usptoResult.error, tabId, true);
     }

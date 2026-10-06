@@ -16,12 +16,14 @@ import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  test: { setupFiles: ['./tests/setup.js'] },
   plugins: [
     cloudflareTest({
       wrangler: { configPath: './wrangler.toml' },
       miniflare: {
         bindings: {
           PROXY_TOKEN: 'test-token',
+          CACHE_WRITE_TOKEN: 'test-cache-writer',
           USPTO_API_KEY: 'test-api-key',
           // DISCORD_WEBHOOK_URL: so Discord fetch path is testable without hitting a real webhook
           // BUG_REPORTS KV namespace is wired automatically from wrangler.toml configPath

@@ -10,6 +10,7 @@ import {
   buildLineEntry,
   extractPrintedColumnNumbers,
   isLikelySpecPage,
+  isTwoColumnPage,
   stripCrossBoundaryText,
   buildPositionMap,
 } from '../../src/shared/position-map-builder.js';
@@ -231,6 +232,12 @@ describe('extractPrintedColumnNumbers', () => {
     expect(extractPrintedColumnNumbers(items, pageHeight, pageWidth)).toEqual({ left: 1, right: 2 });
   });
 
+  it('reads OCR punctuation on column numbers without trusting center patent fragments', () => {
+    const items = [makeHeaderItem('17', 167, 750), makeHeaderItem('129', 291, 760), makeHeaderItem('18.', 394, 750)];
+    expect(extractPrintedColumnNumbers(items, 818, 557)).toEqual({ left: 17, right: 18 });
+    expect(extractPrintedColumnNumbers([makeHeaderItem('4.', 391, 742)], 818, 557)).toEqual({ left: 3, right: 4 });
+  });
+
   it('returns null when left column is even (e.g., 4,5)', () => {
     const items = [
       makeHeaderItem('4', 50, 750),
@@ -319,6 +326,16 @@ describe('buildPositionMap sequential column validation', () => {
     expect(cols).toContain(2);
     expect(cols).toContain(3);
     expect(cols).toContain(4);
+  });
+
+  it('retains sequential spec pages with very unequal OCR fragment counts', () => {
+    const asymmetric = makeSpecPage(2, 3, 4);
+    // Printed headers identify the page even when almost all right-column
+    // lines were extracted as single items and left-column lines were fragmented.
+    asymmetric.items = asymmetric.items.filter(item => item.x < 306 || item.y > 700 || item.text === 'right text 0');
+    expect(isTwoColumnPage(asymmetric.items, pageWidth)).toBe(false);
+    const result = buildPositionMap([makeSpecPage(1, 1, 2), asymmetric, makeSpecPage(3, 5, 6)]);
+    expect([...new Set(result.map(entry => entry.column))]).toEqual(expect.arrayContaining([1, 2, 3, 4, 5, 6]));
   });
 
   it('rejects pages that break the sequential pattern (1,2 → 203,204)', () => {

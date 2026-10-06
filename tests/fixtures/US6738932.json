@@ -62,7 +62,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 7,
+    "lineNumber": 8,
     "text": "The present invention relates, in general, to Systems and",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -74,7 +74,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "methods for determining at a particular operating time, e.g.,",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -86,7 +86,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 9,
+    "lineNumber": 10,
     "text": "at the time of a crash, the version of Software executing on",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -98,7 +98,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 10,
+    "lineNumber": 11,
     "text": "a computer System, and, more particularly, to a Software",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -110,7 +110,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "identification System and method for use in dump analysis",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -122,7 +122,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 12,
+    "lineNumber": 13,
     "text": "for identifying from a memory image which version of",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -134,7 +134,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "kernel or other Software was running on a computer System",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -146,7 +146,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "at the time of a System crash.",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -158,7 +158,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "2. Relevant Background",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -170,7 +170,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "Computer System designers and analysts face the ongoing",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -182,7 +182,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "and often difficult task of determining why a computer",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -194,7 +194,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "System Stopped operating or is failing to operate as designed.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -206,7 +206,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "When a problem or error condition in the computer system",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -218,7 +218,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "is Serious enough to Stop or interrupt the execution of a",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -230,7 +230,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "running program, this failure is known as a crash. To assist",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -242,7 +242,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "in System analysis, a crash or memory dump is performed",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -254,7 +254,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "when a computer System crashes to generate a memory",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -266,7 +266,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "image of the existing State of Software executing on the",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -278,7 +278,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "System at the time of the crash and of other System-related",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -290,7 +290,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "information. In this regard, the System-level commands or",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -302,7 +302,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "programs in the operating System, i.e., the kernel Software,",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -314,7 +314,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "is of particular interest to System analysts in debugging a",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -326,7 +326,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "crashed computer system. For example, in an UNIX(R)-based",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -338,7 +338,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "System, the kernel is the program that contains the device",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -350,7 +350,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "drivers, the memory management routines, the Scheduler,",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -362,7 +362,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "and System calls. Often, dump analysis begins with analysis",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -374,7 +374,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "of these executables. Dump analysis, which includes inspec",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -386,7 +386,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "tion of the memory image for the cause of the crash, is a",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -398,7 +398,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "difficult and time-consuming task due to the large quantity",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -410,7 +410,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "of information contained in the dumped memory image.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -422,7 +422,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "The task of identifying and correcting the cause of the",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -434,7 +434,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "problem in the currently running Software is further com",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -446,7 +446,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "plicated because the perSon or mechanism performing the",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -458,7 +458,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "dump analysis usually needs to first identify what version of",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -470,7 +470,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "kernel (or other) Software was running on the computer",
     "hasWrapHyphen": false,
     "x": 59.99999762706768,
@@ -482,7 +482,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "System when the crash occurred and the memory image was",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -494,7 +494,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "created. In this regard, dump analysis often requires properly",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -506,7 +506,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "matching machine code or executables present in the crash",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -518,7 +518,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "memory image to the Source code that created the machine",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -530,7 +530,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "code to identify programming problems and errors. This",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -542,7 +542,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "matching proceSS can be a time-consuming and nearly",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -554,7 +554,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "impossible task without knowledge of the versions of soft",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -566,7 +566,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "ware the computer System was running.",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -578,7 +578,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "Typically, after a version of kernel or other Software is",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -590,7 +590,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "installed in a computer System, updated versions and patches",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -602,7 +602,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "(i.e., Small additions to the original Software code to bypass",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -614,7 +614,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "or correct problems) become available from the software",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -626,7 +626,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "provider and are installed by the System operator. The",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -638,7 +638,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "installation of these updates and patches often are not",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -650,7 +650,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "recorded, Such as by entering them into a Software manage",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -662,7 +662,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "ment System. Additionally, the System operator may modify",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -674,7 +674,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "the received software with or without the permission of the",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -686,7 +686,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "Software provider and may fail to notify the Software pro",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -698,7 +698,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "vider what modifications have been made to the system",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -710,7 +710,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "Software. Consequently, there is a need for an effective way",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -722,7 +722,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "to identify the version of Software running on a computer",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -734,7 +734,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "System, especially at the time of a System crash, to improve",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -746,7 +746,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "debugging and maintenance of System Software.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -758,7 +758,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "While providing some useful version information, exist",
     "hasWrapHyphen": false,
     "x": 68.63999805657144,
@@ -770,7 +770,7 @@
   {
     "page": 6,
     "column": 1,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "ing techniques of identifying the version ofSoftware running",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -1178,7 +1178,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "SUMMARY OF THE INVENTION",
     "hasWrapHyphen": false,
     "x": 335.0400074940953,
@@ -1190,7 +1190,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "The present invention addresses the above discussed and",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -1202,7 +1202,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "additional problems by providing a Software version iden",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -1214,7 +1214,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "tification system that effectively and efficiently isolates and",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1226,7 +1226,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "then identifies Software (e.g., executables) in a crash",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -1238,7 +1238,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "memory image to identify the versions of Software running",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1250,7 +1250,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "on a computer System. Generally, the identification System",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1262,7 +1262,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "includes an indexing mechanism that operates to create a",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1274,7 +1274,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "comparison file containing Signature information for a Set of",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1286,7 +1286,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "executables that may be run on the computer System. The",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1298,7 +1298,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "Signature information includes a total size in bytes of each",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1310,7 +1310,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "executable and includes offset and byte length information",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1322,7 +1322,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "and a checksum for executable text segments (i.e., Segments",
     "hasWrapHyphen": false,
     "x": 293.7599929681804,
@@ -1334,7 +1334,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "of the executable that are typically not altered during execu",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1346,7 +1346,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "tion of the Software) in the executable, and additional",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -1358,7 +1358,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "version identification information (e.g., version name,",
     "hasWrapHyphen": false,
     "x": 293.27999434213535,
@@ -1370,7 +1370,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "patches included, and the like). The identification System",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -1382,7 +1382,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "also includes an identification mechanism configured to",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -1394,7 +1394,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "process memory images from the computer System to deter",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1406,7 +1406,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "mine the Size in bytes of executables in the memory image.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1418,7 +1418,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "The identification system is further operable to index into",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1430,7 +1430,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "the comparison file to find executables that have the same",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1442,7 +1442,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "total size. Positive identification of Software is achieved with",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -1454,7 +1454,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "the identification mechanism by comparing at each matching",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1466,7 +1466,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "offset the lengths of executable text segments the Signature",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1478,7 +1478,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "information and for the executable in the memory image.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1490,7 +1490,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "Positive identification of Software is achieved with the",
     "hasWrapHyphen": false,
     "x": 293.76,
@@ -1502,7 +1502,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "identification mechanism by comparing each checksum in a",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1514,7 +1514,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "Signature with checksums calculated from the memory",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1526,7 +1526,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "image at the same offsets and lengths of executable text",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1538,7 +1538,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "Segments in the Signature.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1550,7 +1550,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "According to another important aspect of the invention, a",
     "hasWrapHyphen": false,
     "x": 302.1600029677142,
@@ -1562,7 +1562,7 @@
   {
     "page": 6,
     "column": 2,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "method is provided for identifying Software executing on a",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -1994,7 +1994,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 38,
+    "lineNumber": 37,
     "text": "with a dump analysis System for identifying Software ver",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -2006,7 +2006,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 39,
+    "lineNumber": 38,
     "text": "Sions running on a computer System according to the present",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2174,7 +2174,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 55,
+    "lineNumber": 54,
     "text": "The present invention is illustrated and described in terms",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -2186,7 +2186,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 56,
+    "lineNumber": 55,
     "text": "of the environment of a computer System, e.g., any elec",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2198,7 +2198,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 57,
+    "lineNumber": 56,
     "text": "tronic device executing Software, that is communicatively",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2210,7 +2210,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 58,
+    "lineNumber": 57,
     "text": "linked to a dump analysis System. The dump analysis System",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2222,7 +2222,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 59,
+    "lineNumber": 58,
     "text": "is configured according to the invention to create, index, and",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2234,7 +2234,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 60,
+    "lineNumber": 59,
     "text": "maintain System comparison files from the Software pro",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2246,7 +2246,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 61,
+    "lineNumber": 60,
     "text": "grams intended to be loaded and run on the computer",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2258,7 +2258,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 62,
+    "lineNumber": 61,
     "text": "System. The comparison files can be thought of as compris",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2270,7 +2270,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 63,
+    "lineNumber": 62,
     "text": "ing unique signatures of the executable files (Such as the",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -2282,7 +2282,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 64,
+    "lineNumber": 63,
     "text": "modules of the kernel software) that can be used by the",
     "hasWrapHyphen": false,
     "x": 59.99999762706768,
@@ -2294,7 +2294,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 65,
+    "lineNumber": 64,
     "text": "dump analysis System to effectively identify from a crash",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2306,7 +2306,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 66,
+    "lineNumber": 65,
     "text": "memory image which versions of the executable files were",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2318,7 +2318,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 67,
+    "lineNumber": 66,
     "text": "running on the computer System at the time of a System",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -2330,7 +2330,7 @@
   {
     "page": 7,
     "column": 3,
-    "lineNumber": 68,
+    "lineNumber": 67,
     "text": "crash. A preferred embodiment of the invention is particu",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -4958,7 +4958,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "At 350, a checksum operation is performed on each of the",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -4982,7 +4982,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "330) to create a numeric signature of each isolated execut",
     "hasWrapHyphen": false,
     "x": 59.519999001022555,
@@ -4994,7 +4994,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "able 200. For example, the executable signature of execut",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5006,7 +5006,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "able 200 would include the listing of checksum labels (i.e.,",
     "hasWrapHyphen": false,
     "x": 59.99999762706768,
@@ -5018,7 +5018,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "C1-C8) for each byte sequence, an offset associated with",
     "hasWrapHyphen": false,
     "x": 59.99999762706768,
@@ -5030,7 +5030,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "each checksum label or byte Sequence, and a calculated byte",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5078,7 +5078,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "other data can be discarded or deleted from memory.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5090,7 +5090,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "At 360, the executable Signatures are Stored as a System",
     "hasWrapHyphen": false,
     "x": 68.63999805657144,
@@ -5102,7 +5102,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "comparison file for the computer system 110 in the system",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5114,7 +5114,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "comparison files 180 by the dump analysis system 150.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5126,7 +5126,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "Other relevant information that may be useful during the",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5138,7 +5138,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "identification proceSS 400 or during later dump analysis",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5150,7 +5150,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "preferably is stored during step 360 and linked to the",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5162,7 +5162,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "executable signature for ready retrieval. For example, this",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5174,7 +5174,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "additional information may include executable or module",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5186,7 +5186,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "200 name, package name, version and revision information,",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5198,7 +5198,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "and the like.",
     "hasWrapHyphen": false,
     "x": 60,
@@ -5210,7 +5210,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "While the executable signatures (or listings of information",
     "hasWrapHyphen": false,
     "x": 68.63999895302256,
@@ -5222,7 +5222,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "for the isolated executables 200) may be stored in numerous",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -5234,7 +5234,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "file formats to practice the invention, one preferred Storage",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5246,7 +5246,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "arrangement is as records and files in a database. In this",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5258,7 +5258,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "embodiment, the system comparison files 180 is a database",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5270,7 +5270,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "Storage System with a database management application",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5282,7 +5282,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "managing data Storage, arrangement, and retrieval. One",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5294,7 +5294,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "useful format for the database comprises files with a first",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5306,7 +5306,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "word of the file being a “magic' or identifying number, a",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5318,7 +5318,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "second word of the file being a version number of the",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5330,7 +5330,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "database (which may be useful for indicating when last",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -5342,7 +5342,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "updated or providing other useful information), and a third",
     "hasWrapHyphen": false,
     "x": 59.519999001022555,
@@ -5354,7 +5354,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "word of the file being the index size for the database. The",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5366,7 +5366,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "index size is the number of buckets in the database hash",
     "hasWrapHyphen": false,
     "x": 59.76,
@@ -5378,7 +5378,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "table. The database includes database pointers providing an",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5390,7 +5390,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "offset into each database file. Each bucket entry is the head",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5402,7 +5402,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "of a singly linked list of checksum blocks (i.e., the execut",
     "hasWrapHyphen": false,
     "x": 59.75999831404511,
@@ -5414,7 +5414,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "able signatures). The bucket entries describe attributes of the",
     "hasWrapHyphen": false,
     "x": 59.99999762706768,
@@ -5426,7 +5426,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "immediately following text Segment and checksum block.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5438,7 +5438,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "The checksum blocks further include the above described",
     "hasWrapHyphen": false,
     "x": 68.88,
@@ -5450,7 +5450,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 59,
+    "lineNumber": 60,
     "text": "checksum labels, offsets, and byte Sequence lengths for use",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5462,7 +5462,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 60,
+    "lineNumber": 61,
     "text": "in the identification process 400. Each checksum block may",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5474,7 +5474,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 61,
+    "lineNumber": 62,
     "text": "also be the head of another singly linked list of identification",
     "hasWrapHyphen": false,
     "x": 59.99999812857144,
@@ -5486,7 +5486,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 62,
+    "lineNumber": 63,
     "text": "blocks that include information useful for describing the",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5498,7 +5498,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 63,
+    "lineNumber": 64,
     "text": "binary or executable 200. A linked list is useful because the",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5510,7 +5510,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 64,
+    "lineNumber": 65,
     "text": "same executable 200 may be included in multiple releases or",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -5522,7 +5522,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 65,
+    "lineNumber": 66,
     "text": "versions of operating system 120, kernel 130, or patch",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5534,7 +5534,7 @@
   {
     "page": 9,
     "column": 7,
-    "lineNumber": 66,
+    "lineNumber": 67,
     "text": "versions. The checksum blocks can be hashed by a Selected",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -5714,7 +5714,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 15,
+    "lineNumber": 14,
     "text": "tion process 400. Alignment in Elf-based applications is",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5726,7 +5726,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 16,
+    "lineNumber": 15,
     "text": "especially important because in Elf the in-core copies of the",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5738,7 +5738,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 17,
+    "lineNumber": 16,
     "text": "text segments are a combination of the text extension",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5750,7 +5750,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 18,
+    "lineNumber": 17,
     "text": "Sections and various rodata extension Sections that are all",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -5762,7 +5762,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 19,
+    "lineNumber": 18,
     "text": "aligned according to the alignment value in the Elf Section",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -5774,7 +5774,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 20,
+    "lineNumber": 19,
     "text": "header. The kernel 130 also adds a word, of varying size, to",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5786,7 +5786,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 21,
+    "lineNumber": 20,
     "text": "the end of a text segment as a hook for the kernel 130 to",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5798,7 +5798,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 22,
+    "lineNumber": 21,
     "text": "move the whole text segment under various conditions of the",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5810,7 +5810,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 23,
+    "lineNumber": 22,
     "text": "operating System 120.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5822,7 +5822,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 24,
+    "lineNumber": 23,
     "text": "Although not shown in FIG. 3, the indexing process 300",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -5834,7 +5834,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 25,
+    "lineNumber": 24,
     "text": "is preferably repeated at least periodically for each computer",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5846,7 +5846,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 26,
+    "lineNumber": 25,
     "text": "System 110 to maintain an up-to-date comparison file of the",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5858,7 +5858,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 27,
+    "lineNumber": 26,
     "text": "executables 200 that may be run on computer system 110. As",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5870,7 +5870,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 28,
+    "lineNumber": 27,
     "text": "new versions of Software and patches become available, the",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5882,7 +5882,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 29,
+    "lineNumber": 28,
     "text": "system comparison files 180 may become less useful in",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5894,7 +5894,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 30,
+    "lineNumber": 29,
     "text": "accurately identifying versions of Software for dump analy",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -5906,7 +5906,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 31,
+    "lineNumber": 30,
     "text": "sis if the indexing process 300 is not repeated. Periodic",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5918,7 +5918,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 32,
+    "lineNumber": 31,
     "text": "repeating (e.g., daily, weekly, monthly, quarterly, and the",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -5930,7 +5930,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 33,
+    "lineNumber": 32,
     "text": "like) of the indexing process 300 can be performed auto",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -5942,7 +5942,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 34,
+    "lineNumber": 33,
     "text": "matically over link 140 by operating the dump analysis",
     "hasWrapHyphen": false,
     "x": 293.5200028504401,
@@ -5954,7 +5954,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 35,
+    "lineNumber": 34,
     "text": "system 150. Alternatively, the operator of the dump analysis",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -5966,7 +5966,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 36,
+    "lineNumber": 35,
     "text": "System 150 may insert (i.e., in a separate indexing process",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -5978,7 +5978,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 37,
+    "lineNumber": 36,
     "text": "300, rather then by retrieval of executables 200 from the",
     "hasWrapHyphen": false,
     "x": 293.2799961845714,
@@ -5990,7 +5990,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 38,
+    "lineNumber": 37,
     "text": "computer System 110) new Software revisions and patches",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6002,7 +6002,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 39,
+    "lineNumber": 38,
     "text": "into existing comparison files in the files 180 as such",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6014,7 +6014,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 40,
+    "lineNumber": 39,
     "text": "revisions and patches become available (i.e., before or",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6026,7 +6026,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 41,
+    "lineNumber": 40,
     "text": "concurrent with loading of Such Software on the computer",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6038,7 +6038,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 42,
+    "lineNumber": 41,
     "text": "system 110). Of course, the entire indexing process 300 may",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6050,7 +6050,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 43,
+    "lineNumber": 42,
     "text": "be performed without communication between the dump",
     "hasWrapHyphen": false,
     "x": 293.2799961845714,
@@ -6062,7 +6062,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 44,
+    "lineNumber": 43,
     "text": "analysis system 150 and computer system 110 with software",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -6074,7 +6074,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 45,
+    "lineNumber": 44,
     "text": "for inclusion in created comparison files 180 being Sepa",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6086,7 +6086,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 46,
+    "lineNumber": 45,
     "text": "rately identified and provided by the operator of the dump",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6098,7 +6098,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 47,
+    "lineNumber": 46,
     "text": "analysis system 150.",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -6110,7 +6110,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 48,
+    "lineNumber": 47,
     "text": "Referring now to FIG. 4, the identification process 400",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -6122,7 +6122,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 49,
+    "lineNumber": 48,
     "text": "may be used to identify the versions of Software running on",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6134,7 +6134,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 50,
+    "lineNumber": 49,
     "text": "the computer system 110 at the time of a crash (or at other",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6146,7 +6146,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 51,
+    "lineNumber": 50,
     "text": "operating times) once the indexing process 300 is com",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6158,7 +6158,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 52,
+    "lineNumber": 51,
     "text": "pleted. The identification process 400 is initiated with the",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6170,7 +6170,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 53,
+    "lineNumber": 52,
     "text": "receipt at the dump analysis System 150 of a memory image",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6182,7 +6182,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 54,
+    "lineNumber": 53,
     "text": "(e.g., a crash memory image) from computer System 110 that",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6194,7 +6194,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 55,
+    "lineNumber": 54,
     "text": "is communicated over the link 140 and then stored in the",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -6206,7 +6206,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 56,
+    "lineNumber": 55,
     "text": "crash memory images 190. Of course, the memory image",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6218,7 +6218,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 57,
+    "lineNumber": 56,
     "text": "may also be transferred to the dump analysis system 150 by",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -6230,7 +6230,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 58,
+    "lineNumber": 57,
     "text": "physical transfer of a memory device (e.g., a disk,",
     "hasWrapHyphen": false,
     "x": 293.5199936551579,
@@ -6242,7 +6242,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 59,
+    "lineNumber": 58,
     "text": "CD-ROM, and the like). The dump analysis system 150 may",
     "hasWrapHyphen": false,
     "x": 293.7599929681804,
@@ -6254,7 +6254,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 60,
+    "lineNumber": 59,
     "text": "also receive a request for dump analysis or, at least, for",
     "hasWrapHyphen": false,
     "x": 293.759997552,
@@ -6266,7 +6266,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 61,
+    "lineNumber": 60,
     "text": "identification of the versions of Software operating on the",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6278,7 +6278,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 62,
+    "lineNumber": 61,
     "text": "computer system 110 at the time of the memory dump.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6290,7 +6290,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 63,
+    "lineNumber": 62,
     "text": "At 410, the identification process 400 continues with the",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -6302,7 +6302,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 64,
+    "lineNumber": 63,
     "text": "determination of the size of each executable module 200 in",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -6314,7 +6314,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 65,
+    "lineNumber": 64,
     "text": "the received memory image. The determination of the total",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6326,7 +6326,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 66,
+    "lineNumber": 65,
     "text": "size or length in bytes of the executable modules 200",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6338,7 +6338,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 67,
+    "lineNumber": 66,
     "text": "typically also involves identifying the Starting address of",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -6350,7 +6350,7 @@
   {
     "page": 9,
     "column": 8,
-    "lineNumber": 68,
+    "lineNumber": 67,
     "text": "each executable 200.",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -8210,7 +8210,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "Second computer code devices configured to cause a",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -8222,7 +8222,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "computer to process the located executable files to",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8246,7 +8246,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "located executables including a size value;",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8258,7 +8258,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 25,
+    "lineNumber": 26,
     "text": "third computer code devices configured to cause a com",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -8270,7 +8270,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 26,
+    "lineNumber": 27,
     "text": "puter to locate in a comparison file executable Signa",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8282,7 +8282,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 27,
+    "lineNumber": 28,
     "text": "tures associated with Select ones of preselected",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8294,7 +8294,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 28,
+    "lineNumber": 29,
     "text": "executables executable on the computer System having",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8306,7 +8306,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 29,
+    "lineNumber": 30,
     "text": "a matching Size value; and",
     "hasWrapHyphen": false,
     "x": 77.99999386428576,
@@ -8318,7 +8318,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 30,
+    "lineNumber": 31,
     "text": "fourth computer code devices configured to cause a",
     "hasWrapHyphen": false,
     "x": 68.88000491171424,
@@ -8330,7 +8330,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 31,
+    "lineNumber": 32,
     "text": "computer to compare the comparison information for",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8342,7 +8342,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 32,
+    "lineNumber": 33,
     "text": "the located executable files with version identifying",
     "hasWrapHyphen": false,
     "x": 77.76000363873361,
@@ -8354,7 +8354,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 33,
+    "lineNumber": 34,
     "text": "information included in the executable signatures hav",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8366,7 +8366,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 34,
+    "lineNumber": 35,
     "text": "ing matching Size values.",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8378,7 +8378,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 35,
+    "lineNumber": 36,
     "text": "9. The computer program product of claim 8, wherein",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -8390,7 +8390,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 36,
+    "lineNumber": 37,
     "text": "version identifying information comprises Size and offset",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -8402,7 +8402,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 37,
+    "lineNumber": 38,
     "text": "information for executable Segments in executables and",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8414,7 +8414,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 38,
+    "lineNumber": 39,
     "text": "wherein the comparison information includes size and offset",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -8426,7 +8426,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 39,
+    "lineNumber": 40,
     "text": "information for executable Segments in the located execut",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8438,7 +8438,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 40,
+    "lineNumber": 41,
     "text": "able files.",
     "hasWrapHyphen": false,
     "x": 60,
@@ -8450,7 +8450,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 41,
+    "lineNumber": 42,
     "text": "10. The computer program of claim 9, wherein the com",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -8462,7 +8462,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 42,
+    "lineNumber": 43,
     "text": "paring by the fourth computer code devices includes match",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8474,7 +8474,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 43,
+    "lineNumber": 44,
     "text": "ing the offset information and at each matched offset com",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8486,7 +8486,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 44,
+    "lineNumber": 45,
     "text": "paring the Size information for the executable Segments of",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8498,7 +8498,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 45,
+    "lineNumber": 46,
     "text": "the located executable files and the executable Signature.",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8510,7 +8510,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 46,
+    "lineNumber": 47,
     "text": "11. A Software identification system for identifying soft",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -8522,7 +8522,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 47,
+    "lineNumber": 48,
     "text": "Ware executing on a computer System using a generated",
     "hasWrapHyphen": false,
     "x": 59.51999676114287,
@@ -8534,7 +8534,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 48,
+    "lineNumber": 49,
     "text": "memory image defining a State of the executing Software on",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8546,7 +8546,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 49,
+    "lineNumber": 50,
     "text": "the computer System, comprising:",
     "hasWrapHyphen": false,
     "x": 59.76000361628567,
@@ -8558,7 +8558,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 50,
+    "lineNumber": 51,
     "text": "an indexing mechanism adapted for processing a plurality",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -8570,7 +8570,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 51,
+    "lineNumber": 52,
     "text": "of executable files executable on the computerS System",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8582,7 +8582,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 52,
+    "lineNumber": 53,
     "text": "to create a listing of byte Sequences representing the",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8594,7 +8594,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 53,
+    "lineNumber": 54,
     "text": "executable files, wherein the listing of byte Sequences",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8606,7 +8606,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 54,
+    "lineNumber": 55,
     "text": "includes a size value for each ofthe byte Sequences and",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8618,7 +8618,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 55,
+    "lineNumber": 56,
     "text": "an offset value and a length value for executable text",
     "hasWrapHyphen": false,
     "x": 77.99999386428576,
@@ -8630,7 +8630,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 56,
+    "lineNumber": 57,
     "text": "Segments in each of the byte Sequences, and",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8642,7 +8642,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 57,
+    "lineNumber": 58,
     "text": "an identification mechanism adapted for processing the",
     "hasWrapHyphen": false,
     "x": 69.11999942399999,
@@ -8654,7 +8654,7 @@
   {
     "page": 11,
     "column": 11,
-    "lineNumber": 58,
+    "lineNumber": 59,
     "text": "memory image to locate executables, to determine a",
     "hasWrapHyphen": false,
     "x": 77.759999352,
@@ -8750,7 +8750,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 8,
+    "lineNumber": 9,
     "text": "offset value and a length value for each of the isolated",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8762,7 +8762,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 9,
+    "lineNumber": 10,
     "text": "executable text segments.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8774,7 +8774,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 10,
+    "lineNumber": 11,
     "text": "13. The system of claim 12, wherein the identification",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -8786,7 +8786,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 11,
+    "lineNumber": 12,
     "text": "mechanism is operable to compare for each of the identified",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8798,7 +8798,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 12,
+    "lineNumber": 13,
     "text": "byte Sequences the offset and length values of the identified",
     "hasWrapHyphen": false,
     "x": 293.2799961845714,
@@ -8810,7 +8810,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 13,
+    "lineNumber": 14,
     "text": "byte Sequences with the offset and length values determined",
     "hasWrapHyphen": false,
     "x": 293.2799961845714,
@@ -8822,7 +8822,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 14,
+    "lineNumber": 15,
     "text": "for the located executables and based on the comparison,",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8834,7 +8834,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 15,
+    "lineNumber": 16,
     "text": "determining whether a positive identification of located",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8846,7 +8846,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 16,
+    "lineNumber": 17,
     "text": "executables is achieved for the computer System by com",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8858,7 +8858,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 17,
+    "lineNumber": 18,
     "text": "paring a checksum value determined for the located",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8870,7 +8870,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 18,
+    "lineNumber": 19,
     "text": "executables and the executable text segments in the indexed",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8882,7 +8882,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 19,
+    "lineNumber": 20,
     "text": "byte Sequences.",
     "hasWrapHyphen": false,
     "x": 293.2799961845714,
@@ -8894,7 +8894,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 20,
+    "lineNumber": 21,
     "text": "14. A method for identifying executables running at a",
     "hasWrapHyphen": false,
     "x": 302.87999884742857,
@@ -8906,7 +8906,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 21,
+    "lineNumber": 22,
     "text": "particular time in a computer System, comprising:",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -8918,7 +8918,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 22,
+    "lineNumber": 23,
     "text": "generating a comparison file comprising Signature data for",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -8930,7 +8930,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 23,
+    "lineNumber": 24,
     "text": "a set of executables executable on the computer System,",
     "hasWrapHyphen": false,
     "x": 311.7599932877143,
@@ -8942,7 +8942,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 24,
+    "lineNumber": 25,
     "text": "the Signature data being indexed on a total length",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -8954,7 +8954,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 25,
+    "lineNumber": 27,
     "text": "parameter calculated for each of the executables,",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -8966,7 +8966,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 26,
+    "lineNumber": 28,
     "text": "receiving a memory image defining a State of the",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -8978,7 +8978,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 27,
+    "lineNumber": 29,
     "text": "executables running on the computer System at the",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -8990,7 +8990,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 28,
+    "lineNumber": 30,
     "text": "particular time;",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -9002,7 +9002,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 29,
+    "lineNumber": 31,
     "text": "calculating a total length value for each of the executables",
     "hasWrapHyphen": false,
     "x": 302.39999747999997,
@@ -9014,7 +9014,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 30,
+    "lineNumber": 32,
     "text": "in the memory image, and",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -9026,7 +9026,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 31,
+    "lineNumber": 33,
     "text": "indexing into the comparison file with the calculated total",
     "hasWrapHyphen": false,
     "x": 302.40000287444013,
@@ -9038,7 +9038,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 32,
+    "lineNumber": 35,
     "text": "length values to locate a Set of the executables in the",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -9050,7 +9050,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 33,
+    "lineNumber": 36,
     "text": "comparison file for each of the executables in the",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -9062,7 +9062,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 34,
+    "lineNumber": 37,
     "text": "memory image with a matching total length parameter.",
     "hasWrapHyphen": false,
     "x": 311.5199987754285,
@@ -9074,7 +9074,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 35,
+    "lineNumber": 38,
     "text": "15. The method of claim 14, wherein the generating",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -9086,7 +9086,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 36,
+    "lineNumber": 39,
     "text": "includes isolating executable text segments in the",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9098,7 +9098,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 37,
+    "lineNumber": 40,
     "text": "executables and determining an offset and a checksum of",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9110,7 +9110,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 38,
+    "lineNumber": 41,
     "text": "each of the executable text segments, the offsets and check",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9122,7 +9122,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 39,
+    "lineNumber": 42,
     "text": "Sums being recorded in the Signature data.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9134,7 +9134,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 40,
+    "lineNumber": 43,
     "text": "16. The method of claim 15, further including isolating",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -9146,7 +9146,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 41,
+    "lineNumber": 44,
     "text": "executable text segments in the executables in the memory",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9158,7 +9158,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 42,
+    "lineNumber": 45,
     "text": "image and determining an offset and a checksum of each of",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9170,7 +9170,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 43,
+    "lineNumber": 46,
     "text": "the executable text Segments and after the indexing, com",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9182,7 +9182,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 44,
+    "lineNumber": 47,
     "text": "paring the offset and the checksum in the Signature data for",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9194,7 +9194,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 45,
+    "lineNumber": 48,
     "text": "each of the executables in the matched set with the offset and",
     "hasWrapHyphen": false,
     "x": 293.52,
@@ -9206,7 +9206,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 46,
+    "lineNumber": 49,
     "text": "the checksum determined for the corresponding executable",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9218,7 +9218,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 47,
+    "lineNumber": 50,
     "text": "from the memory image having the matching total length",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9230,7 +9230,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 48,
+    "lineNumber": 51,
     "text": "parameter.",
     "hasWrapHyphen": false,
     "x": 293.52000183449996,
@@ -9242,7 +9242,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 49,
+    "lineNumber": 52,
     "text": "17. The method of claim 16, further including determin",
     "hasWrapHyphen": false,
     "x": 302.63999199228573,
@@ -9254,7 +9254,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 50,
+    "lineNumber": 53,
     "text": "ing a number of offset or checksum mismatches occurring",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9266,7 +9266,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 51,
+    "lineNumber": 54,
     "text": "during the offset and checkSum comparing and based on a",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9278,7 +9278,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 52,
+    "lineNumber": 55,
     "text": "comparison of the determined number of mismatches with a",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9290,7 +9290,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 53,
+    "lineNumber": 56,
     "text": "mismatch tolerance, generating a positive identification list",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9302,7 +9302,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 54,
+    "lineNumber": 57,
     "text": "ing of the executables in the comparison file.",
     "hasWrapHyphen": false,
     "x": 293.5200030397142,
@@ -9314,7 +9314,7 @@
   {
     "page": 11,
     "column": 12,
-    "lineNumber": 56,
+    "lineNumber": 59,
     "text": "k k k k k",
     "hasWrapHyphen": false,
     "x": 373.67999731805037,

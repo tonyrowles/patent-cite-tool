@@ -217,7 +217,7 @@ async function generateFixture(patentId, { quiet = false } = {}) {
   }
 
   // Step 4: Build PositionMap
-  const { buildPositionMap } = await import('../src/offscreen/position-map-builder.js');
+  const { buildPositionMap } = await import('../src/shared/position-map-builder.js');
   const positionMap = buildPositionMap(pageResults);
 
   if (positionMap.length === 0) {

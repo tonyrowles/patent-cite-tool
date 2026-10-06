@@ -320,11 +320,6 @@ async function handleParseResult(message) {
     // Transition toolbar icon: partial -> active (position map ready, citations enabled)
     setTabIcon(patent.tabId, 'active');
     await chrome.storage.local.set({ currentPatent: patent });
-    // Fire-and-forget cache upload — CACH-03
-    chrome.runtime.sendMessage({
-      type: MSG.UPLOAD_TO_CACHE,
-      patentId: patent.patentId,
-    }).catch(() => { /* fire-and-forget */ });
   } else if (message.error === 'no-text-layer') {
     if (patent.patentType === PATENT_TYPE.GRANT && patent.source !== 'uspto') {
       // Grant patent with no text layer from Google — try USPTO fallback

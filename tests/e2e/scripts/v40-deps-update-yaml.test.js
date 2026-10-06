@@ -47,6 +47,16 @@ beforeAll(() => {
 
 describe('v40-deps-update.yml contract (Phase 40-03)', () => {
 
+  it('runs a blocking regression gate for every PR without a success shortcut', () => {
+    const gate = yaml.slice(yaml.indexOf('  deps-update-gate:'));
+    expect(gate).not.toContain('continue-on-error: true');
+    expect(gate).not.toContain('steps.scope');
+    expect(gate).not.toContain('Fast-path SUCCESS');
+    expect(gate).toContain('contents: read');
+    expect(gate).toContain('PROXY_TOKEN: test-proxy-token');
+    expect(gate).toContain('specs/regression.spec.js');
+  });
+
   it('D1 — no schedule trigger (scan runs only via workflow_dispatch)', () => {
     // Supersedes 40-CONTEXT locked decision #2: no scheduled workflows in this repo.
     expect(yaml).not.toMatch(/^\s*schedule:/m);

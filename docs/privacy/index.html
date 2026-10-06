@@ -89,7 +89,7 @@
 
   <h1>Privacy Policy</h1>
   <p class="subtitle"><strong>Patent Citation Tool</strong></p>
-  <p class="last-updated">Last updated: June 2026</p>
+  <p class="last-updated">Last updated: October 2026</p>
 
   <p>Patent Citation Tool does not collect, store, or transmit any personal data, except as described in the Bug Report Feature section below. The extension runs entirely in your browser and only communicates with two services for its core citation generation functionality.</p>
 
@@ -115,7 +115,7 @@
   <p><strong>chrome.storage.sync</strong><br>
   Three user preferences are synced across Chrome sessions using Chrome's built-in sync storage:</p>
   <ul>
-    <li>Trigger mode (floating button or text selection)</li>
+    <li>Trigger mode (floating button, automatic, context menu, or silent copy)</li>
     <li>Display mode (tooltip or side panel)</li>
     <li>Patent number prefix toggle (whether to prepend the patent number to citations)</li>
   </ul>
@@ -126,7 +126,7 @@
   <ul>
     <li>No account, login, cookies, analytics, or usage tracking — the same as the extension.</li>
     <li>Patent PDFs are <strong>proxied through the developer's first-party Worker</strong> (pct.tonyrowles.com) via a dedicated <code>/webapp/pdf</code> route. The webapp never fetches patent documents directly from Google's CDN. Only the patent document identifier is included in the request.</li>
-    <li>Parsed patent text position maps are cached in the <strong>same shared first-party Cloudflare KV</strong> used by the extension, keyed only by patent number. No user data is stored — the cache contains only derived patent-document position data.</li>
+    <li>The webapp reads operator-prepared patent text position maps from the <strong>same shared first-party Cloudflare KV</strong> used by the extension, keyed by cache version and patent number. Browser clients do not upload shared maps. Cached maps expire after 30 days and contain only derived public patent-document data. A cache miss is parsed locally in your browser.</li>
     <li>Your citation-format and patent-number-prefix preferences are stored <strong>locally in your browser</strong> (localStorage) and are never transmitted.</li>
     <li>The webapp authenticates to the Worker using an <strong>Origin header check only</strong> — no token and no <code>Authorization</code> header is sent in any request.</li>
   </ul>
@@ -178,9 +178,9 @@
   </ul>
   <p>Because the entire bug report feature is user-initiated, all of this data is <strong>opt-in</strong>: it is transmitted only when you explicitly click Submit. The extension never collects technical, interaction, website-activity, or website-content data in the background or during normal citation generation. If you include a free-text note, please avoid entering any personal information, as the note is sent verbatim.</p>
   <p><strong>No IP address is stored in bug report records.</strong> Your IP address is used only for transient server-side rate limiting (a short-lived counter that resets automatically) and is never written to any stored report record.</p>
-  <p><strong>Retention:</strong> Bug reports are retained for 90 days and then automatically deleted.</p>
+  <p><strong>Retention:</strong> Bug reports are retained on the server for 90 days and then automatically deleted. Pending reports and retry metadata are stored in local browser storage; queued reports expire after seven days and are removed after delivery or exhausted retries.</p>
   <p><strong>Purpose:</strong> Reports are used solely for maintainer triage — to identify and fix citation failures. They are not used for advertising, analytics, or any other purpose.</p>
-  <p><strong>Destinations:</strong> Submitted reports are stored in Cloudflare KV (the <code>BUG_REPORTS</code> namespace on first-party infrastructure at pct.tonyrowles.com) and a notification is sent to a maintainer-only Discord channel. These are the only destinations. No data is shared with third parties.</p>
+  <p><strong>Destinations:</strong> Submitted reports are stored in Cloudflare KV (the <code>BUG_REPORTS</code> namespace on first-party infrastructure at pct.tonyrowles.com) and a notification is sent to a maintainer-only Discord channel. Cloudflare and Discord are the service providers for this feature, as described under Data Sharing. Reports are not sold or shared with other parties.</p>
 
   <footer>
     Patent Citation Tool &mdash; <a href="https://github.com/tonyrowles/patent-cite-tool">GitHub</a>

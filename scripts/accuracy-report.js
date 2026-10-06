@@ -199,7 +199,6 @@ for (const [cat, stats] of categoryStats.entries()) {
     continue;
   }
 
-  const accuracy = (stats.exact + stats.systematic + stats.boundary) / stats.total;
   const row =
     '  ' +
     cat.padEnd(COL_WIDTHS.cat) + '| ' +
@@ -209,7 +208,7 @@ for (const [cat, stats] of categoryStats.entries()) {
     String(stats.boundary).padStart(COL_WIDTHS.bound - 2) + ' | ' +
     String(stats.mismatch).padStart(COL_WIDTHS.mis - 2) + ' | ' +
     String(stats.noMatch).padStart(COL_WIDTHS.noMatch - 2) + ' | ' +
-    pct(stats.exact + stats.systematic + stats.boundary, stats.total);
+    pct(stats.exact, stats.total);
   console.log(row);
 }
 

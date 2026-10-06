@@ -56,11 +56,10 @@ on:
   # manually via workflow_dispatch when needed.
   workflow_dispatch: {}    # Manual trigger for testing
 
-# Static concurrency group prevents schedule + workflow_dispatch from racing.
-# cancel-in-progress: false so a running scan + PR open is never killed by a
-# new trigger.
+# Serialize scans on the same ref while allowing different PR gates to run.
+# Do not cancel a scan while it is creating a draft PR.
 concurrency:
-  group: v40-deps-update
+  group: v40-deps-update-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -182,50 +181,27 @@ jobs:
             2>&1 || true
 
   # ---------------------------------------------------------------------------
-  # Job 2: deps-update-gate — nightly-suite gate
-  #
-  # NAMED EXACTLY `deps-update-gate` — this is the slot reserved for the
-  # Phase 47 required-status-checks ruleset edit (40-RESEARCH lines 651-665).
-  # In Phase 40 this job is ADVISORY (no `needs:` dependency from dep-scan,
-  # no required-status-check rule); DRAFT state + CODEOWNERS provide the
-  # load-bearing defenses.
-  #
-  # The job runs the nightly suite SHAPE (smoke + regression against the
-  # current main-branch dependency state) so Phase 47's CLEANUP-04 audit
-  # can add the ruleset rule against this job name without further changes.
+  # Job 2: required smoke + regression check for every pull request.
+  # Keep the job ID stable because main's protection rule refers to it.
+  # External failures block the check and require a successful rerun.
   # ---------------------------------------------------------------------------
   deps-update-gate:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 30   # Nightly suite shape: smoke + regression — cap at 30
     env:
       PLAYWRIGHT_RUN_ID: ${{ github.run_id }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
 
     steps:
-      - name: Scope decision (v40-deps-update/* PRs only; fast-path SUCCESS otherwise)
-        id: scope
-        if: github.event_name == 'pull_request'
-        run: |
-          if [[ "${{ github.head_ref }}" == v40-deps-update/* ]]; then
-            echo "active=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "active=false" >> "$GITHUB_OUTPUT"
-            echo "Fast-path SUCCESS — non-v40-deps-update PR (head=${{ github.head_ref }})"
-          fi
-
       - uses: actions/checkout@v5
-        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
 
       - uses: actions/setup-node@v5
-        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         with:
           node-version: 22
           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
-        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -235,26 +211,21 @@ jobs:
 
       - name: Cache Playwright Chromium
         id: playwright-cache
-        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
 
       - name: Install Playwright Chromium
-        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && (steps.playwright-cache.outputs.cache-hit != 'true')
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Build Chrome extension
-        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
         env:
-          PROXY_TOKEN: ${{ secrets.PROXY_TOKEN }}
+          PROXY_TOKEN: test-proxy-token
         run: npm run build:chrome
 
       - name: Pre-flight smoke (1 case)
         id: smoke
-        if: steps.scope.outputs.active == 'true' || github.event_name != 'pull_request'
-        continue-on-error: true
         # Mirrors e2e-nightly.yml smoke probe (seed patent, single case).
         run: |
           npx playwright test \
@@ -263,16 +234,21 @@ jobs:
             specs/regression.spec.js
 
       - name: Run E2E regression (deterministic daily rotation)
-        if: (steps.scope.outputs.active == 'true' || github.event_name != 'pull_request') && (steps.smoke.outcome == 'success')
-        continue-on-error: true
-        # Mirrors e2e-nightly.yml regression invocation — uses the cron-case
-        # selector for the day's rotating 30-case sample. continue-on-error
-        # so the workflow exits success (filed issues are the failure signal
-        # in nightly; the gate here is ADVISORY and produces logs for human
-        # review of the candidate dep state).
+        # Fail the required check when any selected regression fails.
         run: |
           CASES=$(node scripts/select-cron-cases.mjs)
           npx playwright test \
             --config tests/e2e/playwright.config.js \
             --grep "$CASES" \
             specs/regression.spec.js
+
+      - name: Retain regression diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-gate-diagnostics-${{ github.run_id }}
+          path: |
+            tests/e2e/artifacts/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

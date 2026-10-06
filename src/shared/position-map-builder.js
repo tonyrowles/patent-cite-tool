@@ -146,7 +146,9 @@ export function extractPrintedColumnNumbers(items, pageHeight, pageWidth) {
   for (const item of items) {
     if (item.y >= headerThreshold) {
       const text = item.text.trim();
-      if (/^\d{1,3}$/.test(text)) {
+      // OCR sometimes appends a period to a printed column number.
+      // Patent-number fragments sit near the page center, unlike column headers.
+      if (/^\d{1,3}\.?$/.test(text) && Math.abs(item.x - midX) > 30) {
         headerNumbers.push({ value: parseInt(text, 10), x: item.x });
       }
     }
@@ -775,7 +777,13 @@ export function buildPositionMap(pageResults) {
   let expectedLeftCol = 1; // spec always starts at col 1
   for (const pageResult of pageResults) {
     const { items, pageWidth, pageHeight } = pageResult;
-    if (!isTwoColumnPage(items, pageWidth)) continue;
+    // OCR splits the two columns into unequal numbers of fragments; the
+    // item-count ratio can reject genuine spec pages. Once the sequence has
+    // started, matching printed headers are stronger evidence than that ratio.
+    if (items.length < 20) continue;
+    if (expectedLeftCol === 1 && !isTwoColumnPage(items, pageWidth) && !isLikelySpecPage(items, pageHeight)) continue;
+    const header = items.filter(item => item.y >= pageHeight - 90).map(item => item.text).join(' ');
+    if (/sheet\s+\d+\s+of|certificate of correction/i.test(header)) continue;
 
     const colNums = extractPrintedColumnNumbers(items, pageHeight, pageWidth);
     if (!colNums) continue;

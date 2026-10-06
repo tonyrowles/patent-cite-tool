@@ -1,3 +1,4 @@
+import { CACHE_VERSION, validateCachePayload } from '../shared/cache-schema.js';
 /**
  * Offscreen document for the Patent Citation Tool extension.
  *
@@ -26,13 +27,7 @@ const WORKER_URL = 'https://pct.tonyrowles.com';
 // Token injected at build time by esbuild define (SEC-02). Never a literal.
 const PROXY_TOKEN = __PROXY_TOKEN__;
 
-// Cache version — bump to invalidate all cached entries.
-// v5: evicts maps built during the v5.0.x fix window — both the v5.0.0
-// column-sequence regression AND the cross-column merged-line dropout
-// (stripCrossBoundaryText) that dropped right-column lines. POST /cache is
-// write-once, so any map cached under an older version must be abandoned by
-// bumping here. See position-map-builder.js.
-const CACHE_VERSION = 'v5';
+
 
 // ---------------------------------------------------------------------------
 // Test-mode hook — Phase 30 E2E fault-injection support
@@ -78,8 +73,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     fetchUsptoWithRetry(message.patentId);
   } else if (message.type === MSG.CHECK_CACHE) {
     handleCheckCache(message.patentId, message.pdfUrl);
-  } else if (message.type === MSG.UPLOAD_TO_CACHE) {
-    uploadToCache(message.patentId);
+
   }
   // Don't return true — these are fire-and-forget, no sendResponse needed
 });
@@ -307,7 +301,8 @@ async function checkCache(patentId) {
     clearTimeout(timeoutId);
 
     if (!response.ok) return null;  // 404 = cache miss, other errors = fallthrough
-    return await response.json();
+    const cached = await response.json();
+    return validateCachePayload(cached) ? cached : null;
   } catch (err) {
     clearTimeout(timeoutId);
     // AbortError (timeout) or network error — fall through silently
@@ -382,67 +377,6 @@ async function handleCacheHit(patentId, cachedData) {
   }
 }
 
-/**
- * Upload the position map for a parsed patent to the Cloudflare KV cache.
- * Fire-and-forget — errors are swallowed to never impact the user experience.
- *
- * Strips bounding box fields (x, y, width, height) from each entry per locked decision.
- * Only caches: text, column, lineNumber, page, section, hasWrapHyphen.
- *
- * @param {string} patentId - The patent identifier to upload cache for.
- */
-async function uploadToCache(patentId) {
-  try {
-    const db = await openDb();
-    const record = await new Promise((resolve, reject) => {
-      const tx = db.transaction('pdfs', 'readonly');
-      const store = tx.objectStore('pdfs');
-      const request = store.get(patentId);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = (event) => reject(new Error(`IndexedDB read: ${event.target.error}`));
-      tx.oncomplete = () => db.close();
-    });
-
-    if (!record?.positionMap || !record?.positionMapMeta) {
-      console.warn('[Offscreen] No positionMap to upload for', patentId);
-      return;
-    }
-
-    // Strip bounding box fields per locked decision — only cache:
-    // text, column, lineNumber, page, section, hasWrapHyphen
-    const entries = record.positionMap.map(({ text, column, lineNumber, page, section, hasWrapHyphen }) => ({
-      text, column, lineNumber, page, section, hasWrapHyphen,
-    }));
-
-    const payload = {
-      entries,
-      meta: {
-        totalLines: record.positionMapMeta.totalLines,
-        totalColumns: record.positionMapMeta.totalColumns,
-        hasClaimsSection: record.positionMapMeta.hasClaimsSection,
-      },
-      cachedAt: Date.now(),
-      version: CACHE_VERSION,
-    };
-
-    const { cacheVersion, testMode } = await readTestModeOverrides();
-    const url = `${WORKER_URL}/cache?patent=${encodeURIComponent(patentId)}&v=${cacheVersion}`;
-    const headers = {
-      'Authorization': `Bearer ${PROXY_TOKEN}`,
-      'Content-Type': 'application/json',
-    };
-    if (testMode) headers['X-PCT-Test-Mode'] = 'true';
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
-    console.log(`[Offscreen] Cache upload for ${patentId}: ${resp.status} ${resp.statusText}`);
-  } catch (err) {
-    // Silently ignore — cache upload failure must never affect user
-    console.warn('[Offscreen] Cache upload failed:', err.message);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // IndexedDB operations
@@ -455,10 +389,12 @@ async function uploadToCache(patentId) {
  */
 function openDb() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('patent-cite-tool', 1);
+    const request = indexedDB.open('patent-cite-tool', 2);
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
+      // Discard maps persisted before operator-only cache writes and the parser fixes.
+      if (event.oldVersion < 2 && db.objectStoreNames.contains('pdfs')) db.deleteObjectStore('pdfs');
       if (!db.objectStoreNames.contains('pdfs')) {
         db.createObjectStore('pdfs', { keyPath: 'patentId' });
       }

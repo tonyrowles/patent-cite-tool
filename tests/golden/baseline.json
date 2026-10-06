@@ -100,7 +100,7 @@
     "confidence": 0.98
   },
   "US4723129-claims": {
-    "citation": "34:24-26",
+    "citation": "34:25-27",
     "confidence": 0.97
   },
   "US4723129-cross-col": {
@@ -196,11 +196,11 @@
     "confidence": 0.97
   },
   "US5371234-claims": {
-    "citation": "5:20-23",
+    "citation": "5:24-27",
     "confidence": 0.97
   },
   "US5371234-chemical-cross-col": {
-    "citation": "5:15-19",
+    "citation": "5:18-22",
     "confidence": 0.98
   },
   "US5850559-spec-short": {

@@ -43,8 +43,20 @@ jobs:
       - name: Test — firefox-dist (Vitest firefox)
         run: npm run test:firefox
 
-      - name: Test — lint (web-ext lint)
+      - name: Test — lint (Mozilla addons-linter)
         run: npm run test:lint
+
+      - name: Test — ESLint
+        run: npm run lint
+
+      - name: Build standalone webapp
+        run: npm run build:webapp
+
+      - name: Install Worker dependencies
+        run: npm --prefix worker ci
+
+      - name: Test — Worker
+        run: npm --prefix worker test
 
       - name: Package Chrome extension
         run: cd dist/chrome && zip -r ../../patent-cite-chrome.zip .

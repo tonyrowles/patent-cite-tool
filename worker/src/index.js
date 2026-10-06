@@ -8,7 +8,10 @@
  *
  * Also provides a KV-backed cache for storing and retrieving position maps:
  *   GET  /cache?patent={number}&v={version} — read cached position map
- *   POST /cache?patent={number}&v={version} — write position map (if not exists)
+ *   POST /cache?patent={number}&v={version} — create an operator-signed map
+ *   PUT /cache?patent={number}&v={version} — replace an operator-signed map
+ *   DELETE /cache?patent={number}&v={version} — remove a map
+ * Mutations require a separate CACHE_WRITE_TOKEN, never the public browser token.
  *
  * Bug report route:
  *   POST /report — submit a bug report; authenticated by Bearer PROXY_TOKEN
@@ -22,6 +25,36 @@
  *   - US-prefixed: US12505414
  *   - Full ID with kind code: US12505414B2
  */
+
+import { CACHE_VERSION, MAX_CACHE_BYTES, CACHE_TTL_SECONDS, validateCachePayload } from '../../src/shared/cache-schema.js';
+
+function isCacheWriter(request, env) {
+  return Boolean(env.CACHE_WRITE_TOKEN && env.CACHE_WRITE_TOKEN !== env.PROXY_TOKEN &&
+    request.headers.get('Authorization') === `Bearer ${env.CACHE_WRITE_TOKEN}`);
+}
+
+async function cacheSigningKey(secret) {
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+
+function cacheSignedBytes(key, record) {
+  // Bind the record to its namespace and patent number as well as its content.
+  return new TextEncoder().encode(`patent-cache\n${key}\n${JSON.stringify(record)}`);
+}
+
+async function signCacheRecord(key, record, secret) {
+  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', await cacheSigningKey(secret), cacheSignedBytes(key, record)));
+  return Array.from(signature, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyCacheRecord(key, cached, env) {
+  if (!env.CACHE_WRITE_TOKEN || env.CACHE_WRITE_TOKEN === env.PROXY_TOKEN || cached.source !== 'operator' ||
+      !/^[a-f0-9]{64}$/.test(cached.signature || '')) return false;
+  const { signature, ...record } = cached;
+  const bytes = Uint8Array.from(signature.match(/../g), byte => parseInt(byte, 16));
+  return crypto.subtle.verify('HMAC', await cacheSigningKey(env.CACHE_WRITE_TOKEN), bytes, cacheSignedBytes(key, record));
+}
 
 const ODP_BASE = 'https://api.uspto.gov/api/v1/patent/applications';
 
@@ -643,7 +676,7 @@ export default {
         headers: {
           // Reflect specific origin for webapp callers; fall back to wildcard for extension
           ...(preflightOrigin ? webappCorsHeaders(preflightOrigin) : corsHeaders()),
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-PCT-Test-Mode',
           'Access-Control-Max-Age': '86400',
         },
@@ -725,10 +758,10 @@ export default {
       }
     }
 
-    // 4. Cache routes: GET /cache (read) and POST /cache (write with existence check)
+    // 4. Cache routes: GET /cache (read) and POST /cache (operator create), PUT (repair), DELETE (remove)
     if (path === '/cache') {
       const rawPatent = url.searchParams.get('patent') || '';
-      const version = url.searchParams.get('v') || 'v1';
+      const version = url.searchParams.get('v') || CACHE_VERSION;
 
       // WRKR-04: published-application check FIRST (zero-I/O)
       if (isPublishedApplication(rawPatent)) {
@@ -742,7 +775,7 @@ export default {
       }
 
       // WRKR-02: dual-auth — require Bearer OR Origin; neither → 403/401
-      if (!auth) {
+      if (!auth && !(['POST', 'PUT', 'DELETE'].includes(request.method) && isCacheWriter(request, env))) {
         return new Response('Forbidden', {
           status: 403,
           headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
@@ -751,7 +784,7 @@ export default {
 
       const patentNumber = cleanPatentNumber(rawPatent);
       if (!/^\d{6,8}$/.test(patentNumber)) {
-        const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
+        const corsH = auth?.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
         return new Response(
           `Invalid patent number: "${rawPatent}". Expected 6-8 digits.`,
           {
@@ -761,123 +794,87 @@ export default {
         );
       }
 
+      const corsH = matchOrigin(request) ? webappCorsHeaders(matchOrigin(request)) : corsHeaders();
+      const respond = (body, status) => new Response(body, {
+        status, headers: { ...corsH, 'Content-Type': 'text/plain' },
+      });
+      // Never serve pre-v6 records, which could have been written by public clients.
+      if (version !== CACHE_VERSION) return respond('Unsupported cache version', 400);
       const key = `${version}:${patentNumber}`;
 
       if (request.method === 'GET') {
         if (auth.method === 'origin') {
-          // SEC-04: webapp per-IP rate limit on GET /cache Origin path
-          const { allowed: rlAllowed } = await checkWebappRateLimit(env, clientIp, testMode);
-          if (!rlAllowed) {
-            return new Response('Too Many Requests', {
-              status: 429,
-              headers: {
-                ...webappCorsHeaders(auth.origin),
-                'Content-Type': 'text/plain',
-                'Retry-After': '60',
-              },
-            });
-          }
-
-          // Read from KV — return cached position map or 404 with webappCorsHeaders (WRKR-02)
-          const cached = await env.PATENT_CACHE.get(key, { type: 'json' });
-          if (cached === null) {
-            return new Response('Not found', {
-              status: 404,
-              headers: { ...webappCorsHeaders(auth.origin), 'Content-Type': 'text/plain' },
-            });
-          }
-          return new Response(JSON.stringify(cached), {
-            status: 200,
-            headers: { ...webappCorsHeaders(auth.origin), 'Content-Type': 'application/json' },
-          });
-        } else {
-          // Bearer path (extension) — wildcard CORS, unchanged behavior
-          const cached = await env.PATENT_CACHE.get(key, { type: 'json' });
-          if (cached === null) {
-            return new Response('Not found', {
-              status: 404,
-              headers: { ...corsHeaders(), 'Content-Type': 'text/plain' },
-            });
-          }
-          return new Response(JSON.stringify(cached), {
-            status: 200,
-            headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+          const { allowed } = await checkWebappRateLimit(env, clientIp, testMode);
+          if (!allowed) return new Response('Too Many Requests', {
+            status: 429, headers: { ...corsH, 'Retry-After': '60' },
           });
         }
-      }
-
-      if (request.method === 'POST') {
-        // Existence check FIRST (before write guard — Pitfall 6)
-        const existing = await env.PATENT_CACHE.get(key);
-        if (existing !== null) {
-          const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
-          return new Response('Already cached', {
-            status: 200,
-            headers: { ...corsH, 'Content-Type': 'text/plain' },
-          });
-        }
-
-        // SEC-04: webapp rate limit on POST /cache Origin path
-        if (auth.method === 'origin') {
-          const { allowed: rlAllowed } = await checkWebappRateLimit(env, clientIp, testMode);
-          if (!rlAllowed) {
-            return new Response('Too Many Requests', {
-              status: 429,
-              headers: {
-                ...webappCorsHeaders(auth.origin),
-                'Content-Type': 'text/plain',
-                'Retry-After': '60',
-              },
-            });
-          }
-        }
-
-        // Parse request body
-        let payload;
+        let cached;
         try {
-          payload = await request.json();
-        } catch (_) {
-          const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
-          return new Response('Invalid JSON body', {
-            status: 400,
-            headers: { ...corsH, 'Content-Type': 'text/plain' },
-          });
+          cached = await env.PATENT_CACHE.get(key, { type: 'json' });
+        } catch {
+          return respond('Not found', 404);
         }
-
-        // SEC-05: daily write guard — only for new writes (after existence check, Pitfall 6)
-        const { allowed: wgAllowed } = await checkDailyWriteGuard(env, testMode);
-        if (!wgAllowed) {
-          const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
-          return new Response('Service Unavailable', {
-            status: 503,
-            headers: { ...corsH, 'Content-Type': 'text/plain' },
-          });
-        }
-
-        // WRKR-03: inject source:"webapp" provenance field for Origin callers
-        if (auth.method === 'origin') {
-          payload.source = 'webapp';
-        }
-
-        // Write to KV (no TTL per design decision)
-        // INJ-01: X-PCT-Test-Mode suppresses KV write; daily write guard also suppressed above
-        if (!testMode) {
-          await env.PATENT_CACHE.put(key, JSON.stringify(payload));
-        }
-
-        const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
-        return new Response('Cached', {
-          status: 201,
-          headers: { ...corsH, 'Content-Type': 'text/plain' },
+        if (!validateCachePayload(cached, version) || !await verifyCacheRecord(key, cached, env)) return respond('Not found', 404);
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsH, 'Content-Type': 'application/json' },
         });
       }
 
-      // Method not allowed for /cache path
-      const corsH = auth.method === 'origin' ? webappCorsHeaders(auth.origin) : corsHeaders();
-      return new Response('Method Not Allowed', {
-        status: 405,
-        headers: { ...corsH, 'Content-Type': 'text/plain' },
-      });
+      if (['POST', 'PUT', 'DELETE'].includes(request.method)) {
+        // Origin headers and the distributed extension token are public. Only a
+        // separate operator credential may create, repair, or remove shared maps.
+        // Refuse credential reuse so a misconfiguration cannot reopen public writes.
+        if (!isCacheWriter(request, env)) return respond('Cache writes require an operator credential', 403);
+        if (request.method === 'DELETE') {
+          if (!testMode) await env.PATENT_CACHE.delete(key);
+          return respond('Deleted', 200);
+        }
+        // Read a bounded stream; do not trust Content-Length or buffer an unlimited body.
+        const reader = request.body?.getReader();
+        const chunks = [];
+        let size = 0;
+        if (reader) {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              size += value.byteLength;
+              if (size > MAX_CACHE_BYTES) {
+                await reader.cancel();
+                return respond('Cache payload too large', 413);
+              }
+              chunks.push(value);
+            }
+          } finally { reader.releaseLock(); }
+        }
+        let payload;
+        try {
+          const bytes = new Uint8Array(size);
+          let offset = 0;
+          for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+          payload = JSON.parse(new TextDecoder().decode(bytes));
+        } catch { return respond('Invalid JSON body', 400); }
+        if (!validateCachePayload(payload, version)) return respond('Invalid cache payload', 400);
+        if (request.method === 'POST' && await env.PATENT_CACHE.get(key) !== null) {
+          return respond('Already cached; use PUT to replace', 409);
+        }
+        const { allowed } = await checkDailyWriteGuard(env, testMode);
+        if (!allowed) return respond('Service Unavailable', 503);
+        // Store only allowed fields and server-owned provenance/timestamps.
+        const entries = payload.entries.map(({ text, column, lineNumber, page, section, hasWrapHyphen }) =>
+          ({ text, column, lineNumber, page, section, hasWrapHyphen }));
+        const record = {
+          entries, meta: { totalLines: payload.meta.totalLines, totalColumns: payload.meta.totalColumns,
+            hasClaimsSection: payload.meta.hasClaimsSection }, version, cachedAt: Date.now(), source: 'operator',
+        };
+        if (!testMode) {
+          record.signature = await signCacheRecord(key, record, env.CACHE_WRITE_TOKEN);
+          await env.PATENT_CACHE.put(key, JSON.stringify(record), { expirationTtl: CACHE_TTL_SECONDS });
+        }
+        return respond(request.method === 'PUT' ? 'Replaced' : 'Cached', request.method === 'PUT' ? 200 : 201);
+      }
+      return respond('Method Not Allowed', 405);
     }
 
     // 5. Bug report route: POST /report — Bearer-only (D-01)

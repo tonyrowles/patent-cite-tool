@@ -123,6 +123,15 @@ describe('release workflow invariant (Phase 25 / CICD-04)', () => {
     expect(yml).not.toContain('continue-on-error: true');
   });
 
+  it('runs Worker tests, ESLint, and the webapp build before packaging', () => {
+    const yml = readReleaseWorkflow();
+    const packaging = yml.indexOf('      - name: Package Chrome extension');
+    for (const command of ['npm run lint', 'npm run build:webapp', 'npm --prefix worker ci', 'npm --prefix worker test']) {
+      expect(yml.indexOf(command)).toBeGreaterThan(0);
+      expect(yml.indexOf(command)).toBeLessThan(packaging);
+    }
+  });
+
   it('R7: ci.yml `on:` block has no `tags:` sub-key (trigger-independence from release.yml)', () => {
     // Independence is enforced by trigger separation: ci.yml fires
     // on branch pushes + PRs + manual workflow_dispatch, but NOT

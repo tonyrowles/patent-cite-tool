@@ -721,16 +721,10 @@ ls -lh tests/e2e/artifacts/          # check artifacts dir size
 Re-running with `--iterations N` creates a fresh `{run-id}/llm-report.json`
 under a new directory; it does not resume the broken one.
 
-### Pre-existing unit test failures
+### Citation baseline checks
 
-The repo currently has known pre-existing failures in
-`tests/unit/text-matcher.test.js` (15 cases) and
-`tests/unit/pdf-verifier.test.js` (Tier C boundary, 1 case). These
-predate Phase 31 and are tracked separately. They do NOT block the
-exploratory runner or the e2e suite.
-
----
-
-For the v3.0 milestone roadmap and per-phase summaries, see
-`.planning/ROADMAP.md` and `.planning/phases/`. For project-level
-context, see the root `README.md` (forthcoming) and `.planning/PROJECT.md`.
+The source and built matcher suites require exact citations, including line boundaries.
+The five PDFs investigated in October 2026 are recorded in
+[`docs/citation-accuracy-audit.md`](../../docs/citation-accuracy-audit.md).
+Do not regenerate the golden baseline just to silence a failure: verify changes
+against the original PDF and record the evidence.

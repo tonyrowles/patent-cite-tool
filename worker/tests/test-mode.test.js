@@ -15,10 +15,11 @@ import { env } from 'cloudflare:workers';
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import worker from '../src/index.js';
+import { buildCachePayload } from '../../src/shared/cache-schema.js';
 
-const TEST_TOKEN = 'test-token'; // must match miniflare.bindings.PROXY_TOKEN
-const URL_BASE = 'https://worker.example.com/cache?patent=11427642&v=v3';
-const BODY = JSON.stringify({ entries: [], meta: {} });
+const TEST_TOKEN = 'test-cache-writer'; // must match miniflare.bindings.CACHE_WRITE_TOKEN
+const URL_BASE = 'https://worker.example.com/cache?patent=11427642&v=v6';
+const BODY = JSON.stringify(buildCachePayload([{ text: 'patent text', column: 1, lineNumber: 1, page: 2, section: 'description', hasWrapHyphen: false }]));
 
 function makeRequest({ withTestMode }) {
   const headers = {
@@ -53,9 +54,9 @@ describe('POST /cache — X-PCT-Test-Mode header guard (INJ-01)', () => {
     expect(await response.text()).toBe('Cached');
 
     // KV DID get written — the existence check + put() path was taken
-    // Filter to v3: prefix to isolate from daily write guard keys (wq:YYYYMMDD)
-    const listed = await env.PATENT_CACHE.list({ prefix: 'v3:' });
+    // Filter to v6: prefix to isolate from daily write guard keys (wq:YYYYMMDD)
+    const listed = await env.PATENT_CACHE.list({ prefix: 'v6:' });
     expect(listed.keys.length).toBe(1);
-    expect(listed.keys[0].name).toBe('v3:11427642');
+    expect(listed.keys[0].name).toBe('v6:11427642');
   });
 });

@@ -132,7 +132,7 @@ describe('matchAndCite corpus', () => {
       else if (r.tier === 'no-match') noMatch++;
       else mismatch++;
 
-      const isCorrect = r.tier === 'exact' || r.tier === 'systematic' || r.tier === 'boundary';
+      const isCorrect = r.tier === 'exact';
       const conf = r.confidence;
 
       if (conf >= 0.95) {
@@ -216,20 +216,9 @@ describe('matchAndCite corpus', () => {
         goldenConfidence: golden.confidence,
       });
 
-      if (classification.tier === 'exact') {
-        // Strict assertion — must match exactly
-        expect(result.citation).toBe(golden.citation);
-      } else if (classification.tier === 'systematic' || classification.tier === 'boundary') {
-        // Off-by-one: warn but do not fail
-        console.warn(
-          `[OFF-BY-ONE] ${id}: expected ${golden.citation}, got ${result.citation} (${classification.detail} -> ${classification.tier} offset)\n` +
-          `  Expected ${golden.citation}, got ${result.citation} (${classification.detail})`
-        );
-        // Soft assertion: do not throw
-      } else {
-        // Mismatch: fail with diff
-        expect(result.citation).toBe(golden.citation);
-      }
+      // A one-line error is still a wrong citation. All verified spans are exact.
+      expect(result.citation, `${id}: ${classification.detail || classification.tier}`).toBe(golden.citation);
+
     });
   }
 });

@@ -47,9 +47,10 @@ beforeAll(() => {
 
 describe('v40-deps-update.yml contract (Phase 40-03)', () => {
 
-  it("D1 — cron '0 9 * * 1' (Monday 09:00 UTC EXACT)", () => {
-    // 40-CONTEXT locked decision #2 / DEPS-01 cron pin
-    expect(yaml).toContain("cron: '0 9 * * 1'");
+  it('D1 — no schedule trigger (scan runs only via workflow_dispatch)', () => {
+    // Supersedes 40-CONTEXT locked decision #2: no scheduled workflows in this repo.
+    expect(yaml).not.toMatch(/^\s*schedule:/m);
+    expect(yaml).not.toMatch(/^\s*- cron:/m);
   });
 
   it('D2 — workflow_dispatch present (manual trigger)', () => {

@@ -52,8 +52,8 @@ on:
   # pull_request via a job-level `if` below: the gate runs on PRs, the scan does not.
   pull_request:
     types: [opened, synchronize, reopened]
-  schedule:
-    - cron: '0 9 * * 1'   # Monday 09:00 UTC — 40-CONTEXT locked decision #2
+  # Weekly schedule removed: no scheduled workflows in this repo. Run the scan
+  # manually via workflow_dispatch when needed.
   workflow_dispatch: {}    # Manual trigger for testing
 
 # Static concurrency group prevents schedule + workflow_dispatch from racing.

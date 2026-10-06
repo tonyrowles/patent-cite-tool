@@ -89,6 +89,8 @@ jobs:
         # silent bad-cache scenario (29-RESEARCH.md Pitfall 2).
 
       - name: Build Chrome extension
+        env:
+          PROXY_TOKEN: ${{ secrets.PROXY_TOKEN }}
         run: npm run build:chrome
 
       - name: Run Phase 29 unit tests (sanity gate)
@@ -282,6 +284,8 @@ jobs:
         if: inputs.llm_run_id != ''
         continue-on-error: true
         timeout-minutes: 15
+        env:
+          PROXY_TOKEN: ${{ secrets.PROXY_TOKEN }}
         run: npm run e2e:quarantine
         # continue-on-error mirrors the regression step (line 191) — a quarantine failure
         # NEVER fails the job (QUAR-04). The filed issue is the signal, not a red-X.

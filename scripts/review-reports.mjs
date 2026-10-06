@@ -134,7 +134,8 @@ export function parseArgs(argv) {
 // ───────────────────────── I/O (wrangler) ─────────────────────────
 
 function wrangler(args) {
-  return execFileSync('npx', ['wrangler', ...args], {
+  const cli = join(WORKER_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
+  return execFileSync(process.execPath, [cli, ...args], {
     cwd: WORKER_DIR, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
   });
 }

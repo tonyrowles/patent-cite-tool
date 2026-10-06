@@ -207,8 +207,9 @@ describe('createIssueWithLabels — shell-free execFileSync (WR-01, T-11-02)', (
     expect(src).toContain('execFileSync');
     // execSync should NOT be used for createIssueWithLabels or addLabel
     // (those methods must be shell-free — WR-01)
-    // The file should still import execSync for listWithSearch/isPostFixSuppressed
-    expect(src).toContain("import { execSync, execFileSync }");
+    // Searches must also stay shell-free on Windows and POSIX.
+    expect(src).toContain("import { execFileSync }");
+    expect(src).not.toMatch(/\bexecSync\(/);
   });
 });
 

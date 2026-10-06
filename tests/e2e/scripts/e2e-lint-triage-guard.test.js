@@ -26,7 +26,7 @@
 // `tests/e2e/lib/triage-classifier.js`. This test only validates that specific scope.
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnLint } from '../../helpers/spawn-lint.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,7 +63,7 @@ describe('ESLint D-07 guard (TRIAGE-04 scope extension)', () => {
   it(
     'npm run lint exits 0 on current triage-classifier.js (sanity check — no false positives)',
     () => {
-      const r = spawnSync('npm', ['run', 'lint'], {
+      const r = spawnLint({
         encoding: 'utf8',
         timeout: 60000,
         cwd: path.resolve(__dirname, '../../..'),
@@ -92,7 +92,7 @@ describe('ESLint D-07 guard (TRIAGE-04 scope extension)', () => {
         );
         fs.writeFileSync(FILE_UNDER_TEST, violatingContent);
 
-        r = spawnSync('npm', ['run', 'lint'], {
+        r = spawnLint({
           encoding: 'utf8',
           timeout: 60000,
           cwd: path.resolve(__dirname, '../../..'),

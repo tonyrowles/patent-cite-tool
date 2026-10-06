@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isMainModule } from './lib/is-main.mjs';
 //
 // scripts/report-fix.mjs — Phase 12 Plan 03 (D-01)
 //
@@ -554,7 +555,7 @@ export async function runReportFix({
 // CLI entry point (workflow invokes: node scripts/report-fix.mjs --kv-record-file <path> ...)
 // ---------------------------------------------------------------------------
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const { values } = parseArgs({
     args: process.argv.slice(2),
     options: {

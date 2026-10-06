@@ -72,7 +72,7 @@ vi.mock('node:child_process', () => ({
 // via mockSdkResponse() / mockSdkError() per-test.
 const sdkCreateMock = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn(() => ({ messages: { create: sdkCreateMock } })),
+  default: vi.fn(function () { return { messages: { create: sdkCreateMock } }; }),
 }));
 function mockSdkResponse(response) {
   sdkCreateMock.mockResolvedValueOnce(response);

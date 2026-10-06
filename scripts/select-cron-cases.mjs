@@ -1,3 +1,4 @@
+import { isMainModule } from './lib/is-main.mjs';
 // scripts/select-cron-cases.mjs
 //
 // Phase 29 (CRON-02) — rotating-sample selector for the nightly cron.
@@ -109,7 +110,7 @@ export function selectCronCases(opts = {}) {
 // Exit codes: 0 on success (always).
 // ---------------------------------------------------------------------------
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = isMainModule(import.meta.url);
 if (isMain) {
   const forceFull = process.argv.includes('--full');
   const cases = selectCronCases({ forceFull });

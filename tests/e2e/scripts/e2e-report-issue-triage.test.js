@@ -26,6 +26,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
+import { writeMockGh, mockGhEnv } from '../../helpers/mock-gh.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -81,32 +82,7 @@ beforeEach(() => {
   // 3. Create mock-gh stub as a `gh` binary in tmpDir (PATH shadowing).
   //    The script uses execSync('gh ...') so we shadow the system gh via PATH.
   //    Note: We use the name `gh` (not `mock-gh`) so it intercepts the execSync calls.
-  const mockGhPath = path.join(tmpDir, 'gh');
-
-  // Write the mock-gh stub script.
-  // It records all invocations to gh-transcript.txt, then responds minimally:
-  //   gh issue list → returns [] (empty JSON array for dual-search)
-  //   gh issue create → returns a fake issue URL
-  //   gh issue edit → returns a fake URL (for addLabel)
-  //   gh --version → returns a fake version string (for any version checks)
-  const stubScript = [
-    '#!/usr/bin/env bash',
-    `echo "$@" >> "${transcriptPath}"`,
-    'case "$1" in',
-    '  issue)',
-    '    case "$2" in',
-    '      list) echo "[]" ;;',
-    '      create) echo "https://github.com/test/test/issues/42" ;;',
-    '      edit) echo "https://github.com/test/test/issues/42" ;;',
-    '      *) echo "[mock-gh] unknown issue subcommand: $@" >&2 ; exit 1 ;;',
-    '    esac',
-    '    ;;',
-    '  --version) echo "gh version 2.83.1 (mock)" ;;',
-    '  *) echo "[mock-gh] unknown root command: $@" >&2 ; exit 0 ;;',
-    'esac',
-  ].join('\n');
-
-  fs.writeFileSync(mockGhPath, stubScript, { mode: 0o755 });
+  writeMockGh(tmpDir, transcriptPath);
 });
 
 afterEach(() => {
@@ -134,9 +110,10 @@ function spawnReporter(args, extraEnv = {}) {
   return spawnSync('node', [SCRIPT_PATH, ...args], {
     env: {
       ...process.env,
+      ...mockGhEnv(tmpDir),
       ...extraEnv,
       // Prepend tmpDir so our `gh` stub shadows the real gh binary (PATH shadowing)
-      PATH: `${tmpDir}:${process.env.PATH}`,
+      PATH: `${tmpDir}${path.delimiter}${process.env.PATH}`,
       GITHUB_REPOSITORY: 'test/test',
     },
     encoding: 'utf8',

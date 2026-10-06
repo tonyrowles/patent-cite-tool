@@ -6,4 +6,9 @@
 
 ## Pending
 
-- [ ] **When resuming v4.3 (Auto-Fix Loop Closure) as a future milestone** — follow `.planning/RESUME-V4.3.md` to restore the CI plumbing made dormant for the v5.0 Bug Report release: re-enable 2 disabled `v40-*` workflows (`gh workflow enable`), restore their gated triggers, and un-skip 6 stale contract tests. The auto-fix engine itself was untouched. v4.3 *work* scope (mutator + `--max-turns` relaxation, etc.) is in `.planning/MILESTONES.md` (v4.2 entry).
+- [ ] Define the next milestone. Worker-route infrastructure fixes remain outside the v6.1 matching-core fix scope (see STATE.md).
+- [ ] Complete the remaining live UAT tails: auto-promote issue closure and the per-run fix cap.
+
+## Retired
+
+- v4.3 Auto-Fix Loop Closure machinery was retired in v6.1. The former resume checklist is superseded; do not restore its synthetic triggers or deleted contract tests. See `.planning/milestones/v4.3-phases-paused/` and STATE.md.

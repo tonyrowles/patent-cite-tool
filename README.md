@@ -1,6 +1,6 @@
 # Patent Citation Tool
 
-A Chrome extension that generates precise column/line citations from highlighted text on Google Patents. Built for patent attorneys, patent agents, and IP professionals who need accurate citation references during prosecution.
+Chrome and Firefox extensions, plus a standalone webapp, that generate precise column/line citations from highlighted text on Google Patents. Built for patent attorneys, patent agents, and IP professionals who need accurate citation references during prosecution.
 
 Highlight text in a patent specification → get a formatted citation like `Col. 5, ll. 12-14` instantly. No PDF downloads, no manual counting.
 
@@ -23,10 +23,12 @@ Highlight text in a patent specification → get a formatted citation like `Col.
 
 ### From source
 
-1. Clone this repository
-2. Open `chrome://extensions/` in Chrome
-3. Enable **Developer mode** (top right)
-4. Click **Load unpacked** and select the `src/` directory
+1. Clone this repository and follow the development setup below.
+2. Run `npm run build:chrome`.
+3. Open `chrome://extensions/` in Chrome and enable **Developer mode**.
+4. Click **Load unpacked** and select `dist/chrome/`.
+
+For Firefox, run `npm run build:firefox` and load `dist/firefox/manifest.json` through `about:debugging`. The standalone webapp is at [cite.tonyrowles.com](https://cite.tonyrowles.com).
 
 ## How It Works
 
@@ -47,13 +49,13 @@ src/
 ├── offscreen/         Offscreen document — PDF.js parsing, position map builder
 ├── options/           Options page — settings with auto-save
 ├── popup/             Popup — status display with link to settings
-├── shared/            Shared constants
+├── shared/            Matching, PDF parsing, reporting, and shared constants
 ├── icons/             Icon PNGs (3 states × 4 sizes) and source SVG
 ├── lib/               PDF.js library (pdf.mjs + pdf.worker.mjs)
 └── manifest.json
 worker/                Cloudflare Worker — USPTO API proxy and KV cache
 scripts/               Dev tools — fixture generation, icon generation, accuracy reports
-tests/                 Vitest test suite — 71-case patent corpus with golden baseline
+tests/                 Vitest test suite — patent corpus with golden baseline
 docs/privacy/          Privacy policy (GitHub Pages)
 ```
 
@@ -61,19 +63,26 @@ docs/privacy/          Privacy policy (GitHub Pages)
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.13+ (Node 22 LTS recommended)
 - npm
 
 ### Setup
 
 ```bash
-npm install
+npm ci
+npm --prefix worker ci
 ```
+
+Extension builds require `PROXY_TOKEN`. Add `PROXY_TOKEN=<your Worker token>` to a git-ignored root `.env`, or export it in your shell. For local unit tests only, `PROXY_TOKEN=test-proxy-token` is sufficient; that placeholder does not authenticate live Worker requests. The webapp build (`npm run build:webapp`) requires no token.
+
+Git attributes enforce LF line endings so Windows checkouts preserve source-hash guards.
 
 ### Tests
 
 ```bash
-npm test                  # Run full test suite (95 tests)
+npm test                  # Builds, source/dist tests, ESLint, and Firefox validation
+npm --prefix worker test  # Worker integration tests (separate dependency tree)
+npm run build:webapp      # Standalone webapp build
 npm run accuracy-report   # Per-category accuracy breakdown
 ```
 
@@ -84,6 +93,16 @@ npm run generate-icons    # Regenerate icon PNGs from source SVG
 npm run update-golden     # Update golden baseline (requires --confirm)
 npm run accuracy-report -- --compare   # Compare against pre-fix baseline
 ```
+
+### Automation maintenance
+
+Weekly digests publish an `e2e-digest` issue and retain Markdown reports and bypass audits as Actions artifacts for 90 days. They do not push directly to protected `main`.
+
+Dependency scans retain review reports. They create draft PRs only when the Actions pull-request policy can be confirmed as enabled; otherwise the artifact is available for manual review. Build steps in nightly and dependency-gate workflows use the repository's `PROXY_TOKEN` secret.
+
+A disabled workflow stays disabled until the maintainer intentionally enables it. In particular, `deps-update-gate` is a required check, so the dependency workflow must be enabled before merging PRs. The retired v4.3 autonomous machinery must not be restored. v6.1 report fixes run locally through `npm run fix-report -- <issue-number>`; CI only supplies verification and notification.
+
+Firefox validation calls Mozilla's `addons-linter` directly, with the same PDF.js library exclusion used by `web-ext lint`. Both dependency trees are locked; run `npm audit` and `npm --prefix worker audit` when updating them. The Worker overrides for `sharp` and `undici` select patched releases while upstream Cloudflare test tooling still pins older versions.
 
 ### Cloudflare Worker
 

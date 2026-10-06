@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isMainModule } from './lib/is-main.mjs';
 // scripts/a-b-winner.mjs
 //
 // Phase 54 Plan 01 (AB-04) — operator-triggered A/B winner-declaration CLI.
@@ -25,7 +26,7 @@
 //                                inline rationale below at the constant)
 //   - Output:  `NO_WINNER_YET\n` (trailing newline, stdout, exit 0) when
 //              sample threshold unmet (D-17);  markdown table otherwise (D-18).
-//   - Imports: node:fs ONLY — pure CLI script (D-21).
+//   - Imports: node:fs + platform-safe CLI guard — pure CLI script (D-21).
 //   - Default ledger: tests/e2e/.llm-spend-ledger.json (D-15).
 //
 // PHASE 66 ABSTENTION PATH (narrowed from Phase 54 D-20)
@@ -638,7 +639,7 @@ export function main(argv) {
 
 // CLI shim — only runs when this file is invoked directly. Tests import the
 // pure helpers above and never reach this branch.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const result = main(process.argv);
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.stdout) process.stdout.write(result.stdout);

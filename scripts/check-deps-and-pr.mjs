@@ -24,6 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmCommand } from './lib/npm-command.mjs';
 import { spawnSync } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,7 +77,9 @@ export const MANUAL_BUMP_NOTES_PATH = path.resolve(
  *   stdout (e.g., everything up-to-date).
  */
 export function readOutdated() {
-  const result = spawnSync('npm', ['outdated', '--json'], { encoding: 'utf8' });
+  const { command, args } = npmCommand(['outdated', '--json']);
+  const result = spawnSync(command, args, { encoding: 'utf8' });
+  if (result.error) throw result.error;
   const stdout = result?.stdout?.trim();
   if (!stdout) return {};
   try {
@@ -97,7 +100,9 @@ export function readOutdated() {
  * @returns {{ auditReportVersion?: number, vulnerabilities: Record<string, {severity: string, fixAvailable: false | {name: string, version: string, isSemVerMajor: boolean}}>, metadata?: object }}
  */
 export function readAudit() {
-  const result = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8' });
+  const { command, args } = npmCommand(['audit', '--json']);
+  const result = spawnSync(command, args, { encoding: 'utf8' });
+  if (result.error) throw result.error;
   const stdout = result?.stdout?.trim();
   if (!stdout) return { vulnerabilities: {} };
   try {

@@ -1,3 +1,4 @@
+import { isMainModule } from './lib/is-main.mjs';
 // scripts/auto-fix.mjs
 //
 // Phase 42 Plan 02 — Self-Healing auto-fix CLI dispatcher.
@@ -1135,7 +1136,7 @@ export async function runDispatcher({
 // CLI shim (NOT unit-tested; Plan 42-03 demo exercises this path)
 // ---------------------------------------------------------------------------
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   let parsed;
   try {
     parsed = parseArgs({

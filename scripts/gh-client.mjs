@@ -8,15 +8,13 @@
 // Threat model (T-11-01, T-11-02, T-11-03):
 //   T-11-01 (WR-01): createIssueWithLabels and addLabel use execFileSync (no shell),
 //            so title/label values are passed as argv — no shell metacharacters interpreted.
-//            listWithSearch / isPostFixSuppressed still use execSync with a single-quoted
-//            query string; those paths remain safe because the query is only the server-
-//            validated patentNumber / kv-key (bounded charset).
+//            Searches also use argv so quotes and shell metacharacters stay literal.
 //   T-11-02: Issue body passed to gh exclusively via --body-file - stdin ({ input: body }),
 //            NEVER concatenated into the shell command string.
 //   T-11-03: findExistingIssueByKvKey dedup marker is constructed from server-computed
 //            fingerprint+timestamp, not user free-text. Residual risk accepted (see plan).
 
-import { execSync, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 // ---------------------------------------------------------------------------
 // Env-configurable post-fix suppression window (TRI-06).
@@ -63,11 +61,7 @@ export function isWithinCutoff(isoTimestamp, suppressDays, now = Date.now()) {
  * @returns {{ findExistingIssueByKvKey, createIssueWithLabels, isPostFixSuppressed, listWithSearch, addLabel }}
  */
 export function makeKvReportGhClient(repo) {
-  // WR-05: pre-build a --repo flag fragment for shell-string commands (safe: repo comes
-  // from process.env.GITHUB_REPOSITORY which is server-set, not user free-text;
-  // only alphanumeric/- chars expected, but we escape the shell context defensively).
-  const repoArg = repo ? ` --repo '${repo.replaceAll("'", "'\\''")}'` : '';
-  // For execFileSync (shell-free) commands, a separate argv pair.
+  // Pass repository and query values as argv on every platform.
   const repoArgv = repo ? ['--repo', repo] : [];
 
   return {
@@ -75,7 +69,7 @@ export function makeKvReportGhClient(repo) {
      * Search issues by query string across open and closed states.
      *
      * Generalized from e2e-report-issue.mjs listOpenWithSearch (line 522), adding a `state` arg.
-     * Shell-escapes query for single-quoted shell context (T-11-01).
+     * Passes the query as a literal argv value (T-11-01).
      * Returns [] on transient gh failures.
      *
      * @param {string} query
@@ -84,9 +78,8 @@ export function makeKvReportGhClient(repo) {
      */
     listWithSearch(query, state = 'open') {
       try {
-        const escaped = query.replaceAll("'", "'\\''");
-        const raw = execSync(
-          `gh issue list${repoArg} --search '${escaped}' --state ${state} --json number,title,body,state --limit 30`,
+        const raw = execFileSync(
+          'gh', ['issue', 'list', ...repoArgv, '--search', query, '--state', state, '--json', 'number,title,body,state', '--limit', '30'],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
         const parsed = JSON.parse(raw);
@@ -167,7 +160,6 @@ export function makeKvReportGhClient(repo) {
      * @returns {boolean}
      */
     isPostFixSuppressed(patentNumber, suppressDays = POST_FIX_SUPPRESS_DAYS) {
-      const escaped = patentNumber.replaceAll("'", "'\\''");
       // WR-02: exact-match token for body post-filter — the builder renders the patent
       // number in a backtick cell: `| Patent | \`US11427642\` |`. Checking for this
       // delimited token prevents US1234 from matching a body that only contains US12345.
@@ -175,9 +167,8 @@ export function makeKvReportGhClient(repo) {
 
       // Query 1: merged auto-fix/* PRs referencing patentNumber (T-11-01 — query escaping)
       try {
-        const raw = execSync(
-          `gh pr list${repoArg} --state merged --search '${escaped} in:body' ` +
-          `--json number,mergedAt,headRefName,body --limit 20`,
+        const raw = execFileSync(
+          'gh', ['pr', 'list', ...repoArgv, '--state', 'merged', '--search', `${patentNumber} in:body`, '--json', 'number,mergedAt,headRefName,body', '--limit', '20'],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
         const prs = JSON.parse(raw);
@@ -192,9 +183,8 @@ export function makeKvReportGhClient(repo) {
 
       // Query 2: closed report-fix-candidate Issues referencing patentNumber (T-11-01)
       try {
-        const raw = execSync(
-          `gh issue list${repoArg} --label report-fix-candidate --state closed ` +
-          `--search '${escaped} in:body' --json number,closedAt,body --limit 20`,
+        const raw = execFileSync(
+          'gh', ['issue', 'list', ...repoArgv, '--label', 'report-fix-candidate', '--state', 'closed', '--search', `${patentNumber} in:body`, '--json', 'number,closedAt,body', '--limit', '20'],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         );
         const issues = JSON.parse(raw);

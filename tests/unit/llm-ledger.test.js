@@ -58,7 +58,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   readLedger,
   currentMonth,
@@ -588,7 +588,7 @@ describe('Phase 32 — per-phase ledger helpers (D-13/D-14/D-15/D-16)', () => {
     // misconfigured CI). Strip both env vars from the child so this test
     // exercises the local override path on CI runners.
     const overridePath = path.join(tmpDir2, 'override-ledger.json');
-    const script = `import(${JSON.stringify(LEDGER_MODULE_PATH)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
+    const script = `import(${JSON.stringify(pathToFileURL(LEDGER_MODULE_PATH).href)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
       env: { ...process.env, CI: '', GITHUB_ACTIONS: '', E2E_LEDGER_PATH_OVERRIDE: overridePath },
       encoding: 'utf8',
@@ -606,7 +606,7 @@ describe('Phase 32 — per-phase ledger helpers (D-13/D-14/D-15/D-16)', () => {
   });
 
   it('Test 33: LEDGER_PATH falls back to default when E2E_LEDGER_PATH_OVERRIDE unset or empty', () => {
-    const script = `import(${JSON.stringify(LEDGER_MODULE_PATH)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
+    const script = `import(${JSON.stringify(pathToFileURL(LEDGER_MODULE_PATH).href)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
 
     // (a) Env var fully unset.
     const envNoOverride = { ...process.env };
@@ -644,7 +644,7 @@ describe('Phase 32 — per-phase ledger helpers (D-13/D-14/D-15/D-16)', () => {
     // when both the override AND a CI flag are set together. Verify both
     // CI and GITHUB_ACTIONS flag values trigger the guard.
     const overridePath = path.join(tmpDir2, 'should-not-be-used.json');
-    const script = `import(${JSON.stringify(LEDGER_MODULE_PATH)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
+    const script = `import(${JSON.stringify(pathToFileURL(LEDGER_MODULE_PATH).href)}).then(m => { process.stdout.write(m.LEDGER_PATH); }).catch(e => { process.stderr.write(String(e)); process.exit(2); });`;
 
     // (a) CI=1 plus override → throw.
     const a = spawnSync(process.execPath, ['--input-type=module', '-e', script], {

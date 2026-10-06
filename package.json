@@ -31,7 +31,7 @@
     "test:src": "vitest run",
     "test:chrome": "vitest run --config vitest.config.chrome.js",
     "test:firefox": "vitest run --config vitest.config.firefox.js",
-    "test:lint": "npx web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'",
+    "test:lint": "node scripts/lint-firefox.mjs",
     "test:watch": "vitest",
     "verify:calibrate": "node scripts/verify-calibrate.mjs",
     "update-golden": "node scripts/update-golden.js --confirm",
@@ -43,10 +43,14 @@
     "@anthropic-ai/sdk": "0.100.1",
     "@napi-rs/canvas": "1.0.0",
     "@playwright/test": "1.60.0",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.2",
     "eslint": "10.4.0",
     "pdfjs-dist": "^5.5.207",
-    "sharp": "^0.34.5",
-    "vitest": "^3.0.0"
+    "sharp": "^0.35.5",
+    "vitest": "^4.1.11",
+    "addons-linter": "10.13.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

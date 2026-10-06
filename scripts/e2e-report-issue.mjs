@@ -1,3 +1,4 @@
+import { isMainModule } from './lib/is-main.mjs';
 // scripts/e2e-report-issue.mjs
 //
 // Phase 29 (CRON-04, CRON-05) — issue filer with fingerprint-based dedup.
@@ -668,7 +669,7 @@ async function mainTriage(triageReportPath, opts) {
 // CLI entrypoint
 // ---------------------------------------------------------------------------
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = isMainModule(import.meta.url);
 if (isMain) {
   const { source, triageReportPath } = parseSourceArgs(process.argv);
 

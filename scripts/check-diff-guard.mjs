@@ -1,3 +1,4 @@
+import { isMainModule } from './lib/is-main.mjs';
 // scripts/check-diff-guard.mjs
 //
 // Phase 41 Plan 41-01 — VFY-GATE-04 (diff-guard regex bank for forbidden
@@ -88,7 +89,7 @@ export function checkDiffGuard(changedPaths) {
 // CLI guard — invoked as `git diff --name-only ... | node scripts/check-diff-guard.mjs`
 // ---------------------------------------------------------------------------
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   let buf = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => { buf += chunk; });

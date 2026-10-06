@@ -337,7 +337,7 @@ describe('Phase 54 AB-04: Test 7 — alphabetical sort by ERROR_CLASS', () => {
       });
     }
     const tmp = writeTmpLedger(makeLedgerPayload(iterations));
-    const result = main(['node', 'a-b-winner.mjs', '--ledger', tmp]);
+    const result = main(['node', 'a-b-winner.mjs', '--ledger', tmp, '--since-iso', '2026-06-01T00:00:00Z']);
     expect(result.exitCode).toBe(0);
     const aIdx = result.stdout.indexOf('| A_CLASS ');
     const bIdx = result.stdout.indexOf('| B_CLASS ');
@@ -365,13 +365,14 @@ describe('Phase 54 AB-04: Test 8 — N_PER_ARM_REQUIRED=20 top-of-file pin', () 
 // ---------------------------------------------------------------------------
 
 describe('Phase 54 AB-04: Test 9 — imports pin (D-21: node:fs only)', () => {
-  it('source file has exactly one top-level import line, from node:fs', () => {
+  it('source imports only node:fs and the platform-safe CLI guard', () => {
     const src = fs.readFileSync(SCRIPT_PATH, 'utf8');
     const importLines = src
       .split(/\r?\n/)
       .filter((l) => /^import\s/.test(l));
-    expect(importLines).toHaveLength(1);
-    expect(importLines[0]).toMatch(/from\s+['"]node:fs['"]/);
+    expect(importLines).toHaveLength(2);
+    expect(importLines.some(line => /from\s+['"]node:fs['"]/.test(line))).toBe(true);
+    expect(importLines.some(line => line.includes("from './lib/is-main.mjs'"))).toBe(true);
   });
 });
 

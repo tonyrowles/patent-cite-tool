@@ -1,3 +1,4 @@
+import { isMainModule } from './lib/is-main.mjs';
 // scripts/parse-affected-cases.mjs
 //
 // Phase 41 Plan 41-01 — VFY-GATE-01 (affected-cases parser). Pure-function
@@ -63,7 +64,7 @@ export function parseAffectedCases(prBody) {
 // CLI guard — invoked as `gh pr view ... --jq '.body' | node scripts/parse-affected-cases.mjs`
 // ---------------------------------------------------------------------------
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   let buf = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => { buf += chunk; });

@@ -29,7 +29,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const sdkCreateMock = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn(() => ({ messages: { create: sdkCreateMock } })),
+  default: vi.fn(function () { return { messages: { create: sdkCreateMock } }; }),
 }));
 
 // Import AFTER vi.mock so the driver receives the mocked SDK.

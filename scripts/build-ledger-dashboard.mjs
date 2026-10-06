@@ -37,6 +37,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { isMainModule } from './lib/is-main.mjs';
 import { parseArgs } from 'node:util';
 
 import {
@@ -268,11 +269,7 @@ Options:
 
 This script is read-only against the ledger. Phase 46 Plan 02 (AUTOFIX-06).`;
 
-const invokedAsCli = (
-  // Resolve realpath for both sides so a symlinked entry (npm bin shim) still matches.
-  import.meta.url === 'file://' + process.argv[1] ||
-  import.meta.url === 'file://' + fs.realpathSync(process.argv[1] || '/')
-);
+const invokedAsCli = isMainModule(import.meta.url);
 if (invokedAsCli) {
   const { values } = parseArgs({
     options: {

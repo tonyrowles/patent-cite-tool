@@ -6,10 +6,10 @@
  * submission-ready for the Firefox Add-ons store. The enforcement
  * chain is:
  *
- *   1. package.json scripts.test:lint defines the canonical command.
+ *   1. package.json scripts.test:lint invokes the locked Mozilla scanner.
  *   2. package.json scripts.test chains test:lint as the final gate.
  *   3. .github/workflows/ci.yml runs `npm run test:lint` on every push
- *      and PR via the step named `Test — lint (web-ext lint)`.
+ *      and PR via the step named `Test — lint (Mozilla addons-linter)`.
  *
  * If any link in this chain is removed or weakened, AMO submissions
  * can break silently. This test is a static-grep guard: it reads
@@ -39,8 +39,8 @@ const PACKAGE_JSON = resolve(ROOT, 'package.json');
 const CI_WORKFLOW = resolve(ROOT, '.github/workflows/ci.yml');
 
 const EXPECTED_TEST_LINT =
-  "npx web-ext lint --source-dir dist/firefox --ignore-files 'lib/**'";
-const EXPECTED_CI_STEP_NAME = 'Test — lint (web-ext lint)';
+  'node scripts/lint-firefox.mjs';
+const EXPECTED_CI_STEP_NAME = 'Test — lint (Mozilla addons-linter)';
 
 function readPackageJson() {
   return JSON.parse(readFileSync(PACKAGE_JSON, 'utf-8'));
@@ -51,7 +51,7 @@ function readCiWorkflow() {
 }
 
 describe('web-ext lint invariant (Phase 24 / FOX-06)', () => {
-  it("L1: package.json scripts['test:lint'] is the canonical literal", () => {
+  it("L1: package.json scripts['test:lint'] is the locked Mozilla scanner command", () => {
     const pkg = readPackageJson();
     expect(pkg.scripts['test:lint']).toBe(EXPECTED_TEST_LINT);
   });

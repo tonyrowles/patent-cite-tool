@@ -560,7 +560,6 @@ export async function runTriage({
         // Rule 6 could fire). Iterations of unrelated classifications never
         // exercise Rule 6, so an undefined issue_body there is not a gap.
         if (!warnedMissingIssueBody && iter.classification === 'GOOGLE_DOM_DRIFT') {
-          // eslint-disable-next-line no-console
           console.warn(
             '[triage-classifier] iter.issue_body is undefined on at least one ' +
             'GOOGLE_DOM_DRIFT iteration — Rule 6 mutator-aware heuristic cannot ' +

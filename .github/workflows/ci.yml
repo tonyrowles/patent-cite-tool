@@ -55,7 +55,10 @@ jobs:
       - name: Test — firefox-dist (Vitest firefox)
         run: npm run test:firefox
 
-      - name: Test — lint (web-ext lint)
+      - name: Test — ESLint
+        run: npm run lint
+
+      - name: Test — lint (Mozilla addons-linter)
         run: npm run test:lint
 
       - name: Install worker dependencies
@@ -97,3 +100,20 @@ jobs:
             patent-cite-chrome.zip \
             patent-cite-firefox.zip \
             --clobber
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # This job validates local builds and mocks, without production access.
+      PROXY_TOKEN: test-proxy-token
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test

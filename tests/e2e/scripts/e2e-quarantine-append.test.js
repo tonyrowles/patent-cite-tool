@@ -16,6 +16,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
+import { writeMockGh, mockGhEnv } from '../../helpers/mock-gh.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -49,21 +50,7 @@ beforeEach(() => {
   // Mock-gh: logs all args to transcript; issue list returns a fake issue array.
   mockGhDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pct-quar-mockgh-'));
   transcriptPath = path.join(mockGhDir, 'gh-transcript.txt');
-  const mockGhPath = path.join(mockGhDir, 'gh');
-  const mockGhBody = [
-    '#!/usr/bin/env bash',
-    'echo "$@" >> "' + transcriptPath + '"',
-    'case "$1" in',
-    '  issue)',
-    '    case "$2" in',
-    '      list) echo \'[{"number":42,"body":"<!-- fp: abc123def456 -->","title":"test"}]\' ;;',
-    '      create) echo "https://github.com/test/test/issues/42" ;;',
-    '      edit) echo "https://github.com/test/test/issues/42" ;;',
-    '    esac ;;',
-    '  --version) echo "gh version 2.83.1 (mock)" ;;',
-    'esac',
-  ].join('\n') + '\n';
-  fs.writeFileSync(mockGhPath, mockGhBody, { mode: 0o755 });
+  writeMockGh(mockGhDir, transcriptPath, { issues: [{ number: 42, body: '<!-- fp: abc123def456 -->', title: 'test' }] });
 
   // Corpus override: fresh empty seed in tmpDir — never touches committed file.
   corpusOverridePath = path.join(mockGhDir, 'test-cases-quarantine.js');
@@ -83,7 +70,8 @@ function spawnAppend(args, extraEnv = {}) {
   return spawnSync('node', [SCRIPT_PATH, ...args], {
     env: {
       ...process.env,
-      PATH: mockGhDir + ':' + process.env.PATH,
+      ...mockGhEnv(mockGhDir),
+      PATH: mockGhDir + path.delimiter + process.env.PATH,
       GITHUB_REPOSITORY: 'test/test',
       QUARANTINE_CORPUS_PATH_OVERRIDE: corpusOverridePath,
       ...extraEnv,

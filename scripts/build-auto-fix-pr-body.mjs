@@ -1,3 +1,4 @@
+import { isMainModule } from './lib/is-main.mjs';
 // scripts/build-auto-fix-pr-body.mjs
 //
 // Phase 43 Plan 43-01 (Task 1 GREEN). PR-body helper for v40-auto-fix.yml.
@@ -40,7 +41,7 @@ export function buildAutoFixPrBody({
 }
 
 // CLI shim — not unit-tested directly; B6 exercises stdout shape.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const { values } = parseArgs({
     options: {
       issue: { type: 'string' },

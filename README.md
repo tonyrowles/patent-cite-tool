@@ -4,6 +4,8 @@ Chrome and Firefox extensions, plus a standalone webapp, that generate precise c
 
 Highlight text in a patent specification → get a formatted citation like `Col. 5, ll. 12-14` instantly. No PDF downloads, no manual counting.
 
+Project overview and demo: [Patent Citation Tool for Google Patents](https://tonyrowles.com/projects/patent-cite-tool/).
+
 ## Features
 
 - **Column/line citations** for granted US patents — maps highlighted text to the correct column and line numbers from the patent PDF
